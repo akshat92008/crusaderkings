@@ -17,6 +17,8 @@ server = http.server.ThreadingHTTPServer(('127.0.0.1', 0),
 threading.Thread(target=server.serve_forever, daemon=True).start()
 url = f'http://127.0.0.1:{server.server_address[1]}'
 errors = []
+import sys
+import traceback
 try:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=[
@@ -68,5 +70,10 @@ try:
         print('ATLAS VISUAL SMOKE PASSED. Rendered unique colors:',result['colors'])
         print('Screenshots: atlas-kingdoms.png, atlas-old-world.png, atlas-history.png, atlas-expanded.png')
         browser.close()
+except Exception as e:
+    detail = 'ATLAS VISUAL TEST FAILED\n' + traceback.format_exc()
+    (ROOT/'docs/atlas-browser-error.txt').write_text(detail)
+    print(detail, file=sys.stderr)
+    raise
 finally:
     server.shutdown()
