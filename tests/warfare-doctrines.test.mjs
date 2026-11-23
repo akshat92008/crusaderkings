@@ -74,7 +74,7 @@ test('failed defense transfers ownership, applies real casualties and moves atta
  const g=createGame(world,'england');g.kingdom.difficulty='hard';
  const o=findInvasionOptions(g,world)[0],a=g.armies[o.army];a.infantry+=600;
  const t=planEnemyInvasion(g,world);assert.ok(t);
- for(let i=0;i<t.eta;i++){g.turn++;progressEnemyInvasions(g,world);}
+ const eta=t.eta;for(let i=0;i<eta;i++){g.turn++;progressEnemyInvasions(g,world);}
  const outcome=resolveInvasion(g,world,t,{victory:false,attackerRemaining:.25,enemyRemaining:.62});
  assert.ok(outcome.ok);assert.equal(g.provinces[t.province].owner,t.by);
  assert.equal(g.armies[t.army].province,t.province);
