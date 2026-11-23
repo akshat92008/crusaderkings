@@ -1,10 +1,12 @@
 name: Animated battle visual smoke
 on:
   push:
-    branches: [feature/animated-3d-armies-03]
+    branches: [feature/medieval-battlefield-05]
     paths:
       - src/battle.js
       - src/three-battle.bundle.js
+      - src/battlefield-art.js
+      - src/battlefield-layout.js
       - scripts/battle_browser_smoke.py
       - .github/workflows/battle-visual.yml
   workflow_dispatch:
