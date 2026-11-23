@@ -50,6 +50,29 @@ function createHorse(){
  return {horse,legs};
 }
 
+// Visibly different regiment silhouettes. These are troop layouts, not just buffs.
+export function formationPosition(index,count,id,spacing=1){
+ const row=Math.floor(index/5),col=index%5;
+ if(id==='cavalry_wedge'||id==='elephant_push'){
+  const depth=Math.floor(Math.sqrt(index)),start=depth*depth,within=index-start,number=depth*2+1;
+  return [(within-(number-1)/2)*spacing,(depth-1.3)*spacing*1.3];
+ }
+ if(id==='longbow_line'||id==='volley_line')return [(index-(count-1)/2)*spacing*.84,0];
+ if(id==='pike_square'){
+  const side=Math.ceil(Math.sqrt(count));
+  return [(index%side-(side-1)/2)*spacing,(Math.floor(index/side)-(side-1)/2)*spacing];
+ }
+ if(id==='encirclement'||id==='ambush'){
+  const angle=Math.PI*.15+Math.PI*.7*(index/Math.max(1,count-1));
+  return [Math.cos(angle)*spacing*3.4,Math.sin(angle)*spacing*2.7];
+ }
+ if(id==='flank'){
+  const side=index%2===0?-1:1;
+  return [side*(spacing*2.3+Math.floor(index/2)*spacing*.25),Math.floor(index/2)*spacing];
+ }
+ if(id==='shield_wall')return [(index%7-3)*spacing*.85,(Math.floor(index/7)-.5)*spacing*.75];
+ return [(col-2)*spacing,(row-1)*spacing];
+}
 export class ThreeBattleScene {
  constructor(canvas,config={}) {
   this.isThreeBattle=true;this.canvas=canvas;this.modelsReady=false;this.loadingStatus='Loading KayKit infantry';
@@ -123,8 +146,9 @@ export class ThreeBattleScene {
    for(let i=0;i<units.length;i++){
     const u=units[i];u.root.visible=!g.routed&&i<n;
     if(!u.root.visible)continue;
-    const row=Math.floor(i/cols),col=i%cols,spacing=g.type==='archers'?1.08:g.type==='cavalry'?1.8:.92;
-    u.root.position.set(g.x+(col-(cols-1)/2)*spacing,0,g.z+(row-1.0)*spacing);
+    const spacing=g.type==='archers'?1.08:g.type==='cavalry'?1.8:.92;
+    const [dx,dz]=formationPosition(i,units.length,g.formationId,spacing);
+    u.root.position.set(g.x+dx,0,g.z+dz);
     u.root.rotation.y=facing+(g.side==='defender'?Math.PI:0);
     if(u.mount)for(let j=0;j<u.mount.legs.length;j++)u.mount.legs[j].rotation.x=moving?Math.sin(elapsedTime(u.phase,u.mixer.time,j))*.36:0;
     if(mode!==u.mode){
