@@ -132,7 +132,7 @@ export class CampaignMap{
   c.font='bold 13px Georgia';c.textAlign='center';c.fillStyle='#51442f';c.fillText(this.mode==='historical'?'THE HISTORICAL ATLAS':this.mode==='terrain'?'RELIEF OF THE EARTH':'THE KINGDOMS OF 1450',w/2,40);
   c.restore();atlasBorders(c,w,h);
   c.font='10px Georgia';c.textAlign='left';c.textBaseline='alphabetic';c.fillStyle='rgba(47,48,38,.83)';
-  c.fillText(this.mode==='historical'?'HISTORICAL POLITIES: INCOMPLETE SOURCE COVERAGE':this.mode==='terrain'?'TERRAIN VIEW · STYLIZED RELIEF':'POLITICAL MAP · DECORATIVE COUNTY LINES',25,h-24);
+  c.fillText(this.mode==='historical'?'CLIOPATRIA / SESHAT · CC BY 4.0 · INCOMPLETE COVERAGE':this.mode==='terrain'?'TERRAIN VIEW · STYLIZED RELIEF':'POLITICAL MAP · DECORATIVE COUNTY LINES',25,h-24);
   this._hoverTip(c);
  }
 }
