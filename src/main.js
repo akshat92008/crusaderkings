@@ -19,7 +19,7 @@ const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();}}
 function start(id){game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...f.capital,3.2);render();}
-function load(){try{game=restoreGame(localStorage.getItem('crown-of-nations.save'),world);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
+function load(){try{game=restoreGame(localStorage.getItem('crown-of-nations.save'),world);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();if(!openIncomingSiege())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
 function save(){if(!game)return;try{localStorage.setItem('crown-of-nations.save',snapshot(game));message('Campaign saved to this browser.');}catch(e){message(`Save failed: ${e.message}`);}}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);marchFrom=null;el('map-target-help').textContent='SELECT A PROVINCE TO INSPECT';if(r.ok&&r.type==='battle'){openBattle(r);return;}clickResult(r);}
  selected=id;map.select(id);renderInspector();}
@@ -75,9 +75,51 @@ function openBattle(desc){desc.interactive=true;el('battle-screen').hidden=false
  el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · MEDIEVAL FORTRESS':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFEND THE GATE':'BREACH THE FORTRESS'}`;
  battleDescriptor=desc;try{battle=new BattleGame(el('battle-canvas'),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';}catch(e){el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);}}
-function onBattleStatus(s){el('battle-pause').textContent=s.paused?'▶ RESUME':'Ⅱ PAUSE';const status=s.groups.filter(g=>g.side==='attacker');el('battle-units').innerHTML=status.map((g,i)=>`<button class="unitcard ${i===s.selected?'active':''}" data-unit="${i}"><b>${i+1}. ${g.type.toUpperCase()}</b><small>${g.routed?'ROUTED':Math.round(g.life)+'% STRENGTH'}</small><div class="unithealth"><div style="width:${Math.max(0,g.life)}%"></div></div></button>`).join('');}
-function onBattleFinished(result){let f=result.victory;el('battle-result').hidden=false;el('battle-result').innerHTML=`<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">${f?'♛':'⚔'}</div><h2>${f?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS'}</h2><p>${battleDescriptor?.showcase?'This practice battle does not affect your campaign.':f?'The enemy line has broken. The territory shall pass to your crown.':'Your forces have been defeated or forced to retreat.'} Surviving strength: ${Math.round(result.attackerRemaining*100)}%.<br>Battle duration: ${result.seconds} seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>`;
- el('battle-return').onclick=()=>{const practice=Boolean(battleDescriptor?.showcase);if(!practice)concludeBattle(game,battleDescriptor,result);battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();if(!practice)save();};}
+function onBattleStatus(status){
+ el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';
+ const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
+ el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+g.type.toUpperCase()+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
+ const choices=availableFormations(game.factions[game.player]);
+ el('battle-formation').innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' · '+Math.round(o.damage*100)+'% attack / '+Math.round(o.defense*100)+'% defense</option>').join('');
+ if(unit)el('battle-formation').value=unit.formationId;
+ el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;
+}
+function onBattleFinished(result){
+ const defense=!!battleDescriptor?.defenseMode,practice=!!battleDescriptor?.showcase,win=result.victory;
+ el('battle-result').hidden=false;
+ const title=defense?(win?'THE INVADERS WERE REPELLED':'THE FORTRESS HAS FALLEN'):(win?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS');
+ const explanation=practice?'Practice battle; your campaign will not be changed.':
+   defense?(win?'Your garrison has held the fortress.':'Your defensive position has been overrun.'):
+   win?'The enemy province will be taken.':'Your army has retreated.';
+ el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
+ el('battle-return').onclick=()=>{
+  if(!practice){
+   if(defense){const r=resolveInvasion(game,world,battleDescriptor.threat,result);if(!r.ok)message(r.msg);}
+   else concludeBattle(game,battleDescriptor,result);
+  }
+  battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;
+  document.body.style.overflow='';render();if(!practice)save();
+ };
+}
+function openIncomingSiege(){
+ const threat=game?.kingdom?.threats?.find(t=>t.status==='ready');
+ if(!threat||battle)return false;
+ const stationed=armiesAt(game,threat.province,game.player)[0],defense=game.provinces[threat.province];
+ const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
+ const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
+ openBattle({defenseMode:true,attacker:stationed?.id||null,enemyArmy:threat.army,enemy:threat.by,
+  to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison,
+  threat:{army:threat.army,province:threat.province}});
+ return true;
+}
+function advanceWithInvasions(){
+ if(!game||battle)return;
+ if(openIncomingSiege())return;
+ advanceMonth(game,world);render();
+ if(openIncomingSiege()&&speedInterval){
+  clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';
+ }
+}
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-faction').innerHTML=world.factions.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<option value="${f.id}" ${f.id==='ottomans'?'selected':''}>${esc(f.name)} — ${esc(f.continent)}</option>`).join('');
 function renderStartFaction(){const f=world.factions.find(f=>f.id===el('start-faction').value),d=militaryDoctrine(f);el('start-faction-info').textContent=`${f.government} · ${f.continent} · ${d.name} · Signature: ${d.unique} · ${d.mix.map(x=>Math.round(x*100)+'%').join(' / ')} infantry / archers / cavalry`; }
@@ -86,8 +128,8 @@ el('start-new').addEventListener('click',()=>start(el('start-faction').value));
 try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
 el('load-existing').addEventListener('click',load);
 el('save-game').addEventListener('click',save);
-el('next-month').addEventListener('click',()=>{if(!game||battle)return;advanceMonth(game,world);render();});
-el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceMonth(game,world);render();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
+el('next-month').addEventListener('click',advanceWithInvasions);
+el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceWithInvasions();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
 el('focus-capital').addEventListener('click',()=>{if(game)map.focus(...player().capital,3.2);});
 el('reset-map').addEventListener('click',()=>{map.panX=0;map.panY=0;map.zoom=1.02;map.render();});
 el('old-world').addEventListener('click',()=>map.focusOldWorld());
@@ -125,4 +167,18 @@ el('battle-showcase').addEventListener('click',()=>{
 });
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
+el('battle-start').addEventListener('click',()=>battle?.startAssault());
+el('battle-formation').addEventListener('change',e=>{
+ if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
+});
+el('battle-lanes').addEventListener('click',e=>{
+ const target=e.target.closest('[data-lane]');if(target&&battle)battle.setLane(battle.selected,Number(target.dataset.lane));
+});
+el('invasion-defend').addEventListener('click',openIncomingSiege);
+el('invasion-auto').addEventListener('click',()=>{
+ if(!game||battle)return;const threat=game.kingdom?.threats?.find(t=>t.status==='ready');
+ if(!threat)return;const r=autoResolveInvasion(game,world,threat);
+ if(r.ok){message(r.msg);render();save();}
+});
+
 window.addEventListener('beforeunload',()=>{if(game){try{localStorage.setItem('crown-of-nations.save',snapshot(game));}catch{}}});
