@@ -48,7 +48,7 @@ export function createTerrainMesh(nx=256,ny=128){
  return {vertices,indices};
 }
 export class ReliefMap{
- constructor(canvas,invalidate){this.canvas=canvas;this.invalidate=invalidate;this.ready=false;this.enabled=true;this.failReason='';this.gl=null;
+ constructor(canvas,invalidate,world=null){this.canvas=canvas;this.invalidate=invalidate;this.world=world;this.ready=false;this.enabled=true;this.failReason='';this.gl=null;
   try{
    const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:false,preserveDrawingBuffer:true});
    if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;
@@ -63,7 +63,39 @@ export class ReliefMap{
    Promise.all([this.loadTexture('assets/terrain/natural-earth-relief.webp'),this.loadTexture('assets/terrain/terrain-height.png')]).then(([color,height])=>{this.colorTexture=color;this.heightTexture=height;this.ready=true;this.invalidate?.();}).catch(e=>{this.failReason=String(e);console.warn('Campaign relief disabled:',e);this.invalidate?.();});
   }catch(e){this.failReason=String(e);console.warn('Campaign 3D relief unavailable:',e);}
  }
- async loadTexture(url){const response=await fetch(url);if(!response.ok)throw Error(url+': HTTP '+response.status);const blob=await response.blob();const image=await createImageBitmap(blob);
+ createProceduralTexture(heightMode){
+  // Self-contained 3D fallback: the campaign never depends on missing ZIP files.
+  // This is illustrative terrain, NOT precise survey elevation.
+  const W=1024,H=512,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const c=canvas.getContext('2d');
+  c.fillStyle=heightMode?'#050505':'#769b94';c.fillRect(0,0,W,H);
+  const polygons=this.world?.provinces||[];
+  c.save();c.translate(W*.5,H*.5);c.scale(W/360,-H/180);
+  for(const p of polygons){
+   if(!p.geometry?.coordinates)continue;const polys=p.geometry.type==='Polygon'?[p.geometry.coordinates]:p.geometry.coordinates;
+   c.beginPath();for(const poly of polys)for(const ring of poly){if(!ring.length)continue;c.moveTo(...ring[0]);for(let i=1;i<ring.length;i++)c.lineTo(...ring[i]);c.closePath();}
+   c.fillStyle=heightMode?(p.terrain==='highlands'?'#707070':p.terrain==='forest'?'#292929':'#1a1a1a'):(p.terrain==='highlands'?'#b4a687':p.terrain==='forest'?'#889b75':p.terrain==='desert'?'#dbb985':'#b8b28d');
+   c.fill('evenodd');
+  }
+  c.restore();
+  if(heightMode){ // Additional stylized mountain ridges, no copyrighted texture.
+   c.save();c.filter='blur(6px)';c.strokeStyle='#b1b1b1';c.lineWidth=8;
+   const chains=[
+    [[-78,6],[-77,-8],[-72,-23],[-70,-36],[-73,-51]],
+    [[-147,62],[-128,52],[-116,43],[-107,34]],
+    [[7,44],[11,46],[16,47]],[[38,42],[48,43]],
+    [[68,35],[76,35],[82,31],[89,28],[96,29]],
+    [[81,35],[94,33],[105,33]],[[99,22],[104,17]],
+    [[26,-2],[33,-8]],[[136,35],[141,42]]
+   ];
+   for(const pts of chains){c.beginPath();pts.forEach(([lon,lat],i)=>{const x=(lon+180)*W/360,y=(90-lat)*H/180;i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();}
+   c.restore();
+  }
+  return canvas;
+ }
+ async loadTexture(url){let image;
+  try{const response=await fetch(url);if(!response.ok)throw Error(url+': HTTP '+response.status);image=await createImageBitmap(await response.blob());}
+  catch(e){console.info('Using generated terrain texture:',url);image=await createImageBitmap(this.createProceduralTexture(url.includes('height')));}
+
   const gl=this.gl,tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,image.width,image.height,0,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.generateMipmap(gl.TEXTURE_2D);image.close();return tex;
  }
  render(w,h,dpr,zoom,panX,panY,compression){if(!this.ready||!this.gl)return false;
