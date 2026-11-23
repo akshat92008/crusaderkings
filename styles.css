@@ -6,3 +6,47 @@
 @media(max-width:1200px){.topresources{gap:10px}.gamebody{grid-template-columns:220px minmax(360px,1fr) 260px}.brand{min-width:225px}.brandname{font-size:14px}.brandcaption{font-size:8px}.maptop h1{font-size:15px}.topbar{padding:0 13px;gap:10px}}
 @media(max-width:900px){.topbar{flex-wrap:wrap;height:auto;padding:10px}.topresources{margin-left:auto}.gamebody{grid-template-columns:190px 1fr}.rightbar{grid-column:1/-1;min-height:auto}.leftbar{min-height:680px}.maparea{min-height:680px}.resource:nth-child(3){display:none}}
 @media(max-width:650px){.gamebody{display:block}.leftbar{min-height:0}.leftbar .leftfooter{display:none}.tabs{flex-direction:row}.tab{flex:1;text-align:center;justify-content:center}.tab span{display:none}.tab-content{max-height:210px}.maparea{min-height:520px}.canvaswrap{min-height:350px}.rightbar{min-height:380px}.resource:nth-child(2){display:none}.mapcorner.right{display:none}.maptop{padding:15px}.mapactions{display:none}.startcard{padding:25px 18px}.startcard h1{font-size:24px}.battle-units{overflow-x:auto;justify-content:flex-start}.unitcard{min-width:90px}}
+
+/* Milestone 02: selectable political atlas over a real WebGL2 heightfield. */
+.canvaswrap #terrain-map{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.canvaswrap #world-map{position:relative;z-index:1;background:transparent}
+.canvaswrap .mapcorner{z-index:4}
+.mapmodes{z-index:5;position:absolute;top:56px;left:17px;display:flex;gap:2px;padding:4px;background:#091a1edc;border:1px solid #ad996755;box-shadow:0 7px 19px #0006}
+.mapmodebtn{color:#aebdb6;background:transparent;border:1px solid transparent;padding:8px 9px;font-size:9px;font-weight:750;letter-spacing:.9px;white-space:nowrap}
+.mapmodebtn:hover{color:#f4deaf;background:#243330}
+.mapmodebtn.active{color:#171f1b;background:#d9bc81;border-color:#f7e2b6}
+#toggle-relief[aria-pressed="true"]{border-color:#bca470;color:#e9d3a0}
+@media(max-width:1050px){.mapmodes{top:58px}.mapmodebtn{font-size:8px;padding:7px}}
+
+
+/* Atlas art-direction pass — a wood-framed illuminated medieval atlas.
+ * These visuals are part of the running Canvas map, not a static screenshot. */
+.maparea{background:#282c29}
+.maptop{background:linear-gradient(160deg,#292a26,#30362f);border-bottom:2px solid #a88953;box-shadow:inset 0 1px rgba(245,224,177,.2)}
+.maptop h1{color:#f1dfb6;letter-spacing:1.4px}
+.maptop h1 span{color:#d6b779}
+.mapactions{gap:6px;align-items:center;flex-wrap:wrap;justify-content:end}
+.mapactions .smallbtn{font-family:Georgia,serif;font-size:11px;padding:9px 10px;border-color:#a48b5e77;background:linear-gradient(#35433b,#212c29);color:#e9dcbb}
+.mapactions .smallbtn:hover{background:#4b5a4e}
+.canvaswrap{margin:8px 9px;min-height:390px;background:#82978e;border:8px solid #4d3527;outline:2px solid #b99963;outline-offset:-4px;box-shadow:0 0 0 2px #141d1c,0 14px 32px #060d0d90,inset 0 0 0 5px #c1a66d}
+.canvaswrap::after{content:'';position:absolute;z-index:4;inset:0;pointer-events:none;box-shadow:inset 0 0 35px rgba(43,30,20,.55),inset 0 0 0 2px rgba(240,209,153,.37)}
+.canvaswrap #terrain-map{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.canvaswrap #world-map{position:relative;z-index:1;background:transparent}
+.canvaswrap .mapcorner{z-index:6;font-family:Georgia,serif;border:1px solid #ad976d;color:#5c4c32;background:linear-gradient(#e5d7ad,#c5ad7b);letter-spacing:1px;box-shadow:0 2px 7px #0005}
+.canvaswrap .mapcorner.top{top:13px;left:14px}
+.canvaswrap .mapcorner.top b{color:#563a27}
+.canvaswrap .mapcorner.right{top:13px;right:14px}
+.canvaswrap .mapcorner.bottomright{bottom:14px;right:14px;color:#463827}
+.mapmodes{z-index:6;position:absolute;top:55px;left:14px;display:flex;gap:2px;padding:3px;background:#32271edb;border:1px solid #a6895a}
+.mapmodebtn{color:#e2d4b0;background:#6d5943;border:1px solid transparent;padding:8px 9px;font-family:Georgia,serif;font-size:10px;letter-spacing:.7px}
+.mapmodebtn:hover{color:#fff0c9;background:#856a4b}
+.mapmodebtn.active{color:#3f3224;background:linear-gradient(#ecdcaa,#c9ab71);border-color:#f3dfa9}
+.mapfooter{background:linear-gradient(#3d453e,#283931);border-top:2px solid #947a4f;color:#e4d5ad}
+.atlas-expanded .gamebody{grid-template-columns:minmax(0,1fr)}
+.atlas-expanded .maparea{grid-column:1;width:100%;min-width:0}
+.atlas-expanded .leftbar,.atlas-expanded .rightbar{display:none}
+.atlas-expanded .maparea{min-height:calc(100vh - 80px)}
+.atlas-expanded .canvaswrap{min-height:calc(100vh - 260px)}
+@media(max-width:1250px){.mapactions .smallbtn{font-size:10px;padding:8px}.maptop{gap:8px}.maptop h1{font-size:15px}}
+@media(max-width:900px){.mapmodes{left:10px;top:53px}.mapmodebtn{padding:7px;font-size:9px}.mapactions .smallbtn{padding:7px}}
+@media(max-width:650px){.mapactions{display:flex;gap:4px}.mapactions #reset-map,.mapactions #focus-capital,.mapactions #old-world{display:none}.maptop h1{font-size:13px}.mapmodebtn{font-size:8px;padding:5px}.canvaswrap{margin:5px;border-width:5px}}

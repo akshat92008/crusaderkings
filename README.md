@@ -94,3 +94,21 @@ Create an empty repository in GitHub first, **without** initializing README/lice
 ## Credits
 
 Design and implementation: AI-assisted prototype built for the requester. Map base data: Natural Earth (public domain). No assets from Crusader Kings, Europa Universalis or Total War are distributed with this project; their names describe genre references only.
+
+## Milestone 01 — Real GLB battlefield scenery
+
+The native WebGL2 battle can load CC0 Kenney castle GLB models and existing historical Indian source models. Infantry formations now use additional low-poly geometry types. Existing campaign, diplomacy, economy and battle-result logic are preserved. See [milestone verification](docs/MILESTONE_01_BATTLE_3D.md).
+
+The downloadable Milestone 01 package includes a small CC0 Kenney subset. When using this GitHub branch directly, import your copy of the official [Kenney Castle Kit](https://kenney.nl/assets/castle-kit) using:
+
+```bash
+python3 scripts/import_kenney_castle.py /path/to/kenney_castle-kit.zip
+```
+
+The source branch's stone wall GLB is a fallback when the local Kenney wall is absent. The world map and battle graphics are still work in progress; native WebGL2 visual quality has not yet been GPU-tested in this environment.
+
+## Milestone 02: Interactive 3D World Atlas
+
+This development branch includes a WebGL2 3D relief campaign renderer, political and terrain modes, an optional Cliopatria historical-reference overlay, and graceful 2D fallback. The 3D height field is a **stylized approximation, not a surveyed elevation model**, while the original 299 playable provinces remain experimental/synthetic.
+
+Run the static build using `python3 -m http.server 8080`. See [the full milestone report](docs/MILESTONE_02_CAMPAIGN_3D.md) for the source-asset generation commands and limitations. The ready-to-run Milestone 02 ZIP supplied in chat already contains its generated imagery and historical GeoJSON; the GitHub branch does not yet bundle those binaries/data.
