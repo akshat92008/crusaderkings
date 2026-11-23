@@ -56,10 +56,17 @@ try:
      loaded:__battleSmoke.ctx.modelsReady,
      squads:__battleSmoke.ctx.groups.size,
      animated:[...__battleSmoke.ctx.groups.values()].flat().filter(x=>!!x.mixer&&!!x.current).length,
-     clipCounts:Object.fromEntries(Object.entries(__battleSmoke.ctx.templates).map(([k,v])=>[k,v.animations.length]))
+     clipCounts:Object.fromEntries(Object.entries(__battleSmoke.ctx.templates).map(([k,v])=>[k,v.animations.length])),
+     environment:__battleSmoke.ctx.environment?.stats||null,
+     ground:!!__battleSmoke.ctx.environment?.group.getObjectByName('Illustrated battlefield ground'),
+     gate:__battleSmoke.ctx.environment?.layout.gate||null
    })""")
-   assert stats['loaded'] and stats['animated']>=30,stats
-   screenshot='battle-real-kaykit-3d.png'
+   assert stats['loaded'] and stats['animated']>=80,stats
+   assert stats['environment'] and stats['environment']['houses']>=15 and stats['environment']['towers']==2,stats
+   assert stats['environment']['renderedSceneryInstances']>=350,stats
+   assert stats['environment']['instancedDrawCalls']<=70,stats
+   assert stats['ground'] and stats['gate']['passageWidth']==8,stats
+   screenshot='battle-medieval-fortress-3d.png'
   else:
    stats={'note':'Canvas fallback; GLB files valid, GPU animation could not be tested'}
    screenshot='battle-fallback-only.png'
