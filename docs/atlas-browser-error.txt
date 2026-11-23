@@ -1,0 +1,6 @@
+ATLAS VISUAL TEST FAILED
+Traceback (most recent call last):
+  File "/home/runner/work/crusaderkings/crusaderkings/scripts/atlas_browser_smoke.py", line 59, in <module>
+    assert result['colors'] >= 25, f'Map appears blank/monochrome: {result}'
+           ^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Map appears blank/monochrome: {'colors': 1, 'w': 1, 'h': 724}
