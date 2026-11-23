@@ -1,4 +1,5 @@
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
+import {BattleModelArt} from './glb-art.js';
 const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vec=(x=0,y=0,z=0)=>[x,y,z];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -19,6 +20,15 @@ function boxes(){let v=[],ind=[],faces=[
  [[0,1,0],[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]],
  [[0,-1,0],[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]]];
  for(let f=0;f<6;f++){for(let j=1;j<5;j++)v.push(...faces[f][j],...faces[f][0]);ind.push(f*4,f*4+1,f*4+2,f*4,f*4+2,f*4+3);}return {v:new Float32Array(v),ind:new Uint16Array(ind)};}
+/** Low-poly geometric primitives; all share the same compact instanced attributes. */
+function curvedMesh(kind,sides=8){const v=[],idx=[];
+ function triangle(a,b,c){const u=sub(b,a),w=sub(c,a),n=norm(cross(u,w)),start=v.length/6;for(const p of [a,b,c])v.push(...p,...n);idx.push(start,start+1,start+2);}
+ const ring=(r,y,i)=>[Math.cos(i*TAU/sides)*r,y,Math.sin(i*TAU/sides)*r];
+ if(kind==='cone'){for(let i=0;i<sides;i++){triangle(ring(.5,-.5,i+1),ring(.5,-.5,i),[0,.5,0]);triangle([0,-.5,0],ring(.5,-.5,i),ring(.5,-.5,i+1));}}
+ else if(kind==='cylinder'){for(let i=0;i<sides;i++){let a=ring(.5,-.5,i),b=ring(.5,-.5,i+1),c=ring(.5,.5,i),d=ring(.5,.5,i+1);triangle(a,c,b);triangle(b,c,d);triangle([0,.5,0],d,c);triangle([0,-.5,0],a,b);}}
+ else if(kind==='sphere'){const bands=5;for(let j=0;j<bands;j++){const phi0=Math.PI*j/bands,phi1=Math.PI*(j+1)/bands;const p=(phi,i)=>[Math.sin(phi)*Math.cos(i*TAU/sides)*.5,Math.cos(phi)*.5,Math.sin(phi)*Math.sin(i*TAU/sides)*.5];for(let i=0;i<sides;i++){triangle(p(phi0,i),p(phi1,i),p(phi0,i+1));triangle(p(phi0,i+1),p(phi1,i),p(phi1,i+1));}}}
+ return {v:new Float32Array(v),ind:new Uint16Array(idx)};
+}
 function compile(gl,type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
 class Renderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('Your browser requires WebGL2 for the 3D battlefield.');this.gl=gl;
@@ -34,17 +44,20 @@ class Renderer{
  precision mediump float;in vec3 vColor;in float vLight;in float vFog;out vec4 frag;
  void main(){vec3 col=mix(vColor*vLight,vec3(.35,.39,.34),vFog);frag=vec4(pow(col,vec3(.94)),1.);}`;
  let p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,vs));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);this.program=p;this.loc=gl.getUniformLocation(p,'uVP');
- const m=boxes();const vao=gl.createVertexArray();gl.bindVertexArray(vao);
- let verts=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,verts);gl.bufferData(gl.ARRAY_BUFFER,m.v,gl.STATIC_DRAW);
- gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
- let indexes=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexes);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,m.ind,gl.STATIC_DRAW);
- this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,9*4*2400,gl.DYNAMIC_DRAW);
- for(let j=0;j<3;j++){gl.enableVertexAttribArray(2+j);gl.vertexAttribPointer(2+j,3,gl.FLOAT,false,36,j*12);gl.vertexAttribDivisor(2+j,1);}
- this.vao=vao;this.indexCount=m.ind.length;gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clearColor(.65,.70,.67,1);
+ this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,9*4*6000,gl.DYNAMIC_DRAW);
+ this.meshes={};for(const [kind,geom] of Object.entries({box:boxes(),cone:curvedMesh('cone'),cylinder:curvedMesh('cylinder'),sphere:curvedMesh('sphere')})){
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,geom.v,gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
+  const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,geom.ind,gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);for(let j=0;j<3;j++){gl.enableVertexAttribArray(2+j);gl.vertexAttribPointer(2+j,3,gl.FLOAT,false,36,j*12);gl.vertexAttribDivisor(2+j,1);}
+  this.meshes[kind]={vao,ib,vb,count:geom.ind.length};
+ }
+ gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clearColor(.65,.70,.67,1);
  }
  render(instances,camera){const gl=this.gl,canvas=this.canvas,dpr=Math.min(window.devicePixelRatio||1,1.5);const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
- let P=perspective(Math.PI/3,w/h,.5,300),VP=matMul(P,lookAt(camera.eye,camera.target));gl.useProgram(this.program);gl.uniformMatrix4fv(this.loc,false,VP);gl.bindVertexArray(this.vao);
- let arr=new Float32Array(instances.length*9);for(let i=0;i<instances.length;i++)arr.set(instances[i],i*9);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.DYNAMIC_DRAW);gl.drawElementsInstanced(gl.TRIANGLES,this.indexCount,gl.UNSIGNED_SHORT,0,instances.length);
+ let P=perspective(Math.PI/3,w/h,.5,300),VP=matMul(P,lookAt(camera.eye,camera.target));gl.useProgram(this.program);gl.uniformMatrix4fv(this.loc,false,VP);
+ const batches=new Map;for(const o of instances){let kind=o.shape||'box';if(!batches.has(kind))batches.set(kind,[]);batches.get(kind).push(o);}
+ for(const [kind,objects] of batches){const mesh=this.meshes[kind]||this.meshes.box;gl.bindVertexArray(mesh.vao);const arr=new Float32Array(objects.length*9);for(let i=0;i<objects.length;i++)arr.set(objects[i],i*9);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.DYNAMIC_DRAW);gl.drawElementsInstanced(gl.TRIANGLES,mesh.count,gl.UNSIGNED_SHORT,0,objects.length);}
  return VP;}
 }
 class CanvasFallback{
@@ -68,12 +81,35 @@ class CanvasFallback{
   c.fillStyle='#e7d6b5';c.font='11px monospace';c.fillText('SOFTWARE 3D MODE · WEBGL2 NOT AVAILABLE',22,h-170);
  }
 }
-const instance=(out,x,y,z,sx,sy,sz,color)=>out.push([x,y,z,sx,sy,sz,...color]);
+const instance=(out,x,y,z,sx,sy,sz,color,shape='box')=>{const item=[x,y,z,sx,sy,sz,...color];item.shape=shape;out.push(item);};
 const factionRgb=(hex,light=1)=>hexColor(hex).map(v=>clamp(v*light,0,1));
 function formation(id,side,type,order,start,ratio,color){const count=type==='cavalry'?15:type==='archers'?24:36;let x=(order-2.5)*10,z=side==='attacker'?24:-24;
  return {id,side,type,x,z,targetX:x,targetZ:z,orderX:x,orderZ:z,order,life:100,initial:count,units:count,displayUnits:count,morale:100,speed:type==='cavalry'?6.8:type==='archers'?3.6:4.5,range:type==='archers'?15:2.5,damage:type==='cavalry'?18:type==='archers'?9:11,cooldown:0,color,enabled:ratio>0,routed:ratio<=0,lossScale:ratio,phase:Math.random()*TAU};}
 export class BattleGame{
  constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=false;this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();this.ctx=canvas.getContext('webgl2')?new Renderer(canvas):new CanvasFallback(canvas);
+ // The existing campaign and combat simulation are retained. The asset art layer
+ // loads optional scenery from CC0 Kenney packs or this repository's source library.
+ this.scenery=null;this.sceneryPlacements=[];
+ if(this.ctx instanceof Renderer){
+  try{
+   this.scenery=new BattleModelArt(this.ctx.gl);
+   const load=(id,...paths)=>{(async()=>{for(const path of paths){const result=await this.scenery?.load(id,new URL(path,import.meta.url));if(result)break;}})();};
+   load('wall','../assets/battle/kenney/wall.glb','../source/low-ruined-wall-section-optimized.glb');
+   load('gate','../assets/battle/kenney/gate.glb');
+   load('tower','../assets/battle/kenney/tower-square-base.glb');
+   load('catapult','../assets/battle/kenney/siege-catapult.glb');
+   for(let j=-3;j<=3;j++)if(j!==0)this.sceneryPlacements.push({id:'wall',x:j*9,y:0,z:-42,size:8.5});
+   this.sceneryPlacements.push({id:'gate',x:0,z:-42,size:6.5});
+   for(const x of [-31,31])this.sceneryPlacements.push({id:'tower',x,z:-42,size:10});
+   this.sceneryPlacements.push({id:'catapult',x:29,z:22,size:7});
+   const indianFactions=new Set(['vijayanagara','delhi','bahmani','bengal','gujarat','malwa','jaunpur']);
+   if(indianFactions.has(game.player)||indianFactions.has(descriptor.enemy)){
+    load('temple','../source/south-indian-small-temple-kadamba-style-optimized%20(1).glb');
+    this.sceneryPlacements.push({id:'temple',x:43,y:0,z:-40,size:11});
+   }
+  }catch(e){console.warn('Optional battle scenery disabled:',e);this.scenery=null;}
+ }
+
  const a=game.armies[descriptor.attacker],enemy=game.factions[descriptor.enemy];const ratio=clamp((a?.infantry||0)+(a?.archers||0)+(a?.cavalry||0),60,450)/250;
  this.groups=[];let counts={infantry:0,archers:0,cavalry:0};
  for(let i=0;i<6;i++){let type=i===4?'archers':i===5?'cavalry':'infantry';counts[type]++;let q=type==='infantry'?(a?.infantry||0):type==='archers'?(a?.archers||0):(a?.cavalry||0);let group=formation('p'+i,'attacker',type,i,[0,0],q/Math.max(1,counts[type]),'#4b98b3');group.life=clamp(q/(type==='infantry'?170:type==='archers'?65:40)*100,15,100);this.groups.push(group);}
@@ -123,27 +159,27 @@ export class BattleGame{
  instance(obj,0,-.31,0,150,.6,118,C.grass);
  // Stained ground tiles create variation without textures.
  for(let x=-65;x<=65;x+=13)for(let z=-52;z<=52;z+=13){let shade=(Math.sin(x*17+z*9)+1)/14;instance(obj,x,-.006,z,12,.016,12,[.28+shade,.34+shade,.275+shade]);}
- for(const t of this.terrain){if(t.type==='tree'){instance(obj,t.x,.8,t.z,.8,1.7,.8,C.trunk);instance(obj,t.x,t.h*.67,t.z,t.h*.64,t.h*.75,t.h*.64,C.leaf);}else{instance(obj,t.x,.5,t.z,1.2+t.r,1+t.r,1.2+t.r,C.stone);}}
+ for(const t of this.terrain){if(t.type==='tree'){instance(obj,t.x,.8,t.z,.8,1.7,.8,C.trunk);instance(obj,t.x,t.h*.64,t.z,t.h*.88,t.h*.95,t.h*.88,C.leaf,'cone');}else{instance(obj,t.x,.5,t.z,1.2+t.r,1+t.r,1.2+t.r,C.stone,'sphere');}}
  // Defensive fort visual near the far side of the field.
- for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0)instance(obj,x,3.55,-42,3,1.5,3,C.stone);}
- for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
+ for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
+ for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
   const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
    const px=g.x+ox,pz=g.z+oz,walk=Math.sin(this.elapsed*7+i*.55)*.045;
-   if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27]);instance(obj,px,1.15+walk,pz,.48,.76,.43,base);instance(obj,px,1.68+walk,pz,.31,.29,.31,head);
-   } else {instance(obj,px,.75+walk,pz,.4,.85,.38,base);instance(obj,px,1.31+walk,pz,.3,.28,.32,head);}
-   if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel);}
-   if(g.type==='archers'){instance(obj,px+.30,.85+walk,pz,.12,1.0,.1,C.trunk);}
+   if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27],'sphere');instance(obj,px,1.15+walk,pz,.48,.76,.43,base,'cylinder');instance(obj,px,1.68+walk,pz,.31,.29,.31,head,'sphere');instance(obj,px,1.87+walk,pz,.40,.28,.42,C.steel,'cone');
+   } else {instance(obj,px,.75+walk,pz,.44,.80,.38,base,'cylinder');instance(obj,px,1.30+walk,pz,.29,.29,.29,head,'sphere');instance(obj,px,1.52+walk,pz,.36,.29,.36,C.steel,'cone');instance(obj,px-.15,.18+walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');instance(obj,px+.15,.18-walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');}
+   if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel,'cylinder');}
+   if(g.type==='archers'){instance(obj,px+.30,.85+walk,pz,.12,1.0,.1,C.trunk,'cylinder');}
   }
-  const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel);instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
   if(k===this.selected){instance(obj,g.x,.08,g.z,5,.14,5,[.95,.79,.42]);instance(obj,g.x,.11,g.z,4.3,.15,4.3,[.28,.35,.32]);}
  }
  for(const p of this.projectiles){let t=p.t;instance(obj,mix(p.sx,p.tx,t),.8+Math.sin(t*Math.PI)*3,mix(p.sz,p.tz,t),.1,.1,.6,C.arrow);}
- this.ctx.render(obj,this.getCamera());
+ const vp=this.ctx.render(obj,this.getCamera());if(this.scenery&&vp)this.scenery.render(vp,this.sceneryPlacements);
  }
- loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;if(!this.paused&&!this.done)this.update(dt);this.render();if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
+ loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
  finish(victory,leftPower){if(this.done)return;this.done=true;this.paused=true;let initial=this.groups.filter(g=>g.side==='attacker').length*100;let fraction=clamp(leftPower/initial,.08,.95);this.report();this.onFinish({victory,attackerRemaining:fraction,seconds:Math.round(this.elapsed)});}
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
  togglePause(){this.paused=!this.paused;this.report();}
- stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);}
+ stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.scenery?.dispose();}
 }
