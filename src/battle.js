@@ -89,7 +89,12 @@ function formation(id,side,type,order,start,ratio,color){const count=type==='cav
 export class BattleGame{
  constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=false;this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();const hasWebGL2=Boolean(canvas.getContext('webgl2'));
  if(hasWebGL2){
-  try{this.ctx=new ThreeBattleScene(canvas);}
+  try{
+   const province=game.provinces?.[descriptor.to],fortLevel=province?.buildings?.fort||0;
+   const desertFactions=new Set(['mamluks','delhi','bahmani','gujarat','malwa','morocco','tunis','mali','songhai','arabia','timurids','persia','oman','yemen','safavids']);
+   const biome=desertFactions.has(game.player)||desertFactions.has(descriptor.enemy)?'desert':'temperate';
+   this.ctx=new ThreeBattleScene(canvas,{fortLevel,biome,seed:1450+Math.round(fortLevel*23)});
+  }
   catch(error){console.warn('Skinned character renderer unavailable, using native WebGL:',error);this.ctx=new Renderer(canvas);}
  }else this.ctx=new CanvasFallback(canvas);
  // The existing campaign and combat simulation are retained. The asset art layer
@@ -161,12 +166,14 @@ export class BattleGame{
  if(left.length===0||right.length===0||this.elapsed>=220){const leftPower=left.reduce((s,g)=>s+g.life,0),rightPower=right.reduce((s,g)=>s+g.life,0);this.finish(leftPower>rightPower,leftPower);}
  }
  render(){if(!this.ctx)return;const obj=[],C={grass:[.29,.36,.29],earth:[.43,.40,.31],shadow:[.25,.27,.23],trunk:[.36,.25,.18],leaf:[.28,.37,.25],stone:[.42,.43,.41],gold:[.91,.74,.42],steel:[.63,.70,.69],arrow:[.96,.66,.35]};
+ if(!this.ctx.isThreeBattle){
  instance(obj,0,-.31,0,150,.6,118,C.grass);
  // Stained ground tiles create variation without textures.
  for(let x=-65;x<=65;x+=13)for(let z=-52;z<=52;z+=13){let shade=(Math.sin(x*17+z*9)+1)/14;instance(obj,x,-.006,z,12,.016,12,[.28+shade,.34+shade,.275+shade]);}
  for(const t of this.terrain){if(t.type==='tree'){instance(obj,t.x,.8,t.z,.8,1.7,.8,C.trunk);instance(obj,t.x,t.h*.64,t.z,t.h*.88,t.h*.95,t.h*.88,C.leaf,'cone');}else{instance(obj,t.x,.5,t.z,1.2+t.r,1+t.r,1.2+t.r,C.stone,'sphere');}}
  // Defensive fort visual near the far side of the field.
  for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
+ }
  for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
   const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   if(!(this.ctx.isThreeBattle&&this.ctx.modelsReady))for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
