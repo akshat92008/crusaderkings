@@ -6,7 +6,7 @@
 export const VICTORY_YEAR=1500;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const hash=s=>{let n=2166136261;for(const ch of String(s))n=Math.imul(n^ch.charCodeAt(0),16777619);return n>>>0;};
-const choose=(v,n)=>v[(Math.abs(n)|0)%v.length];
+const choose=(v,n)=>v[Math.trunc(Math.abs(n))%v.length];
 const pair=(a,b)=>[a,b].sort().join('|');
 const seeds={
  Europe:['Alaric','Isolde','Matilda','Edmund','Cecilia','Hugh','Eleanor','Baldwin','Margaret','Theodoric'],
