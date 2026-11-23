@@ -111,7 +111,7 @@ export const EVENTS=[
  ]},
  {id:'riders',title:'Riders on the Frontier',description:'Your scouts report restless levies massing near the border.',choices:[
   {label:'Pay to reinforce the watch',cost:100,morale:8},
-  {label:'Reassure the population',cost:40,stability:4}
+  {label:'Reassure the population',stability:3}
  ]},
  {id:'scholar',title:'A Scholar at Court',description:'A traveling scholar offers to instruct the royal household.',choices:[
   {label:'Sponsor the academy',cost:190,tech:1,prestige:5},
@@ -127,7 +127,7 @@ export const EVENTS=[
  ]},
  {id:'festival',title:'A Festival of the Realm',description:'The court debates whether to hold a grand civic celebration.',choices:[
   {label:'Sponsor a royal festival',cost:155,stability:8,prestige:6},
-  {label:'Permit local celebrations',cost:30,stability:2}
+  {label:'Permit local celebrations',stability:2}
  ]}
 ];
 export function currentRoyalEvent(g){
@@ -264,8 +264,8 @@ export function advanceKingdomSystems(g,world){
  tickTrade(g);
  if(g.turn%3===0)aiMonthly(g,world);
  if(g.turn%12===0)tickSuccession(g,world);
- if(g.turn%15===0)planInvasion(g,world);
  if(g.kingdom.threats.length)tickInvasions(g);
+ if(g.turn%15===0)planInvasion(g,world);
  if(g.turn%9===0&&!g.kingdom.pendingEvent){
   const event=choose(EVENTS,hash(g.seed+g.turn+g.kingdom.eventsResolved));
   g.kingdom.pendingEvent={id:event.id,created:g.turn};
