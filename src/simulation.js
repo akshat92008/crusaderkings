@@ -1,4 +1,5 @@
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
+import {initializeKingdomSystems,advanceKingdomSystems,royalDiplomacy,tradeIncome} from './kingdom-depth.js';
 export const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 export const BUILDINGS={farm:{name:'Farmstead',cost:180,icon:'🌾',desc:'+food and population growth'},market:{name:'Market Hall',cost:260,icon:'⚖',desc:'+tax and trade income'},barracks:{name:'Barracks',cost:320,icon:'⚔',desc:'stronger army recruitment'},fort:{name:'Fortification',cost:440,icon:'▣',desc:'larger defending army and advantage'}};
 export const POLICY={tax:['Lenient','Moderate','Heavy'],levy:['Voluntary','Standard','Mass levy'],tolerance:['Restrictive','Pragmatic','Pluralist']};
@@ -14,7 +15,9 @@ export function createGame(world,player='ottomans'){
   const prov=owned[0];const qty=95+(faction.id.length*13)%60;
   armies['a'+nextId]={id:'a'+nextId++,owner:faction.id,province:prov.id,infantry:qty,archers:Math.round(qty*.4),cavalry:Math.round(qty*.16),experience:0.08,morale:78,commander:`Commander of ${faction.name}`};
  }
- return {version:1,seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
+ const game={version:1,seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
+ initializeKingdomSystems(game,world);
+ return game;
 }
 export function makeLog(g,text){g.log.unshift({date:`${MONTHS[g.month]} ${g.year}`,text});g.log=g.log.slice(0,30);}
 export const ownerName=(g,id)=>g.factions[id]?.name||id;
@@ -24,10 +27,13 @@ export function armySize(a){return a?Math.max(0,Math.round(a.infantry+a.archers+
 export function empireStats(g,owner){
  const p=controlled(g,owner); const f=g.factions[owner];
  const tax=[.65,1,1.5][f?.policies.tax??1];
- const income=Math.round(p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0));
+ const trade=tradeIncome(g,owner);
+ const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
+ const taxIncome=Math.round(p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const income=taxIncome+trade;
  const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0));
  const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
- return {provinces:p.length,income,upkeep,balance:income-upkeep,foodDelta:food,troops:Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a),0),population:p.reduce((s,a)=>s+a.population,0)};
+ return {provinces:p.length,income,trade,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops:Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a),0),population:p.reduce((s,a)=>s+a.population,0)};
 }
 export function setPolicy(g,key,value){
  const f=g.factions[g.player];if(!f||!Object.hasOwn(POLICY,key)||!Number.isInteger(value)||value<0||value>2)return {ok:false,msg:'Invalid policy'};
@@ -92,8 +98,9 @@ export function concludeBattle(g,battle,result){
   makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Won'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
  } else {src.morale=clamp(src.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${armySize(src)} survivors.`);}
 }
-export function negotiate(g,other,action){
+export function negotiate(g,other,action,world={factions:[]}){
  if(other===g.player||other==='independent'||!g.factions[other])return {ok:false,msg:'Invalid diplomatic target'};
+ if(action==='trade'||action==='marriage')return royalDiplomacy(g,world,other,action);
  const f=g.factions[g.player],o=g.factions[other];const relation=f.relations[other]||0;
  if(action==='gift'){
   if(f.treasury<250)return {ok:false,msg:'Need 250 gold'};f.treasury-=250;o.treasury+=250;f.relations[other]=clamp(relation+20,-100,100);o.relations[g.player]=clamp((o.relations[g.player]||0)+20,-100,100);
@@ -164,11 +171,13 @@ export function advanceMonth(g,world){
  if(g.turn%8===0){
   const me=g.factions[g.player];if(me){me.prestige+=1;makeLog(g,`The royal council convenes to review the realm's affairs.`);}
  }
+ advanceKingdomSystems(g,world);
  return g;
 }
 export function snapshot(g){return JSON.stringify(g);}
 export function restoreGame(text,world){
  const o=JSON.parse(text);if(o.version!==1||!world.factions.some(f=>f.id===o.player)||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
  if(Object.keys(o.provinces).length!==world.provinces.length)throw Error('Map version mismatch');
+ initializeKingdomSystems(o,world);
  return o;
 }
