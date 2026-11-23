@@ -24,7 +24,8 @@ text = ('CROWN OF NATIONS: 1450 — KINGDOMS AND AI PLAYTEST\n'
         'and the history overlay is incomplete.\n'
         'WebGL2 battles use bundled KayKit animated infantry, archers and riders.\n'
         'New castles, settlements, siege props and camp scenery are procedural.\n'
-        'Royal courts, rival AI, trade and 23 narrative events are now playable.\n'\n        'The 1450 world borders and advanced wars remain unfinished; this is a preview.\n')
+        'Royal courts, rival AI, trade and 23 narrative events are now playable.\n'
+        'The 1450 world borders and advanced wars remain unfinished; this is a preview.\n')
 for needed in ['assets/battle/characters/Knight.glb','assets/battle/characters/Rogue_Hooded.glb','src/three-battle.bundle.js']:
   if not (ROOT/needed).is_file(): raise FileNotFoundError('Required playable battle art missing: '+needed)
 with ZipFile(OUT,'w',ZIP_DEFLATED,compresslevel=8) as zipf:
