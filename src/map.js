@@ -40,7 +40,7 @@ export class CampaignMap{
  setHistorical(data){this.history=data?.features?data:null;this.render();}
  setMode(mode){if(!['political','terrain','historical'].includes(mode))return;this.mode=mode;this.render();}
  setRelief(v){this.useRelief=Boolean(v);this.render();}
- get compression(){return this.useRelief&&this.terrain?.ready?.82:1;}
+ get compression(){return this.useRelief&&this.terrain?.ready?0.82:1;}
  select(id){this.selected=id;this.render();}
  focus(lon,lat,z=2.6){this.zoom=clamp(z,bounds.minZoom,bounds.maxZoom);this.panX=-lon*this.scale();this.panY=lat*this.scale()*this.compression;this.render();}
  focusOldWorld(){this.focus(56,33,2.05);}
@@ -54,7 +54,7 @@ export class CampaignMap{
   c.save();c.lineJoin='round';for(const p of this.world.provinces){
    const owner=this.game?.provinces?.[p.id]?.owner??p.owner;
    c.beginPath();drawGeoPath(c,p.geometry);c.fillStyle=atlasColor(this.game?.factions?.[owner]?.color||this.ownerColors[owner]||'#b4b09a',.29);
-   c.globalAlpha=owner===this.game?.player?.87:.77;c.fill('evenodd');c.globalAlpha=1;
+   c.globalAlpha=owner===this.game?.player?0.87:0.77;c.fill('evenodd');c.globalAlpha=1;
    c.lineWidth=clamp(1.35/s,.05,.52);c.strokeStyle='rgba(54,43,31,.50)';c.stroke();
   }c.restore();
  }
