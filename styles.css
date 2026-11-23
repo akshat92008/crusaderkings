@@ -50,3 +50,12 @@
 @media(max-width:1250px){.mapactions .smallbtn{font-size:10px;padding:8px}.maptop{gap:8px}.maptop h1{font-size:15px}}
 @media(max-width:900px){.mapmodes{left:10px;top:53px}.mapmodebtn{padding:7px;font-size:9px}.mapactions .smallbtn{padding:7px}}
 @media(max-width:650px){.mapactions{display:flex;gap:4px}.mapactions #reset-map,.mapactions #focus-capital,.mapactions #old-world{display:none}.maptop h1{font-size:13px}.mapmodebtn{font-size:8px;padding:5px}.canvaswrap{margin:5px;border-width:5px}}
+
+
+/* Playable visual showcase; safe practice battle never touches campaign ownership. */
+.mapactions .showcasebtn{
+ color:#f0dcaa;border-color:#d1ac6f;background:linear-gradient(165deg,#735838,#433528);
+ box-shadow:inset 0 1px rgba(255,228,165,.18);letter-spacing:.35px;font-weight:700;
+}
+.mapactions .showcasebtn:hover{color:#fff0d4;background:linear-gradient(#8d6a43,#57422f)}
+@media(max-width:650px){.mapactions .showcasebtn{display:inline-block;font-size:8px;padding:6px}}
