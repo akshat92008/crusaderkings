@@ -6,3 +6,14 @@
 @media(max-width:1200px){.topresources{gap:10px}.gamebody{grid-template-columns:220px minmax(360px,1fr) 260px}.brand{min-width:225px}.brandname{font-size:14px}.brandcaption{font-size:8px}.maptop h1{font-size:15px}.topbar{padding:0 13px;gap:10px}}
 @media(max-width:900px){.topbar{flex-wrap:wrap;height:auto;padding:10px}.topresources{margin-left:auto}.gamebody{grid-template-columns:190px 1fr}.rightbar{grid-column:1/-1;min-height:auto}.leftbar{min-height:680px}.maparea{min-height:680px}.resource:nth-child(3){display:none}}
 @media(max-width:650px){.gamebody{display:block}.leftbar{min-height:0}.leftbar .leftfooter{display:none}.tabs{flex-direction:row}.tab{flex:1;text-align:center;justify-content:center}.tab span{display:none}.tab-content{max-height:210px}.maparea{min-height:520px}.canvaswrap{min-height:350px}.rightbar{min-height:380px}.resource:nth-child(2){display:none}.mapcorner.right{display:none}.maptop{padding:15px}.mapactions{display:none}.startcard{padding:25px 18px}.startcard h1{font-size:24px}.battle-units{overflow-x:auto;justify-content:flex-start}.unitcard{min-width:90px}}
+
+/* Milestone 02: selectable political atlas over a real WebGL2 heightfield. */
+.canvaswrap #terrain-map{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.canvaswrap #world-map{position:relative;z-index:1;background:transparent}
+.canvaswrap .mapcorner{z-index:4}
+.mapmodes{z-index:5;position:absolute;top:56px;left:17px;display:flex;gap:2px;padding:4px;background:#091a1edc;border:1px solid #ad996755;box-shadow:0 7px 19px #0006}
+.mapmodebtn{color:#aebdb6;background:transparent;border:1px solid transparent;padding:8px 9px;font-size:9px;font-weight:750;letter-spacing:.9px;white-space:nowrap}
+.mapmodebtn:hover{color:#f4deaf;background:#243330}
+.mapmodebtn.active{color:#171f1b;background:#d9bc81;border-color:#f7e2b6}
+#toggle-relief[aria-pressed="true"]{border-color:#bca470;color:#e9d3a0}
+@media(max-width:1050px){.mapmodes{top:58px}.mapmodebtn{font-size:8px;padding:7px}}
