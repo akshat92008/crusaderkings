@@ -16,7 +16,7 @@ const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();}}
-function start(id){game=createGame(world,id);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...f.capital,3.2);render();}
+function start(id){game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...f.capital,3.2);render();}
 function load(){try{game=restoreGame(localStorage.getItem('crown-of-nations.save'),world);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
 function save(){if(!game)return;try{localStorage.setItem('crown-of-nations.save',snapshot(game));message('Campaign saved to this browser.');}catch(e){message(`Save failed: ${e.message}`);}}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);marchFrom=null;el('map-target-help').textContent='SELECT A PROVINCE TO INSPECT';if(r.ok&&r.type==='battle'){openBattle(r);return;}clickResult(r);}
