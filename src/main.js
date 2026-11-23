@@ -1,5 +1,7 @@
 import {CampaignMap} from './map.js';
 import {BattleGame} from './battle.js';
+import {militaryDoctrine,availableFormations} from './military-doctrines.js';
+import {resolveInvasion,autoResolveInvasion} from './invasions.js';
 import {renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
@@ -17,7 +19,7 @@ const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();}}
 function start(id){game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...f.capital,3.2);render();}
-function load(){try{game=restoreGame(localStorage.getItem('crown-of-nations.save'),world);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
+function load(){try{game=restoreGame(localStorage.getItem('crown-of-nations.save'),world);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();if(!openIncomingSiege())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
 function save(){if(!game)return;try{localStorage.setItem('crown-of-nations.save',snapshot(game));message('Campaign saved to this browser.');}catch(e){message(`Save failed: ${e.message}`);}}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);marchFrom=null;el('map-target-help').textContent='SELECT A PROVINCE TO INSPECT';if(r.ok&&r.type==='battle'){openBattle(r);return;}clickResult(r);}
  selected=id;map.select(id);renderInspector();}
@@ -28,11 +30,21 @@ function render(){if(!game)return;const f=player(),s=empireStats(game,game.playe
  el('world-counter').textContent=`${world.provinces.length} PROVINCES · ${world.factions.length} CIVILIZATIONS`;
  el('latest-event').textContent=game.log[0]?.text||'Your court awaits.';
  const courtButton=document.querySelector('[data-tab="court"]');if(courtButton)courtButton.classList.toggle('pending',Boolean(currentRoyalEvent(game)));
+ const threat=game.kingdom?.threats?.[0],banner=el('invasion-alert');
+ banner.hidden=!threat;
+ if(threat){
+  const opponent=game.factions[threat.by]?.name||'An enemy kingdom';
+  el('invasion-text').textContent=threat.status==='ready'
+   ?`⚔ ${opponent} IS ATTACKING ${threat.province.toUpperCase()} — DEFEND YOUR REALM`
+   :`⚑ ${opponent} APPROACHES ${threat.province.toUpperCase()} · ${threat.eta} MONTH(S) LEFT`;
+  el('invasion-defend').hidden=threat.status!=='ready';
+  el('invasion-auto').hidden=threat.status!=='ready';
+ }
  renderTab();renderInspector();map.render();}
 function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);
  const f=player(),s=empireStats(game,game.player);let html='';
  if(tab==='realm'){
-  html=`<div class="label">STATE OF THE REALM</div><div class="divider"></div><div class="statlist"><label>Controlled provinces</label><strong>${fmt(s.provinces)}</strong><label>Population</label><strong>${fmt(s.population)}k</strong><label>Total revenue / mo.</label><strong class="up">+${fmt(s.income)}</strong><label>Trade / mo.</label><strong class="up">+${fmt(s.trade||0)}</strong><label>Army upkeep / mo.</label><strong class="down">−${fmt(s.upkeep)}</strong><label>Net treasury / mo.</label><strong class="${s.balance>=0?'up':'down'}">${s.balance>=0?'+':''}${fmt(s.balance)}</strong><label>Food reserve</label><strong>${fmt(f.food)}</strong><label>Food change / mo.</label><strong class="${s.foodDelta>=0?'up':'down'}">${s.foodDelta>=0?'+':''}${fmt(s.foodDelta)}</strong><label>Legitimacy</label><strong>${fmt(f.legitimacy)}%</strong><label>Prestige</label><strong>${fmt(f.prestige)}</strong></div><div class="divider"></div><div class="sectiontitle">CIVILIZATION TRADITION</div><div class="rule">✦ ${esc(f.specialty)}<div class="smallnote">Faction specialties are thematic for this prototype; unique troop bonuses are planned for later versions.</div></div><div class="sectiontitle">COURT ADVICE</div><p class="paragraph">Expand with care. Taxes and conscription increase unrest. A depleted treasury or food reserve undermines public stability. Build markets to finance your armies.</p>`;
+  html=`<div class="label">STATE OF THE REALM</div><div class="divider"></div><div class="statlist"><label>Controlled provinces</label><strong>${fmt(s.provinces)}</strong><label>Population</label><strong>${fmt(s.population)}k</strong><label>Total revenue / mo.</label><strong class="up">+${fmt(s.income)}</strong><label>Trade / mo.</label><strong class="up">+${fmt(s.trade||0)}</strong><label>Army upkeep / mo.</label><strong class="down">−${fmt(s.upkeep)}</strong><label>Net treasury / mo.</label><strong class="${s.balance>=0?'up':'down'}">${s.balance>=0?'+':''}${fmt(s.balance)}</strong><label>Food reserve</label><strong>${fmt(f.food)}</strong><label>Food change / mo.</label><strong class="${s.foodDelta>=0?'up':'down'}">${s.foodDelta>=0?'+':''}${fmt(s.foodDelta)}</strong><label>Legitimacy</label><strong>${fmt(f.legitimacy)}%</strong><label>Prestige</label><strong>${fmt(f.prestige)}</strong></div><div class="divider"></div><div class="sectiontitle">MILITARY DOCTRINE</div><div class="rule"><b>⚔ ${esc(militaryDoctrine(f).name)}</b><div class="smallnote">Specialist: ${esc(militaryDoctrine(f).unique)} · Army mix ${militaryDoctrine(f).mix.map(x=>Math.round(x*100)).join(" / ")}% · ${militaryDoctrine(f).formations.map(id=>id.replaceAll("_"," ")).join(" · ")}. These formations affect movement, range, attack and defense in real battles.</div></div><div class="sectiontitle">COURT ADVICE</div><p class="paragraph">Expand with care. Taxes and conscription increase unrest. A depleted treasury or food reserve undermines public stability. Build markets to finance your armies.</p>`;
  }else if(tab==='decrees'){
   const descriptions={tax:'Taxation balances state revenue against civilian unrest.',levy:'Conscription policy affects the political burden of raising regiments.',tolerance:'Pluralism reduces unrest at the cost of central control.'};
   html=`<div class="label">ROYAL DECREES</div><p class="paragraph" style="margin-top:12px">New laws cost 80 gold to enact. Their consequences apply during monthly simulation.</p>${Object.keys(POLICY).map(key=>`<div class="rule"><div class="label">${key.toUpperCase()}</div><select class="policy-select" data-policy="${key}">${POLICY[key].map((name,i)=>`<option value="${i}" ${f.policies[key]===i?'selected':''}>${esc(name)}</option>`).join('')}</select><div class="smallnote">${descriptions[key]}</div></div>`).join('')}<div class="sectiontitle">REALM STABILITY</div><div class="statlist"><label>Current stability</label><strong>${fmt(f.stability)}%</strong><label>Royal legitimacy</label><strong>${fmt(f.legitimacy)}%</strong></div>`;
@@ -54,26 +66,70 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
 function renderInspector(){if(!game)return;let p=staticById[selected],state=game.provinces[selected];if(!p||!state){el('province-panel').innerHTML='<div class="emptyselection"><div class="emptycrest">♜</div><h2>THE KING\'S ATLAS</h2><p>Select any province to inspect its holdings.</p></div>';return;}
  const own=state.owner===game.player,owner=game.factions[state.owner],a=armiesAt(game,selected,state.owner),yourArmy=armiesAt(game,selected,game.player)[0];const total=a.reduce((s,q)=>s+armySize(q),0);
  let text=`<div class="inspector"><span class="eyebrow">PROVINCE CHANCERY · ${esc(p.continent.toUpperCase())}</span><h2>${esc(displayProvince(p))}</h2><div class="owner"><span class="swatch" style="background:${esc(owner?.color||'#667670')}"></span>${esc(owner?.name||'Independent Polities')} ${own?'<span style="color:#e4ca83"> · YOUR REALM</span>':''}</div><div class="province-hero">${p.terrain==='forest'?'♣':p.terrain==='highlands'?'▲':'♜'}<span>${esc(p.terrain.toUpperCase())} · ${p.centroid[0].toFixed(1)}°, ${p.centroid[1].toFixed(1)}°</span></div><div class="province-facts"><div class="fact"><label>POPULATION</label><b>${fmt(state.population)}k</b></div><div class="fact"><label>DEVELOPMENT</label><b>LV. ${fmt(state.development)}</b></div><div class="fact"><label>UNREST</label><b style="color:${state.unrest>55?'#e1a194':'#aed2af'}">${fmt(state.unrest)}%</b></div><div class="fact"><label>GARRISON & ARMY</label><b>${fmt(total||45+state.development*12)}</b></div></div>`;
- if(own){text+=`<div class="sectiontitle">MARCHING ORDERS</div><p class="paragraph">${yourArmy?`Your ${fmt(armySize(yourArmy))}-strong field army is stationed here.`:'No field army is stationed here.'} March to a connected province to reinforce or initiate a manual battle.</p><button class="btnblock" data-action="march">⚔ ISSUE MARCH / ATTACK ORDER</button><div class="sectiontitle">RAISE NEW REGIMENTS</div><div class="building-grid"><button data-action="recruit" data-type="infantry">⚔ Infantry <small>50 men · 110g</small></button><button data-action="recruit" data-type="archers">➶ Archers <small>50 men · 150g</small></button><button data-action="recruit" data-type="cavalry">♞ Cavalry <small>25 men · 240g</small></button></div><div class="sectiontitle">PROVINCIAL CONSTRUCTION</div><div class="building-grid">${Object.entries(BUILDINGS).map(([kind,b])=>`<button data-action="build" data-type="${kind}">${b.icon} ${b.name}<small>Lvl ${state.buildings[kind]} / 3 · ${fmt(b.cost*(state.buildings[kind]+1))}g</small></button>`).join('')}</div>`;
+ if(own){text+=`<div class="sectiontitle">MARCHING ORDERS</div><p class="paragraph">${yourArmy?`Your ${fmt(armySize(yourArmy))}-strong field army is stationed here.`:'No field army is stationed here.'} March to a connected province to reinforce or initiate a manual battle.</p><button class="btnblock" data-action="march">⚔ ISSUE MARCH / ATTACK ORDER</button><div class="sectiontitle">RAISE NEW REGIMENTS</div><div class="building-grid"><button data-action="recruit" data-type="infantry">⚔ Infantry <small>50 men · from 90g</small></button><button data-action="recruit" data-type="archers">➶ Archers <small>50 men · from 123g</small></button><button data-action="recruit" data-type="cavalry">♞ Cavalry <small>25 men · from 197g</small></button></div><div class="sectiontitle">PROVINCIAL CONSTRUCTION</div><div class="building-grid">${Object.entries(BUILDINGS).map(([kind,b])=>`<button data-action="build" data-type="${kind}">${b.icon} ${b.name}<small>Lvl ${state.buildings[kind]} / 3 · ${fmt(b.cost*(state.buildings[kind]+1))}g</small></button>`).join('')}</div>`;
  }else{text+=`<div class="sectiontitle">FOREIGN TERRITORY</div><p class="paragraph">To invade, select a neighboring owned province with a field army and choose <strong>Issue March / Attack Order</strong>. Then select this province on the world map.</p><button class="btnblock secondary" data-action="show-diplomacy" data-target="${state.owner}">✦ DIPLOMATIC OPTIONS</button>`;}
  text+=`<div class="sectiontitle">ADJACENT PROVINCES</div><p class="paragraph">${p.neighbors.length} connected land provinces. ${p.neighbors.filter(n=>game.provinces[n].owner!==state.owner).length} under foreign control.</p><div class="divider"></div><p class="paragraph">This map uses generated province shapes for prototype testing. Exact historical 1450 boundaries are not yet represented.</p></div>`;
  el('province-panel').innerHTML=text;
 }
-function openBattle(desc){el('battle-screen').hidden=false;el('battle-result').hidden=true;el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · MEDIEVAL FORTRESS':'THE BATTLE FOR '+desc.to.toUpperCase();el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${fmt(desc.defenseTroops+desc.defenseGarrison)} DEFENDERS`;
+function openBattle(desc){desc.interactive=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
+ el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · MEDIEVAL FORTRESS':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
+ el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFEND THE GATE':'BREACH THE FORTRESS'}`;
  battleDescriptor=desc;try{battle=new BattleGame(el('battle-canvas'),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';}catch(e){el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);}}
-function onBattleStatus(s){el('battle-pause').textContent=s.paused?'▶ RESUME':'Ⅱ PAUSE';const status=s.groups.filter(g=>g.side==='attacker');el('battle-units').innerHTML=status.map((g,i)=>`<button class="unitcard ${i===s.selected?'active':''}" data-unit="${i}"><b>${i+1}. ${g.type.toUpperCase()}</b><small>${g.routed?'ROUTED':Math.round(g.life)+'% STRENGTH'}</small><div class="unithealth"><div style="width:${Math.max(0,g.life)}%"></div></div></button>`).join('');}
-function onBattleFinished(result){let f=result.victory;el('battle-result').hidden=false;el('battle-result').innerHTML=`<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">${f?'♛':'⚔'}</div><h2>${f?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS'}</h2><p>${battleDescriptor?.showcase?'This practice battle does not affect your campaign.':f?'The enemy line has broken. The territory shall pass to your crown.':'Your forces have been defeated or forced to retreat.'} Surviving strength: ${Math.round(result.attackerRemaining*100)}%.<br>Battle duration: ${result.seconds} seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>`;
- el('battle-return').onclick=()=>{const practice=Boolean(battleDescriptor?.showcase);if(!practice)concludeBattle(game,battleDescriptor,result);battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();if(!practice)save();};}
+function onBattleStatus(status){
+ el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';
+ const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
+ el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+g.type.toUpperCase()+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
+ const choices=availableFormations(game.factions[game.player]);
+ el('battle-formation').innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' · '+Math.round(o.damage*100)+'% attack / '+Math.round(o.defense*100)+'% defense</option>').join('');
+ if(unit)el('battle-formation').value=unit.formationId;
+ el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;
+}
+function onBattleFinished(result){
+ const defense=!!battleDescriptor?.defenseMode,practice=!!battleDescriptor?.showcase,win=result.victory;
+ el('battle-result').hidden=false;
+ const title=defense?(win?'THE INVADERS WERE REPELLED':'THE FORTRESS HAS FALLEN'):(win?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS');
+ const explanation=practice?'Practice battle; your campaign will not be changed.':
+   defense?(win?'Your garrison has held the fortress.':'Your defensive position has been overrun.'):
+   win?'The enemy province will be taken.':'Your army has retreated.';
+ el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
+ el('battle-return').onclick=()=>{
+  if(!practice){
+   if(defense){const r=resolveInvasion(game,world,battleDescriptor.threat,result);if(!r.ok)message(r.msg);}
+   else concludeBattle(game,battleDescriptor,result);
+  }
+  battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;
+  document.body.style.overflow='';render();if(!practice)save();
+ };
+}
+function openIncomingSiege(){
+ const threat=game?.kingdom?.threats?.find(t=>t.status==='ready');
+ if(!threat||battle)return false;
+ const stationed=armiesAt(game,threat.province,game.player)[0],defense=game.provinces[threat.province];
+ const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
+ const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
+ openBattle({defenseMode:true,attacker:stationed?.id||null,enemyArmy:threat.army,enemy:threat.by,
+  to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison,
+  threat:{army:threat.army,province:threat.province}});
+ return true;
+}
+function advanceWithInvasions(){
+ if(!game||battle)return;
+ if(openIncomingSiege())return;
+ advanceMonth(game,world);render();
+ if(openIncomingSiege()&&speedInterval){
+  clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';
+ }
+}
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-faction').innerHTML=world.factions.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<option value="${f.id}" ${f.id==='ottomans'?'selected':''}>${esc(f.name)} — ${esc(f.continent)}</option>`).join('');
-function renderStartFaction(){const f=world.factions.find(f=>f.id===el('start-faction').value);el('start-faction-info').textContent=`${f.government} · ${f.continent} · Military tradition: ${f.specialty}`;}
+function renderStartFaction(){const f=world.factions.find(f=>f.id===el('start-faction').value),d=militaryDoctrine(f);el('start-faction-info').textContent=`${f.government} · ${f.continent} · ${d.name} · Signature: ${d.unique} · ${d.mix.map(x=>Math.round(x*100)+'%').join(' / ')} infantry / archers / cavalry`; }
 el('start-faction').addEventListener('change',renderStartFaction);renderStartFaction();
 el('start-new').addEventListener('click',()=>start(el('start-faction').value));
 try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
 el('load-existing').addEventListener('click',load);
 el('save-game').addEventListener('click',save);
-el('next-month').addEventListener('click',()=>{if(!game||battle)return;advanceMonth(game,world);render();});
-el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceMonth(game,world);render();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
+el('next-month').addEventListener('click',advanceWithInvasions);
+el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceWithInvasions();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
 el('focus-capital').addEventListener('click',()=>{if(game)map.focus(...player().capital,3.2);});
 el('reset-map').addEventListener('click',()=>{map.panX=0;map.panY=0;map.zoom=1.02;map.render();});
 el('old-world').addEventListener('click',()=>map.focusOldWorld());
@@ -111,4 +167,18 @@ el('battle-showcase').addEventListener('click',()=>{
 });
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
+el('battle-start').addEventListener('click',()=>battle?.startAssault());
+el('battle-formation').addEventListener('change',e=>{
+ if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
+});
+el('battle-lanes').addEventListener('click',e=>{
+ const target=e.target.closest('[data-lane]');if(target&&battle)battle.setLane(battle.selected,Number(target.dataset.lane));
+});
+el('invasion-defend').addEventListener('click',openIncomingSiege);
+el('invasion-auto').addEventListener('click',()=>{
+ if(!game||battle)return;const threat=game.kingdom?.threats?.find(t=>t.status==='ready');
+ if(!threat)return;const r=autoResolveInvasion(game,world,threat);
+ if(r.ok){message(r.msg);render();save();}
+});
+
 window.addEventListener('beforeunload',()=>{if(game){try{localStorage.setItem('crown-of-nations.save',snapshot(game));}catch{}}});

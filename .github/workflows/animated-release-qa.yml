@@ -1,7 +1,7 @@
 name: Animated armies downloadable build QA
 on:
   push:
-    branches: [feature/kingdom-ai-content-06]
+    branches: [feature/ck-coc-warfare-07]
     paths:
       - scripts/package_playable.py
       - scripts/check_release_package.py
@@ -27,5 +27,5 @@ jobs:
           python3 scripts/check_release_package.py
       - uses: actions/upload-artifact@v4
         with:
-          name: crown-of-nations-kingdom-ai-playable-zip
-          path: dist/Crown-of-Nations-1450-Kingdoms-and-AI-Playtest.zip
+          name: crown-of-nations-cultural-warfare-zip
+          path: dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip

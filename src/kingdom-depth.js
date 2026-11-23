@@ -3,6 +3,7 @@
  * Generated rulers, court names and stories are fictional game content.
  * AI is deterministic rule-based gameplay, NOT an external language model.
  */
+import {planEnemyInvasion,progressEnemyInvasions} from './invasions.js';
 export const VICTORY_YEAR=1500;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const hash=s=>{let n=2166136261;for(const ch of String(s))n=Math.imul(n^ch.charCodeAt(0),16777619);return n>>>0;};
@@ -283,53 +284,18 @@ function tickTrade(g){
   f.treasury+=Math.round(Math.min(85,6+sum(id)*3+sum(other)*2));
  }
 }
-function planInvasion(g,world){
- if(g.kingdom.threats.length||g.turn%15!==0||g.kingdom.difficulty==='peaceful')return;
- const targets=[];
- for(const a of Object.values(g.armies)){
-  if(a.owner===g.player||a.owner==='independent'||size(a)<130||g.provinces[a.province]?.owner!==a.owner)continue;
-  const home=world.provinces.find(p=>p.id===a.province);if(!home)continue;
-  if(['alliance','marriage'].includes(g.factions[a.owner]?.treaties?.[g.player]))continue;
-  for(const to of home.neighbors){
-   const p=g.provinces[to];if(p?.owner!==g.player)continue;
-   const defense=45+p.development*12+(p.buildings.fort||0)*45+armies(g,g.player).filter(x=>x.province===to).reduce((n,x)=>n+size(x),0);
-   if(size(a)>defense*(g.kingdom.difficulty==='hard'?1.08:1.28))targets.push({by:a.owner,army:a.id,province:to,eta:3});
-  }
- }
- if(targets.length){
-  const target=choose(targets,hash(g.turn+g.seed));g.kingdom.threats.push(target);
-  log(g,'INVASION WARNING: '+g.factions[target.by].name+' will attack '+target.province+' in three months. Move armies or build a fort.');
- }
-}
-function tickInvasions(g){
- const keep=[];
- for(const threat of g.kingdom.threats){
-  threat.eta--;if(threat.eta>0){keep.push(threat);continue;}
-  const army=g.armies[threat.army],p=g.provinces[threat.province];
-  if(!army||!p||p.owner!==g.player||army.owner!==threat.by)continue;
-  const defenders=armies(g,g.player).filter(a=>a.province===threat.province);
-  const protection=45+p.development*12+(p.buildings.fort||0)*45+defenders.reduce((n,a)=>n+size(a)*(.65+a.experience*.3),0);
-  const offensive=size(army)*(.88+army.experience*.25+army.morale/320);
-  const enemyWins=offensive>protection*(1.08+rand(g)*.33);
-  if(enemyWins){
-   p.owner=threat.by;p.unrest=clamp(p.unrest+26,0,100);army.province=threat.province;
-   army.infantry=Math.round(army.infantry*.8);army.archers=Math.round(army.archers*.8);army.cavalry=Math.round(army.cavalry*.8);
-   for(const a of defenders){a.infantry=Math.round(a.infantry*.3);a.archers=Math.round(a.archers*.3);a.cavalry=Math.round(a.cavalry*.3);}
-   log(g,threat.province+' fell to '+g.factions[threat.by].name+'. The lost province may be reconquered.');
-  }else{
-   army.infantry=Math.round(army.infantry*.76);army.archers=Math.round(army.archers*.76);army.cavalry=Math.round(army.cavalry*.76);
-   g.factions[g.player].prestige+=5;log(g,'The garrison of '+threat.province+' successfully repelled '+g.factions[threat.by].name+'.');
-  }
- }
- g.kingdom.threats=keep;
-}
 export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  tickTrade(g);
  if(g.turn%3===0)aiMonthly(g,world);
  if(g.turn%12===0)tickSuccession(g,world);
- if(g.kingdom.threats.length)tickInvasions(g);
- if(g.turn%15===0)planInvasion(g,world);
+ const incoming=progressEnemyInvasions(g,world);
+ if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
+  log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
+ if(g.turn%6===0){
+  const threat=planEnemyInvasion(g,world);
+  if(threat)log(g,'INVASION WARNING: '+g.factions[threat.by].name+' has mobilized against '+threat.province+'. Approximately '+threat.eta+' months to prepare.');
+ }
  if(g.turn%9===0&&!g.kingdom.pendingEvent){
   const event=choose(EVENTS,hash(g.seed+g.turn+g.kingdom.eventsResolved));
   g.kingdom.pendingEvent={id:event.id,created:g.turn};

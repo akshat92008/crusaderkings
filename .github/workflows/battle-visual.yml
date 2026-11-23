@@ -1,9 +1,13 @@
 name: Animated battle visual smoke
 on:
   push:
-    branches: [feature/medieval-battlefield-05]
+    branches: [feature/ck-coc-warfare-07]
     paths:
       - src/battle.js
+      - src/three-battle-scene.js
+      - src/military-doctrines.js
+      - src/invasions.js
+      - src/main.js
       - src/three-battle.bundle.js
       - src/battlefield-art.js
       - src/battlefield-layout.js

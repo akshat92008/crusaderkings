@@ -1,7 +1,7 @@
 name: Build KayKit animated army assets
 on:
   push:
-    branches: [feature/medieval-battlefield-05]
+    branches: [feature/ck-coc-warfare-07]
     paths:
       - scripts/build_3d_battle.mjs
       - src/three-battle-scene.js

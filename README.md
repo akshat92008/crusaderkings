@@ -147,3 +147,12 @@ Use the new **ROYAL COURT**, **TRADE**, and **LEGACY** tabs to play these system
 See [Milestone 05 details and limitations](docs/MILESTONE_05_KINGDOM_AI.md).
 
 This remains an early-access prototype: historically correct world borders, full dynasty/vassal depth, naval mechanics, complex siege gameplay, cultural unit diversity and final optimization are still missing.
+
+
+## Milestone 06 — Cultural warfare and enemy attacks
+
+The v0.7 development branch now includes **15 original military doctrines** and **ten tactical formations** with actual differences in army mixes and battle statistics. Animated troops use visible wedge, line, square and flanking deployments.
+
+Rival kingdoms can **initiate border invasions** instead of leaving every war to the human player. They marshal an existing army, cross connected territory, issue a warning and launch a playable defensive battle. Choose a troop formation and a left/center/right deployment lane, then click **Start Assault**. A defending player may also auto-resolve the battle. Defenses, casualties and the resulting province ownership are saved.
+
+This does **not** implement a complete Clash of Clans destructible village system or CK3's full title/claim/dynasty simulation. Read [the technical milestone report](docs/MILESTONE_06_CULTURAL_WARFARE.md).

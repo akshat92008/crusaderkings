@@ -2,11 +2,12 @@
 from pathlib import Path
 from zipfile import ZipFile
 ROOT=Path(__file__).resolve().parents[1]
-zip_path=ROOT/'dist/Crown-of-Nations-1450-Kingdoms-and-AI-Playtest.zip'
+zip_path=ROOT/'dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip'
 required=[
  'crown-of-nations/index.html','crown-of-nations/styles.css',
  'crown-of-nations/src/battle.js','crown-of-nations/src/three-battle.bundle.js',
  'crown-of-nations/src/kingdom-depth.js','crown-of-nations/src/kingdom-ui.js',
+ 'crown-of-nations/src/invasions.js','crown-of-nations/src/military-doctrines.js',
  'crown-of-nations/assets/battle/characters/Knight.glb',
  'crown-of-nations/assets/battle/characters/Rogue_Hooded.glb',
  'crown-of-nations/assets/battle/characters/LICENSE.txt',
