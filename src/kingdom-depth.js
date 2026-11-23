@@ -128,6 +128,70 @@ export const EVENTS=[
  {id:'festival',title:'A Festival of the Realm',description:'The court debates whether to hold a grand civic celebration.',choices:[
   {label:'Sponsor a royal festival',cost:155,stability:8,prestige:6},
   {label:'Permit local celebrations',stability:2}
+ ]},
+ {id:'mercenaries',title:'Captains for Hire',description:'Veteran mercenaries offer their services at the court gate.',choices:[
+  {label:'Pay a retainer to train the army',cost:180,morale:9,prestige:2},
+  {label:'Decline the offer',stability:1}
+ ]},
+ {id:'irrigation',title:'The Canal Builders',description:'Engineers ask permission to restore a neglected irrigation channel.',choices:[
+  {label:'Fund the engineering works',cost:150,food:105,tech:1},
+  {label:'Leave the channel to local lords',food:-25,stability:-1}
+ ]},
+ {id:'embassy',title:'Ambassadors Arrive',description:'A procession of foreign envoys requests an audience.',choices:[
+  {label:'Host a diplomatic reception',cost:90,legitimacy:5,prestige:4},
+  {label:'Receive them without ceremony',legitimacy:1}
+ ]},
+ {id:'river',title:'Floodwater on the Plains',description:'Seasonal rains have overwhelmed low-lying farmsteads.',choices:[
+  {label:'Finance repairs and relief',cost:160,food:45,stability:6},
+  {label:'Order regional lords to respond',stability:-3,food:-20}
+ ]},
+ {id:'ransom',title:'A Prisoner of Rank',description:'A captured noble asks to purchase safe passage back to their homeland.',choices:[
+  {label:'Accept a ransom',gold:200,legitimacy:-2},
+  {label:'Release the prisoner honorably',prestige:9,legitimacy:4}
+ ]},
+ {id:'workshops',title:'The Armorers Guild',description:'Blacksmiths petition for investment in new ironworking facilities.',choices:[
+  {label:'Sponsor royal forges',cost:160,tech:1,morale:4},
+  {label:'Allow private workshops to continue',gold:25}
+ ]},
+ {id:'pilgrims',title:'Travelers at the Gate',description:'An unusual number of pilgrims and travelers have arrived seeking safe passage.',choices:[
+  {label:'Open guesthouses and shelters',cost:90,legitimacy:5,stability:3},
+  {label:'Permit passage without royal subsidy',stability:1}
+ ]},
+ {id:'drought',title:'A Summer Without Rain',description:'The granaries are shrinking as the countryside suffers a dry season.',choices:[
+  {label:'Purchase emergency grain',cost:130,food:130,stability:3},
+  {label:'Ration the royal stores',food:-70,stability:-5}
+ ]},
+ {id:'mint',title:'The Royal Mint',description:'The mint master proposes a new stamped coinage to simplify payments.',choices:[
+  {label:'Reform the mint carefully',cost:165,tech:1,prestige:7},
+  {label:'Collect a coinage fee',gold:140,stability:-4}
+ ]},
+ {id:'scribes',title:'A Library of Records',description:'Scribes request materials to catalogue grants, treaties and chronicles.',choices:[
+  {label:'Commission the archive',cost:120,tech:1,legitimacy:4},
+  {label:'Continue using existing records',prestige:1}
+ ]},
+ {id:'messengers',title:'The Courier Network',description:'The road wardens propose establishing fixed messenger stations.',choices:[
+  {label:'Build the royal relay',cost:145,tech:1,prestige:5},
+  {label:'Keep local messengers',gold:20}
+ ]},
+ {id:'borderlords',title:'The Lords of the March',description:'Frontier castellans argue that their fortifications require greater provisions.',choices:[
+  {label:'Release funds for the border',cost:160,morale:7,stability:3},
+  {label:'Demand self-financing garrisons',gold:90,stability:-4}
+ ]},
+ {id:'ballads',title:'The Wandering Performers',description:'Traveling storytellers offer songs of the royal house.',choices:[
+  {label:'Patronize the performers',cost:70,prestige:8,stability:3},
+  {label:'Let the marketplace decide',prestige:1}
+ ]},
+ {id:'outlawry',title:'Bandits on the Road',description:'Merchants complain of robbery along rural roads and toll stations.',choices:[
+  {label:'Fund road patrols',cost:105,stability:6,morale:3},
+  {label:'Allow the merchants to hire guards',stability:-3,prestige:-2}
+ ]},
+ {id:'royalprogress',title:'The Royal Progress',description:'Councilors suggest visiting outlying towns to hear petitions directly.',choices:[
+  {label:'Travel with a full retinue',cost:145,stability:7,legitimacy:5},
+  {label:'Send trusted commissioners instead',stability:2}
+ ]},
+ {id:'grainmarket',title:'A Disputed Grain Price',description:'Merchants and millers argue over food prices following a poor harvest.',choices:[
+  {label:'Subsidize the market',cost:105,food:50,stability:5},
+  {label:'Permit a free market',gold:40,stability:-2}
  ]}
 ];
 export function currentRoyalEvent(g){
