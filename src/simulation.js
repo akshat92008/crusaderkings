@@ -1,5 +1,6 @@
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
 import {initializeKingdomSystems,advanceKingdomSystems,royalDiplomacy,tradeIncome} from './kingdom-depth.js';
+import {militaryDoctrine,startingTroops} from './military-doctrines.js';
 export const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 export const BUILDINGS={farm:{name:'Farmstead',cost:180,icon:'🌾',desc:'+food and population growth'},market:{name:'Market Hall',cost:260,icon:'⚖',desc:'+tax and trade income'},barracks:{name:'Barracks',cost:320,icon:'⚔',desc:'stronger army recruitment'},fort:{name:'Fortification',cost:440,icon:'▣',desc:'larger defending army and advantage'}};
 export const POLICY={tax:['Lenient','Moderate','Heavy'],levy:['Voluntary','Standard','Mass levy'],tolerance:['Restrictive','Pragmatic','Pluralist']};
@@ -12,8 +13,9 @@ export function createGame(world,player='ottomans'){
  for(const faction of world.factions){
   let owned=world.provinces.filter(p=>p.owner===faction.id);if(!owned.length)continue;
   owned.sort((a,b)=>Math.hypot(a.centroid[0]-faction.capital[0],a.centroid[1]-faction.capital[1])-Math.hypot(b.centroid[0]-faction.capital[0],b.centroid[1]-faction.capital[1]));
-  const prov=owned[0];const qty=95+(faction.id.length*13)%60;
-  armies['a'+nextId]={id:'a'+nextId++,owner:faction.id,province:prov.id,infantry:qty,archers:Math.round(qty*.4),cavalry:Math.round(qty*.16),experience:0.08,morale:78,commander:`Commander of ${faction.name}`};
+  const prov=owned[0];const qty=155+(faction.id.length*13)%60;
+  const troopMix=startingTroops(faction,qty);
+  armies['a'+nextId]={id:'a'+nextId++,owner:faction.id,province:prov.id,...troopMix,experience:0.08,morale:78,commander:`Commander of ${faction.name}`,doctrine:militaryDoctrine(faction).id};
  }
  const game={version:1,seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
  initializeKingdomSystems(game,world);
@@ -62,14 +64,18 @@ export function recruit(g,provinceId,type='infantry'){
  const p=g.provinces[provinceId],f=g.factions[g.player];
  if(!p||p.owner!==g.player)return {ok:false,msg:'Select your own province'};
  const prices={infantry:110,archers:150,cavalry:240};if(!Object.hasOwn(prices,type))return {ok:false,msg:'Unknown troop type'};
- const cost=Math.round(prices[type]*(1-(p.buildings.barracks*.06)));
+ const doctrine=militaryDoctrine(g.player);
+ const primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
+ const discount=type===primary?.82:1;
+ const cost=Math.round(prices[type]*discount*(1-(p.buildings.barracks*.06)));
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
  a[type]+=type==='cavalry'?25:50;
+ a.doctrine=doctrine.id;
  makeLog(g,`${50*(type==='cavalry'?.5:1)} ${type} recruited in ${provinceId}.`);
- return {ok:true,msg:'Regiment recruited'};
+ return {ok:true,msg:doctrine.unique+' tradition: regiment recruited'};
 }
 export function isAdjacent(world,src,dst){return !!world.provinces.find(p=>p.id===src)?.neighbors?.includes(dst);}
 export function startMarch(g,world,fromId,toId){
