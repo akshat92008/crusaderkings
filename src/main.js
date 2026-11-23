@@ -8,6 +8,8 @@ const world=await fetch('data/world.json').then(r=>{if(!r.ok)throw Error(`Map da
 const staticById=Object.fromEntries(world.provinces.map(p=>[p.id,p]));
 let game=null,selected=null,tab='realm',marchFrom=null,diplomaticTarget='france',battle=null,battleDescriptor=null,speedInterval=null,toastTimer=null;
 const map=new CampaignMap(el('world-map'),world,onProvince);
+if(!map.terrain?.gl){const button=el('toggle-relief');button.textContent='▤ 2D MAP';button.title='3D terrain requires a WebGL2-capable browser';button.setAttribute('aria-pressed','false');button.disabled=true;}
+fetch('data/historical-1450-reference.geojson').then(r=>r.ok?r.json():Promise.reject(new Error('History reference unavailable'))).then(data=>map.setHistorical(data)).catch(e=>console.info('Optional 1450 history layer:',e.message));
 const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
@@ -65,6 +67,8 @@ el('next-month').addEventListener('click',()=>{if(!game||battle)return;advanceMo
 el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceMonth(game,world);render();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
 el('focus-capital').addEventListener('click',()=>{if(game)map.focus(...player().capital,3.2);});
 el('reset-map').addEventListener('click',()=>{map.panX=0;map.panY=0;map.zoom=1.02;map.render();});
+el('toggle-relief').addEventListener('click',()=>{map.setRelief(!map.useRelief);el('toggle-relief').textContent=map.useRelief?'◈ 3D ON':'▤ 3D OFF';el('toggle-relief').setAttribute('aria-pressed',String(map.useRelief));});
+el('map-modes').addEventListener('click',e=>{const button=e.target.closest('[data-mapmode]');if(!button)return;map.setMode(button.dataset.mapmode);el('mapmode').textContent=button.dataset.mapmode==='historical'?'1450 REFERENCE':button.dataset.mapmode.toUpperCase();for(const b of el('map-modes').querySelectorAll('[data-mapmode]')){const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}if(button.dataset.mapmode==='historical')message('Reference map only: historical coverage is incomplete. Playable provinces remain experimental.');});
 el('tabs').addEventListener('click',e=>{let t=e.target.closest('[data-tab]');if(t){tab=t.dataset.tab;renderTab();}});
 el('tab-content').addEventListener('change',e=>{
  if(e.target.matches('.policy-select'))clickResult(setPolicy(game,e.target.dataset.policy,Number(e.target.value)));
