@@ -127,3 +127,12 @@ python3 -m http.server 8080
 ```
 
 No internet connection is needed to play the packaged release. See [Milestone 03 report](docs/MILESTONE_03_ANIMATED_ARMIES.md) and the [actual browser-rendered screenshot](docs/battle-real-kaykit-3d.png). **This is not yet a complete or visually polished grand-strategy game.**
+
+
+## Milestone 04: Medieval Battlefields (v0.5 development playtest)
+
+The browser battle now renders an original medieval fortified settlement, village, castle gate, camps, catapults, roads, trees, barrels and textures. Animated KayKit infantry, archers and mounted soldiers remain playable. Environment geometry is batched for efficient WebGL2 rendering. The walls and catapults are visual scenery and are **not yet destructible**.
+
+**To inspect it immediately:** begin a reign, then select **⚔ BATTLE SHOWCASE** from the map controls. This starts a practice encounter without changing your troops, treasury, provinces, or saves.
+
+See the [milestone details](docs/MILESTONE_04_MEDIEVAL_BATTLEFIELD.md) and [actual Chromium screenshot](docs/battle-medieval-fortress-3d.png). The v0.5 playable ZIP includes the local KayKit GLBs and browser-renderer bundle; the 730 MB raw architecture library remains outside the playtest.
