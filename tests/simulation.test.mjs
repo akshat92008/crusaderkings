@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import test from 'node:test';
+import {createGame,advanceMonth,empireStats,build,recruit,setPolicy,negotiate,snapshot,restoreGame,startMarch,concludeBattle} from '../src/simulation.js';
+const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
+test('all playable civilizations have land',()=>{let g=createGame(world);for(const f of world.factions)assert.ok(empireStats(g,f.id).provinces>0,f.id);});
+test('advance 100 years without NaN',()=>{let g=createGame(world);for(let i=0;i<1200;i++)advanceMonth(g,world);assert.equal(g.year,1550);assert.ok(Number.isFinite(g.factions.ottomans.treasury));});
+test('building, recruitment and policy charge money',()=>{let g=createGame(world),id=world.provinces.find(p=>p.owner==='ottomans').id;g.factions.ottomans.treasury=10000;let before=g.factions.ottomans.treasury;assert.ok(build(g,id,'farm').ok);assert.ok(recruit(g,id,'cavalry').ok);assert.ok(setPolicy(g,'tax',2).ok);assert.ok(g.factions.ottomans.treasury<before);});
+test('cannot build and recruit in enemy provinces',()=>{let g=createGame(world),id=world.provinces.find(p=>p.owner==='france').id;assert.equal(build(g,id,'farm').ok,false);assert.equal(recruit(g,id).ok,false);});
+test('marches obey connectivity and ownership',()=>{let g=createGame(world),owned=world.provinces.find(p=>p.owner==='ottomans');assert.equal(startMarch(g,world,owned.id,owned.id).ok,false);});
+test('diplomacy and save/load survive round-trip',()=>{let g=createGame(world);g.factions.ottomans.treasury=15000;assert.ok(negotiate(g,'france','gift').ok);let restored=restoreGame(snapshot(g),world);assert.equal(restored.factions.ottomans.relations.france,20);});
+test('victorious battles transfer ownership and casualties',()=>{let g=createGame(world);let a=Object.values(g.armies).find(a=>a.owner==='ottomans');let b={attacker:a.id,to:world.provinces.find(p=>p.owner==='france').id};let n=a.infantry;concludeBattle(g,b,{victory:true,attackerRemaining:.6});assert.equal(g.provinces[b.to].owner,'ottomans');assert.ok(g.armies[a.id].infantry<n);});

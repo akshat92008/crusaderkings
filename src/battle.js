@@ -1,0 +1,149 @@
+/* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
+const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const vec=(x=0,y=0,z=0)=>[x,y,z];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{const d=Math.hypot(...a)||1;return a.map(x=>x/d);};
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
+const matMul=(a,b)=>{let r=new Float32Array(16);for(let c=0;c<4;c++)for(let j=0;j<4;j++)for(let k=0;k<4;k++)r[c*4+j]+=a[k*4+j]*b[c*4+k];return r;};
+const perspective=(fovy,aspect,near,far)=>{let f=1/Math.tan(fovy/2),m=new Float32Array(16);m[0]=f/aspect;m[5]=f;m[10]=(far+near)/(near-far);m[11]=-1;m[14]=2*far*near/(near-far);return m;};
+const lookAt=(eye,target)=>{let z=norm(sub(eye,target)),x=norm(cross([0,1,0],z)),y=cross(z,x);return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);};
+const mix=(a,b,t)=>a+(b-a)*t;
+const hexColor=hex=>{let s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255];};
+function boxes(){let v=[],ind=[],faces=[
+ [[0,0,1],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]],
+ [[0,0,-1],[.5,-.5,-.5],[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5]],
+ [[1,0,0],[.5,-.5,.5],[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5]],
+ [[-1,0,0],[-.5,-.5,-.5],[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5]],
+ [[0,1,0],[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]],
+ [[0,-1,0],[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]]];
+ for(let f=0;f<6;f++){for(let j=1;j<5;j++)v.push(...faces[f][j],...faces[f][0]);ind.push(f*4,f*4+1,f*4+2,f*4,f*4+2,f*4+3);}return {v:new Float32Array(v),ind:new Uint16Array(ind)};}
+function compile(gl,type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+class Renderer{
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('Your browser requires WebGL2 for the 3D battlefield.');this.gl=gl;
+ const vs=`#version 300 es
+ precision highp float;
+ layout(location=0) in vec3 aPos;layout(location=1) in vec3 aNormal;
+ layout(location=2) in vec3 iPos;layout(location=3) in vec3 iScale;layout(location=4) in vec3 iColor;
+ uniform mat4 uVP;out vec3 vColor;out float vLight;out float vFog;
+ void main(){vec3 p=aPos*iScale+iPos;gl_Position=uVP*vec4(p,1.);vColor=iColor;
+ vec3 n=normalize(aNormal);vLight=.58+.42*max(dot(n,normalize(vec3(-.4,.85,.48))),0.);
+ vFog=clamp((length(p.xz)-15.)/145.,0.,.4);}`;
+ const fs=`#version 300 es
+ precision mediump float;in vec3 vColor;in float vLight;in float vFog;out vec4 frag;
+ void main(){vec3 col=mix(vColor*vLight,vec3(.35,.39,.34),vFog);frag=vec4(pow(col,vec3(.94)),1.);}`;
+ let p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,vs));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);this.program=p;this.loc=gl.getUniformLocation(p,'uVP');
+ const m=boxes();const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ let verts=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,verts);gl.bufferData(gl.ARRAY_BUFFER,m.v,gl.STATIC_DRAW);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
+ let indexes=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexes);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,m.ind,gl.STATIC_DRAW);
+ this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,9*4*2400,gl.DYNAMIC_DRAW);
+ for(let j=0;j<3;j++){gl.enableVertexAttribArray(2+j);gl.vertexAttribPointer(2+j,3,gl.FLOAT,false,36,j*12);gl.vertexAttribDivisor(2+j,1);}
+ this.vao=vao;this.indexCount=m.ind.length;gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clearColor(.65,.70,.67,1);
+ }
+ render(instances,camera){const gl=this.gl,canvas=this.canvas,dpr=Math.min(window.devicePixelRatio||1,1.5);const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ let P=perspective(Math.PI/3,w/h,.5,300),VP=matMul(P,lookAt(camera.eye,camera.target));gl.useProgram(this.program);gl.uniformMatrix4fv(this.loc,false,VP);gl.bindVertexArray(this.vao);
+ let arr=new Float32Array(instances.length*9);for(let i=0;i<instances.length;i++)arr.set(instances[i],i*9);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.DYNAMIC_DRAW);gl.drawElementsInstanced(gl.TRIANGLES,this.indexCount,gl.UNSIGNED_SHORT,0,instances.length);
+ return VP;}
+}
+class CanvasFallback{
+ // Perspective 3D cuboid projection for browsers/devices where WebGL2 is unavailable.
+ constructor(canvas){this.canvas=canvas;this.c=canvas.getContext('2d');if(!this.c)throw Error('Neither WebGL2 nor 2D canvas rendering is available.');}
+ render(objects,camera){const canvas=this.canvas,c=this.c,w=canvas.clientWidth||900,h=canvas.clientHeight||600,dpr=Math.min(window.devicePixelRatio||1,1.5);
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
+  c.setTransform(dpr,0,0,dpr,0,0);c.fillStyle='#a4b0a8';c.fillRect(0,0,w,h);
+  const forward=norm(sub(camera.target,camera.eye)),right=norm(cross(forward,[0,1,0])),up=cross(right,forward),scale=h/(2*Math.tan(Math.PI/6));
+  const project=p=>{let d=sub(p,camera.eye),depth=dot(d,forward);if(depth<=.2)return null;return [w/2+dot(d,right)*scale/depth,h/2-dot(d,up)*scale/depth,depth];};
+  const faces=[{i:[4,5,6,7],n:[0,1,0],light:1.05},{i:[0,1,5,4],n:[0,0,1],light:.88},{i:[1,2,6,5],n:[1,0,0],light:.70},{i:[2,3,7,6],n:[0,0,-1],light:.68},{i:[3,0,4,7],n:[-1,0,0],light:.80}];
+  const ordered=objects.map((o,i)=>({o,i,depth:Math.hypot(o[0]-camera.eye[0],o[1]-camera.eye[1],o[2]-camera.eye[2])})).sort((a,b)=>(a.i===0?-1:b.i===0?1:b.depth-a.depth));
+  for(const {o} of ordered){const [x,y,z,sx,sy,sz,r,g,b]=o;
+   const pts=[[-1,-1,1],[1,-1,1],[1,-1,-1],[-1,-1,-1],[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]].map(q=>[x+q[0]*sx/2,y+q[1]*sy/2,z+q[2]*sz/2]);
+   const projected=pts.map(project);if(projected.every(p=>!p))continue;
+   for(const f of faces){const cv=dot(f.n,[camera.eye[0]-x,camera.eye[1]-y,camera.eye[2]-z]);if(cv<=0||f.i.some(i=>!projected[i]))continue;
+    const shade=f.light;c.beginPath();for(let j=0;j<4;j++){let [u,v]=projected[f.i[j]];j?c.lineTo(u,v):c.moveTo(u,v);}c.closePath();
+    const red=Math.round(clamp(r*shade*255,0,255)),green=Math.round(clamp(g*shade*255,0,255)),blue=Math.round(clamp(b*shade*255,0,255));c.fillStyle=`rgb(${red},${green},${blue})`;c.fill();
+   }
+  }
+  c.fillStyle='#e7d6b5';c.font='11px monospace';c.fillText('SOFTWARE 3D MODE · WEBGL2 NOT AVAILABLE',22,h-170);
+ }
+}
+const instance=(out,x,y,z,sx,sy,sz,color)=>out.push([x,y,z,sx,sy,sz,...color]);
+const factionRgb=(hex,light=1)=>hexColor(hex).map(v=>clamp(v*light,0,1));
+function formation(id,side,type,order,start,ratio,color){const count=type==='cavalry'?15:type==='archers'?24:36;let x=(order-2.5)*10,z=side==='attacker'?24:-24;
+ return {id,side,type,x,z,targetX:x,targetZ:z,orderX:x,orderZ:z,order,life:100,initial:count,units:count,displayUnits:count,morale:100,speed:type==='cavalry'?6.8:type==='archers'?3.6:4.5,range:type==='archers'?15:2.5,damage:type==='cavalry'?18:type==='archers'?9:11,cooldown:0,color,enabled:ratio>0,routed:ratio<=0,lossScale:ratio,phase:Math.random()*TAU};}
+export class BattleGame{
+ constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=false;this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();this.ctx=canvas.getContext('webgl2')?new Renderer(canvas):new CanvasFallback(canvas);
+ const a=game.armies[descriptor.attacker],enemy=game.factions[descriptor.enemy];const ratio=clamp((a?.infantry||0)+(a?.archers||0)+(a?.cavalry||0),60,450)/250;
+ this.groups=[];let counts={infantry:0,archers:0,cavalry:0};
+ for(let i=0;i<6;i++){let type=i===4?'archers':i===5?'cavalry':'infantry';counts[type]++;let q=type==='infantry'?(a?.infantry||0):type==='archers'?(a?.archers||0):(a?.cavalry||0);let group=formation('p'+i,'attacker',type,i,[0,0],q/Math.max(1,counts[type]),'#4b98b3');group.life=clamp(q/(type==='infantry'?170:type==='archers'?65:40)*100,15,100);this.groups.push(group);}
+ let fort=game.provinces[descriptor.to]?.buildings.fort||0;for(let i=0;i<6;i++){let type=i===4?'archers':i===5?'cavalry':'infantry';let e=formation('e'+i,'defender',type,i,[0,0],1,enemy?.color||'#b86855');e.life=clamp((descriptor.defenseTroops+descriptor.defenseGarrison)/(80+fort*23),28,100);if(type==='cavalry')e.life*=.72;this.groups.push(e);}
+ this.selected=0;
+ this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
+ for(let i=0;i<105;i++){let x=(rng()-.5)*125,z=(rng()-.5)*100;if(Math.abs(z)<33&&Math.abs(x)<44)continue;this.terrain.push({x,z,h:1.4+rng()*5,r:rng(),type:rng()>.55?'tree':'rock'});}
+ this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){this.paused=!this.paused;e.preventDefault();this.report();}};
+ this._onKeyUp=e=>this.keys.delete(e.key.toLowerCase());this._onWheel=e=>{e.preventDefault();this.camera.distance=clamp(this.camera.distance+e.deltaY*.065,35,165);};
+ this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0};}};
+ this._onMove=e=>{if(this.drag){this.drag.moved+=Math.hypot(e.movementX,e.movementY);if(e.buttons&1&&this.drag.moved>3){this.camera.target[0]-=e.movementX*.08;this.camera.target[2]-=e.movementY*.08;}}};
+ this._onUp=e=>{if(this.drag&&this.drag.moved<8){let best=-1,d=24;for(let i=0;i<6;i++){const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-e.offsetX,p[1]-e.offsetY);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
+ window.addEventListener('keydown',this._onKeyDown);window.addEventListener('keyup',this._onKeyUp);canvas.addEventListener('wheel',this._onWheel,{passive:false});canvas.addEventListener('contextmenu',this._onContext);canvas.addEventListener('pointerdown',this._onDown);window.addEventListener('pointermove',this._onMove);window.addEventListener('pointerup',this._onUp);
+ this.report();this.loop=this.loop.bind(this);this.raf=requestAnimationFrame(this.loop);
+ }
+ getCamera(){const c=this.camera,y=c.yaw,dist=c.distance;const eye=[c.target[0]+Math.sin(y)*dist*.68,c.target[1]+dist*.72,c.target[2]+Math.cos(y)*dist*.68];return {eye,target:c.target};}
+ cameraVectors(){const {eye,target}=this.getCamera(),forward=norm(sub(target,eye)),right=norm(cross(forward,[0,1,0])),up=cross(right,forward);return {eye,forward,right,up};}
+ rayGround(px,py){const {eye,forward,right,up}=this.cameraVectors();let w=this.canvas.clientWidth,h=this.canvas.clientHeight,ratio=w/h,t=Math.tan(Math.PI/6);let u=(2*px/w-1)*ratio*t,v=(1-2*py/h)*t;let dir=norm([forward[0]+right[0]*u+up[0]*v,forward[1]+right[1]*u+up[1]*v,forward[2]+right[2]*u+up[2]*v]);if(dir[1]>=0)return null;let d=-eye[1]/dir[1];return [eye[0]+d*dir[0],0,eye[2]+d*dir[2]];}
+ project(p){let {eye,forward,right,up}=this.cameraVectors();let d=sub(p,eye),depth=dot(d,forward);if(depth<=.5)return null;let scale=this.canvas.clientHeight/(2*Math.tan(Math.PI/6));return [this.canvas.clientWidth/2+dot(d,right)*scale/depth,this.canvas.clientHeight/2-dot(d,up)*scale/depth];}
+ report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed});}
+ update(dt){this.elapsed+=dt;const c=this.camera;
+ if(this.keys.has('q'))c.yaw-=dt*.9;if(this.keys.has('e'))c.yaw+=dt*.9;
+ if(this.keys.has('w'))c.target[2]-=dt*22;if(this.keys.has('s'))c.target[2]+=dt*22;
+ if(this.keys.has('a'))c.target[0]-=dt*22;if(this.keys.has('d'))c.target[0]+=dt*22;
+ for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
+  const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
+  const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];
+  if(!e)continue;
+  // Manual player movement supersedes AI until arrival.
+  let dd=dist([g.x,0,g.z],[e.x,0,e.z]);
+  if(g.side==='defender'||(!g.manual&&g.side==='attacker')){if(g.type==='archers'&&dd<=g.range*.9){g.targetX=g.x;g.targetZ=g.z;}else{g.targetX=e.x;g.targetZ=e.z;}}
+  let d=Math.hypot(g.targetX-g.x,g.targetZ-g.z);
+  if(d>.3){let step=Math.min(d,dt*g.speed*(g.life/100*.4+.6));g.x+=(g.targetX-g.x)/d*step;g.z+=(g.targetZ-g.z)/d*step;}else if(g.manual){g.manual=false;}
+  dd=dist([g.x,0,g.z],[e.x,0,e.z]);g.cooldown-=dt;
+  if(dd<g.range&&g.cooldown<=0){g.cooldown=g.type==='archers'?1.2:.8;
+   let damage=g.damage*(.75+.25*g.life/100)*(g.type==='cavalry'&&e.type==='archers'?1.6:1)*(.80+Math.random()*.35);
+   e.life=Math.max(0,e.life-damage*.18);e.morale=Math.max(0,e.morale-damage*.29);
+   if(g.type==='archers')this.projectiles.push({sx:g.x,sz:g.z,tx:e.x,tz:e.z,t:0});
+   if(e.life<8||e.morale<13){e.routed=true;e.life=0;}
+  }
+ }
+ for(const p of this.projectiles)p.t+=dt*2.3;this.projectiles=this.projectiles.filter(p=>p.t<=1);
+ const left=this.groups.filter(g=>g.side==='attacker'&&!g.routed),right=this.groups.filter(g=>g.side==='defender'&&!g.routed);
+ if(left.length===0||right.length===0||this.elapsed>=220){const leftPower=left.reduce((s,g)=>s+g.life,0),rightPower=right.reduce((s,g)=>s+g.life,0);this.finish(leftPower>rightPower,leftPower);}
+ }
+ render(){if(!this.ctx)return;const obj=[],C={grass:[.29,.36,.29],earth:[.43,.40,.31],shadow:[.25,.27,.23],trunk:[.36,.25,.18],leaf:[.28,.37,.25],stone:[.42,.43,.41],gold:[.91,.74,.42],steel:[.63,.70,.69],arrow:[.96,.66,.35]};
+ instance(obj,0,-.31,0,150,.6,118,C.grass);
+ // Stained ground tiles create variation without textures.
+ for(let x=-65;x<=65;x+=13)for(let z=-52;z<=52;z+=13){let shade=(Math.sin(x*17+z*9)+1)/14;instance(obj,x,-.006,z,12,.016,12,[.28+shade,.34+shade,.275+shade]);}
+ for(const t of this.terrain){if(t.type==='tree'){instance(obj,t.x,.8,t.z,.8,1.7,.8,C.trunk);instance(obj,t.x,t.h*.67,t.z,t.h*.64,t.h*.75,t.h*.64,C.leaf);}else{instance(obj,t.x,.5,t.z,1.2+t.r,1+t.r,1.2+t.r,C.stone);}}
+ // Defensive fort visual near the far side of the field.
+ for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0)instance(obj,x,3.55,-42,3,1.5,3,C.stone);}
+ for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
+  const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
+  for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
+   const px=g.x+ox,pz=g.z+oz,walk=Math.sin(this.elapsed*7+i*.55)*.045;
+   if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27]);instance(obj,px,1.15+walk,pz,.48,.76,.43,base);instance(obj,px,1.68+walk,pz,.31,.29,.31,head);
+   } else {instance(obj,px,.75+walk,pz,.4,.85,.38,base);instance(obj,px,1.31+walk,pz,.3,.28,.32,head);}
+   if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel);}
+   if(g.type==='archers'){instance(obj,px+.30,.85+walk,pz,.12,1.0,.1,C.trunk);}
+  }
+  const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel);instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  if(k===this.selected){instance(obj,g.x,.08,g.z,5,.14,5,[.95,.79,.42]);instance(obj,g.x,.11,g.z,4.3,.15,4.3,[.28,.35,.32]);}
+ }
+ for(const p of this.projectiles){let t=p.t;instance(obj,mix(p.sx,p.tx,t),.8+Math.sin(t*Math.PI)*3,mix(p.sz,p.tz,t),.1,.1,.6,C.arrow);}
+ this.ctx.render(obj,this.getCamera());
+ }
+ loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;if(!this.paused&&!this.done)this.update(dt);this.render();if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
+ finish(victory,leftPower){if(this.done)return;this.done=true;this.paused=true;let initial=this.groups.filter(g=>g.side==='attacker').length*100;let fraction=clamp(leftPower/initial,.08,.95);this.report();this.onFinish({victory,attackerRemaining:fraction,seconds:Math.round(this.elapsed)});}
+ retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
+ togglePause(){this.paused=!this.paused;this.report();}
+ stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);}
+}
