@@ -25,7 +25,8 @@ text = ('CROWN OF NATIONS: 1450 — CULTURAL WARFARE PLAYTEST\n'
         'WebGL2 battles use bundled KayKit animated infantry, archers and riders.\n'
         'New castles, settlements, siege props and camp scenery are procedural.\n'
         'Royal courts, rival AI, trade and 23 narrative events are now playable.\n'
-        'This edition adds cultural army doctrine and defensive battles, with selectable formations and deployment.\n'\n        'The world map remains synthetic and full CK3 politics/CoC siege gameplay is unfinished.\n')
+        'This edition adds cultural army doctrine and defensive battles, with selectable formations and deployment.\n'
+        'The world map remains synthetic and full CK3 politics/CoC siege gameplay is unfinished.\n')
 for needed in ['assets/battle/characters/Knight.glb','assets/battle/characters/Rogue_Hooded.glb','src/three-battle.bundle.js']:
   if not (ROOT/needed).is_file(): raise FileNotFoundError('Required playable battle art missing: '+needed)
 with ZipFile(OUT,'w',ZIP_DEFLATED,compresslevel=8) as zipf:
