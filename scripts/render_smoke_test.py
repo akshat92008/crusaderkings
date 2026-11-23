@@ -14,7 +14,7 @@ art=(ROOT/'src/glb-art.js').read_text().replace('export ','')
 modules.append('globalThis.ART=(()=>{'+art+'\nreturn {BattleModelArt,parseStaticGLB};})();')
 for name,key,returned in [('simulation','SIM','createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName'),('map','MAP','CampaignMap'),('battle','BATTLE','BattleGame')]:
  source=(ROOT/'src'/f'{name}.js').read_text().replace('export ','')
- if name=='battle':source=source.replace("import {BattleModelArt} from './glb-art.js';",'const {BattleModelArt}=ART;').replace('import.meta.url',"'https://example.test/src/battle.js'")
+ if name=='battle':source=source.replace("import {BattleModelArt} from './glb-art.js';",'const {BattleModelArt}=ART;').replace("import {ThreeBattleScene} from './three-battle.bundle.js';",'').replace('new ThreeBattleScene(canvas)','new Renderer(canvas)').replace('import.meta.url',"'https://example.test/src/battle.js'")
  modules.append(f'globalThis.{key}=(()=>{{{source}\nreturn {{{returned}}};}})();')
 main=(ROOT/'src/main.js').read_text()
 main=re.sub(r'^import .*?;\s*$', '',main,flags=re.M)
