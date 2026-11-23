@@ -1,7 +1,7 @@
 name: Animated armies downloadable build QA
 on:
   push:
-    branches: [feature/kingdom-ai-content-06]
+    branches: [feature/ck-coc-warfare-07]
     paths:
       - scripts/package_playable.py
       - scripts/check_release_package.py
