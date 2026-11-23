@@ -1,5 +1,6 @@
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
 import {BattleModelArt} from './glb-art.js';
+import {armyFormationSlots,militaryDoctrine,startingTroops,combatStatistics,chooseCounterFormation,availableFormations} from './military-doctrines.js';
 import {ThreeBattleScene} from './three-battle.bundle.js';
 const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vec=(x=0,y=0,z=0)=>[x,y,z];
@@ -85,9 +86,19 @@ class CanvasFallback{
 const instance=(out,x,y,z,sx,sy,sz,color,shape='box')=>{const item=[x,y,z,sx,sy,sz,...color];item.shape=shape;out.push(item);};
 const factionRgb=(hex,light=1)=>hexColor(hex).map(v=>clamp(v*light,0,1));
 function formation(id,side,type,order,start,ratio,color){const count=type==='cavalry'?15:type==='archers'?24:36;let x=(order-2.5)*10,z=side==='attacker'?24:-24;
- return {id,side,type,x,z,targetX:x,targetZ:z,orderX:x,orderZ:z,order,life:100,initial:count,units:count,displayUnits:count,morale:100,speed:type==='cavalry'?6.8:type==='archers'?3.6:4.5,range:type==='archers'?15:2.5,damage:type==='cavalry'?18:type==='archers'?9:11,cooldown:0,color,enabled:ratio>0,routed:ratio<=0,lossScale:ratio,phase:Math.random()*TAU};}
+ const speed=type==='cavalry'?6.8:type==='archers'?3.6:4.5,range=type==='archers'?15:2.5,damage=type==='cavalry'?18:type==='archers'?9:11;
+ return {id,side,type,x,z,targetX:x,targetZ:z,orderX:x,orderZ:z,order,life:100,initial:count,units:count,displayUnits:count,morale:100,baseSpeed:speed,baseRange:range,baseDamage:damage,speed,range,damage,armor:1,cavalryCounter:1,cooldown:0,color,enabled:ratio>0,routed:ratio<=0,lossScale:ratio,phase:order*.87};}
+function attachTactics(group,faction,formationId){
+ const doctrine=militaryDoctrine(faction);
+ const selected=doctrine.formations.includes(formationId)?formationId:doctrine.formations[0];
+ const stats=combatStatistics(faction,group.type,selected);
+ group.doctrine=doctrine.id;group.specialist=doctrine.unique;group.formationId=selected;
+ group.speed=group.baseSpeed*stats.speed;group.range=group.baseRange*stats.range;
+ group.damage=group.baseDamage*stats.damage;group.armor=stats.defense;group.cavalryCounter=stats.cavalryCounter;
+ return group;
+}
 export class BattleGame{
- constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=false;this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();const hasWebGL2=Boolean(canvas.getContext('webgl2'));
+ constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=Boolean(descriptor.interactive);this.deployment=Boolean(descriptor.interactive);this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();const hasWebGL2=Boolean(canvas.getContext('webgl2'));
  if(hasWebGL2){
   try{
    const province=game.provinces?.[descriptor.to],fortLevel=province?.buildings?.fort||0;
@@ -120,10 +131,34 @@ export class BattleGame{
   }catch(e){console.warn('Optional battle scenery disabled:',e);this.scenery=null;}
  }
 
- const a=game.armies[descriptor.attacker],enemy=game.factions[descriptor.enemy];const ratio=clamp((a?.infantry||0)+(a?.archers||0)+(a?.cavalry||0),60,450)/250;
- this.groups=[];let counts={infantry:0,archers:0,cavalry:0};
- for(let i=0;i<6;i++){let type=i===4?'archers':i===5?'cavalry':'infantry';counts[type]++;let q=type==='infantry'?(a?.infantry||0):type==='archers'?(a?.archers||0):(a?.cavalry||0);let group=formation('p'+i,'attacker',type,i,[0,0],q/Math.max(1,counts[type]),'#4b98b3');group.life=clamp(q/(type==='infantry'?170:type==='archers'?65:40)*100,15,100);this.groups.push(group);}
- let fort=game.provinces[descriptor.to]?.buildings.fort||0;for(let i=0;i<6;i++){let type=i===4?'archers':i===5?'cavalry':'infantry';let e=formation('e'+i,'defender',type,i,[0,0],1,enemy?.color||'#b86855');e.life=clamp((descriptor.defenseTroops+descriptor.defenseGarrison)/(80+fort*23),28,100);if(type==='cavalry')e.life*=.72;this.groups.push(e);}
+ const a=game.armies[descriptor.attacker]||{
+  infantry:Math.round((descriptor.defenseGarrison||90)*.60),
+  archers:Math.round((descriptor.defenseGarrison||90)*.32),
+  cavalry:Math.round((descriptor.defenseGarrison||90)*.08)
+ };
+ const playerFaction=game.factions[game.player],enemy=game.factions[descriptor.enemy];
+ const enemyArmy=descriptor.enemyArmy&&game.armies[descriptor.enemyArmy];
+ const enemies=enemyArmy||startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseGarrison||0)));
+ this.groups=[];
+ const mySlots=armyFormationSlots(playerFaction,a,6),enemySlots=armyFormationSlots(enemy,enemies,6);
+ for(let i=0;i<6;i++){
+  const type=mySlots[i],slotCount=mySlots.filter(t=>t===type).length;
+  const unitCount=(a[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?-26:24;
+  const g=formation('p'+i,'attacker',type,i,[0,0],unitCount,'#4b98b3');
+  g.z=position;g.targetZ=position;g.orderZ=position;
+  g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
+  g.routed=unitCount<1;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
+  this.groups.push(g);
+ }
+ for(let i=0;i<6;i++){
+  const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
+  const unitCount=(enemies[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?24:-24;
+  const g=formation('e'+i,'defender',type,i,[0,0],unitCount,enemy?.color||'#b86855');
+  g.z=position;g.targetZ=position;g.orderZ=position;
+  g.life=clamp(unitCount/(type==='infantry'?50:type==='archers'?32:22)*100,10,100);
+  g.routed=unitCount<1;attachTactics(g,enemy,militaryDoctrine(enemy).formations[i%militaryDoctrine(enemy).formations.length]);
+  this.groups.push(g);
+ }
  this.selected=0;
  this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
  for(let i=0;i<105;i++){let x=(rng()-.5)*125,z=(rng()-.5)*100;if(Math.abs(z)<33&&Math.abs(x)<44)continue;this.terrain.push({x,z,h:1.4+rng()*5,r:rng(),type:rng()>.55?'tree':'rock'});}
@@ -139,7 +174,18 @@ export class BattleGame{
  cameraVectors(){const {eye,target}=this.getCamera(),forward=norm(sub(target,eye)),right=norm(cross(forward,[0,1,0])),up=cross(right,forward);return {eye,forward,right,up};}
  rayGround(px,py){const {eye,forward,right,up}=this.cameraVectors();let w=this.canvas.clientWidth,h=this.canvas.clientHeight,ratio=w/h,t=Math.tan(Math.PI/6);let u=(2*px/w-1)*ratio*t,v=(1-2*py/h)*t;let dir=norm([forward[0]+right[0]*u+up[0]*v,forward[1]+right[1]*u+up[1]*v,forward[2]+right[2]*u+up[2]*v]);if(dir[1]>=0)return null;let d=-eye[1]/dir[1];return [eye[0]+d*dir[0],0,eye[2]+d*dir[2]];}
  project(p){let {eye,forward,right,up}=this.cameraVectors();let d=sub(p,eye),depth=dot(d,forward);if(depth<=.5)return null;let scale=this.canvas.clientHeight/(2*Math.tan(Math.PI/6));return [this.canvas.clientWidth/2+dot(d,right)*scale/depth,this.canvas.clientHeight/2-dot(d,up)*scale/depth];}
- report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed});}
+ report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed,deployment:this.deployment});}
+ setFormation(index,id){
+  const g=this.groups[index];
+  if(!g||g.side!=='attacker'||g.routed||!availableFormations(this.game.factions[this.game.player]).some(f=>f.id===id))return false;
+  attachTactics(g,this.game.factions[this.game.player],id);this.report();return true;
+ }
+ setLane(index,lane){
+  if(!this.deployment||![0,1,2].includes(lane))return false;
+  const g=this.groups[index];if(!g||g.side!=='attacker'||g.routed)return false;
+  g.x=(lane-1)*26+(index%2?2:-2);g.orderX=g.x;g.targetX=g.x;this.report();return true;
+ }
+ startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.last=performance.now();this.report();return true;}
  update(dt){this.elapsed+=dt;const c=this.camera;
  if(this.keys.has('q'))c.yaw-=dt*.9;if(this.keys.has('e'))c.yaw+=dt*.9;
  if(this.keys.has('w'))c.target[2]-=dt*22;if(this.keys.has('s'))c.target[2]+=dt*22;
@@ -150,12 +196,17 @@ export class BattleGame{
   if(!e)continue;
   // Manual player movement supersedes AI until arrival.
   let dd=dist([g.x,0,g.z],[e.x,0,e.z]);
+  if(g.side==='defender'&&this.elapsed%6<dt){
+   attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));
+  }
   if(g.side==='defender'||(!g.manual&&g.side==='attacker')){if(g.type==='archers'&&dd<=g.range*.9){g.targetX=g.x;g.targetZ=g.z;}else{g.targetX=e.x;g.targetZ=e.z;}}
   let d=Math.hypot(g.targetX-g.x,g.targetZ-g.z);
   if(d>.3){let step=Math.min(d,dt*g.speed*(g.life/100*.4+.6));g.x+=(g.targetX-g.x)/d*step;g.z+=(g.targetZ-g.z)/d*step;}else if(g.manual){g.manual=false;}
   dd=dist([g.x,0,g.z],[e.x,0,e.z]);g.cooldown-=dt;
   if(dd<g.range&&g.cooldown<=0){g.cooldown=g.type==='archers'?1.2:.8;
-   let damage=g.damage*(.75+.25*g.life/100)*(g.type==='cavalry'&&e.type==='archers'?1.6:1)*(.80+Math.random()*.35);
+   let damage=g.damage*(.75+.25*g.life/100)*(g.type==='cavalry'&&e.type==='archers'?1.6:1)*
+   (g.type==='cavalry'?1/Math.max(.6,e.cavalryCounter):1)/
+   Math.max(.6,e.armor)*( .82+Math.random()*.30);
    e.life=Math.max(0,e.life-damage*.18);e.morale=Math.max(0,e.morale-damage*.29);
    if(g.type==='archers')this.projectiles.push({sx:g.x,sz:g.z,tx:e.x,tz:e.z,t:0});
    if(e.life<8||e.morale<13){e.routed=true;e.life=0;}
@@ -163,7 +214,7 @@ export class BattleGame{
  }
  for(const p of this.projectiles)p.t+=dt*2.3;this.projectiles=this.projectiles.filter(p=>p.t<=1);
  const left=this.groups.filter(g=>g.side==='attacker'&&!g.routed),right=this.groups.filter(g=>g.side==='defender'&&!g.routed);
- if(left.length===0||right.length===0||this.elapsed>=220){const leftPower=left.reduce((s,g)=>s+g.life,0),rightPower=right.reduce((s,g)=>s+g.life,0);this.finish(leftPower>rightPower,leftPower);}
+ if(left.length===0||right.length===0||this.elapsed>=220){const leftPower=left.reduce((s,g)=>s+g.life,0),rightPower=right.reduce((s,g)=>s+g.life,0);this.finish(leftPower>rightPower,leftPower,rightPower);}
  }
  render(){if(!this.ctx)return;const obj=[],C={grass:[.29,.36,.29],earth:[.43,.40,.31],shadow:[.25,.27,.23],trunk:[.36,.25,.18],leaf:[.28,.37,.25],stone:[.42,.43,.41],gold:[.91,.74,.42],steel:[.63,.70,.69],arrow:[.96,.66,.35]};
  if(!this.ctx.isThreeBattle){
@@ -190,7 +241,12 @@ export class BattleGame{
  const vp=this.ctx.render(obj,this.getCamera(),this.groups,this.elapsed);if(this.scenery&&vp)this.scenery.render(vp,this.sceneryPlacements);
  }
  loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
- finish(victory,leftPower){if(this.done)return;this.done=true;this.paused=true;let initial=this.groups.filter(g=>g.side==='attacker').length*100;let fraction=clamp(leftPower/initial,.08,.95);this.report();this.onFinish({victory,attackerRemaining:fraction,seconds:Math.round(this.elapsed)});}
+ finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;
+  const total=this.groups.filter(g=>g.side==='attacker').length*100;
+  const fraction=clamp(leftPower/total,.04,.95);
+  const enemies=rightPower??this.groups.filter(g=>g.side==='defender'&&!g.routed).reduce((sum,g)=>sum+g.life,0);
+  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:clamp(enemies/600,.03,.95),seconds:Math.round(this.elapsed)});
+ }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
  togglePause(){this.paused=!this.paused;this.report();}
  stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.scenery?.dispose();this.ctx?.dispose?.();}
