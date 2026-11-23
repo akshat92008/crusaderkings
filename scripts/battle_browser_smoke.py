@@ -79,7 +79,32 @@ try:
   after=page.evaluate("""() => {const g=__battleSmoke.groups[0];return [g.x,g.z];}""")
   assert before!=after or page.evaluate("window.__battleSmoke.done"),'Battle units not moving'
   page.evaluate("window.__battleSmoke.stop()")
-  print('BATTLE BROWSER SMOKE PASSED: renderer=',info,'models=',glbs,'animation=',stats,'screenshot=',screenshot)
+  page.evaluate("document.querySelector('#battle-screen').hidden=true")
+  # Verify the user can open the actual upgraded scene directly and return
+  # without altering the kingdom save or campaign resources.
+  before_showcase=page.evaluate("""() => ({
+     treasury:document.querySelector('#resource-gold').textContent,
+     army:document.querySelector('#resource-army').textContent,
+     name:document.querySelector('#faction-name').textContent,
+     saved:localStorage.getItem('crown-of-nations.save')
+  })""")
+  page.click('#battle-showcase')
+  page.wait_for_function("document.querySelector('#battle-screen').hidden===false",timeout=10000)
+  assert 'SHOWCASE' in page.locator('#battle-title').inner_text()
+  page.wait_for_timeout(300)
+  page.click('#battle-retreat')
+  page.wait_for_function("document.querySelector('#battle-return')!==null",timeout=10000)
+  assert 'practice battle' in page.locator('#battle-result').inner_text().lower()
+  page.click('#battle-return')
+  assert page.locator('#battle-screen').is_hidden()
+  after_showcase=page.evaluate("""() => ({
+     treasury:document.querySelector('#resource-gold').textContent,
+     army:document.querySelector('#resource-army').textContent,
+     name:document.querySelector('#faction-name').textContent,
+     saved:localStorage.getItem('crown-of-nations.save')
+  })""")
+  assert before_showcase==after_showcase,(before_showcase,after_showcase)
+  print('BATTLE BROWSER SMOKE PASSED: renderer=',info,'models=',glbs,'animation=',stats,'screenshot=',screenshot,'practice_mode=SAFE')
   browser.close()
 except Exception:
  detail='BATTLE VISUAL TEST FAILED\n'+traceback.format_exc()
