@@ -37,7 +37,7 @@ try:
    const descriptor={attacker:attacker.id,enemy,to:attacker.province,defenseTroops:85,defenseGarrison:65};
    const battle=new BattleGame(document.getElementById('battle-canvas'),descriptor,game,()=>{},()=>{});
    window.__battleSmoke=battle;
-   return {formations:battle.groups.length,renderer:battle.ctx.constructor.name,webgl:!!document.createElement('canvas').getContext('webgl2')};
+   return {formations:battle.groups.length,renderer:battle.ctx.constructor.name,three:!!battle.ctx.isThreeBattle,webgl:!!document.createElement('canvas').getContext('webgl2')};
   }""")
   assert info['formations']==12,info
   # Prove actual asset URLs and binary GLB data are in the runnable build.
@@ -49,7 +49,7 @@ try:
    }));
   }""")
   assert all(x['valid'] and x['length']>1000000 for x in glbs),glbs
-  if info['renderer']=='ThreeBattleScene':
+  if info['three']:
    page.wait_for_function("window.__battleSmoke.ctx.modelsReady",timeout=35000)
    page.wait_for_function("window.__battleSmoke.ctx.groups.size>=8",timeout=25000)
    stats=page.evaluate("""() => ({
