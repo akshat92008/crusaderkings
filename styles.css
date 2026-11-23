@@ -42,7 +42,8 @@
 .mapmodebtn:hover{color:#fff0c9;background:#856a4b}
 .mapmodebtn.active{color:#3f3224;background:linear-gradient(#ecdcaa,#c9ab71);border-color:#f3dfa9}
 .mapfooter{background:linear-gradient(#3d453e,#283931);border-top:2px solid #947a4f;color:#e4d5ad}
-.atlas-expanded .gamebody{grid-template-columns:0 minmax(0,1fr) 0}
+.atlas-expanded .gamebody{grid-template-columns:minmax(0,1fr)}
+.atlas-expanded .maparea{grid-column:1;width:100%;min-width:0}
 .atlas-expanded .leftbar,.atlas-expanded .rightbar{display:none}
 .atlas-expanded .maparea{min-height:calc(100vh - 80px)}
 .atlas-expanded .canvaswrap{min-height:calc(100vh - 260px)}
