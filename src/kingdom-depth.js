@@ -229,7 +229,7 @@ function planInvasion(g,world){
   for(const to of home.neighbors){
    const p=g.provinces[to];if(p?.owner!==g.player)continue;
    const defense=45+p.development*12+(p.buildings.fort||0)*45+armies(g,g.player).filter(x=>x.province===to).reduce((n,x)=>n+size(x),0);
-   if(size(a)>defense*1.28)targets.push({by:a.owner,army:a.id,province:to,eta:3});
+   if(size(a)>defense*(g.kingdom.difficulty==='hard'?1.08:1.28))targets.push({by:a.owner,army:a.id,province:to,eta:3});
   }
  }
  if(targets.length){
