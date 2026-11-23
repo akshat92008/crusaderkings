@@ -18,6 +18,36 @@ const walkClip=clips=>clips.find(c=>/^Walking_A$/i.test(c.name))||clips.find(c=>
 const idleClip=clips=>clips.find(c=>/^Idle_A$/i.test(c.name))||clips.find(c=>/idle/i.test(c.name))||clips[0];
 const attackClip=clips=>clips.find(c=>/1H_Melee_Attack_Slice/i.test(c.name))||clips.find(c=>/melee.*attack|attack.*slash/i.test(c.name))||clips.find(c=>/attack/i.test(c.name));
 const bowClip=clips=>clips.find(c=>/bow.*(shoot|release)/i.test(c.name))||clips.find(c=>/shoot.*bow|archery/i.test(c.name))||attackClip(clips);
+const elapsedTime=(phase,t,j)=>(t*10+phase+j*Math.PI*.6);
+
+
+/** Simple authored procedural mount until a properly rigged horse is integrated. */
+function createHorse(){
+ const horse=new THREE.Group();
+ const fur=new THREE.MeshLambertMaterial({color:0x775136});
+ const mane=new THREE.MeshLambertMaterial({color:0x382d29});
+ const saddle=new THREE.MeshLambertMaterial({color:0x594137});
+ const shape=(geometry,material,x,y,z,sx,sy,sz)=>{
+  const item=new THREE.Mesh(geometry,material);item.position.set(x,y,z);item.scale.set(sx,sy,sz);horse.add(item);return item;
+ };
+ shape(new THREE.SphereGeometry(.5,9,7),fur,0,.88,0,.78,.64,1.30);
+ const neck=shape(new THREE.CylinderGeometry(.22,.31,1,7),fur,0,1.20,.52,.9,1,.9);
+ neck.rotation.x=-.50;
+ shape(new THREE.BoxGeometry(1,1,1),fur,0,1.52,.80,.34,.42,.61);
+ shape(new THREE.BoxGeometry(1,1,1),mane,0,1.42,.50,.42,.32,.14);
+ shape(new THREE.BoxGeometry(1,1,1),saddle,0,1.23,-.12,.70,.22,.56);
+ const legs=[];
+ for(const x of [-.30,.30])for(const z of [-.47,.47]){
+  const joint=new THREE.Group();joint.position.set(x,.57,z);horse.add(joint);
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.10,.08,.70,6),fur);
+  leg.position.y=-.31;joint.add(leg);
+  const hoof=new THREE.Mesh(new THREE.BoxGeometry(.19,.14,.27),mane);
+  hoof.position.set(0,-.69,.07);joint.add(hoof);legs.push(joint);
+ }
+ const tail=shape(new THREE.ConeGeometry(.17,.63,6),mane,0,.93,-.83,.85,1,1);
+ tail.rotation.x=.46;
+ return {horse,legs};
+}
 
 export class ThreeBattleScene {
  constructor(canvas) {
@@ -55,22 +85,26 @@ export class ThreeBattleScene {
   }
  }
  prepareSquad(g){
-  if(this.groups.has(g.id)||!this.modelsReady||g.type==='cavalry')return;
+  if(this.groups.has(g.id)||!this.modelsReady)return;
   const template=this.templates[g.type]||this.templates.infantry;
-  const count=g.type==='archers'?8:11;
+  const count=g.type==='archers'?8:g.type==='cavalry'?6:11;
   const units=[];
   for(let i=0;i<count;i++){
    const rig=cloneSkeleton(template.scene);
    const box=new THREE.Box3().setFromObject(rig);const height=box.max.y-box.min.y||1.7;const scale=1.75/height;
    // A wrapper allows the original skeleton to keep its root animation.
-   const root=new THREE.Group();rig.scale.multiplyScalar(scale);rig.position.y=-box.min.y*scale;
+   const root=new THREE.Group(),mounted=g.type==='cavalry';
+   rig.scale.multiplyScalar(mounted?scale*.74:scale);
+   rig.position.y=(mounted?.91:0)-box.min.y*scale*(mounted?.74:1);
+   let mount=null;
+   if(mounted){mount=createHorse();root.add(mount.horse);}
    root.add(rig);this.scene.add(root);
    const mixer=new THREE.AnimationMixer(rig);
    const idle=idleClip(template.animations),walk=walkClip(template.animations),attack=g.type==='archers'?bowClip(template.animations):attackClip(template.animations);
    const actions={};
    for(const [name,clip] of [['idle',idle],['walk',walk],['attack',attack]])if(clip){actions[name]=mixer.clipAction(clip);actions[name].loop=THREE.LoopRepeat;}
    const start=actions.idle||actions.walk||actions.attack;if(start)start.play();
-   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null});
+   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null,mount});
    this.mixers.push(mixer);
   }
   this.groups.set(g.id,units);
@@ -78,9 +112,8 @@ export class ThreeBattleScene {
  updateCharacters(groups,dt){
   if(!this.modelsReady)return;
   for(const g of groups||[]){
-   if(g.type==='cavalry')continue;
    this.prepareSquad(g);const units=this.groups.get(g.id);if(!units)continue;
-   const n=Math.round(units.length*cap(g.life/100,0,1));const cols=g.type==='archers'?4:5;
+   const n=Math.round(units.length*cap(g.life/100,0,1));const cols=g.type==='archers'?4:g.type==='cavalry'?3:5;
    const facing=Math.atan2(g.targetX-g.x,g.targetZ-g.z);
    const moving=Math.hypot(g.targetX-g.x,g.targetZ-g.z)>.7;
    const fighting=g.cooldown>.22&&g.cooldown<.72;
@@ -88,9 +121,10 @@ export class ThreeBattleScene {
    for(let i=0;i<units.length;i++){
     const u=units[i];u.root.visible=!g.routed&&i<n;
     if(!u.root.visible)continue;
-    const row=Math.floor(i/cols),col=i%cols,spacing=g.type==='archers'?1.08:.92;
+    const row=Math.floor(i/cols),col=i%cols,spacing=g.type==='archers'?1.08:g.type==='cavalry'?1.8:.92;
     u.root.position.set(g.x+(col-(cols-1)/2)*spacing,0,g.z+(row-1.0)*spacing);
     u.root.rotation.y=facing+(g.side==='defender'?Math.PI:0);
+    if(u.mount)for(let j=0;j<u.mount.legs.length;j++)u.mount.legs[j].rotation.x=moving?Math.sin(elapsedTime(u.phase,u.mixer.time,j))*.36:0;
     if(mode!==u.mode){
      const action=u.actions[mode]||u.actions.walk||u.actions.idle;
      if(action&&action!==u.current){
