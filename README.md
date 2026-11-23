@@ -112,3 +112,18 @@ The source branch's stone wall GLB is a fallback when the local Kenney wall is a
 This development branch includes a WebGL2 3D relief campaign renderer, political and terrain modes, an optional Cliopatria historical-reference overlay, and graceful 2D fallback. The 3D height field is a **stylized approximation, not a surveyed elevation model**, while the original 299 playable provinces remain experimental/synthetic.
 
 Run the static build using `python3 -m http.server 8080`. See [the full milestone report](docs/MILESTONE_02_CAMPAIGN_3D.md) for the source-asset generation commands and limitations. The ready-to-run Milestone 02 ZIP supplied in chat already contains its generated imagery and historical GeoJSON; the GitHub branch does not yet bundle those binaries/data.
+
+
+## Milestone 03: Animated 3D armies (development preview)
+
+WebGL2 battles now use original CC0 KayKit **Knight** and **Rogue Hooded** character GLBs, animated at runtime, including mounted Knight riders on procedural horses. The game continues to work without WebGL2 by rendering the previous geometric battlefield.
+
+The two locally bundled rigged characters and the self-hosted Three.js scene come from a reproducible script:
+
+```bash
+npm ci
+npm run build:battle
+python3 -m http.server 8080
+```
+
+No internet connection is needed to play the packaged release. See [Milestone 03 report](docs/MILESTONE_03_ANIMATED_ARMIES.md) and the [actual browser-rendered screenshot](docs/battle-real-kaykit-3d.png). **This is not yet a complete or visually polished grand-strategy game.**
