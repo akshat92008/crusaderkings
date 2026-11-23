@@ -1,0 +1,35 @@
+name: Kingdom AI and royal content browser QA
+on:
+  push:
+    branches: [feature/kingdom-ai-content-06]
+    paths:
+      - src/kingdom-depth.js
+      - src/kingdom-ui.js
+      - src/simulation.js
+      - src/main.js
+      - index.html
+      - scripts/kingdom_browser_smoke.py
+      - .github/workflows/kingdom-visual.yml
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chromium and Playwright
+        run: |
+          python -m pip install --quiet playwright
+          python -m playwright install --with-deps chromium
+      - name: Run real kingdom management gameplay
+        run: python3 scripts/kingdom_browser_smoke.py
+      - name: Upload actual browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingdom-ai-court-trade-legacy-screenshots
+          path: docs/kingdom-*.png
+          if-no-files-found: warn
