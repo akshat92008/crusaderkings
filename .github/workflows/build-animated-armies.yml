@@ -1,10 +1,12 @@
 name: Build KayKit animated army assets
 on:
   push:
-    branches: [feature/animated-3d-armies-03]
+    branches: [feature/medieval-battlefield-05]
     paths:
       - scripts/build_3d_battle.mjs
       - src/three-battle-scene.js
+      - src/battlefield-art.js
+      - src/battlefield-layout.js
       - package.json
       - .github/workflows/build-animated-armies.yml
   workflow_dispatch:
