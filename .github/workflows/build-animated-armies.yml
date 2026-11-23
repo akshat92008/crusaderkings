@@ -38,5 +38,6 @@ jobs:
           git add src/three-battle.bundle.js assets/battle/characters package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m "Bundle CC0 KayKit animated soldier GLBs and self-hosted Three.js"
-            git push
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push origin HEAD:"$GITHUB_REF_NAME"
           fi
