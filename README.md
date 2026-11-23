@@ -136,3 +136,14 @@ The browser battle now renders an original medieval fortified settlement, villag
 **To inspect it immediately:** begin a reign, then select **⚔ BATTLE SHOWCASE** from the map controls. This starts a practice encounter without changing your troops, treasury, provinces, or saves.
 
 See the [milestone details](docs/MILESTONE_04_MEDIEVAL_BATTLEFIELD.md) and [actual Chromium screenshot](docs/battle-medieval-fortress-3d.png). The v0.5 playable ZIP includes the local KayKit GLBs and browser-renderer bundle; the 730 MB raw architecture library remains outside the playtest.
+
+
+## Milestone 05 — Royal Courts, Trade, Events and AI
+
+The campaign now includes generated (fictional) royal dynasties and succession for all 44 factions, five playable court decisions, merchant trade treaties, dynastic marriage diplomacy, **23 interactive narrative events**, smarter rule-based kingdom AI and attacks with warning periods, Peaceful/Normal/Hard difficulty, six campaign objectives, and a year-1500 legacy assessment.
+
+Use the new **ROYAL COURT**, **TRADE**, and **LEGACY** tabs to play these systems. Royal events appear every nine months of game time if there is no unresolved event. Old saves are upgraded automatically. All AI behavior is local and deterministic—not based on an external paid service.
+
+See [Milestone 05 details and limitations](docs/MILESTONE_05_KINGDOM_AI.md).
+
+This remains an early-access prototype: historically correct world borders, full dynasty/vassal depth, naval mechanics, complex siege gameplay, cultural unit diversity and final optimization are still missing.

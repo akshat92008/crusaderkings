@@ -1,4 +1,4 @@
-name: Publish playable animated-armies strategy build
+name: Publish playable kingdom AI and royal content build
 on:
   push:
     branches: [main]
@@ -26,17 +26,17 @@ jobs:
       - name: Upload playtest ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Crown-of-Nations-1450-Medieval-Battlefields-Playtest
-          path: dist/Crown-of-Nations-1450-Medieval-Battlefields-Playtest.zip
+          name: Crown-of-Nations-1450-Kingdoms-and-AI-Playtest
+          path: dist/Crown-of-Nations-1450-Kingdoms-and-AI-Playtest.zip
           if-no-files-found: error
       - name: Publish public prerelease download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=v0.5.0-medieval-battlefields
-          ZIP=dist/Crown-of-Nations-1450-Medieval-Battlefields-Playtest.zip
+          TAG=v0.6.0-kingdoms-ai
+          ZIP=dist/Crown-of-Nations-1450-Kingdoms-and-AI-Playtest.zip
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ZIP" --clobber
           else
-            gh release create "$TAG" "$ZIP" --title "Crown of Nations: 1450 — Medieval Battlefields Playtest" --notes "Playable preview with a new CK-style political atlas, an incomplete 1450 historical-reference layer, the existing economy/diplomacy simulation, and animated CC0 KayKit infantry, archers and mounted cavalry, plus original textured 3D castle, village, siege props and army camps; 2D fallback remains; fortifications are not yet destructible. Not a finished game. Download, extract, and serve the game folder with python3 -m http.server 8080." --prerelease
+            gh release create "$TAG" "$ZIP" --title "Crown of Nations: 1450 — Kingdoms and AI Playtest" --notes "Playable prototype with 44 fictional royal dynasties, rival kingdom AI, courts, 23 narrative events, treaties, trade income, diplomacy, 1450 atlas, objectives and legacy outcome; keeps animated KayKit 3D battles and fortresses. Synthetic borders and advanced systems remain incomplete. Not a finished game. Download, extract, and serve the game folder with python3 -m http.server 8080." --prerelease
           fi
