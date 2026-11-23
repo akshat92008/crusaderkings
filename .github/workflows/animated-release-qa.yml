@@ -1,0 +1,30 @@
+name: Animated armies downloadable build QA
+on:
+  push:
+    branches: [feature/animated-3d-armies-03]
+    paths:
+      - scripts/package_playable.py
+      - scripts/check_release_package.py
+      - .github/workflows/animated-release-qa.yml
+  workflow_dispatch:
+jobs:
+  playable-zip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run campaign regression and syntax checks
+        run: |
+          npm test
+          npm run check
+      - name: Build small real playable ZIP with bundled character assets
+        run: |
+          python3 scripts/package_playable.py
+          python3 scripts/check_release_package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crown-of-nations-animated-armies-playable-zip
+          path: dist/Crown-of-Nations-1450-Animated-Armies-Playtest.zip
