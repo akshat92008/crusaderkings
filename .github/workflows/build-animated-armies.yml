@@ -1,0 +1,40 @@
+name: Build KayKit animated army assets
+on:
+  push:
+    branches: [feature/animated-3d-armies-03]
+    paths:
+      - scripts/build_3d_battle.mjs
+      - src/three-battle-scene.js
+      - package.json
+      - .github/workflows/build-animated-armies.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked-version build tools
+        run: npm install --no-audit --no-fund
+      - name: Download original KayKit CC0 character models and bundle Three.js
+        run: npm run build:battle
+      - name: Check bundled modules and original GLB data
+        run: |
+          node --check src/three-battle.bundle.js
+          test -s assets/battle/characters/Knight.glb
+          test -s assets/battle/characters/Rogue_Hooded.glb
+          test -s assets/battle/characters/LICENSE.txt
+      - name: Commit source-verified, browser-ready assets to this development branch
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add src/three-battle.bundle.js assets/battle/characters package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Bundle CC0 KayKit animated soldier GLBs and self-hosted Three.js"
+            git push
+          fi
