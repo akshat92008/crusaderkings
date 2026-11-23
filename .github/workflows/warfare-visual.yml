@@ -1,0 +1,38 @@
+name: Cultural warfare interactive browser QA
+on:
+  push:
+    branches: [feature/ck-coc-warfare-07]
+    paths:
+      - src/battle.js
+      - src/main.js
+      - src/invasions.js
+      - src/military-doctrines.js
+      - src/three-battle.bundle.js
+      - scripts/warfare_browser_smoke.py
+      - .github/workflows/warfare-visual.yml
+  workflow_dispatch:
+jobs:
+  warfare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chromium
+        run: |
+          python -m pip install --quiet playwright
+          python -m playwright install --with-deps chromium
+      - name: Test player formations and authentic rival-initiated defense
+        run: python3 scripts/warfare_browser_smoke.py
+      - name: Upload real browser screenshots and errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crown-of-nations-v07-war-acceptance
+          path: |
+            docs/warfare-cultural-formations.png
+            docs/warfare-enemy-invasion.png
+            docs/warfare-browser-error.txt
+          if-no-files-found: warn
