@@ -1,61 +1,138 @@
 import {ReliefMap} from './relief-map.js';
-/* Canvas cartography: bundled public-domain coastlines, original synthetic provinces. */
-const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-const bounds={minZoom:.65,maxZoom:12};
-const pointRing=(x,y,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)hit=!hit;}return hit;};
-const pointPolygon=(x,y,rings)=>pointRing(x,y,rings[0])&&!rings.slice(1).some(r=>pointRing(x,y,r));
-function inside(x,y,geo){if(geo.type==='Polygon')return pointPolygon(x,y,geo.coordinates);if(geo.type==='MultiPolygon')return geo.coordinates.some(r=>pointPolygon(x,y,r));return false;}
+import {
+ atlasPaper,atlasColor,buildDecorativeCounties,drawGeoPath,drawSea,drawLand,
+ drawTopography,drawDivisions,drawRosette,atlasBorders,drawSettlement,drawOceanLettering
+} from './atlas-art.js';
+
+/** Crown of Nations — living political atlas over the existing campaign game. */
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),bounds={minZoom:.55,maxZoom:16};
+function pointRing(x,y,ring){let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)hit=!hit;}return hit;}
+function pointPolygon(x,y,rings){return pointRing(x,y,rings[0])&&!rings.slice(1).some(r=>pointRing(x,y,r));}
+export function inside(x,y,geo){if(geo?.type==='Polygon')return pointPolygon(x,y,geo.coordinates);if(geo?.type==='MultiPolygon')return geo.coordinates.some(r=>pointPolygon(x,y,r));return false;}
+function polityColor(i){const palette=['#a7b6a0','#bc9eaa','#d7b778','#b2a6ce','#b3b18e','#9eb9ba','#caa19a','#a7c0a0','#d7b99f','#b6a7bf','#ccb18c','#a6b0a3','#d3a4a5','#bfcca0'];return palette[(i*7+Math.floor(i/7))%palette.length];}
+function areaOf(geo){if(!geo)return 0;const ring=geo.type==='Polygon'?geo.coordinates[0]:geo.type==='MultiPolygon'?geo.coordinates[0]?.[0]:null;if(!ring)return 0;let total=0;for(let j=0;j<ring.length;j++){const a=ring[j],b=ring[(j+1)%ring.length];total+=a[0]*b[1]-b[0]*a[1];}return Math.abs(total)/2;}
+function centerOf(geo){const points=geo?.type==='Polygon'?geo.coordinates[0]:geo?.type==='MultiPolygon'?geo.coordinates[0]?.[0]:[];if(!points?.length)return [0,0];let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;for(const [x,y] of points){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}return [(x0+x1)/2,(y0+y1)/2];}
+
 export class CampaignMap{
- constructor(canvas,world,onProvince){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.world=world;this.onProvince=onProvince;this.game=null;this.selected=null;this.hover=null;this.zoom=1.02;this.panX=0;this.panY=0;this.drag=null;this.frame=0;this.drawn=false;this.mode='political';this.history=null;this.useRelief=true;this.hoverHistoric=null;this.fallbackTerrain=new Image();this.fallbackTerrain.onload=()=>this.render();this.fallbackTerrain.src='assets/terrain/natural-earth-relief.webp';this.terrain=new ReliefMap(document.getElementById('terrain-map'),()=>this.render());
+ constructor(canvas,world,onProvince){
+  this.canvas=canvas;this.ctx=canvas.getContext('2d');this.world=world;this.onProvince=onProvince;
+  this.game=null;this.selected=null;this.hover=null;this.hoverHistorical=null;
+  this.zoom=1.02;this.panX=0;this.panY=0;this.drag=null;this.mode='political';this.history=null;this.useRelief=true;
+  this.counties=buildDecorativeCounties(world);this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));this.paper=this.ctx?atlasPaper(this.ctx):null;
+  this.dirty=true;
+  const terrainCanvas=document.getElementById('terrain-map');this.terrain=terrainCanvas?new ReliefMap(terrainCanvas,()=>this.render()):null;
   const obs=new ResizeObserver(()=>this.resize());obs.observe(canvas.parentElement);this.resize();
-  canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;canvas.setPointerCapture(e.pointerId);this.drag={x:e.clientX,y:e.clientY,panX:this.panX,panY:this.panY,dist:0};});
-  canvas.addEventListener('pointermove',e=>{if(this.drag){let dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.dist=Math.max(this.drag.dist,Math.hypot(dx,dy));if(this.drag.dist>4){this.panX=this.drag.panX+dx;this.panY=this.drag.panY+dy;this.render();}return;}
-   const p=this.toGeo(e.offsetX,e.offsetY),found=this.pick(p[0],p[1]),historic=this.mode==='historical'?this.pickHistorical(...p):null;if(found?.id!==this.hover?.id||historic?.properties?.Name!==this.hoverHistoric?.properties?.Name){this.hover=found;this.hoverHistoric=historic;canvas.style.cursor=found?'crosshair':'grab';this.render();}});
-  canvas.addEventListener('pointerup',e=>{if(this.drag?.dist<5){const loc=this.toGeo(e.offsetX,e.offsetY);const p=this.pick(...loc);if(p)this.onProvince(p.id);}this.drag=null;});
-  canvas.addEventListener('wheel',e=>{e.preventDefault();let old=this.zoom;let next=clamp(old*Math.exp(-e.deltaY*.0012),bounds.minZoom,bounds.maxZoom);let ax=e.offsetX-this.canvas.clientWidth/2-this.panX,ay=e.offsetY-this.canvas.clientHeight/2-this.panY;this.panX-=ax*(next/old-1);this.panY-=ay*(next/old-1);this.zoom=next;this.render();},{passive:false});
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;canvas.setPointerCapture(e.pointerId);this.drag={x:e.clientX,y:e.clientY,px:this.panX,py:this.panY,distance:0};});
+  canvas.addEventListener('pointermove',e=>{
+   if(this.drag){let dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.distance=Math.max(this.drag.distance,Math.hypot(dx,dy));if(this.drag.distance>3){this.panX=this.drag.px+dx;this.panY=this.drag.py+dy;this.render();}return;}
+   const p=this.toGeo(e.offsetX,e.offsetY),found=this.pick(...p),historical=this.mode==='historical'?this.pickHistorical(...p):null;
+   if(found?.id!==this.hover?.id||historical?.properties?.name!==this.hoverHistorical?.properties?.name){this.hover=found;this.hoverHistorical=historical;canvas.style.cursor=found?'crosshair':'grab';this.render();}
+  });
+  canvas.addEventListener('pointerup',e=>{if(this.drag?.distance<5){const province=this.pick(...this.toGeo(e.offsetX,e.offsetY));if(province)this.onProvince(province.id);}this.drag=null;});
+  canvas.addEventListener('pointercancel',()=>{this.drag=null;});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();const old=this.zoom,next=clamp(old*Math.exp(-e.deltaY*.00122),bounds.minZoom,bounds.maxZoom);
+   const dx=e.offsetX-this.w/2-this.panX,dy=e.offsetY-this.h/2-this.panY;
+   this.panX-=dx*(next/old-1);this.panY-=dy*(next/old-1);this.zoom=next;this.render();
+  },{passive:false});
  }
- resize(){const rect=this.canvas.getBoundingClientRect();this.w=Math.max(1,rect.width);this.h=Math.max(1,rect.height);this.dpr=Math.min(window.devicePixelRatio||1,2);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.render();}
+ resize(){const r=this.canvas.getBoundingClientRect();this.w=Math.max(1,r.width);this.h=Math.max(1,r.height);this.dpr=Math.min(window.devicePixelRatio||1,2);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.render();}
  setGame(g){this.game=g;this.render();}
- setHistorical(data){this.history=data;this.render();}
+ setHistorical(data){this.history=data?.features?data:null;this.render();}
  setMode(mode){if(!['political','terrain','historical'].includes(mode))return;this.mode=mode;this.render();}
- setRelief(enabled){this.useRelief=Boolean(enabled);this.render();}
- get compression(){return this.useRelief && this.terrain?.ready ? 0.82 : 1;}
- select(p){this.selected=p;this.render();}
- focus(lon,lat,z=2.6){this.zoom=z;this.panX=-lon*this.scale();this.panY=lat*this.scale()*this.compression;this.render();}
+ setRelief(v){this.useRelief=Boolean(v);this.render();}
+ get compression(){return this.useRelief&&this.terrain?.ready?.82:1;}
+ select(id){this.selected=id;this.render();}
+ focus(lon,lat,z=2.6){this.zoom=clamp(z,bounds.minZoom,bounds.maxZoom);this.panX=-lon*this.scale();this.panY=lat*this.scale()*this.compression;this.render();}
+ focusOldWorld(){this.focus(56,33,2.05);}
  scale(){return Math.min(this.w/355,this.h/150)*this.zoom;}
  toScreen(lon,lat){const s=this.scale();return [this.w/2+this.panX+lon*s,this.h/2+this.panY-lat*s*this.compression];}
  toGeo(x,y){const s=this.scale();return [(x-this.w/2-this.panX)/s,(this.h/2+this.panY-y)/(s*this.compression)];}
  pick(x,y){for(let i=this.world.provinces.length-1;i>=0;i--){let p=this.world.provinces[i];if(inside(x,y,p.geometry))return p;}return null;}
- pickHistorical(x,y){if(!this.history)return null;for(let i=this.history.features.length-1;i>=0;i--){const p=this.history.features[i];if(p.geometry?.type?.includes('Polygon')&&inside(x,y,p.geometry))return p;}return null;}
- render(){if(!this.ctx||!this.w||!this.h)return;const c=this.ctx,w=this.w,h=this.h,s=this.scale();c.setTransform(this.dpr,0,0,this.dpr,0,0);c.clearRect(0,0,w,h);
-  const terrainDrawn=this.terrain?.render(w,h,this.dpr,this.zoom,this.panX,this.panY,this.compression);
-  if(!terrainDrawn){const bg=c.createLinearGradient(0,0,w,h);bg.addColorStop(0,'#0c2830');bg.addColorStop(.56,'#102c35');bg.addColorStop(1,'#091c25');c.fillStyle=bg;c.fillRect(0,0,w,h);if(this.fallbackTerrain?.naturalWidth){const [tx,ty]=this.toScreen(-180,90);c.drawImage(this.fallbackTerrain,tx,ty,360*s,180*s*this.compression);}}
-  c.strokeStyle='rgba(194,176,123,.075)';c.lineWidth=1;
-  for(let lon=-180;lon<=180;lon+=15){const [x]=this.toScreen(lon,0);c.beginPath();c.moveTo(x,0);c.lineTo(x,h);c.stroke();}
-  for(let lat=-75;lat<=75;lat+=15){const [,y]=this.toScreen(0,lat);c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();}
-  c.save();c.translate(w/2+this.panX,h/2+this.panY);c.scale(s,-s*this.compression);
-  for(const p of this.world.provinces){let owner=this.game?.provinces[p.id]?.owner||p.owner;let color=this.game?.factions[owner]?.color||this.world.factions.find(f=>f.id===owner)?.color||'#646c68';c.beginPath();this.trace(c,p.geometry);
-   c.fillStyle=color;c.globalAlpha=(terrainDrawn||this.fallbackTerrain?.naturalWidth)?(this.mode==='political'?(owner===this.game?.player ? .53 : .37):.10):(owner===this.game?.player ? .84 : .56);c.fill('evenodd');c.globalAlpha=1;
-   c.strokeStyle=this.mode==='political'?'rgba(245,225,181,.34)':'rgba(231,212,179,.19)';c.lineWidth=clamp(.8/s,.03,.42);c.stroke();
-  }
-  if(this.mode==='historical'&&this.history){for(const p of this.history.features){if(!p.geometry?.type?.includes('Polygon'))continue;c.beginPath();this.trace(c,p.geometry);c.fillStyle='rgba(209,154,80,.10)';c.fill('evenodd');c.strokeStyle='rgba(252,211,133,.74)';c.lineWidth=clamp(1.25/s,.03,.48);c.stroke();}}
-  // Fortifications, capital settlements and army markers.
-  for(const f of this.world.factions){let [x,y]=f.capital;if(s*this.zoom<0)continue;c.beginPath();c.arc(x,y,clamp(2.8/s,.3,1.2),0,Math.PI*2);c.fillStyle='#ead7ab';c.globalAlpha=.9;c.fill();c.globalAlpha=1;}
-  const sel=this.world.provinces.find(p=>p.id===this.selected);if(sel){c.beginPath();this.trace(c,sel.geometry);c.fillStyle='rgba(244,197,106,.16)';c.fill('evenodd');c.lineWidth=2.5/s;c.strokeStyle='#ffe1a0';c.stroke();}
-  const over=this.hover;if(over&&over.id!==this.selected){c.beginPath();this.trace(c,over.geometry);c.lineWidth=1.9/s;c.strokeStyle='rgba(255,236,185,.75)';c.stroke();}
-  c.restore();
-  // Macro regions and key states — labels adapt to map zoom.
-  c.font=`${this.zoom>=2?600:500} ${Math.max(9,Math.min(14,10+this.zoom*.8))}px Georgia,serif`;c.textAlign='center';c.textBaseline='middle';
-  const used=[];for(const f of this.world.factions){const [x,y]=this.toScreen(...f.capital);if(x<40||x>w-40||y<22||y>h-22)continue;
-   if(this.mode==='terrain'&&this.zoom<2)continue;
-   if(this.zoom<1.4&&!['england','ottomans','france','ming','delhi','inca','mali','ashikaga','mexica','timurids','vijayanagara','ethiopia'].includes(f.id))continue;
-   if(used.some(([px,py])=>Math.abs(px-x)<75&&Math.abs(py-y)<20))continue;
-   used.push([x,y]);c.strokeStyle='rgba(11,23,24,.82)';c.lineWidth=3.2;c.strokeText(f.name,x,y+13);c.fillStyle='#eee3c4';c.fillText(f.name,x,y+13);
-  }
-  if(this.zoom<1.65){for(const [lon,lat,label] of [[-37,7,'ATLANTIC OCEAN'],[76,-31,'INDIAN OCEAN'],[-145,-1,'PACIFIC OCEAN']]){const [x,y]=this.toScreen(lon,lat);c.font='italic 12px Georgia,serif';c.fillStyle='rgba(146,192,191,.32)';c.fillText(label,x,y);}}
-  // Scale and lower-left geo notation.
-  c.font='11px ui-monospace,monospace';c.textAlign='left';c.fillStyle='rgba(216,213,190,.48)';c.fillText(this.mode==='historical'?`1450 · HISTORICAL REFERENCE · ${this.history?.features.length||0} SOURCED SHAPES · INCOMPLETE`:`1450 · ${this.mode.toUpperCase()} · ${this.world.provinces.length} PLAYABLE PROVINCES · EXPERIMENTAL BORDERS`,17,h-17);
-  if(this.hover){const [x,y]=this.toScreen(...this.hover.centroid);const own=this.game?.provinces[this.hover.id]?.owner||this.hover.owner;const name=this.game?.factions[own]?.name||this.world.factions.find(f=>f.id===own)?.name||'Independent Polities';let label=this.mode==='historical'&&this.hoverHistoric?`HISTORICAL REFERENCE: ${this.hoverHistoric.properties.Name}`:`${this.hover.id.toUpperCase()} · ${name}`;c.font='12px sans-serif';const tx=clamp(x+14,10,w-c.measureText(label).width-30),ty=clamp(y-15,15,h-25);c.fillStyle='rgba(4,15,20,.87)';c.fillRect(tx-6,ty-12,c.measureText(label).width+15,24);c.fillStyle='#f4e3bb';c.fillText(label,tx,ty+3);}
+ pickHistorical(x,y){if(!this.history)return null;for(let i=this.history.features.length-1;i>=0;i--){const f=this.history.features[i];if(inside(x,y,f.geometry))return f;}return null;}
+ trace(ctx,geo){drawGeoPath(ctx,geo);}
+ _drawProvinceColors(c,s){
+  c.save();c.lineJoin='round';for(const p of this.world.provinces){
+   const owner=this.game?.provinces?.[p.id]?.owner??p.owner;
+   c.beginPath();drawGeoPath(c,p.geometry);c.fillStyle=atlasColor(this.game?.factions?.[owner]?.color||this.ownerColors[owner]||'#b4b09a',.29);
+   c.globalAlpha=owner===this.game?.player?.87:.77;c.fill('evenodd');c.globalAlpha=1;
+   c.lineWidth=clamp(1.35/s,.05,.52);c.strokeStyle='rgba(54,43,31,.50)';c.stroke();
+  }c.restore();
  }
- trace(c,geo){const rings=geo.type==='Polygon'?[geo.coordinates]:geo.coordinates;for(const polygon of rings){for(const ring of polygon){if(!ring.length)continue;c.moveTo(ring[0][0],ring[0][1]);for(let i=1;i<ring.length;i++)c.lineTo(ring[i][0],ring[i][1]);c.closePath();}}}
+ _drawHistorical(c,s){
+  if(!this.history?.features?.length)return;
+  c.save();c.lineJoin='round';
+  for(let i=0;i<this.history.features.length;i++){const f=this.history.features[i];c.beginPath();drawGeoPath(c,f.geometry);c.fillStyle=polityColor(i);c.globalAlpha=.83;c.fill('evenodd');c.globalAlpha=1;c.strokeStyle='rgba(55,44,35,.75)';c.lineWidth=clamp(1.35/s,.06,.65);c.stroke();}
+  c.restore();
+ }
+ _markArmy(c,a){const province=this.world.provinces.find(p=>p.id===a.province);if(!province)return;
+  const [x,y]=this.toScreen(...province.centroid);if(x<20||y<32||x>this.w-25||y>this.h-30)return;
+  const mine=a.owner===this.game?.player;
+  c.save();c.translate(x,y-15);c.shadowColor='rgba(26,29,20,.58)';c.shadowBlur=5;c.fillStyle=mine?'#c9a04d':'#6c5c55';c.strokeStyle='#2e3430';c.lineWidth=1.3;
+  c.beginPath();c.moveTo(-6,-12);c.lineTo(6,-12);c.lineTo(6,5);c.lineTo(0,11);c.lineTo(-6,5);c.closePath();c.fill();c.stroke();c.shadowBlur=0;
+  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText('⚔',0,-2);c.restore();
+ }
+ _labels(c,s){
+  c.save();c.textAlign='center';c.textBaseline='middle';const used=[];
+  if(this.mode==='historical'&&this.history){
+   const entries=this.history.features.map((f,i)=>({f,i,area:areaOf(f.geometry)})).filter(o=>o.area>1.8).sort((a,b)=>b.area-a.area);
+   for(const {f,area} of entries){const pt=centerOf(f.geometry),[x,y]=this.toScreen(...pt);if(x<38||y<40||x>this.w-38||y>this.h-48)continue;
+    const text=String(f.properties.name||'').toUpperCase(),font=clamp(10+Math.sqrt(area)*.48,11,17);c.font='600 '+font+'px Georgia';
+    const width=c.measureText(text).width;if(used.some(v=>Math.abs(x-v[0])<Math.max(width,v[2])*.56&&Math.abs(y-v[1])<20))continue;
+    c.lineWidth=3.2;c.strokeStyle='rgba(240,222,182,.84)';c.strokeText(text,x,y);c.fillStyle='rgba(45,49,40,.89)';c.fillText(text,x,y);used.push([x,y,width]);if(used.length>65)break;
+   }
+  }else if(this.mode==='political'){
+   const factions=this.world.factions.slice();factions.sort((a,b)=>{const ca=this.world.provinces.filter(p=>(this.game?.provinces[p.id]?.owner??p.owner)===a.id).length,cb=this.world.provinces.filter(p=>(this.game?.provinces[p.id]?.owner??p.owner)===b.id).length;return cb-ca;});
+   for(const f of factions){const [x,y]=this.toScreen(...f.capital);if(x<22||y<36||x>this.w-22||y>this.h-42)continue;
+    if(this.zoom<1.6&&!['france','england','ottomans','ming','delhi','timurids','mali','inca','ashikaga','mexica','vijayanagara','ethiopia','mamluks'].includes(f.id))continue;
+    const label=f.name.toUpperCase(),font=clamp(9+this.zoom*.83,10,16);c.font='bold '+font+'px Georgia,serif';
+    const ww=c.measureText(label).width;if(used.some(([px,py,pw])=>Math.abs(x-px)<(ww+pw)*.52&&Math.abs(y-py)<21))continue;
+    c.lineWidth=3.5;c.strokeStyle='rgba(227,215,182,.86)';c.strokeText(label,x,y+19);c.fillStyle='#283a34';c.fillText(label,x,y+19);used.push([x,y,ww]);
+   }
+  }
+  c.restore();
+ }
+ _cityMarkers(c){c.save();for(const f of this.world.factions){const [x,y]=this.toScreen(...f.capital);if(x<18||y<25||x>this.w-18||y>this.h-35)continue;drawSettlement(c,x,y,this.game?.player===f.id);}c.restore();}
+ _hoverTip(c){
+  if(!this.hover)return;
+  const [cx,cy]=this.toScreen(...this.hover.centroid),state=this.game?.provinces?.[this.hover.id],f=this.game?.factions?.[state?.owner]||this.world.factions.find(f=>f.id===this.hover.owner);
+  const text=this.mode==='historical'&&this.hoverHistorical?'1450 SOURCE: '+this.hoverHistorical.properties.name:(this.hover.name+' · '+(f?.name||'Independent'));
+  c.font='11px Georgia';const width=clamp(c.measureText(text).width+18,90,this.w-36),x=clamp(cx+13,20,this.w-width-20),y=clamp(cy-25,30,this.h-41);
+  c.fillStyle='rgba(38,45,39,.96)';c.strokeStyle='#bc9c66';c.lineWidth=1;c.fillRect(x,y,width,24);c.strokeRect(x,y,width,24);c.fillStyle='#ecdcb9';c.textAlign='left';c.textBaseline='middle';c.fillText(text,x+9,y+12,width-16);
+ }
+ render(){
+  if(!this.ctx||!this.w||!this.h)return;
+  const c=this.ctx,w=this.w,h=this.h,s=this.scale(),view=(lon,lat)=>this.toScreen(lon,lat);
+  const gpu=this.useRelief&&this.mode==='terrain'&&this.terrain?.render(w,h,this.dpr,this.zoom,this.panX,this.panY,this.compression);
+  c.setTransform(this.dpr,0,0,this.dpr,0,0);c.clearRect(0,0,w,h);
+  if(gpu){c.globalAlpha=.18;drawSea(c,w,h,this.paper);c.globalAlpha=1;}else drawSea(c,w,h,this.paper);
+  // Geographic drawing in degrees, with exactly the same transform as picking.
+  c.save();c.translate(w*.5+this.panX,h*.5+this.panY);c.scale(s,-s*this.compression);
+  c.globalAlpha=gpu?.52:1;drawLand(c,this.world,s);c.globalAlpha=1;
+  if(this.mode==='historical'){
+   this._drawHistorical(c,s);
+  }else{
+   if(this.mode==='political')this._drawProvinceColors(c,s);
+   if(this.mode==='terrain'){c.globalAlpha=.36;this._drawProvinceColors(c,s);c.globalAlpha=1;}
+   if(this.mode==='political')drawDivisions(c,this.counties,s,this.zoom>.73);
+  }
+  if(this.mode!=='historical')drawTopography(c,this.world,s);
+  // Borders of selected/hovered playable provinces always remain interactive.
+  const selected=this.world.provinces.find(p=>p.id===this.selected);
+  if(selected){c.beginPath();drawGeoPath(c,selected.geometry);c.fillStyle='rgba(255,217,126,.14)';c.fill('evenodd');c.lineWidth=clamp(3.4/s,.12,.95);c.strokeStyle='#fff0b7';c.stroke();}
+  if(this.hover&&this.hover.id!==this.selected){c.beginPath();drawGeoPath(c,this.hover.geometry);c.lineWidth=clamp(2.5/s,.08,.7);c.strokeStyle='#f9e3ac';c.stroke();}
+  c.restore();
+  drawOceanLettering(c,view,w,h);
+  if(this.mode!=='terrain')this._labels(c,s);
+  this._cityMarkers(c);
+  if(this.game){for(const a of Object.values(this.game.armies||{}))this._markArmy(c,a);}
+  if(w>340&&h>280)drawRosette(c,75,h-108,24);
+  // Atlas masthead is ink on translucent parchment; not part of geography.
+  c.save();c.fillStyle='rgba(234,217,176,.87)';c.strokeStyle='rgba(102,84,53,.63)';c.lineWidth=1.1;
+  const bx=w*.5-111; c.fillRect(bx,19,222,34);c.strokeRect(bx,19,222,34);
+  c.font='bold 13px Georgia';c.textAlign='center';c.fillStyle='#51442f';c.fillText(this.mode==='historical'?'THE HISTORICAL ATLAS':this.mode==='terrain'?'RELIEF OF THE EARTH':'THE KINGDOMS OF 1450',w/2,40);
+  c.restore();atlasBorders(c,w,h);
+  c.font='10px Georgia';c.textAlign='left';c.textBaseline='alphabetic';c.fillStyle='rgba(47,48,38,.83)';
+  c.fillText(this.mode==='historical'?'HISTORICAL POLITIES: INCOMPLETE SOURCE COVERAGE':this.mode==='terrain'?'TERRAIN VIEW · STYLIZED RELIEF':'POLITICAL MAP · DECORATIVE COUNTY LINES',25,h-24);
+  this._hoverTip(c);
+ }
 }
