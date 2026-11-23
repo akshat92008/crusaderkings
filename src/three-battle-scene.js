@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
+import {buildMedievalBattlefield} from './battlefield-art.js';
 
 const cap=(v,a,b)=>Math.max(a,Math.min(b,v));
 const meshes={
@@ -50,14 +51,14 @@ function createHorse(){
 }
 
 export class ThreeBattleScene {
- constructor(canvas) {
+ constructor(canvas,config={}) {
   this.isThreeBattle=true;this.canvas=canvas;this.modelsReady=false;this.loadingStatus='Loading KayKit infantry';
   this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
   this.renderer.outputColorSpace=THREE.SRGBColorSpace;
   this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.45;
   this.gl=this.renderer.getContext();
-  this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x9cafa7);
-  this.scene.fog=new THREE.FogExp2(0x9cafa7,.003);
+  this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x9da9a0);
+  this.scene.fog=new THREE.FogExp2(0x9da9a0,.0035);
   this.camera=new THREE.PerspectiveCamera(60,1,.5,330);
   this.scene.add(new THREE.HemisphereLight(0xd9e5da,0x51452f,2.15));
   const sunlight=new THREE.DirectionalLight(0xffe9bd,2.3);sunlight.position.set(-35,70,55);this.scene.add(sunlight);
@@ -67,6 +68,7 @@ export class ThreeBattleScene {
    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);inst.frustumCulled=false;inst.count=0;this.scene.add(inst);this.batches[kind]=inst;
   }
   this.groups=new Map();this.templates={};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
+  this.environment=buildMedievalBattlefield(this.scene,config);
   this.prepareCharacters();
  }
  async prepareCharacters(){
@@ -157,6 +159,7 @@ export class ThreeBattleScene {
   }
   let dt=elapsed-this.lastRenderTime;this.lastRenderTime=elapsed;
   this.updateCharacters(groups,cap(dt,0,.05));
+  this.environment?.update(elapsed);
   this.renderer.render(this.scene,this.camera);
   return null;
  }
@@ -164,6 +167,7 @@ export class ThreeBattleScene {
   this.disposed=true;
   for(const units of this.groups.values())for(const u of units){u.mixer.stopAllAction();this.scene.remove(u.root);}
   this.groups.clear();this.mixers.length=0;
+  this.environment?.dispose();
   for(const m of Object.values(this.batches)){m.geometry.dispose();m.material.dispose();this.scene.remove(m);}
   this.renderer.dispose();
  }
