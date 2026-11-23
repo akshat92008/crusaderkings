@@ -1,0 +1,40 @@
+name: 1450 Atlas browser and screenshots
+on:
+  push:
+    branches:
+      - feature/atlas-1450-map-overhaul
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  atlas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install actual Chromium for visual tests
+        run: |
+          python -m pip install --quiet playwright
+          python -m playwright install --with-deps chromium
+      - name: Run in-browser gameplay and screenshot checks
+        run: python scripts/atlas_browser_smoke.py
+      - name: Upload actual game screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crown-of-nations-atlas-gameplay
+          path: docs/atlas-*.png
+          if-no-files-found: warn
+      - name: Publish verified screenshots on development branch
+        if: success()
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add docs/atlas-*.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Attach actual 1450 atlas gameplay screenshots from Chromium"
+            git push
+          fi
