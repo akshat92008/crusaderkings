@@ -26,17 +26,17 @@ jobs:
       - name: Upload playtest ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Crown-of-Nations-1450-Kingdoms-and-AI-Playtest
-          path: dist/Crown-of-Nations-1450-Kingdoms-and-AI-Playtest.zip
+          name: Crown-of-Nations-1450-Cultural-Warfare-Playtest
+          path: dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip
           if-no-files-found: error
       - name: Publish public prerelease download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=v0.6.0-kingdoms-ai
-          ZIP=dist/Crown-of-Nations-1450-Kingdoms-and-AI-Playtest.zip
+          TAG=v0.7.0-cultural-warfare
+          ZIP=dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ZIP" --clobber
           else
-            gh release create "$TAG" "$ZIP" --title "Crown of Nations: 1450 — Kingdoms and AI Playtest" --notes "Playable prototype with 44 fictional royal dynasties, rival kingdom AI, courts, 23 narrative events, treaties, trade income, diplomacy, 1450 atlas, objectives and legacy outcome; keeps animated KayKit 3D battles and fortresses. Synthetic borders and advanced systems remain incomplete. Not a finished game. Download, extract, and serve the game folder with python3 -m http.server 8080." --prerelease
+            gh release create "$TAG" "$ZIP" --title "Crown of Nations: 1450 — Cultural Warfare Playtest" --notes "Playable preview with 15 distinct military doctrines, ten tactical formations, actual deployment choices, enemy-initiated invasions and playable settlement defense. Includes the existing courts, trade, 1450 atlas, animated KayKit soldiers and fortresses. Historical accuracy and fully destructible sieges are unfinished. Not a finished game. Download, extract, and serve the game folder with python3 -m http.server 8080." --prerelease
           fi
