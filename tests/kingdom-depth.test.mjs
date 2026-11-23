@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {createGame,advanceMonth,empireStats,negotiate,snapshot,restoreGame} from '../src/simulation.js';
-import {initializeKingdomSystems,currentCourt,courtDecision,royalDiplomacy,tradeIncome,currentRoyalEvent,resolveRoyalEvent,objectives,campaignStanding,tradePactCount} from '../src/kingdom-depth.js';
+import {initializeKingdomSystems,currentCourt,courtDecision,royalDiplomacy,tradeIncome,currentRoyalEvent,resolveRoyalEvent,objectives,campaignStanding,tradePactCount,EVENTS} from '../src/kingdom-depth.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 
 test('all 44 factions have distinct fictional rulers, heirs and generated royal houses',()=>{
@@ -93,4 +93,27 @@ test('strategic AI does not unilaterally invade players with peaceful difficulty
  const g=createGame(world);g.kingdom.difficulty='peaceful';
  for(let i=0;i<30;i++)advanceMonth(g,world);
  assert.equal(g.kingdom.threats.length,0);
+});
+
+test('all 23 court narratives can be resolved even if treasury is empty',()=>{
+ assert.equal(EVENTS.length,23);
+ assert.equal(new Set(EVENTS.map(e=>e.id)).size,EVENTS.length);
+ for(const event of EVENTS){
+  assert.ok(event.title&&event.description);
+  assert.equal(event.choices.length,2);
+  assert.ok(event.choices.some(choice=>!choice.cost),event.id);
+  const g=createGame(world);g.factions.ottomans.treasury=0;g.kingdom.pendingEvent={id:event.id,created:g.turn};
+  const ix=event.choices.findIndex(choice=>!choice.cost);
+  assert.equal(resolveRoyalEvent(g,world,ix).ok,true,event.id);
+  assert.equal(g.kingdom.eventsResolved,1);
+ }
+});
+test('rival invasion alerts remain visible for three actual monthly ticks',()=>{
+ const g=createGame(world);g.kingdom.difficulty='peaceful';
+ const enemy=Object.values(g.armies).find(a=>a.owner==='france');
+ const province=world.provinces.find(p=>p.owner==='ottomans');
+ g.kingdom.threats=[{by:'france',army:enemy.id,province:province.id,eta:3}];
+ advanceMonth(g,world);assert.equal(g.kingdom.threats[0].eta,2);
+ advanceMonth(g,world);assert.equal(g.kingdom.threats[0].eta,1);
+ advanceMonth(g,world);assert.equal(g.kingdom.threats.length,0);
 });
