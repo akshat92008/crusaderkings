@@ -56,7 +56,9 @@ try:
   assert defended,'No incoming AI army reached a playable defensive battle'
   assert 'DEFEND' in page.locator('#battle-title').inner_text()
   assert page.locator('#battle-start').is_visible()
-  page.screenshot(path=str(ROOT/'docs/warfare-enemy-invasion.png'))
+  # Browser canvas captures may stall in software-rendered WebGL on CI.
+  # Verify live defensive gameplay regardless; the battle-art test already captures GPU output.
+  print('INCOMING DEFENSE VERIFIED:',page.locator('#battle-title').inner_text())
   page.click('#battle-start')
   page.wait_for_timeout(450)
   page.click('#battle-retreat')
