@@ -66,7 +66,7 @@ export function recruit(g,provinceId,type='infantry'){
  const prices={infantry:110,archers:150,cavalry:240};if(!Object.hasOwn(prices,type))return {ok:false,msg:'Unknown troop type'};
  const doctrine=militaryDoctrine(g.player);
  const primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
- const discount=type===primary?.82:1;
+ const discount=type===primary?0.82:1;
  const cost=Math.round(prices[type]*discount*(1-(p.buildings.barracks*.06)));
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
