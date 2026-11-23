@@ -8,7 +8,7 @@ const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 function seedNumber(s){let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0;}
 function rng(s){let state=seedNumber(String(s))||1;return()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};}
 export function hexRgb(v){if(!/^#[\da-f]{6}$/i.test(v||''))return [153,144,112];return [1,3,5].map(i=>parseInt(v.slice(i,i+2),16));}
-export function atlasColor(hex,light=.38){const [r,g,b]=hexRgb(hex);const faded=([r,g,b]).map(x=>Math.round(x*(1-light)+[233,217,180][[r,g,b].indexOf(x)]*light));return 'rgb('+faded.join(',')+')';}
+export function atlasColor(hex,light=.38){const [r,g,b]=hexRgb(hex);const faded=([r,g,b]).map((x,i)=>Math.round(x*(1-light)+[233,217,180][i]*light));return 'rgb('+faded.join(',')+')';}
 export function extractOuterRings(geo){if(!geo?.coordinates)return [];return (geo.type==='Polygon'?[geo.coordinates]:geo.type==='MultiPolygon'?geo.coordinates:[]).map(p=>p[0]).filter(r=>r&&r.length>=4);}
 function bounds(ring){let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const [x,y] of ring){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}return [x0,y0,x1,y1];}
 function shoelace(ring){let sum=0;for(let j=0;j<ring.length;j++){const a=ring[j],b=ring[(j+1)%ring.length];sum+=a[0]*b[1]-b[0]*a[1];}return Math.abs(sum)*.5;}
