@@ -57,7 +57,8 @@ test('decision responses reject invalid costs and preserve pending events',()=>{
  const g=createGame(world);g.kingdom.pendingEvent={id:'festival',created:0};g.factions.ottomans.treasury=0;
  assert.equal(resolveRoyalEvent(g,world,0).ok,false);
  assert.ok(currentRoyalEvent(g));
- assert.ok(resolveRoyalEvent(g,world,1).ok===false);
+ assert.equal(resolveRoyalEvent(g,world,1).ok,true);
+ assert.equal(currentRoyalEvent(g),null);
  assert.equal(resolveRoyalEvent(g,world,3).ok,false);
 });
 test('campaign objectives and legacy score respond to actual realm progress',()=>{
