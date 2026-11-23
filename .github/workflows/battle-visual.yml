@@ -1,10 +1,12 @@
 name: Animated battle visual smoke
 on:
   push:
-    branches: [feature/animated-3d-armies-03]
+    branches: [feature/medieval-battlefield-05]
     paths:
       - src/battle.js
       - src/three-battle.bundle.js
+      - src/battlefield-art.js
+      - src/battlefield-layout.js
       - scripts/battle_browser_smoke.py
       - .github/workflows/battle-visual.yml
   workflow_dispatch:
@@ -35,13 +37,5 @@ jobs:
             docs/battle-fallback-only.png
             docs/battle-browser-error.txt
           if-no-files-found: warn
-      - name: Attach screenshots to development branch
-        if: success()
-        run: |
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git add docs/battle-*.png
-          if ! git diff --cached --quiet; then
-            git commit -m "Attach actual animated battle Chromium screenshot"
-            git push
-          fi
+      # Screenshots are uploaded as workflow artifacts above; do not push binary
+      # PNGs from parallel test jobs, which creates non-fast-forward conflicts.

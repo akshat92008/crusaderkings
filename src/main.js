@@ -50,11 +50,11 @@ function renderInspector(){if(!game)return;let p=staticById[selected],state=game
  text+=`<div class="sectiontitle">ADJACENT PROVINCES</div><p class="paragraph">${p.neighbors.length} connected land provinces. ${p.neighbors.filter(n=>game.provinces[n].owner!==state.owner).length} under foreign control.</p><div class="divider"></div><p class="paragraph">This map uses generated province shapes for prototype testing. Exact historical 1450 boundaries are not yet represented.</p></div>`;
  el('province-panel').innerHTML=text;
 }
-function openBattle(desc){el('battle-screen').hidden=false;el('battle-result').hidden=true;el('battle-title').textContent='THE BATTLE FOR '+desc.to.toUpperCase();el('battle-meta').textContent=`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${fmt(desc.defenseTroops+desc.defenseGarrison)} DEFENDERS`;
+function openBattle(desc){el('battle-screen').hidden=false;el('battle-result').hidden=true;el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · MEDIEVAL FORTRESS':'THE BATTLE FOR '+desc.to.toUpperCase();el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${fmt(desc.defenseTroops+desc.defenseGarrison)} DEFENDERS`;
  battleDescriptor=desc;try{battle=new BattleGame(el('battle-canvas'),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';}catch(e){el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);}}
 function onBattleStatus(s){el('battle-pause').textContent=s.paused?'▶ RESUME':'Ⅱ PAUSE';const status=s.groups.filter(g=>g.side==='attacker');el('battle-units').innerHTML=status.map((g,i)=>`<button class="unitcard ${i===s.selected?'active':''}" data-unit="${i}"><b>${i+1}. ${g.type.toUpperCase()}</b><small>${g.routed?'ROUTED':Math.round(g.life)+'% STRENGTH'}</small><div class="unithealth"><div style="width:${Math.max(0,g.life)}%"></div></div></button>`).join('');}
-function onBattleFinished(result){let f=result.victory;el('battle-result').hidden=false;el('battle-result').innerHTML=`<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">${f?'♛':'⚔'}</div><h2>${f?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS'}</h2><p>${f?'The enemy line has broken. The territory shall pass to your crown.':'Your forces have been defeated or forced to retreat.'} Surviving strength: ${Math.round(result.attackerRemaining*100)}%.<br>Battle duration: ${result.seconds} seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>`;
- el('battle-return').onclick=()=>{concludeBattle(game,battleDescriptor,result);battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();save();};}
+function onBattleFinished(result){let f=result.victory;el('battle-result').hidden=false;el('battle-result').innerHTML=`<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">${f?'♛':'⚔'}</div><h2>${f?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS'}</h2><p>${battleDescriptor?.showcase?'This practice battle does not affect your campaign.':f?'The enemy line has broken. The territory shall pass to your crown.':'Your forces have been defeated or forced to retreat.'} Surviving strength: ${Math.round(result.attackerRemaining*100)}%.<br>Battle duration: ${result.seconds} seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>`;
+ el('battle-return').onclick=()=>{const practice=Boolean(battleDescriptor?.showcase);if(!practice)concludeBattle(game,battleDescriptor,result);battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();if(!practice)save();};}
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-faction').innerHTML=world.factions.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<option value="${f.id}" ${f.id==='ottomans'?'selected':''}>${esc(f.name)} — ${esc(f.continent)}</option>`).join('');
 function renderStartFaction(){const f=world.factions.find(f=>f.id===el('start-faction').value);el('start-faction-info').textContent=`${f.government} · ${f.continent} · Military tradition: ${f.specialty}`;}
@@ -87,6 +87,16 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='build')clickResult(build(game,selected,type));
  if(['gift','alliance','insult'].includes(action))clickResult(negotiate(game,diplomaticTarget,action));
  if(action==='show-diplomacy'){if(btn.dataset.target==='independent'){message('Independent polities have no central court to negotiate with.');return;}tab='diplomacy';diplomaticTarget=btn.dataset.target;renderTab();}
+});
+el('battle-showcase').addEventListener('click',()=>{
+ if(!game){message('Begin your reign before opening a practice battle.');return;}
+ if(battle){message('A battle is already in progress.');return;}
+ const armyEntry=Object.entries(game.armies).find(([,a])=>a.owner===game.player);
+ if(!armyEntry){message('Recruit at least one army to enter the battle showcase.');return;}
+ const target=world.provinces.find(p=>{const owner=game.provinces[p.id]?.owner;return owner&&owner!==game.player&&game.factions[owner];});
+ if(!target){message('No opposing provinces are available.');return;}
+ const enemy=game.provinces[target.id].owner;
+ openBattle({attacker:armyEntry[0],enemy,to:target.id,defenseTroops:110,defenseGarrison:80,showcase:true});
 });
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
