@@ -26,14 +26,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: crown-of-nations-atlas-gameplay
-          path: docs/atlas-*.png
+          path: |
+            docs/atlas-*.png
+            docs/atlas-browser-error.txt
           if-no-files-found: warn
-      - name: Publish verified screenshots on development branch
-        if: success()
+      - name: Publish actual screenshots or actionable error report on development branch
+        if: always()
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add docs/atlas-*.png
+          git add docs/atlas-*.png docs/atlas-browser-error.txt 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "Attach actual 1450 atlas gameplay screenshots from Chromium"
             git push
