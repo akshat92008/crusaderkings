@@ -7,7 +7,7 @@
   "scripts": {
     "start": "python3 -m http.server 8080",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/main.js && node --check src/battle.js && node --check src/map.js && node --check src/simulation.js && node --check src/glb-art.js && node --check src/relief-map.js && node --check src/atlas-art.js && node --check src/three-battle-scene.js",
+    "check": "node --check src/main.js && node --check src/battle.js && node --check src/map.js && node --check src/simulation.js && node --check src/glb-art.js && node --check src/relief-map.js && node --check src/atlas-art.js && node --check src/three-battle-scene.js && node --check src/battlefield-layout.js && node --check src/battlefield-art.js",
     "build:battle": "node scripts/build_3d_battle.mjs"
   },
   "license": "MIT",
