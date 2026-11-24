@@ -3,7 +3,8 @@
 import {controller} from './campaign-war.js';
 import {syncTitles,isImprisoned} from './feudal-systems.js';
 import {requestVassalPetition} from './vassal-courts.js';
-import {characterInfluence} from './character-agency.js';
+import {characterInfluence,characterInteractionAs} from './character-agency.js';
+import {estateRetinue,estateRetinueAction,estateClaimTargets,openEstateClaim,estateDisputes} from './estate-conflicts.js';
 const no=msg=>({ok:false,msg}),ok=msg=>({ok:true,msg}),cap=(x,a,b)=>Math.max(a,Math.min(b,x));
 const person=(g,id)=>g.politics?.people?.[id];
 const free=(g,p)=>p?.alive&&p.age>=18&&!isImprisoned(g,p.id);
@@ -42,12 +43,15 @@ export function careerView(g){
  const x=vassalCareer(g);if(!x)return null;const p=person(g,x.person),rows=estates(g,x.realm,x.person,false).map(([id,h])=>({id,h,province:g.provinces[id],controlled:controller(g,id)===x.realm}));
  return {career:x,person:p,rows,free:free(g,p)&&p.realm===x.realm,liege:person(g,crown(g,x.realm)),petition:Object.values(g.vassalCourts?.petitions||{}).filter(q=>q.person===x.person).sort((a,b)=>b.started-a.started)[0]};
 }
-export function careerAction(g,action,id,extra){
+export function careerAction(g,action,id,extra,world=null){
  if(action==='start')return startVassalCareer(g,id);
  const x=reconcileCareer(g);if(!x)return no('No active vassal career.');
  const p=person(g,x.person);
  if(!free(g,p)||p.realm!==x.realm)return no('Your character must be a free adult in this realm.');
  const h=g.politics.holdings[id],pr=g.provinces[id],owned=h&&h.lord===p.id&&h.realm===x.realm&&pr?.owner===x.realm&&controller(g,id)===x.realm;
+ if(action==='personal-gift'||action==='personal-rebuke')return characterInteractionAs(g,x.realm,p.id,id,action);
+ if(action==='retinue')return estateRetinueAction(g,x.realm,p.id,id,extra);
+ if(action==='estate-claim'){if(!owned||!estateClaimTargets(g,world,x.realm,p.id,id).includes(extra))return no('Select a controlled estate and an eligible neighboring vassal holding.');return openEstateClaim(g,world,x.realm,id,extra,true);}
  if(action==='invest'){
   const rule=INVESTMENTS[extra];if(!owned||!rule||pr.buildings[extra]>=3||h.wealth<rule.cost||g.turn-(x.lastInvestment[id]??-120)<6)return no('Requires your controlled estate, available building level, estate funds and six months between investments.');
   h.wealth-=rule.cost;pr.buildings[extra]++;pr.development=cap(pr.development+1,1,20);pr.unrest=cap(pr.unrest-3,0,100);x.lastInvestment[id]=g.turn;return ok(rule.label+' improved with estate funds.');
@@ -76,12 +80,13 @@ export function renderCareer(g,world,esc){
  const v=careerView(g);if(!v)return '';const {career:x,person:p,rows}=v;
  const btn=(type,id,extra,label)=>'<button class="rowbtn" data-action="career" data-type="'+type+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'">'+esc(label)+'</button>';
  const name=id=>world.provinces.find(q=>q.id===id)?.name||id;
- let h='<div class="rule"><h3>VASSAL CAREER</h3><p>'+esc(p?.name||'Dynasty extinct')+' · '+esc(p?.house||x.house)+'</p><p>Liege: '+esc(v.liege?.name||'None')+' · Personal gold: '+Math.floor(p?.wealth||0)+'</p><p class="smallnote">The crown controls realm-wide policy, armies and diplomacy. You control your own estates and petitions.</p></div>';
+ let h='<div class="rule"><h3>VASSAL CAREER</h3><p>'+esc(p?.name||'Dynasty extinct')+' · '+esc(p?.house||x.house)+'</p><p>Liege: '+esc(v.liege?.name||'None')+' · Personal gold: '+Math.floor(p?.wealth||0)+'</p><p class="smallnote">The crown controls realm-wide policy, armies and diplomacy. You control your own estates, private retinues, personal relationships and estate claims.</p></div>';
  if(!v.free)return h+'<p class="paragraph">Your character is not a free adult. Advance time for succession or release.</p>';
  for(const row of rows){const {id,h:estate,province:pr}=row;h+='<div class="rule"><h3>'+esc(name(id))+'</h3><p>Estate gold: '+Math.floor(estate.wealth)+' · Loyalty: '+Math.round(estate.loyalty)+'% · Development: '+pr.development+'</p>';
- if(row.controlled){h+=Object.entries(INVESTMENTS).filter(([k])=>pr.buildings[k]<3).map(([k,r])=>btn('invest',id,k,r.label+' upgrade ('+r.cost+' estate gold)')).join('')+btn('withdraw',id,'','Withdraw 40 estate gold')+(estate.tax>0?btn('petition',id,'tax','Petition for lower taxes'):'')+(estate.autonomy<2?btn('petition',id,'autonomy','Petition for autonomy'):'')+btn('petition',id,'council','Petition for council office');}else h+='<p class="smallnote">Occupied: estate actions unavailable.</p>';h+='</div>';}
+ if(row.controlled){const ret=estateRetinue(g,x.realm,p.id,id);if(ret){h+='<p class="smallnote">Private retainers: '+ret.troops+' / '+ret.capacity+' · paid from estate funds; used in internal feuds.</p>';if(ret.available>0)h+=btn('retinue',id,'recruit','Recruit '+ret.available+' retainers ('+ret.available*4+' estate gold)');if(ret.troops)h+=btn('retinue',id,'disband','Disband retainers');}const claims=estateClaimTargets(g,world,x.realm,p.id,id);if(claims.length){h+='<details><summary>Assert a neighboring estate claim (60 estate gold)</summary><p class="smallnote">Crown arbitration may prevent an internal feud.</p>'+claims.map(target=>btn('estate-claim',id,target,'Claim '+name(target))).join('')+'</details>';}h+=Object.entries(INVESTMENTS).filter(([k])=>pr.buildings[k]<3).map(([k,r])=>btn('invest',id,k,r.label+' upgrade ('+r.cost+' estate gold)')).join('')+btn('withdraw',id,'','Withdraw 40 estate gold')+(estate.tax>0?btn('petition',id,'tax','Petition for lower taxes'):'')+(estate.autonomy<2?btn('petition',id,'autonomy','Petition for autonomy'):'')+btn('petition',id,'council','Petition for council office');}else h+='<p class="smallnote">Occupied: estate actions unavailable.</p>';h+='</div>';}
  if(!rows.length){const seats=estates(g,x.realm,crown(g,x.realm)).slice(0,20);h+='<div class="rule"><h3>Landless courtier</h3><p>Rebuild your position by training or obtaining a crown-held estate (200 personal gold, 20 influence).</p>'+seats.map(([id])=>btn('recover',id,'','Request charter for '+name(id))).join('')+'</div>';}
  h+='<div class="rule"><h3>Personal development</h3>'+Object.entries(p.skills||{}).filter(([,n])=>n<5).map(([k])=>btn('train',k,'','Train '+k+' (75 personal gold)')).join('')+'</div>';
+ for(const claim of estateDisputes(g,x.realm).filter(q=>[q.claimant,q.defender].includes(p.id)))h+='<div class="rule"><b>Estate claim: '+esc(name(claim.target))+'</b><p>'+esc(claim.status)+' · Crown arbitration / feud in '+Math.max(0,claim.deadline-g.turn)+' months.</p></div>';
  if(v.petition)h+='<p class="smallnote">Latest petition: '+esc(v.petition.kind)+' · '+esc(v.petition.status)+'</p>';
  return h;
 }
