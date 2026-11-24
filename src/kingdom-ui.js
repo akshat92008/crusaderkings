@@ -1,4 +1,5 @@
 import {ROLEPLAY_BRANCHES,COPING,roleplayView} from './roleplay-systems.js';
+import {ESTATE_LAWS,estateCharterTerms,estateLaw,estateSuccession} from './estate-succession.js';
 import {characterInfluence,characterAgenda} from './character-agency.js';
 import {regencyView,regentCandidates} from './regency-systems.js';
 import {successionCandidates,electionView,crownExclusionTerms,crownExcluded} from './succession-systems.js';
@@ -267,6 +268,21 @@ export function renderStories(g,world,esc){
  html+=section('COURT CHRONICLE')+g.chronicles.history.filter(x=>x.realm===realm).slice(0,20).map(x=>'<div class="rule"><div class="smallnote">'+esc(x.message)+'</div></div>').join('');return html;
 }
 
+function renderEstateSuccession(g,id,esc,panel){
+ const h=g.politics.holdings[id],law=estateLaw(g,id),rules=ESTATE_LAWS[law],current=g.politics.realms[h.realm]?.ruler;
+ if(h.lord===current)return '';
+ const preview=estateSuccession(g,id);
+ const terms=estateCharterTerms(g,g.player,id),field='estate-law-'+panel+'-'+id;
+ let html='<details class="rule" data-section="estate-succession"><summary>Estate succession</summary><p class="smallnote"><b>'+esc(rules.name)+'</b> · '+esc(rules.description)+'</p>';
+ html+='<p class="smallnote">Expected holder: '+(preview.heir?characterLink(preview.heir,esc):'An appointed local successor if no family heir survives.')+'</p>';
+ if(preview.ballots.length)html+=preview.ballots.map(v=>'<p class="smallnote">'+esc(g.politics.people[v.voter].name)+' would vote for '+esc(g.politics.people[v.candidate].name)+' · '+v.weight+' votes</p>').join('');
+ if(terms){
+  if(terms.reason)html+='<p class="smallnote">'+esc(terms.reason)+'</p>';
+  else html+='<label for="'+esc(field)+'" class="smallnote">New inheritance rule</label><select class="select" id="'+esc(field)+'">'+Object.entries(ESTATE_LAWS).filter(([key])=>key!==law).map(([key,rule])=>'<option value="'+esc(key)+'">'+esc(rule.name)+'</option>').join('')+'</select>'+contextualButton('feudal','estate-law','c:'+id,'Amend succession ('+terms.cost+'g)',esc,'',field);
+ }
+ return html+'</details>';
+}
+
 export function renderFeudal(g,world,esc){
  const realm=g.player,r=g.politics.realms[realm].ruler,titles=titleList(g,realm),name=id=>g.politics.people[id]?.name||id,place=id=>world.provinces.find(p=>p.id===id)?.name||id;
  const btn=(action,id,label,input='')=>'<button class="rowbtn" data-action="feudal" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
@@ -276,7 +292,7 @@ export function renderFeudal(g,world,esc){
  for(const t of titles.filter(t=>t.tier==='regional')){const field='regional-'+t.id.replaceAll(':','-'),lords=adults.filter(p=>t.members.some(id=>g.politics.holdings[id].lord===p.id));html+='<details class="rule"><summary>'+esc(t.name)+' · '+esc(name(t.holder))+'</summary><p class="paragraph">Regional loyalty effect: '+regionalLoyalty(g,t.members[0]).toFixed(1)+'</p>'+(lords.length?'<select class="select" id="'+field+'">'+lords.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select>'+btn('regional',t.id,'Grant regional title (120g)',field):'');
  for(const id of t.members){const v=g.politics.holdings[id],p=titles.find(x=>x.province===id),grant='grant-'+id;html+='<div class="rule"><b>'+provinceLink(id,world,esc)+' · '+characterLink(g.politics.people[v.lord],esc)+'</b><div class="smallnote">Loyalty '+Math.round(v.loyalty)+'%'+(isImprisoned(g,v.lord)?' · imprisoned':'')+'</div>';
  if(v.lord===r&&adults.length)html+='<select class="select" id="'+grant+'">'+adults.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>').join('')+'</select>'+btn('grant',p.id,'Grant province',grant);
- else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');}html+='</div>';}html+='</details>';}
+ else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');html+=renderEstateSuccession(g,id,esc,'titles');}html+='</div>';}html+='</details>';}
  html+=section('CROWN CLAIMANTS')+'<p class="paragraph">Other eligible children inherit claims on succession. Discontented vassals may support an adult claimant when legitimacy is low.</p>';for(const c of claimantCandidates(g,realm))html+='<div class="rule"><b>'+esc(name(c.person))+'</b><div class="smallnote">Claim from '+esc(name(c.from))+' · expires in '+Math.max(0,180-g.turn+c.created)+' months</div></div>';
  html+=section('PRISONERS AND RANSOM');
  for(const x of Object.values(g.feudal.prisoners).filter(x=>x.status==='held'&&(x.captor===realm||x.realm===realm))){
@@ -547,7 +563,7 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
  return h;}
 function renderEstateCharter(g,holding,button){
  const remaining=Math.max(0,(holding.lastCharter??-EXEMPTION_COOLDOWN)+EXEMPTION_COOLDOWN-g.turn);
- let html='<details class="rule"><summary>Estate exemptions</summary><p class="smallnote">An exemption removes the estate’s tax or levy contribution and adds 22 loyalty. Revocation costs 10 legitimacy and 25 estate loyalty.</p>';
+ let html='<details class="rule" data-section="estate-exemptions"><summary>Estate exemptions</summary><p class="smallnote">An exemption removes the estate’s tax or levy contribution and adds 22 loyalty. Revocation costs 10 legitimacy and 25 estate loyalty.</p>';
  if(remaining)html+='<p class="smallnote">Charter amendments reopen in '+remaining+' months.</p>';
  for(const [key,label] of [['tax','Tax'],['levy','Levy']]){
   const active=Boolean(holding.exemptions?.[key]);
@@ -572,6 +588,7 @@ export function renderProvinceLord(g,world,id,esc){
    if(!exempt)out+='<div class="contract-options">'+[0,1,2].filter(n=>n!==h[key]).map(n=>btn(key,labels[n],n)).join('')+'</div>';
   }
   out+=renderEstateCharter(g,h,btn);
+  out+=renderEstateSuccession(g,id,esc,'province');
   out+=btn('gift','Send gift (100g)')+(h.loyalty<45?btn('concede','Negotiate concession (150g)'):'');
  }
  return out+'</div>';
