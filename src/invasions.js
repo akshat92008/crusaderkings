@@ -1,3 +1,4 @@
+import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {captureCommander} from './feudal-systems.js';
 import {defenseSupport,strategicPlan,raidThreshold} from './strategic-ai.js';
 import {controller,captureProvince} from './campaign-war.js';
@@ -33,7 +34,7 @@ export function findInvasionOptions(g,world){
   for(const neighborId of target.neighbors||[]){
    const rival=g.provinces[neighborId]?.owner;
    if(!rival||rival===player||rival==='independent'||!g.factions[rival])continue;
-   if(hasTruce(g,rival,player)||['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
+   if(nonAggression(g,rival,player)||hasTruce(g,rival,player)||['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
    const warChest=g.factions[rival].treasury;
    if(warChest<90)continue;
    for(const army of armiesOf(g,rival)){
@@ -70,7 +71,7 @@ export function progressEnemyInvasions(g,world){
  const remaining=[];
  for(const threat of g.kingdom.threats||[]){
   const enemy=g.armies[threat.army],province=g.provinces[threat.province];
-  if(!enemy||enemy.owner!==threat.by||!province||province.owner!==g.player||controller(g,threat.province)!==g.player||embarked(g,enemy.id)||hasTruce(g,threat.by,g.player))continue;
+  if(!enemy||enemy.owner!==threat.by||!province||province.owner!==g.player||controller(g,threat.province)!==g.player||embarked(g,enemy.id)||nonAggression(g,threat.by,g.player)||hasTruce(g,threat.by,g.player))continue;
   if(threat.status==='ready'){
    // If the user advances time again instead of defending, allow an
    // automated resolution. Never leave an invisible permanent siege.
@@ -100,7 +101,7 @@ export function resolveInvasion(g,world,threat,result){
  const found=g.kingdom?.threats?.find(t=>t.army===threat?.army&&t.province===threat?.province);
  if(!found||found.status!=='ready')return {ok:false,msg:'No active invasion at that province'};
  const province=g.provinces[found.province],attacker=g.armies[found.army];
- if(!attacker||!province||province.owner!==g.player||hasTruce(g,found.by,g.player))return {ok:false,msg:'The invasion is no longer valid'};
+ if(!attacker||!province||province.owner!==g.player||nonAggression(g,found.by,g.player)||hasTruce(g,found.by,g.player))return {ok:false,msg:'The invasion is no longer valid'};
  const human=armiesOf(g,g.player).filter(a=>a.province===found.province);
  const playerRatio=clamp(result.attackerRemaining??.5,0,1);
  const enemyRatio=clamp(result.enemyRemaining??(result.victory?.45:.78),0,1);
