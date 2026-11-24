@@ -1,8 +1,13 @@
+import {participatingArmies,aggregateForce,regimentTroops} from './field-forces.js';
+import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from './battle-presentation.js';
+import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
 import {BattleModelArt} from './glb-art.js';
 import {armyFormationSlots,militaryDoctrine,startingTroops,combatStatistics,chooseCounterFormation,availableFormations} from './military-doctrines.js';
-import {ThreeBattleScene} from './three-battle.bundle.js';
+import {ThreeBattleScene as BundledBattleScene} from './three-battle.bundle.js';
+// The shipped bundle stays self-hosted; field animation uses the shared runtime adapter.
+class ThreeBattleScene extends BundledBattleScene{updateCharacters(groups,dt){if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);return super.updateCharacters(groups,dt);}}
 const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vec=(x=0,y=0,z=0)=>[x,y,z];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -136,45 +141,47 @@ export class BattleGame{
 
  const playerFaction=game.factions[game.player],enemy=game.factions[descriptor.enemy],fieldArmy=game.armies[descriptor.attacker];
  const garrison=startingTroops(playerFaction,descriptor.defenseMode?(descriptor.defenseGarrison||90):0);
- const a=fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
+ const a=descriptor.fieldBattle?aggregateForce(participatingArmies(game,descriptor.playerArmies||[descriptor.attacker],game.player,descriptor.defenseMode?descriptor.to:descriptor.from),garrison):fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
  const enemyArmy=descriptor.enemyArmy&&game.armies[descriptor.enemyArmy];
- const enemies=enemyArmy?{...enemyArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(enemyArmy[t]||0)+(descriptor.defenseMode?0:startingTroops(enemy,descriptor.defenseGarrison||0)[t])]))}:startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseMode?0:descriptor.defenseGarrison||0)));
+ const enemies=descriptor.fieldBattle&&!descriptor.showcase?aggregateForce(participatingArmies(game,descriptor.enemyArmies||[descriptor.enemyArmy],descriptor.enemy,descriptor.defenseMode?null:descriptor.to),startingTroops(enemy,descriptor.defenseMode?0:descriptor.defenseGarrison||0)):enemyArmy?{...enemyArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(enemyArmy[t]||0)+(descriptor.defenseMode?0:startingTroops(enemy,descriptor.defenseGarrison||0)[t])]))}:startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseMode?0:descriptor.defenseGarrison||0)));
  this.siege=descriptor.fieldBattle?null:createSiegeState(game.provinces?.[descriptor.to]?.buildings?.fort||0,!!descriptor.defenseMode);this.groups=[];
  const mySlots=armyFormationSlots(playerFaction,a,6),enemySlots=armyFormationSlots(enemy,enemies,6);
  for(let i=0;i<6;i++){
   const type=mySlots[i],slotCount=mySlots.filter(t=>t===type).length;
-  const unitCount=(a[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?-26:24;
+  const unitCount=descriptor.fieldBattle?regimentTroops(a,mySlots,i):(a[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?-26:24;
   const g=formation('p'+i,'attacker',type,i,[0,0],unitCount,'#4b98b3');
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
   g.routed=unitCount<1;g.profile=regimentProfile(game,a,type);g.readiness=armyReadiness(game,a);g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
-  this.groups.push(g);
+  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
  }
  for(let i=0;i<6;i++){
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
-  const unitCount=(enemies[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?24:-24;
+  const unitCount=descriptor.fieldBattle?regimentTroops(enemies,enemySlots,i):(enemies[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?24:-24;
   const g=formation('e'+i,'defender',type,i,[0,0],unitCount,enemy?.color||'#b86855');
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?50:type==='archers'?32:22)*100,10,100);
   g.routed=unitCount<1;g.profile=regimentProfile(game,enemyArmy||enemies,type);g.readiness=armyReadiness(game,enemyArmy||enemies);g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,enemy,militaryDoctrine(enemy).formations[i%militaryDoctrine(enemy).formations.length]);
-  this.groups.push(g);
+  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
  }
  this.selected=0;
  this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
  for(let i=0;i<105;i++){let x=(rng()-.5)*125,z=(rng()-.5)*100;if(Math.abs(z)<33&&Math.abs(x)<44)continue;this.terrain.push({x,z,h:1.4+rng()*5,r:rng(),type:rng()>.55?'tree':'rock'});}
- this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){this.paused=!this.paused;e.preventDefault();this.report();}};
- this._onKeyUp=e=>this.keys.delete(e.key.toLowerCase());this._onWheel=e=>{e.preventDefault();this.camera.distance=clamp(this.camera.distance+e.deltaY*.065,35,165);};
- this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0};}};
- this._onMove=e=>{if(this.drag){this.drag.moved+=Math.hypot(e.movementX,e.movementY);if(e.buttons&1&&this.drag.moved>3){this.camera.target[0]-=e.movementX*.08;this.camera.target[2]-=e.movementY*.08;}}};
- this._onUp=e=>{if(this.drag&&this.drag.moved<8){let best=-1,d=24;for(let i=0;i<6;i++){const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-e.offsetX,p[1]-e.offsetY);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
- window.addEventListener('keydown',this._onKeyDown);window.addEventListener('keyup',this._onKeyUp);canvas.addEventListener('wheel',this._onWheel,{passive:false});canvas.addEventListener('contextmenu',this._onContext);canvas.addEventListener('pointerdown',this._onDown);window.addEventListener('pointermove',this._onMove);window.addEventListener('pointerup',this._onUp);
+ this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){if(!this.deployment&&!this.done)this.paused=!this.paused;e.preventDefault();this.report();}};
+ this._onKeyUp=e=>this.keys.delete(e.key.toLowerCase());this._onWheel=e=>{e.preventDefault();this.cameraGoal=null;this.camera.distance=clamp(this.camera.distance+e.deltaY*.065,35,165);};
+ this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){if(this.descriptor.fieldBattle){this.command(this.selected,'move',[target[0],target[2]]);return;}group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0,pointer:e.pointerId};canvas.setPointerCapture?.(e.pointerId);}};
+ this._onMove=e=>{if(this.drag&&this.drag.pointer===e.pointerId){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;this.drag.moved+=Math.hypot(dx,dy);if(this.drag.moved>3){this.cameraGoal=null;this.camera.target[0]-=dx*.08;this.camera.target[2]-=dy*.08;}}};
+ this._onUp=e=>{if(this.drag?.pointer!==e.pointerId)return;if(this.drag.moved<8){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;if(this.tapMove){const p=this.rayGround(x,y);this.tapMove=false;if(p)this.command(this.selected,'move',[p[0],p[2]]);this.report();this.drag=null;return;}let best=-1,d=24;for(let i=0;i<6;i++){const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-x,p[1]-y);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
+ window.addEventListener('keydown',this._onKeyDown);window.addEventListener('keyup',this._onKeyUp);canvas.addEventListener('wheel',this._onWheel,{passive:false});canvas.addEventListener('contextmenu',this._onContext);canvas.addEventListener('pointerdown',this._onDown);window.addEventListener('pointermove',this._onMove);window.addEventListener('pointerup',this._onUp);this._onCancel=()=>{this.drag=null;};canvas.addEventListener('pointercancel',this._onCancel);
  this.report();this.loop=this.loop.bind(this);this.raf=requestAnimationFrame(this.loop);
  }
+ focusCamera(mode){const goal=cameraDestination(mode,this.groups,this.selected);if(!goal)return false;this.cameraGoal=goal;return true;}
+ updateCamera(dt){const c=this.camera,k=this.keys;if(['q','e','w','a','s','d'].some(x=>k.has(x)))this.cameraGoal=null;if(this.cameraGoal&&blendCamera(c,this.cameraGoal,dt))this.cameraGoal=null;if(k.has('q'))c.yaw-=dt*.9;if(k.has('e'))c.yaw+=dt*.9;if(k.has('w'))c.target[2]-=dt*22;if(k.has('s'))c.target[2]+=dt*22;if(k.has('a'))c.target[0]-=dt*22;if(k.has('d'))c.target[0]+=dt*22;c.target[0]=clamp(c.target[0],-90,90);c.target[2]=clamp(c.target[2],-75,75);}
  getCamera(){const c=this.camera,y=c.yaw,dist=c.distance;const eye=[c.target[0]+Math.sin(y)*dist*.68,c.target[1]+dist*.72,c.target[2]+Math.cos(y)*dist*.68];return {eye,target:c.target};}
  cameraVectors(){const {eye,target}=this.getCamera(),forward=norm(sub(target,eye)),right=norm(cross(forward,[0,1,0])),up=cross(right,forward);return {eye,forward,right,up};}
  rayGround(px,py){const {eye,forward,right,up}=this.cameraVectors();let w=this.canvas.clientWidth,h=this.canvas.clientHeight,ratio=w/h,t=Math.tan(Math.PI/6);let u=(2*px/w-1)*ratio*t,v=(1-2*py/h)*t;let dir=norm([forward[0]+right[0]*u+up[0]*v,forward[1]+right[1]*u+up[1]*v,forward[2]+right[2]*u+up[2]*v]);if(dir[1]>=0)return null;let d=-eye[1]/dir[1];return [eye[0]+d*dir[0],0,eye[2]+d*dir[2]];}
  project(p){let {eye,forward,right,up}=this.cameraVectors();let d=sub(p,eye),depth=dot(d,forward);if(depth<=.5)return null;let scale=this.canvas.clientHeight/(2*Math.tan(Math.PI/6));return [this.canvas.clientWidth/2+dot(d,right)*scale/depth,this.canvas.clientHeight/2-dot(d,up)*scale/depth];}
- report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed,deployment:this.deployment,siege:this.siege});}
+ report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed,deployment:this.deployment,siege:this.siege,enemyPosture:this.enemyPosture,tapMove:this.tapMove,roster:{attacker:battleRoster(this.groups,'attacker',!!this.descriptor?.fieldBattle),defender:battleRoster(this.groups,'defender',!!this.descriptor?.fieldBattle)}});}
  setFormation(index,id){
   const g=this.groups[index];
   if(!g||g.side!=='attacker'||g.routed||!availableFormations(this.game.factions[this.game.player]).some(f=>f.id===id))return false;
@@ -183,13 +190,12 @@ export class BattleGame{
  setLane(index,lane){
   if(!this.deployment||![0,1,2].includes(lane))return false;
   const g=this.groups[index];if(!g||g.side!=='attacker'||g.routed)return false;
-  g.x=(lane-1)*26+(index%2?2:-2);g.orderX=g.x;g.targetX=g.x;this.report();return true;
+  g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;this.report();return true;
  }
+ command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed)this.report();return changed;}
  startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.last=performance.now();this.report();return true;}
- update(dt){this.elapsed+=dt;const c=this.camera;
- if(this.keys.has('q'))c.yaw-=dt*.9;if(this.keys.has('e'))c.yaw+=dt*.9;
- if(this.keys.has('w'))c.target[2]-=dt*22;if(this.keys.has('s'))c.target[2]+=dt*22;
- if(this.keys.has('a'))c.target[0]-=dt*22;if(this.keys.has('d'))c.target[0]+=dt*22;
+ update(dt){this.elapsed+=dt;
+ if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
  for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
   const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
   const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];
@@ -228,28 +234,29 @@ export class BattleGame{
  if(!this.descriptor.fieldBattle)for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
  }
  if(this.siege)for(const q of this.siege.structures){const height=q.hp>0?1+3*q.hp/q.max:.35;instance(obj,q.x,height/2,q.z,q.id==='gate'?9:5,height,3,q.hp>0?C.stone:C.earth);}
- for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
+ for(let k=0;k<this.groups.length;k++){const g=this.groups[k],field=!!this.descriptor.fieldBattle;if(g.routed&&(!field||(g.routAge||0)>=3))continue;const n=field?visibleSoldierCount(g,Math.round(g.initial*(this.ctx instanceof CanvasFallback?.65:1))):Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const offsets=field?formationOffsets(n,g.formationId,g.type):null;const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
   const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   if(!(this.ctx.isThreeBattle&&this.ctx.modelsReady))for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
-   const px=g.x+ox,pz=g.z+oz,walk=Math.sin(this.elapsed*7+i*.55)*.045;
+   const pose=field?soldierWorldPose(g,offsets[i]):null,px=pose?.x??g.x+ox,pz=pose?.z??g.z+oz,walk=(!field||visualMode(g)==='walk')?Math.sin(this.elapsed*7+i*.55)*.045:0;
    if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27],'sphere');instance(obj,px,1.15+walk,pz,.48,.76,.43,base,'cylinder');instance(obj,px,1.68+walk,pz,.31,.29,.31,head,'sphere');instance(obj,px,1.87+walk,pz,.40,.28,.42,C.steel,'cone');
    } else {instance(obj,px,.75+walk,pz,.44,.80,.38,base,'cylinder');instance(obj,px,1.30+walk,pz,.29,.29,.29,head,'sphere');instance(obj,px,1.52+walk,pz,.36,.29,.36,C.steel,'cone');instance(obj,px-.15,.18+walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');instance(obj,px+.15,.18-walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');}
    if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel,'cylinder');}
    if(g.type==='archers'){instance(obj,px+.30,.85+walk,pz,.12,1.0,.1,C.trunk,'cylinder');}
   }
-  const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  if(g.routed)continue;const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  if(field&&k===this.selected&&['move','fallback','hold'].includes(g.fieldOrder)){const x=g.anchorX,z=g.anchorZ;instance(obj,x,.09,z,2.2,.12,2.2,[.90,.76,.30]);for(let i=1;i<=5;i++){const t=i/6;instance(obj,mix(g.x,x,t),.06,mix(g.z,z,t),.28,.07,.28,[.90,.76,.30]);}}
   if(k===this.selected){instance(obj,g.x,.08,g.z,5,.14,5,[.95,.79,.42]);instance(obj,g.x,.11,g.z,4.3,.15,4.3,[.28,.35,.32]);}
  }
  for(const p of this.projectiles){let t=p.t;instance(obj,mix(p.sx,p.tx,t),.8+Math.sin(t*Math.PI)*3,mix(p.sz,p.tz,t),.1,.1,.6,C.arrow);}
+ if(this.descriptor.fieldBattle)for(const effect of this.effects||[])for(const p of battleImpactParticles(effect)){const color=p.kind==='dust'?[.59,.51,.36]:p.kind==='rout'?[.80,.69,.47]:[1,.80,.39];instance(obj,p.x,p.y,p.z,p.size,p.size,p.size,color,'sphere');}
  const vp=this.ctx.render(obj,this.getCamera(),this.groups,this.elapsed);if(this.scenery&&vp)this.scenery.render(vp,this.sceneryPlacements);
  }
- loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
+ loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;this.updateCamera(dt);if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
  finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;
-  const fractionFor=side=>{const units=this.groups.filter(g=>g.side===side),total=units.reduce((n,g)=>n+(g.troopCount||0),0);return clamp(units.reduce((n,g)=>n+(g.routed?0:(g.troopCount||0)*g.life/Math.max(1,g.initialLife||100)),0)/Math.max(1,total),0,1);};
-  const fraction=fractionFor('attacker'),enemies=fractionFor('defender');
-  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,fieldBattle:!!this.descriptor?.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
+  const roster={attacker:battleRoster(this.groups,'attacker',!!this.descriptor?.fieldBattle),defender:battleRoster(this.groups,'defender',!!this.descriptor?.fieldBattle)},fraction=roster.attacker.fraction,enemies=roster.defender.fraction;
+  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,roster,fieldBattle:!!this.descriptor?.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
  }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
- togglePause(){this.paused=!this.paused;this.report();}
- stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.scenery?.dispose();this.ctx?.dispose?.();}
+ togglePause(){if(this.deployment||this.done)return;this.paused=!this.paused;this.report();}
+ stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.canvas.removeEventListener('pointercancel',this._onCancel);this.scenery?.dispose();this.ctx?.dispose?.();}
 }

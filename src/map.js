@@ -24,19 +24,17 @@ export class CampaignMap{
   this.dirty=true;
   const terrainCanvas=document.getElementById('terrain-map');this.terrain=terrainCanvas?new ReliefMap(terrainCanvas,()=>this.render(),world):null;
   const obs=new ResizeObserver(()=>this.resize());obs.observe(canvas.parentElement);this.resize();
-  canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;canvas.setPointerCapture(e.pointerId);this.drag={x:e.clientX,y:e.clientY,px:this.panX,py:this.panY,distance:0};});
-  canvas.addEventListener('pointermove',e=>{
-   if(this.drag){let dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.distance=Math.max(this.drag.distance,Math.hypot(dx,dy));if(this.drag.distance>3){this.panX=this.drag.px+dx;this.panY=this.drag.py+dy;this.render();}return;}
-   const p=this.toGeo(e.offsetX,e.offsetY),found=this.pick(...p),historical=this.mode==='historical'?this.pickHistorical(...p):null;
-   if(found?.id!==this.hover?.id||historical?.properties?.name!==this.hoverHistorical?.properties?.name){this.hover=found;this.hoverHistorical=historical;canvas.style.cursor=found?'crosshair':'grab';this.render();}
-  });
-  canvas.addEventListener('pointerup',e=>{if(this.drag?.distance<5){const province=this.pick(...this.toGeo(e.offsetX,e.offsetY));if(province)this.onProvince(province.id);}this.drag=null;});
-  canvas.addEventListener('pointercancel',()=>{this.drag=null;});
-  canvas.addEventListener('wheel',e=>{e.preventDefault();const old=this.zoom,next=clamp(old*Math.exp(-e.deltaY*.00122),bounds.minZoom,bounds.maxZoom);
-   const dx=e.offsetX-this.w/2-this.panX,dy=e.offsetY-this.h/2-this.panY;
-   this.panX-=dx*(next/old-1);this.panY-=dy*(next/old-1);this.zoom=next;this.render();
-  },{passive:false});
+  this.pointers=new Map();this.pinching=false;const local=e=>{const r=canvas.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top];};
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;canvas.setPointerCapture(e.pointerId);this.pointers.set(e.pointerId,local(e));if(this.pointers.size===1){this.pinching=false;this.drag={x:e.clientX,y:e.clientY,px:this.panX,py:this.panY,distance:0};}else{this.pinching=true;this.drag=null;this.pinch=this.pinchState();}});
+  canvas.addEventListener('pointermove',e=>{if(this.pointers.has(e.pointerId))this.pointers.set(e.pointerId,local(e));if(this.pointers.size>=2){const next=this.pinchState();if(this.pinch&&next.distance>0){this.panX+=next.x-this.pinch.x;this.panY+=next.y-this.pinch.y;this.zoomAt(next.x,next.y,next.distance/Math.max(1,this.pinch.distance));}this.pinch=next;return;}if(this.pinching)return;
+   if(this.drag){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.distance=Math.max(this.drag.distance,Math.hypot(dx,dy));if(this.drag.distance>3){this.panX=this.drag.px+dx;this.panY=this.drag.py+dy;this.render();}return;}if(e.pointerType==='touch')return;
+   const p=this.toGeo(...local(e)),found=this.pick(...p),historical=this.mode==='historical'?this.pickHistorical(...p):null;if(found?.id!==this.hover?.id||historical?.properties?.name!==this.hoverHistorical?.properties?.name){this.hover=found;this.hoverHistorical=historical;canvas.style.cursor=found?'crosshair':'grab';this.render();}});
+  const end=(e,cancel=false)=>{if(!cancel&&!this.pinching&&this.drag?.distance<5){const province=this.pick(...this.toGeo(...local(e)));if(province)this.onProvince(province.id);}this.pointers.delete(e.pointerId);this.drag=null;this.pinch=null;if(!this.pointers.size)this.pinching=false;};
+  canvas.addEventListener('pointerup',e=>end(e));canvas.addEventListener('pointercancel',e=>end(e,true));
+  canvas.addEventListener('wheel',e=>{e.preventDefault();this.zoomAt(e.offsetX,e.offsetY,Math.exp(-e.deltaY*.00122));},{passive:false});
  }
+ pinchState(){const [a,b]=[...this.pointers.values()];return {x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,distance:Math.hypot(a[0]-b[0],a[1]-b[1])};}
+ zoomAt(x,y,factor){const old=this.zoom,next=clamp(old*factor,bounds.minZoom,bounds.maxZoom);const dx=x-this.w/2-this.panX,dy=y-this.h/2-this.panY;this.panX-=dx*(next/old-1);this.panY-=dy*(next/old-1);this.zoom=next;this.render();}
  resize(){const r=this.canvas.getBoundingClientRect();this.w=Math.max(1,r.width);this.h=Math.max(1,r.height);this.dpr=Math.min(window.devicePixelRatio||1,2);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.render();}
  setWorld(world){this.world=world;this.game=null;this.selected=null;this.hover=null;this.hoverHistorical=null;this.counties=buildDecorativeCounties(world);this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));if(this.terrain)this.terrain.world=world;this.render();}
  setGame(g){this.game=g;this.render();}

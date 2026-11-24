@@ -1,3 +1,4 @@
+import {applyFieldLosses} from './field-forces.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {captureCommander} from './feudal-systems.js';
 import {defenseSupport,strategicPlan,raidThreshold} from './strategic-ai.js';
@@ -105,8 +106,8 @@ export function resolveInvasion(g,world,threat,result){
  const human=armiesOf(g,g.player).filter(a=>a.province===found.province);
  const playerRatio=clamp(result.attackerRemaining??.5,0,1);
  const enemyRatio=clamp(result.enemyRemaining??(result.victory?.45:.78),0,1);
- for(const a of human){trimArmy(a,playerRatio);syncRegiments(g,a);}
- onArmyMarch(g,attacker);trimArmy(attacker,enemyRatio);syncRegiments(g,attacker);applyFortDamage(g,found.province,result);
+ for(const a of human){if(result.fieldBattle)applyFieldLosses(a,result,'attacker',playerRatio);else trimArmy(a,playerRatio);syncRegiments(g,a);}
+ onArmyMarch(g,attacker);if(result.fieldBattle)applyFieldLosses(attacker,result,'defender',enemyRatio);else trimArmy(attacker,enemyRatio);syncRegiments(g,attacker);applyFortDamage(g,found.province,result);
  const defended=Boolean(result.victory);
  const war=activeWar(g,found.by,g.player);
  if(defended){

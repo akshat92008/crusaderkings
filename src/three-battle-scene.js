@@ -1,3 +1,4 @@
+import {updateFieldCharacters} from './battle-presentation.js';
 /**
  * Crown of Nations — Three.js battle renderer with real KayKit skinned infantry.
  * Bundled locally by scripts/build_3d_battle.mjs. No runtime CDN dependence.
@@ -135,6 +136,7 @@ export class ThreeBattleScene {
   this.groups.set(g.id,units);
  }
  updateCharacters(groups,dt){
+  if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);
   if(!this.modelsReady)return;
   for(const g of groups||[]){
    this.prepareSquad(g);const units=this.groups.get(g.id);if(!units)continue;
