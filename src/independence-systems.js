@@ -29,6 +29,6 @@ export function foundBreakaway(g,world,x){const s=initIndependence(g),parent=x.r
  g.chronicles.realms[id]={ruler:leader.id,decisionAt:-120,chain:null,lastChain:{},ambition:null,completed:[],successionAt:null};
  g.identity.realms[id]={...clone(g.identity.realms[parent]),research:null,lastTradition:g.turn,lastFaith:g.turn,faithAuthority:45};
  for(const a of Object.values(g.armies))if(a.owner===parent&&memberSet.has(a.province)&&!g.naval.voyages[a.id]){const target=remain.find(p=>controller(g,p.id)===parent);if(target)a.province=target.id;else delete g.armies[a.id];}
- const count=Math.max(35,Math.min(350,Math.round(x.rebels??x.power??members.length*45))),aid='a'+g.nextId++;g.armies[aid]={id:aid,owner:id,province:members[0],...startingTroops(g.factions[id],count),experience:.1,morale:75,commander:'Commander of '+name,doctrine:militaryDoctrine(g.factions[id]).id};
+ const count=Math.max(20,Math.min(350,Math.round(x.rebels??x.power??members.length*45))),aid='a'+g.nextId++;g.armies[aid]={id:aid,owner:id,province:members[0],...startingTroops(g.factions[id],count),experience:.1,morale:75,commander:'Commander of '+name,doctrine:militaryDoctrine(g.factions[id]).id};
  s.states[id]={id,parent,founder:leader.id,turn:g.turn,members:[...members],reason:x.status};x.newRealm=id;s.history.unshift({id,parent,turn:g.turn,provinces:[...members]});s.history=s.history.slice(0,100);syncTitles(g);g.log.unshift({date:g.year+' · month '+(g.month+1),text:name+' gained independence from '+old.name+'.'});g.log=g.log.slice(0,45);return id;
 }
