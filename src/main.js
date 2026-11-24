@@ -108,10 +108,11 @@ function renderInspector(){if(!game)return;let p=staticById[selected],state=game
  el('province-panel').innerHTML=text;
 }
 function openBattle(desc){desc.interactive=true;desc.fieldBattle=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
- el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
+ el('battle-camera').value='tactical';el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
  battleDescriptor=desc;try{battle=new BattleGame(el('battle-canvas'),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';}catch(e){el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);}}
 function onBattleStatus(status){
+ const roster=status.roster;if(roster){const a=roster.attacker,b=roster.defender;el('battle-strength').textContent='YOUR FORCE '+fmt(a.surviving)+' / '+fmt(a.initial)+' · ENEMY '+fmt(b.surviving)+' / '+fmt(b.initial)+(status.enemyPosture?' · '+status.enemyPosture.toUpperCase():'');}
  el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
  el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% HP · '+Math.round(g.morale)+'% MORALE · '+Math.round(g.fatigue||0)+'% FATIGUE · '+Math.round(g.cohesion??100)+'% COHESION · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
@@ -128,7 +129,8 @@ function onBattleFinished(result){
  const explanation=practice?'Practice battle; your campaign will not be changed.':
    defense?(win?'Your army held the field.':'Your defensive position has been overrun.'):
    win?(activeWar(game,game.player,battleDescriptor.enemy)?'The province will be occupied pending peace.':'The enemy province will be taken.'):'Your army has retreated.';
- el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
+ const roster=result.roster,report=roster?'<div class="battle-report"><div><b>YOUR FIELD FORCE</b><small>Deployed '+fmt(roster.attacker.initial)+' · Surviving '+fmt(roster.attacker.surviving)+' · Losses '+fmt(roster.attacker.losses)+' · Routed survivors '+fmt(roster.attacker.routed)+'</small></div><div><b>ENEMY FIELD FORCE</b><small>Deployed '+fmt(roster.defender.initial)+' · Surviving '+fmt(roster.defender.surviving)+' · Losses '+fmt(roster.defender.losses)+' · Routed survivors '+fmt(roster.defender.routed)+'</small></div><small>Battlefield estimates include participating garrisons; campaign outcomes may differ.</small></div>':'';
+ el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p>'+report+'<button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
  el('battle-return').onclick=()=>{
   if(!practice){
    if(defense){const r=resolveInvasion(game,world,battleDescriptor.threat,result);if(!r.ok)message(r.msg);}
@@ -218,6 +220,7 @@ el('battle-showcase').addEventListener('click',()=>{
  const enemy=game.provinces[target.id].owner;
  openBattle({attacker:armyEntry[0],enemy,to:target.id,defenseTroops:110,defenseGarrison:80,showcase:true});
 });
+el('battle-camera').addEventListener('change',e=>{if(battle&&!battle.focusCamera(e.target.value))message('Select an active regiment.');});
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
 el('battle-start').addEventListener('click',()=>battle?.startAssault());

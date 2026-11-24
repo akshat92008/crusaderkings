@@ -96,3 +96,6 @@
 .battle-lanes{display:flex;gap:4px;flex-wrap:wrap}
 .battle-lanes[hidden],#battle-start[hidden]{display:none}
 @media(max-width:760px){.battle-commands{gap:5px;padding:5px}.battle-commands select{min-width:90px;max-width:150px}.battle-lanes button{font-size:9px;padding:5px}}
+
+/* Field battle camera and compact after-action report */
+.battle-strength{font-size:10px;letter-spacing:.06em;color:#e8d4a1;margin-top:6px;line-height:1.4}.battle-buttons #battle-camera{max-width:155px;min-width:110px;font-size:10px}.battle-report{display:grid;gap:8px;margin:12px 0;text-align:left}.battle-report>div{border:1px solid rgba(192,161,106,.35);padding:8px 10px;background:rgba(15,27,28,.5)}.battle-report b,.battle-report small{display:block}.battle-report small{font-size:11px;line-height:1.5;opacity:.8}.battle-report b{font-size:10px;letter-spacing:.1em}
