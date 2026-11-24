@@ -1,4 +1,4 @@
-import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField} from './field-tactics.js';
+import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
 import {BattleModelArt} from './glb-art.js';
@@ -149,7 +149,7 @@ export class BattleGame{
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
   g.routed=unitCount<1;g.profile=regimentProfile(game,a,type);g.readiness=armyReadiness(game,a);g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
-  if(descriptor.fieldBattle)initializeFieldGroup(g);this.groups.push(g);
+  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
  }
  for(let i=0;i<6;i++){
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
@@ -158,7 +158,7 @@ export class BattleGame{
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?50:type==='archers'?32:22)*100,10,100);
   g.routed=unitCount<1;g.profile=regimentProfile(game,enemyArmy||enemies,type);g.readiness=armyReadiness(game,enemyArmy||enemies);g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,enemy,militaryDoctrine(enemy).formations[i%militaryDoctrine(enemy).formations.length]);
-  if(descriptor.fieldBattle)initializeFieldGroup(g);this.groups.push(g);
+  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
  }
  this.selected=0;
  this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
@@ -175,7 +175,7 @@ export class BattleGame{
  cameraVectors(){const {eye,target}=this.getCamera(),forward=norm(sub(target,eye)),right=norm(cross(forward,[0,1,0])),up=cross(right,forward);return {eye,forward,right,up};}
  rayGround(px,py){const {eye,forward,right,up}=this.cameraVectors();let w=this.canvas.clientWidth,h=this.canvas.clientHeight,ratio=w/h,t=Math.tan(Math.PI/6);let u=(2*px/w-1)*ratio*t,v=(1-2*py/h)*t;let dir=norm([forward[0]+right[0]*u+up[0]*v,forward[1]+right[1]*u+up[1]*v,forward[2]+right[2]*u+up[2]*v]);if(dir[1]>=0)return null;let d=-eye[1]/dir[1];return [eye[0]+d*dir[0],0,eye[2]+d*dir[2]];}
  project(p){let {eye,forward,right,up}=this.cameraVectors();let d=sub(p,eye),depth=dot(d,forward);if(depth<=.5)return null;let scale=this.canvas.clientHeight/(2*Math.tan(Math.PI/6));return [this.canvas.clientWidth/2+dot(d,right)*scale/depth,this.canvas.clientHeight/2-dot(d,up)*scale/depth];}
- report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed,deployment:this.deployment,siege:this.siege});}
+ report(){if(this.onStatus)this.onStatus({groups:this.groups,selected:this.selected,paused:this.paused,elapsed:this.elapsed,deployment:this.deployment,siege:this.siege,enemyPosture:this.enemyPosture});}
  setFormation(index,id){
   const g=this.groups[index];
   if(!g||g.side!=='attacker'||g.routed||!availableFormations(this.game.factions[this.game.player]).some(f=>f.id===id))return false;
@@ -192,7 +192,7 @@ export class BattleGame{
  if(this.keys.has('q'))c.yaw-=dt*.9;if(this.keys.has('e'))c.yaw+=dt*.9;
  if(this.keys.has('w'))c.target[2]-=dt*22;if(this.keys.has('s'))c.target[2]+=dt*22;
  if(this.keys.has('a'))c.target[0]-=dt*22;if(this.keys.has('d'))c.target[0]+=dt*22;
- if(this.descriptor?.fieldBattle){if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
+ if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
  for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
   const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
   const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];
