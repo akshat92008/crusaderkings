@@ -1,0 +1,11 @@
+const tracks={menu:['main_theme','main_theme_alt'],europe:['campaign_europe'],india:['campaign_india'],east:['campaign_east_asia'],other:['campaign_europe','campaign_india','campaign_east_asia'],intrigue:['intrigue_1','intrigue_2'],battle:['warfare_1','warfare_2'],succession:['succession_1','succession_2']};
+export function campaignMusicMode(game){if(!game)return 'menu';if(game.kingdom?.threats?.length)return 'intrigue';const id=game.player,f=game.factions?.[id]||{};if(['vijayanagara','delhi','bahmani','bengal','gujarat','malwa','jaunpur','mewar','orissa','nepal'].includes(id))return 'india';if(['ming','joseon','ashikaga','ayutthaya','dai_viet','majapahit','malacca'].includes(id))return 'east';return /europe/i.test(f.continent||'')?'europe':'other';}
+export class CampaignMusic{
+ constructor(factory=()=>new Audio(),storage){this.factory=factory;this.enabled=true;try{this.storage=storage===undefined?globalThis.localStorage:storage;this.enabled=this.storage?.getItem('crown.music')!=='off';}catch{}this.mode='menu';this.index=0;this.failed=new Set();this.unlocked=false;this.hidden=false;this.token=0;}
+ select(mode){if(!tracks[mode]||mode===this.mode)return;this.mode=mode;this.index=0;this.stop();this.play();}
+ stop(){this.token++;if(this.audio){this.audio.pause();this.audio.onended=null;this.audio.onerror=null;this.audio=null;}}
+ unlock(){this.unlocked=true;this.play();}
+ setEnabled(v){this.enabled=!!v;try{this.storage?.setItem('crown.music',v?'on':'off');}catch{}if(v){this.unlocked=true;this.play();}else this.stop();}
+ visibility(hidden){this.hidden=hidden;if(hidden)this.audio?.pause();else this.play();}
+ play(){if(!this.enabled||!this.unlocked||this.hidden)return;if(this.audio){this.audio.play()?.catch(()=>{});return;}const names=tracks[this.mode];const list=[...names,...(this.mode==='battle'?['../war theme.ogg']:[])];let candidate;for(let n=0;n<list.length;n++){const name=list[this.index++%list.length];if(!this.failed.has(name)){candidate=name;break;}}if(!candidate)return;const a=this.factory(),token=++this.token;this.audio=a;a.volume=.42;a.preload='auto';const advance=()=>{if(token!==this.token)return;this.stop();this.play();};a.onended=advance;a.onerror=()=>{this.failed.add(candidate);advance();};a.src=candidate.endsWith('.ogg')?'assets/audio/war%20theme.ogg':'assets/audio/music/'+candidate+'.mp3';a.play()?.catch(()=>{});}
+}
