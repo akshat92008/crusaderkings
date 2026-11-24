@@ -32,7 +32,7 @@ export function createGame(world,player='ottomans'){
 export function makeLog(g,text){g.log.unshift({date:`${MONTHS[g.month]} ${g.year}`,text});g.log=g.log.slice(0,30);}
 export const ownerName=(g,id)=>g.factions[id]?.name||id;
 export function controlled(g,id){return Object.values(g.provinces).filter(p=>p.owner===id);}
-export function armiesAt(g,province,owner){return Object.values(g.armies).filter(a=>a.province===province&&(owner===undefined||a.owner===owner));}
+export function armiesAt(g,province,owner){return Object.values(g.armies).filter(a=>a.province===province&&!embarked(g,a.id)&&(owner===undefined||a.owner===owner));}
 export function armySize(a){return a?Math.max(0,Math.round(a.infantry+a.archers+a.cavalry)):0;}
 export function empireStats(g,owner){
  const p=controlled(g,owner); const f=g.factions[owner];
@@ -94,7 +94,7 @@ export function startMarch(g,world,fromId,toId){
  const army=armiesAt(g,fromId,g.player)[0];
  if(!army||embarked(g,army.id)||armySize(army)<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
  if(controller(g,toId)===g.player){onArmyMarch(g,army);army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
- const opponent=controller(g,toId);if(occupation(g,toId)&&opponent!==target.owner&&!activeWar(g,g.player,opponent))return {ok:false,msg:'Cannot attack a third-party occupation without formal war.'};
+ const opponent=controller(g,toId);if(occupation(g,toId)&&opponent!==target.owner&&target.owner!==g.player)return {ok:false,msg:'Cannot attack a third-party occupation without formal war.'};
  if(hasTruce(g,g.player,opponent))return {ok:false,msg:'A peace treaty bars this attack.'};
  if(g.factions[g.player].treaties[opponent]==='alliance')return {ok:false,msg:'Cannot attack an ally'};
  const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));
@@ -105,15 +105,16 @@ export function startMarch(g,world,fromId,toId){
 export function concludeBattle(g,battle,result){
  const src=g.armies[battle.attacker];if(!src)return;
  const dst=g.provinces[battle.to];const was=controller(g,battle.to),war=activeWar(g,g.player,was);
- recordCampaignBattle(g,g.player,was,battle.to,!!result.victory);
+
  const ratio=clamp(result.attackerRemaining??0,0,1);
  const oldsize=armySize(src);onArmyMarch(g,src);applyFortDamage(g,battle.to,result);
  src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);syncRegiments(g,src);
  if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
   const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending)delete g.armies[defending.id];
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
+  recordCampaignBattle(g,g.player,was,battle.to,true);
   makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
- } else {src.morale=clamp(src.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${armySize(src)} survivors.`);}
+ } else {recordCampaignBattle(g,g.player,was,battle.to,false);src.morale=clamp(src.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${armySize(src)} survivors.`);}
 }
 export function negotiate(g,other,action,world={factions:[]}){
  if(other===g.player||other==='independent'||!g.factions[other])return {ok:false,msg:'Invalid diplomatic target'};
@@ -150,7 +151,7 @@ export function advanceMonth(g,world){
   if(f.treasury<0&&rand(g)<.14){f.legitimacy=clamp(f.legitimacy-3,0,100);}
   // Court AI: invest reserves. No fake historical scripting.
   if(f.id!==g.player&&g.turn%4===0&&f.treasury>700&&s.provinces){
-   const own=controlled(g,f.id);const p=own[Math.floor(rand(g)*own.length)];
+   const own=controlled(g,f.id).filter(p=>controller(g,p.id)===f.id);const p=own[Math.floor(rand(g)*own.length)];
    if(p){const cost=Math.round(240*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);if(f.treasury>cost&&p.buildings.market<3){f.treasury-=cost;p.buildings.market=clamp(p.buildings.market+1,0,3);p.development=clamp(p.development+1,1,20);}}
   }
  }
@@ -168,11 +169,11 @@ export function advanceMonth(g,world){
    const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,target.owner).reduce((sum,v)=>sum+armySize(v),0);
    const attack=armySize(a)*armyReadiness(g,a).power*(0.75+rand(g)*.7);
    if(attack>defense*.88){
-    const previous=target.owner,war=activeWar(g,a.owner,previous);recordCampaignBattle(g,a.owner,previous,target.id,true);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
+    const previous=target.owner,war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
     const losses=clamp(defense/Math.max(1,attack)*.29,.07,.44);
     a.infantry=Math.round(a.infantry*(1-losses));a.archers=Math.round(a.archers*(1-losses));a.cavalry=Math.round(a.cavalry*(1-losses));
     for(const defender of armiesAt(g,target.id,previous))delete g.armies[defender.id];
-    onArmyMarch(g,a);a.province=target.id;g.factions[a.owner].prestige+=3;
+    onArmyMarch(g,a);a.province=target.id;recordCampaignBattle(g,a.owner,previous,target.id,true);g.factions[a.owner].prestige+=3;
     makeLog(g,`${ownerName(g,a.owner)} seized ${target.id} from ${ownerName(g,previous)} after a border conflict.`);campaigns++;
    }
   }
@@ -180,7 +181,7 @@ export function advanceMonth(g,world){
  if(g.turn%6===0){
   for(const f of world.factions){
    if(f.id===g.player)continue;
-   let troops=Object.values(g.armies).filter(a=>a.owner===f.id);const a=troops[0];
+   let troops=Object.values(g.armies).filter(a=>a.owner===f.id&&!embarked(g,a.id));const a=troops[0];
    if(a&&f.id!=='independent'&&g.factions[f.id].treasury>600&&armySize(a)<190){g.factions[f.id].treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];}
   }
  }
