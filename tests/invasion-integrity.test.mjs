@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validReadyInvasion,progressEnemyInvasions,resolveInvasion,autoResolveInvasion} from '../src/invasions.js';
+import {validReadyInvasion,progressEnemyInvasions,resolveInvasion,autoResolveInvasion,invasionRecovery,recordInvasionRecovery,planEnemyInvasion} from '../src/invasions.js';
 
 const world={provinces:[{id:'stage',neighbors:['target']},{id:'target',neighbors:['stage']},{id:'remote',neighbors:[]}]};
 function fixture(){
@@ -42,4 +42,16 @@ test('an alert absent from the canonical queue cannot be resolved',()=>{
  const {game,threat}=fixture();game.kingdom.threats=[];
  assert.equal(autoResolveInvasion(game,world,threat).ok,false);
  assert.equal(resolveInvasion(game,world,threat,{victory:false}).ok,false);
+});
+
+test('invasion recovery blocks mobilization across all enemies for six months and defeated rival for twelve',()=>{
+ const {game}=fixture();game.kingdom.threats=[];game.kingdom.difficulty='normal';
+ recordInvasionRecovery(game,'rival',true);assert.equal(invasionRecovery(game),6);assert.equal(invasionRecovery(game,'rival'),12);
+ assert.equal(planEnemyInvasion(game,world),null);
+ game.turn+=6;assert.equal(invasionRecovery(game),0);assert.equal(invasionRecovery(game,'rival'),6);
+ game.turn+=6;assert.equal(invasionRecovery(game,'rival'),0);
+});
+test('hard mode still provides four months of recovery; legacy saves need no migration',()=>{
+ const {game}=fixture();game.kingdom.difficulty='hard';assert.equal(invasionRecovery(game),0);
+ recordInvasionRecovery(game,'rival',false);assert.equal(invasionRecovery(game),4);assert.equal(invasionRecovery(game,'rival'),6);
 });
