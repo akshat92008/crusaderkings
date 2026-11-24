@@ -102,6 +102,7 @@ export function resolveInvasion(g,world,threat,result){
  for(const a of human)trimArmy(a,playerRatio);
  trimArmy(attacker,enemyRatio);
  const defended=Boolean(result.victory);
+ recordCampaignBattle(g,found.by,g.player,found.province,!defended);
  if(defended){
   g.factions[g.player].prestige+=8;
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
