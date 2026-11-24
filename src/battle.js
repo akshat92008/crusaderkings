@@ -247,7 +247,7 @@ export class BattleGame{
  finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;
   const fractionFor=side=>{const units=this.groups.filter(g=>g.side===side),total=units.reduce((n,g)=>n+(g.troopCount||0),0);return clamp(units.reduce((n,g)=>n+(g.routed?0:(g.troopCount||0)*g.life/Math.max(1,g.initialLife||100)),0)/Math.max(1,total),0,1);};
   const fraction=fractionFor('attacker'),enemies=fractionFor('defender');
-  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,fieldBattle:!!this.descriptor.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
+  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,fieldBattle:!!this.descriptor?.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
  }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
  togglePause(){this.paused=!this.paused;this.report();}
