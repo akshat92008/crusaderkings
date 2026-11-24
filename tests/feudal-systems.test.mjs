@@ -65,3 +65,14 @@ test('regional appointments only offer different free adults with controlled dis
  assert.equal(feudalAction(g,world,'regional',t.id,chosen.id).ok,false);
  assert.equal(g.factions[g.player].treasury,cash-120);
 });
+
+test('enemy occupation prevents regional appointment and arrest using the occupied estate',()=>{
+ const g=start(),realm=g.player,t=titleList(g,realm).find(t=>t.tier==='regional'&&regionalTitleCandidates(g,realm,t.id).length);
+ assert.ok(t);const chosen=regionalTitleCandidates(g,realm,t.id)[0],cash=g.factions[realm].treasury;
+ const owned=t.members.filter(id=>g.politics.holdings[id].lord===chosen.id);assert.ok(owned.length);
+ for(const id of owned){g.politics.holdings[id].leverageUntil=48;g.campaignWar.occupations[id]={owner:realm,by:'joseon',war:'fixture'};}
+ assert.ok(!regionalTitleCandidates(g,realm,t.id).some(p=>p.id===chosen.id));
+ assert.equal(feudalAction(g,world,'regional',t.id,chosen.id).ok,false);
+ assert.equal(feudalAction(g,world,'arrest',chosen.id).ok,false);
+ assert.equal(g.factions[realm].treasury,cash);
+});
