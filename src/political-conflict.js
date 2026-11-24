@@ -1,3 +1,4 @@
+import {civicModifiers} from './civic-systems.js';
 // Political opposition, council consent, claims and intrigue. Deterministic, JSON-safe.
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x));
 const size=a=>Math.max(0,(a.infantry||0)+(a.archers||0)+(a.cavalry||0));
@@ -43,7 +44,7 @@ function startScheme(g,realm,kind,target){
  else if(!v||v.realm!==realm||pr.owner!==realm)return no('Select a holding in your own realm.');
  if(f.treasury<rule.cost)return no('Insufficient treasury for scheme.');
  const role=kind==='fabricate'?'chancellor':'spymaster',agent=g.politics.people[s.council[role]],r=g.politics.people[s.ruler],skill=kind==='fabricate'?'diplomacy':'intrigue';
- f.treasury-=rule.cost;const id='s'+c.next++;c.schemes[id]={id,realm,kind,target,targetOwner:pr.owner,targetLord:v?.lord,agent:agent?.id,start:g.turn,due:g.turn+rule.duration,chance:cap(25+(agent?.skills[skill]||1)*9+(r.skills[skill]||1)*5,30,90),status:'active'};
+ f.treasury-=rule.cost;const id='s'+c.next++;c.schemes[id]={id,realm,kind,target,targetOwner:pr.owner,targetLord:v?.lord,agent:agent?.id,start:g.turn,due:g.turn+rule.duration,chance:cap(25+(agent?.skills[skill]||1)*9+(r.skills[skill]||1)*5+civicModifiers(g,realm).scheme,30,90),status:'active'};
  return ok('Scheme launched. Outcome in '+rule.duration+' months.');
 }
 function finishScheme(g,s){const c=initConflict(g),pr=g.provinces[s.target],v=g.politics.holdings[s.target],f=g.factions[s.realm];let success=pr?.owner===s.targetOwner&&(!['sway','investigate'].includes(s.kind)||v?.lord===s.targetLord)&&g.politics.people[s.agent]?.alive&&rng(c)*100<s.chance;

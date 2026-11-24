@@ -1,10 +1,12 @@
+import {initCivic,tickCivic,civicModifiers} from './civic-systems.js';
 import {initConflict,tickConflict} from './political-conflict.js';
 /**
  * Crown of Nations — alternate-history kingdom systems.
  * Generated rulers, court names and stories are fictional game content.
  * AI is deterministic rule-based gameplay, NOT an external language model.
  */
-import {initPolitics,tickPolitics,marryRealm} from './dynastic-politics.js';
+import {startingTroops} from './military-doctrines.js';
+import {politicalLevy,initPolitics,tickPolitics,marryRealm} from './dynastic-politics.js';
 import {planEnemyInvasion,progressEnemyInvasions} from './invasions.js';
 export const VICTORY_YEAR=1500;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -37,13 +39,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -56,7 +58,7 @@ export function tradeIncome(g,id){
   const other=pact.partners.find(x=>x!==id);
   value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2);
  }
- return Math.round(value);
+ return Math.round(value*civicModifiers(g,id).trade);
 }
 export function courtDecision(g,world,action){
  initializeKingdomSystems(g,world);const f=g.factions[g.player],c=currentCourt(g);
@@ -255,12 +257,12 @@ function aiMonthly(g,world){
    const neighbor=world.provinces.find(x=>x.id===p.id)?.neighbors||[];
    const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
    const kind=nation.food<130?'farm':frontier&&(p.buildings.fort||0)<2?'fort':(p.buildings.market||0)<2?'market':'farm';
-   const base={farm:180,fort:440,market:260}[kind],level=p.buildings[kind]||0,cost=base*(level+1);
+   const base={farm:180,fort:440,market:260}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build);
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
   if(g.turn%6===0&&nation.treasury>450){
    const a=armies(g,f.id).sort((x,y)=>size(x)-size(y))[0];
-   if(a&&size(a)<650){nation.treasury-=120;a.infantry+=35;a.morale=clamp(a.morale+1,0,100);}
+   if(a&&size(a)<650){nation.treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];a.morale=clamp(a.morale+1,0,100);}
   }
   if(g.turn%12===0&&nation.treasury>450){
    const peers=world.factions.filter(p=>p.continent===f.continent&&p.id!==f.id);
@@ -280,9 +282,9 @@ function tickTrade(g){
 }
 export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
- tickTrade(g);
+ // Trade is already included in the campaign balance.
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickConflict(g,world);
+ tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
