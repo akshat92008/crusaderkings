@@ -1,3 +1,4 @@
+import {atlasEvents,atlasDecisions} from './atlas-narratives.js';
 import {depthEvents,depthDecisions,depthContext,depthTargetValid,depthEffectKeys,depthEffectAvailable,applyDepthEffect} from './depth-content.js';
 import {supplementalEvents,supplementalDecisions} from './supplemental-content.js';
 import {marriageCandidates,negotiatedMarriage} from './dynastic-politics.js';
@@ -9,6 +10,7 @@ const C=choice,E=event;
 export const EVENTS=[
 ...supplementalEvents(E,C),
 ...depthEvents(E,C),
+...atlasEvents(E,C),
 
 E('plot_review','Intrigue','The intelligence review','Your active political scheme requires a review of its preparations.','activePlot',[C('Fund a careful review',100,{plotPreparation:12},'plot_review_report'),C('Continue without review',0,{plotPreparation:-5},'plot_review_concerns')]),
 E('plot_review_report','Intrigue','A report from the network','The network reports on its preparations.','followup',[C('Improve coordination',90,{plotPreparation:10}),C('Accept the existing plan',0,{plotPreparation:2})]),
@@ -313,6 +315,7 @@ const D=(id,category,title,description,trigger,cost,effects,cooldown=36)=>({id,c
 export const DECISIONS=[
 ...supplementalDecisions(D),
 ...depthDecisions(D),
+...atlasDecisions(D),
 
 D('intelligence_review','Intrigue','Review intelligence preparations','Improve the preparation of your active scheme.','activePlot',160,{plotPreparation:18},24),
 D('confidential_archive','Intrigue','Protect confidential records','Extend the court’s counterintelligence protections.','knownSecret',160,{securityMonths:12},24),
@@ -440,7 +443,7 @@ return {married,foreignMarriage:foreign,competingHeirs:children.length>=2?person
 function activeFaction(g,r,id){const x=g.conflict.factions?.[id];return x?.realm===r&&['organizing','ultimatum'].includes(x.status)&&x.members.some(p=>controlled(g,r,g.provinces[p])&&g.politics.holdings[p]?.realm===r)?x:null;}
 function institutionalContext(g,r,land){const fs=Object.values(g.conflict.factions||{}).filter(x=>activeFaction(g,r,x.id)).sort((a,b)=>b.pressure-a.pressure||a.id.localeCompare(b.id)),faction=kind=>{const x=fs.find(x=>x.kind===kind);return x?{faction:x.id}:null;},local=p=>g.civic.provinces[p.id],inst=p=>g.identity.institutions[p.id],province=p=>p?{province:p.id,faith:local(p).faith}:null,ownFaith=g.civic.realms[r].faith;
 return {taxFaction:faction('tax'),levyFaction:faction('levy'),libertyFaction:faction('liberty'),claimantFaction:faction('claimant'),independenceFaction:faction('independence'),institutionUpgrade:province(land.find(p=>inst(p)&&inst(p).level<3&&inst(p).faith===local(p).faith)),faithTension:province(land.find(p=>local(p).faith!==ownFaith&&local(p).acceptance<65)),lowFaithAuthority:g.identity.realms[r].faithAuthority<45?province(land.find(p=>local(p).faith===ownFaith)):null};}
-const regionalRealms=new Set(["england","france","portugal","ottomans","mamluks","vijayanagara","bahmani","bengal","ming","joseon","malacca","inca","castile","aragon","burgundy","imperial","poland","muscovy","novgorod","timurids","qara","horde","morocco","ethiopia","mali","songhai","kongo","kilwa","delhi","gujarat","ashikaga","ayutthaya","dai-viet","majapahit","mexica","maya","pueblo","haudenosaunee","muisca","tupi","mapuche","maori","fiji","aboriginal"]);
+const regionalRealms=new Set(["england","france","portugal","ottomans","mamluks","vijayanagara","bahmani","bengal","ming","joseon","malacca","inca","castile","aragon","burgundy","imperial","poland","muscovy","novgorod","timurids","qara","horde","morocco","ethiopia","mali","songhai","kongo","kilwa","delhi","gujarat","ashikaga","ayutthaya","dai-viet","majapahit","mexica","maya","pueblo","haudenosaunee","muisca","tupi","mapuche","maori","fiji","aboriginal","scotland","brittany","kalmar","genoa","venice","cyprus","oirats","chagatai","tibet","lanxang","sunda","zayyanid"]);
 // Bind each root and its descendants to the same realm, including restored saves.
 const eventRegion=new Map();for(const e of EVENTS.filter(e=>e.trigger.startsWith('region_'))){const r=e.trigger.slice(7);eventRegion.set(e.id,r);for(const choice of e.choices)if(choice.next)eventRegion.set(choice.next,r);}
 
