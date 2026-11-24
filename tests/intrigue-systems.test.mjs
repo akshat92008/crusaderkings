@@ -19,3 +19,30 @@ test('plots cancel when actor loses throne and saves retain state',()=>{const g=
 
 
 test('scheme preparation and counterintelligence change actual plot odds within bounds',()=>{const g={turn:1,politics:{people:{a:{id:'a',alive:true,age:30,realm:'a',skills:{intrigue:3}},b:{id:'b',alive:true,age:40,realm:'b',skills:{intrigue:3}}},realms:{a:{ruler:'a',council:{}},b:{ruler:'b',council:{}}}},intrigue:{security:{}},feudal:{prisoners:{}}};const p={realm:'a',target:'b',agents:[],kind:'discredit'};const baseline=plotOdds(g,p);assert.equal(plotOdds(g,{...p,preparation:18}).chance,baseline.chance+18);assert.equal(plotOdds(g,{...p,preparation:-5}).chance,baseline.chance-5);g.intrigue.security.b={level:2,until:13};assert.equal(plotOdds(g,{...p,preparation:18}).chance,baseline.chance-2);});
+
+import {canStartPlot,networkView,knownThreats,plotCategory} from '../src/intrigue-systems.js';
+import {personalOpinion,changeOpinion} from '../src/chronicle-systems.js';
+test('distinct personal, political and hostile scheme slots coexist and save their real targets',()=>{
+ const g=setup(),id=g.politics.realms.ming.council.chancellor,other=g.politics.realms.ming.council.steward;
+ assert.equal(plotCategory('sway'),'personal');assert.ok(intrigueAction(g,world,'start','sway',id).ok);assert.ok(intrigueAction(g,world,'start','influence',other).ok);assert.ok(intrigueAction(g,world,'start','investigate',other).ok);
+ assert.equal(activePlots(g,'ming').length,3);assert.equal(canStartPlot(g,'ming','befriend'),false);assert.equal(canStartPlot(g,'ming','discredit'),false);
+ const copy=restoreGame(snapshot(g),world);assert.equal(activePlots(copy,'ming').length,3);
+});
+test('personal schemes resolve against actual relationships and record memories',()=>{
+ const g=setup(),r=g.politics.realms.ming.ruler,id=g.politics.realms.ming.council.chancellor;g.politics.people[r].skills.diplomacy=5;
+ const before=personalOpinion(g,r,id);assert.ok(intrigueAction(g,world,'start','sway',id).ok);assert.equal(finish(g).status,'succeeded');assert.ok(personalOpinion(g,r,id)>before);assert.ok(g.politics.people[id].memories.some(x=>x.includes('Sway opinion')));
+});
+test('persistent intelligence contacts can assist plots and cost periodic upkeep',()=>{
+ const g=setup(),view=networkView(g,'ming'),contact=view.candidates[0];assert.ok(contact);const cash=g.factions.ming.treasury;
+ assert.ok(intrigueAction(g,world,'network-recruit',contact.id).ok);assert.equal(g.factions.ming.treasury,cash-80);
+ const copy=restoreGame(snapshot(g),world);assert.equal(networkView(copy,'ming').members.length,1);copy.turn=3;tickIntrigue(copy,world,removePoliticalCharacter);assert.equal(copy.factions.ming.treasury,cash-90);
+ assert.ok(intrigueAction(copy,world,'network-dismiss',contact.id).ok);assert.equal(networkView(copy,'ming').members.length,0);
+});
+test('reviewing and disrupting a discovered foreign plot changes its actual odds and due date',()=>{
+ const g=setup(),target=g.politics.realms.joseon.ruler;assert.ok(intrigueAction(g,world,'start','discredit',target).ok);const p=activePlots(g,'ming')[0],old=p.due;
+ assert.ok(intrigueAction(g,world,'prepare',p.id).ok);assert.equal(p.preparation,8);assert.equal(intrigueAction(g,world,'prepare',p.id).ok,false);
+ p.discoveredAt=0;g.player='joseon';g.factions.joseon.treasury=1000;assert.equal(knownThreats(g,'joseon').length,1);assert.ok(intrigueAction(g,world,'disrupt',p.id).ok);assert.equal(p.preparation,-4);assert.equal(p.due,old+3);assert.equal(intrigueAction(g,world,'disrupt',p.id).ok,false);
+});
+test('contested allegations are not treated as verified secrets or reusable hooks',()=>{
+ const g=setup(),id=g.politics.realms.joseon.ruler;assert.ok(intrigueAction(g,world,'start','fabricate',id).ok);assert.equal(finish(g).status,'succeeded');const secret=knownSecrets(g,'ming').find(x=>x.kind==='contested');assert.ok(secret);assert.equal(intrigueAction(g,world,'blackmail',secret.id).ok,false);
+});
