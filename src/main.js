@@ -24,7 +24,7 @@ import {strategyAction,defenseSupport} from './strategic-ai.js';
 import {CampaignMap} from './map.js';
 import {BattleGame} from './battle.js';
 import {militaryDoctrine,availableFormations} from './military-doctrines.js';
-import {resolveInvasion,autoResolveInvasion} from './invasions.js';
+import {resolveInvasion,autoResolveInvasion,nativeInvasionArmies,validReadyInvasion} from './invasions.js';
 import {politicsAction} from './dynastic-politics.js';
 import {conflictAction} from './political-conflict.js';
 import {civicAction,civicModifiers} from './civic-systems.js';
@@ -187,12 +187,12 @@ function onBattleFinished(result){
 }
 function openIncomingBattle(){
  const threat=game?.kingdom?.threats?.find(t=>t.status==='ready');
- if(!threat||battle)return false;
+ if(!threat||battle||!validReadyInvasion(game,world,threat))return false;
  const stationed=armiesAt(game,threat.province,game.player),guests=fieldContingentsAt(game,game.player,threat.province,threat.by);
  const defenders=[...stationed,...guests],defense=game.provinces[threat.province];
  const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
  const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
- const opposingContingents=fieldContingentsAt(game,threat.by,enemyArmy.province,game.player),invaders=[enemyArmy,...opposingContingents];
+ const opposingContingents=fieldContingentsAt(game,threat.by,enemyArmy.province,game.player),invaders=[...nativeInvasionArmies(game,threat),...opposingContingents];
  return openBattle({defenseMode:true,attacker:stationed[0]?.id||null,playerArmies:defenders.map(a=>a.id),alliedTroops:guests.reduce((n,a)=>n+armySize(a),0),
   enemyArmy:threat.army,enemyArmies:invaders.map(a=>a.id),enemy:threat.by,from:enemyArmy.province,
   to:threat.province,defenseTroops:invaders.reduce((n,a)=>n+armySize(a),0),defenseGarrison:garrison+defenseSupport(game,game.player,threat.by),
