@@ -62,3 +62,22 @@ test('civil service excludes prisoners and non-imperial governments',()=>{
  const g=fixture('imperial');g.feudal.prisoners.n={status:'held'};assert.equal(governmentAction(g,{},'civil:exam','n').ok,false);
  const f=fixture('centralized');assert.equal(governmentAction(f,{},'civil:exam','n').ok,false);
 });
+
+import {merchantElectionView,steppePastureView} from '../src/regional-institutions.js';
+test('merchant elections use competing funded houses, campaign spending and a separate assembly office',()=>{
+ const g=fixture('republic');g.politics.people.n.house='North';g.politics.people.m.house='South';g.politics.people.m.skills.stewardship=4;
+ assert.ok(governmentAction(g,{},'n').ok);g.turn=6;assert.ok(governmentAction(g,{},'m').ok);tickInstitutions(g);
+ const v=merchantElectionView(g,'a');assert.equal(v.candidates.length,2);assert.equal(v.next,18);
+ assert.ok(governmentAction(g,{},'merchant:campaign','m').ok);assert.equal(merchantElectionView(g,'a').candidates[0].id,'m');
+ const before=institutionModifiers(g,'a').trade;g.turn=18;tickInstitutions(g);assert.equal(merchantElectionView(g,'a').chair.id,'m');assert.ok(institutionModifiers(g,'a').trade>before);assert.equal(g.politics.realms.a.ruler,'r');
+ g.feudal.prisoners.m={status:'held'};assert.equal(merchantElectionView(g,'a').chair,null);
+});
+test('same-house merchants cannot manufacture rival election candidates',()=>{
+ const g=fixture('republic');g.politics.people.n.house='North';g.politics.people.m.house='North';governmentAction(g,{},'n');g.turn=6;governmentAction(g,{},'m');tickInstitutions(g);
+ assert.equal(merchantElectionView(g,'a').candidates.length,1);assert.equal(governmentAction(g,{},'merchant:campaign','m').ok,false);
+});
+test('steppe pasture reserves cost gold, prevent excess herd loss and expire',()=>{
+ const g=fixture('steppe');governmentAction(g,{});assert.ok(governmentAction(g,{},'steppe:pasture').ok);assert.equal(g.factions.a.treasury,800);assert.equal(governmentAction(g,{},'steppe:pasture').ok,false);
+ g.factions.a.food=-10;g.turn=3;tickInstitutions(g);assert.equal(institutionState(g,'a').herds,22);
+ g.turn=12;tickInstitutions(g);assert.equal(steppePastureView(g,'a').active,false);assert.equal(institutionState(g,'a').herds,14);
+});

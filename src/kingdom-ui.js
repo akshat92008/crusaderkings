@@ -20,6 +20,7 @@ import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,mi
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
 import {governmentMotionView} from './government-deliberations.js';
 import {civilServiceView} from './imperial-civil-service.js';
+import {merchantElectionView,steppePastureView} from './regional-institutions.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -321,6 +322,14 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const election=merchantElectionView(g,realm);
+ if(election){html+='<div class="rule"><b>Merchant assembly elections</b><p class="paragraph">Invest in two different merchant houses to begin competitive elections for the assembly chair. The chair improves trade; this office does not alter crown succession.</p><div class="smallnote">Chair: '+esc(election.chair?.name||'Vacant')+' · '+(election.next===null?'Awaiting competing families':'Election in '+Math.max(0,election.next-g.turn)+' months')+'</div>';
+ for(const c of election.candidates)html+='<div class="smallnote">'+esc(c.house)+' · '+esc(c.name)+' · '+c.score+' election score ('+c.base+' reputation + '+c.fund/5+' campaign) </div>';
+ const eligible=election.candidates.filter(c=>c.fund<150);
+ if(election.canFund&&eligible.length)html+='<select class="select" id="merchant-election-person">'+eligible.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+' · '+c.fund+'/150g</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="merchant:campaign" data-second="merchant-election-person"'+(g.factions[realm].treasury<50?' disabled':'')+'>Fund campaign (50g)</button>';
+ html+='</div>';}
+ const pasture=steppePastureView(g,realm);
+ if(pasture){html+='<div class="rule"><b>Clan pasture reserves</b><p class="paragraph">Secure seasonal grazing rights to reduce herd losses in shortages and accelerate herd recovery. The reserve lasts twelve months.</p><div class="smallnote">'+esc(pasture.season)+' · '+(pasture.active?Math.max(0,pasture.until-g.turn)+' months of protected pasture':'No reserve')+'</div><button class="rowbtn" data-action="institution" data-id="steppe:pasture"'+(pasture.active||pasture.herds<10||g.factions[realm].treasury<80?' disabled':'')+'>Reserve pasture (80g)</button></div>';}
  const civil=civilServiceView(g,realm);
  if(civil){html+='<div class="rule"><b>Imperial civil service</b><p class="paragraph">Examinations grant ranks based on learning and stewardship. Qualified governors improve tax administration; unqualified governors can accumulate corruption. Audits cost gold and can antagonize landed officials.</p>';
  const candidates=civil.candidates.filter(c=>c.canSit);

@@ -4,6 +4,7 @@ import {controller} from './campaign-war.js';
 import {isImprisoned} from './feudal-systems.js';
 import {governmentPolicyModifiers,governmentMotionAction,tickGovernmentMotions} from './government-deliberations.js';
 import {administratorBonus,civilServiceAction,tickCivilService,examinationRank} from './imperial-civil-service.js';
+import {merchantChairBonus,merchantCampaign,tickMerchantElections,reservePasture,tickSteppePasture} from './regional-institutions.js';
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const own=(g,r)=>Object.values(g.provinces).filter(p=>p.owner===r&&controller(g,p.id)===r);
 const ruler=(g,r)=>g.politics.people[g.politics.realms[r]?.ruler];
@@ -23,7 +24,7 @@ export const INSTITUTION_TYPES={
  city:{name:'Urban merchant houses',action:'Invest in merchant house',cost:180,mode:'merchants'},
  kinship:{name:'Community reserves',action:'Expand communal stores',cost:100,mode:'reserves'}
 };
-function state(g,r){const root=g.institutions??={version:1,realms:{},history:[],lastTick:-1};const type=g.civic.realms[r].government,mode=INSTITUTION_TYPES[type]?.mode||'estates';let s=root.realms[r];if(!s||s.mode!==mode){s=root.realms[r]={mode,last:-120,compacts:{},offices:{},houses:{},retainers:{},herds:0,reserves:0,tributes:{},lastCollection:-1};}if(s.deliberation&&s.deliberation.government!==type)delete s.deliberation;if(type!=='imperial')delete s.civilService;return s;}
+function state(g,r){const root=g.institutions??={version:1,realms:{},history:[],lastTick:-1};const type=g.civic.realms[r].government,mode=INSTITUTION_TYPES[type]?.mode||'estates';let s=root.realms[r];if(!s||s.mode!==mode){s=root.realms[r]={mode,last:-120,compacts:{},offices:{},houses:{},retainers:{},herds:0,reserves:0,tributes:{},lastCollection:-1};}if(s.deliberation&&s.deliberation.government!==type)delete s.deliberation;if(type!=='imperial')delete s.civilService;if(!['republic','city'].includes(type))delete s.election;if(type!=='steppe')delete s.pastureUntil;return s;}
 export function initInstitutions(g){g.institutions??={version:1,realms:{},history:[],lastTick:-1};for(const r of Object.keys(g.civic.realms))state(g,r);return g.institutions;}
 export function institutionState(g,r){return g.institutions?.realms[r];}
 function note(g,r,msg){const h=g.institutions.history;h.unshift({realm:r,turn:g.turn,message:msg});if(h.length>120)h.length=120;if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}}
@@ -35,7 +36,7 @@ export function institutionModifiers(g,r){const s=institutionState(g,r),out={tax
  if(s.mode==='merchants')out.trade+=Math.min(.18,Object.values(s.houses).filter(h=>eligibleHouse(g,r,h.person)).reduce((n,h)=>n+h.level*.03,0));
  if(s.mode==='retainers')out.levy+=Math.min(.18,Object.values(s.retainers).filter(h=>eligibleHouse(g,r,h.person)).reduce((n,h)=>n+h.level*.03,0));
  if(s.mode==='herds')out.levy+=Math.min(.15,s.herds*.0015);
- const policy=governmentPolicyModifiers(g,r);for(const k of Object.keys(out))out[k]*=policy[k];
+ out.trade+=merchantChairBonus(g,r);const policy=governmentPolicyModifiers(g,r);for(const k of Object.keys(out))out[k]*=policy[k];
  return out;}
 function action(g,r,id,extra){const s=state(g,r),d=INSTITUTION_TYPES[g.civic.realms[r].government],f=g.factions[r];if(!d||!own(g,r).length||f.treasury<d.cost||g.turn-s.last<6)return no('Requires controlled land, sufficient funds and six months between institutional actions.');
  const h=g.politics.holdings[id],valid=institutionTargets(g,r).includes(id);switch(s.mode){
@@ -47,14 +48,14 @@ function action(g,r,id,extra){const s=state(g,r),d=INSTITUTION_TYPES[g.civic.rea
  case 'tribute':{const other=g.factions[id],rev=g.institutions.realms[id]?.tributes[r];if(!valid||s.tributes[id]?.until>g.turn||rev?.until>g.turn||(other.relations[r]||0)<25||Object.values(g.conflict.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)&&[w.attacker,w.defender].includes(id)))return no('Requires a willing foreign realm (+25 relations), no reciprocal compact or war.');const amount=Math.min(25,Math.max(5,own(g,id).length*3));s.tributes[id]={until:g.turn+36,amount};break;}
  default:return no('Unknown institutional model.');}
  f.treasury-=d.cost;s.last=g.turn;note(g,r,d.action+' completed.');return ok(d.action+' completed.');}
-export function governmentAction(g,world,id,extra){if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);if(id==='civil:exam')return civilServiceAction(g,g.player,'exam',extra);if(id==='civil:audit')return civilServiceAction(g,g.player,'audit',extra);return action(g,g.player,id,extra);}
-export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastTick===g.turn)return;root.lastTick=g.turn;for(const [r,s] of Object.entries(root.realms)){const f=g.factions[r],land=own(g,r);tickGovernmentMotions(g,r);if(!land.length)continue;tickCivilService(g,r);
+export function governmentAction(g,world,id,extra){if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);if(id==='civil:exam')return civilServiceAction(g,g.player,'exam',extra);if(id==='civil:audit')return civilServiceAction(g,g.player,'audit',extra);if(id==='merchant:campaign')return merchantCampaign(g,g.player,extra);if(id==='steppe:pasture')return reservePasture(g,g.player);return action(g,g.player,id,extra);}
+export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastTick===g.turn)return;root.lastTick=g.turn;for(const [r,s] of Object.entries(root.realms)){const f=g.factions[r],land=own(g,r);tickGovernmentMotions(g,r);if(!land.length)continue;tickCivilService(g,r);tickMerchantElections(g,r);
  for(const [id,x] of Object.entries(s.compacts))if(x.until<=g.turn||!land.some(p=>p.id===id))delete s.compacts[id];
  for(const [id,x] of Object.entries(s.offices))if(!land.some(p=>p.id===id)||!adult(g,x.person,r))delete s.offices[id];
  for(const list of [s.houses,s.retainers])for(const [id,x] of Object.entries(list))if(!eligibleHouse(g,r,x.person))delete list[id];
  for(const [id,x] of Object.entries(s.tributes)){const other=g.factions[id];if(!other||x.until<=g.turn||!own(g,id).length||(other.relations[r]||0)<0||Object.values(g.conflict.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)&&[w.attacker,w.defender].includes(id))){delete s.tributes[id];continue;}const paid=Math.min(x.amount,Math.max(0,other.treasury));other.treasury-=paid;f.treasury+=paid;}
  if(g.turn%3===0){if(s.mode==='estates')for(const id of Object.keys(s.compacts)){const h=g.politics.holdings[id];if(h?.realm===r)h.loyalty=cap(h.loyalty+2,0,100);}
- if(s.mode==='herds'&&s.herds>0){if(f.food<0)s.herds=Math.max(0,s.herds-8);else{f.food+=Math.floor(s.herds/5);s.herds=Math.min(100,s.herds+2);}}
+ if(s.mode==='herds'&&s.herds>0)tickSteppePasture(g,r,s);
  if(s.mode==='reserves'&&s.reserves>0){const need=Math.max(0,80-f.food),used=Math.min(s.reserves,need);s.reserves-=used;f.food+=used;if(used)f.stability=cap(f.stability+2,0,100);}
  if(s.mode==='merchants')for(const h of Object.values(s.houses)){const p=eligibleHouse(g,r,h.person);if(p)p.wealth+=h.level*3;}
  if(s.mode==='retainers')for(const h of Object.values(s.retainers)){const p=eligibleHouse(g,r,h.person);if(p)for(const v of Object.values(g.politics.holdings))if(v.realm===r&&v.lord===p.id)v.loyalty=cap(v.loyalty+1,0,100);}
