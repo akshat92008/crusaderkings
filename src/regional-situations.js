@@ -486,9 +486,16 @@ export function situationMeasure(g,def,members,cache){
  const span=Math.abs(def.model.bad-def.model.good)||1,severity=worst===null?0:cap(Math.round((high?worst-def.model.good:def.model.good-worst)/span*55),0,100);
  return {values,bad,healthy,severity,label:name[m],available:worst!==null};
 }
+export function situationResponseView(g,r,def){
+ const m=def.model.metric,land=owned(g,r),v=def.members.includes(r)&&land.length?value(g,r,m,land):null,f=g.factions[r],high=highBad.has(m),state=g.heritage?.struggles?.[def.id];
+ const cooldown=state?Math.max(0,12-g.turn+(state.last[r]??-1000)):0;
+ const healthy=v!==null&&(high?v<=def.model.good:v>=def.model.good);
+ const reason=!def.members.includes(r)||!land.length?'No controlled land in this situation.':!Number.isFinite(v)?'No eligible local records.':state?.ended!=null?'Situation already resolved.':state?.phase==='dormant'?'Dormant until the pressure threshold is reached.':healthy?'Local conditions already meet the recovery target.':cooldown?'Response available in '+cooldown+' months.':(f?.treasury??0)<def.model.cost?'Requires '+def.model.cost+' gold.':m==='pressure'&&!targets(g,r,m,land).some(x=>x.status!=='civil war')?'No faction eligible for peaceful mediation.':'';
+ return {value:v,label:name[m],healthy,threshold:def.model.bad,goal:def.model.good,high,cooldown,reason,canRespond:!reason};
+}
 export function respondToSituation(g,r,def){
- const m=def.model.metric,land=owned(g,r),v=value(g,r,m,land),f=g.factions[r];if(v===null||!land.length||f.treasury<def.model.cost)return false;
- const high=highBad.has(m);if(high?v<=def.model.good:v>=def.model.good)return false;
+ const view=situationResponseView(g,r,def);if(!view.canRespond)return false;
+ const m=def.model.metric,land=owned(g,r),v=view.value,f=g.factions[r],high=view.high;
  const t=targets(g,r,m,land),field={loyalty:'loyalty',acceptance:'acceptance',trust:'localTrust',grain:'grain',unrest:'unrest'}[m];
  if(m==='credit')g.economy.realms[r].credit=cap(v+9,0,100);
  else if(m==='faith')g.identity.realms[r].faithAuthority=cap(v+8,0,100);

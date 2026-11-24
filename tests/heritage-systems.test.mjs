@@ -57,3 +57,14 @@ test('new regional pressures use controlled local records, charge once per respo
  assert.equal(respondToSituation(g,'genoa',def),true);assert.equal(g.factions.genoa.treasury,360);assert.equal(g.economy.realms.genoa.credit,39);assert.equal(g.economy.realms.venice.credit,20);
  g.economy.realms.genoa.credit=80;assert.equal(respondToSituation(g,'genoa',def),false);assert.equal(g.factions.genoa.treasury,360);
 });
+
+test('regional UI and action agree on the live threshold, cooldown and recovery target',()=>{
+ const g=start('france'),id='french_recovery',land=Object.values(g.provinces).filter(p=>p.owner==='france');
+ for(const p of land)p.unrest=70;g.turn=3;tickHeritage(g,world);
+ let html=renderHeritage(g,world,String);assert.ok(html.includes('Average unrest: 70'));assert.ok(html.includes('Recovery target ≤ 22'));
+ assert.ok(heritageAction(g,world,'initiative',id,'special').ok);
+ html=renderHeritage(g,world,String);assert.ok(html.includes('Response available in 12 months.'));
+ assert.equal(heritageAction(g,world,'initiative',id,'special').ok,false);
+ for(const p of land)p.unrest=15;g.turn=6;tickHeritage(g,world);
+ html=renderHeritage(g,world,String);assert.ok(html.includes('Local conditions already meet the recovery target.'));assert.ok(html.includes('Healthy quarterly reviews: 1/2'));
+});
