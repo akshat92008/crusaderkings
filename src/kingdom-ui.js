@@ -17,7 +17,13 @@ import {COURT_OFFICES,courtCandidates,courtModifiers} from './royal-court.js';
 import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
 import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions} from './diplomacy-systems.js';
-import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
+import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers,tributeAccounts,estateReviewView} from './government-institutions.js';
+import {governmentMotionView} from './government-deliberations.js';
+import {civilServiceView} from './imperial-civil-service.js';
+import {merchantElectionView,steppePastureView} from './regional-institutions.js';
+import {regionalPoliticalView} from './regional-politics.js';
+import {crownInspectionView,memberAssemblyView} from './institution-procedures.js';
+import {localProgramView} from './local-institution-programs.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -319,6 +325,81 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const estates=estateReviewView(g,realm);
+ if(estates){html+='<div class="rule"><b>Estate consent and renewal</b><p class="paragraph">Compacts bind the current local lord. Renew consent near expiry rather than allowing a lapse. A change of lord invalidates the old agreement.</p>';
+ for(const x of estates)html+='<div class="smallnote">'+esc(place(x.id))+' · '+Math.max(0,x.until-g.turn)+' months · loyalty '+Math.round(x.loyalty)+'</div><button class="rowbtn" data-action="institution" data-id="estate:renew" data-second="estate-renew-'+esc(x.id)+'"'+(x.canRenew?'':' disabled')+'>Renew estate consent (90g)</button><input type="hidden" id="estate-renew-'+esc(x.id)+'" value="'+esc(x.id)+'">';
+ if(!estates.length)html+='<div class="smallnote">Negotiate an estate compact first.</div>';html+='</div>';}
+ if(s.mode==='tribute'){html+='<div class="rule"><b>Tribute accounts</b><p class="paragraph">Missed payments accumulate as arrears. The compact recovers at most one extra month of debt per month; forgive arrears to clear the burden.</p>';
+ const accounts=tributeAccounts(g,realm);
+ for(const x of accounts)html+='<div class="smallnote">'+esc(g.factions[x.id]?.name||x.id)+' · '+x.amount+'g/month · arrears '+x.arrears+'g · '+x.missed+' missed months</div><button class="rowbtn" data-action="institution" data-id="tribute:waive" data-second="tribute-waive-'+esc(x.id)+'"'+(x.arrears?'':' disabled')+'>Forgive arrears</button><input type="hidden" id="tribute-waive-'+esc(x.id)+'" value="'+esc(x.id)+'">';
+ if(!accounts.length)html+='<div class="smallnote">No active tribute agreements.</div>';html+='</div>';}
+ const program=localProgramView(g,realm);
+ if(program){const info={military:['Household service commissions','Commission a funded landed household for political service. After three months the serving lord receives a reward and increased loyalty.','military:commission','Commission household (100g)'],city:['Urban public works','Fund a six-month civic works project to improve community trust and reduce unrest.','city:works','Fund public works (160g)'],kinship:['Community relief allocations','Set aside 30 food from community stores for a three-month local relief program.','kinship:relief','Allocate relief (30 food)']}[program.kind];
+ html+='<div class="rule"><b>'+esc(info[0])+'</b><p class="paragraph">'+esc(info[1])+'</p>';
+ if(program.active)html+='<div class="smallnote">'+esc(place(program.active.province))+' · '+Math.max(0,program.active.ends-g.turn)+' months remaining</div>';
+ else if(program.targets.length)html+='<select class="select" id="institution-program-target">'+program.targets.map(x=>'<option value="'+esc(x.id)+'">'+esc(place(x.id))+' · '+(x.person?esc(name(x.person))+' · loyalty '+Math.round(x.loyalty):'trust '+Math.round(x.trust))+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="'+info[2]+'" data-second="institution-program-target"'+(program.canStart?'':' disabled')+'>'+esc(info[3])+'</button>';
+ else html+='<div class="smallnote">No eligible controlled province or household.</div>';
+ if(program.wait&&!program.active)html+='<div class="smallnote">Next program in '+program.wait+' months</div>';
+ if(program.last)html+='<p class="smallnote">'+esc(program.last.message)+'</p>';html+='</div>';}
+ const inspection=crownInspectionView(g,realm);
+ if(inspection){html+='<div class="rule"><b>Royal inspection reports</b><p class="paragraph">Commission an appointed inspector to review local order. After three months, implement or decline the recommendations. Funding reduces unrest; refusal may anger the local estate.</p>';
+ if(inspection.report){const x=inspection.report;html+='<div class="smallnote">'+esc(place(x.province))+' · '+esc(name(x.person))+' · '+(x.status==='ready'?'Report ready: reduce unrest by '+x.relief:'Investigating · '+Math.max(0,x.ends-g.turn)+' months')+'</div>';
+ if(x.status==='ready')html+='<button class="rowbtn" data-action="institution" data-id="crown:fund"'+(inspection.canFund?'':' disabled')+'>Implement report (100g)</button><button class="rowbtn" data-action="institution" data-id="crown:dismiss">Decline recommendations</button>';
+ }else if(inspection.targets.length)html+='<select class="select" id="crown-inspection-target">'+inspection.targets.map(x=>'<option value="'+esc(x.id)+'">'+esc(place(x.id))+' · unrest '+Math.round(x.unrest)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="crown:inspect" data-second="crown-inspection-target"'+(inspection.canStart?'':' disabled')+'>Commission inspection (70g)</button>';
+ else html+='<div class="smallnote">Appoint an inspector above to unlock reports.</div>';
+ if(inspection.last)html+='<p class="smallnote">'+esc(inspection.last.message)+'</p>';html+='</div>';}
+ const members=memberAssemblyView(g,realm);
+ if(members){html+='<div class="rule"><b>Confederate member assembly</b><p class="paragraph">Member chiefs vote equally on a common relief fund. A strict majority is required; only consenting members benefit from the agreement.</p><div class="smallnote">'+members.support+'/'+members.total+' chiefs support the fund'+(members.assembly?' · Vote in '+Math.max(0,members.assembly.ends-g.turn)+' months':'')+'</div>';
+ for(const x of members.members)html+='<div class="smallnote">'+esc(x.name)+' · '+x.land+' holdings · loyalty '+x.loyalty+' · '+(x.loyalty>=55?'Supports':'Opposes')+'</div>';
+ html+='<button class="rowbtn" data-action="institution" data-id="confed:assembly"'+(members.canStart?'':' disabled')+'>Convene member assembly (100g)</button>';
+ if(members.last)html+='<p class="smallnote">'+esc(members.last.message)+'</p>';html+='</div>';}
+ const regional=regionalPoliticalView(g,realm);
+ if(regional){const disabled=regional.canAct?'':' disabled';html+='<div class="rule">';
+ if(regional.kind==='regional'){
+ html+='<b>Regional land grants</b><p class="paragraph">Negotiate a four-year grant with an existing chief: reduced crown tax, increased levy cooperation, trust and lower unrest. Ownership and inheritance do not change.</p>';
+ for(const x of regional.grants)html+='<div class="smallnote">'+esc(place(x.id))+' · '+esc(name(x.lord))+' · '+Math.max(0,x.until-g.turn)+' months</div>';
+ if(regional.candidates.length)html+='<select class="select" id="regional-grant-chief">'+regional.candidates.map(x=>'<option value="'+esc(x.id)+'">'+esc(place(x.id))+' · '+esc(name(x.lord))+' · loyalty '+Math.round(x.loyalty)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="regional:grant" data-second="regional-grant-chief"'+disabled+'>Negotiate land grant (130g)</button>';
+ }else if(regional.kind==='sultanate'){
+ html+='<b>Scholarly commission</b><p class="paragraph">Appoint a qualified scholar for two years to support institutions and legitimacy. Costs 120g initially and 12g each quarter; existing military households remain separate.</p>';
+ if(regional.scholar)html+='<div class="smallnote">'+esc(regional.scholar.name)+' · '+Math.max(0,regional.scholar.until-g.turn)+' months</div>';
+ else if(regional.candidates.length)html+='<select class="select" id="sultanate-scholar">'+regional.candidates.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+' · learning '+x.learning+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="sultanate:scholar" data-second="sultanate-scholar"'+disabled+'>Commission scholar (120g)</button>';
+ }else{
+ html+='<b>Military house rivalries</b><p class="paragraph">Rival houses draw power from their land and funded retainers. High tension damages authority and local order. An accord improves loyalty and protects the negotiating houses for 18 months.</p><div class="smallnote">Rivalry tension '+regional.tension+'/100 · Threat threshold 75</div>';
+ for(const h of regional.rivals.slice(0,12))html+='<div class="smallnote">'+esc(h.house)+' · influence '+h.power+' · loyalty '+h.loyalty+'</div>';
+ if(regional.mediation)html+='<div class="smallnote">Accord: '+esc(regional.mediation.houses.join(' and '))+' · '+Math.max(0,regional.mediation.until-g.turn)+' months</div>';
+ html+='<button class="rowbtn" data-action="institution" data-id="shogunate:mediate"'+disabled+'>Mediate rival houses (150g)</button>';
+ }
+ if(regional.wait)html+='<div class="smallnote">Next institutional agreement in '+regional.wait+' months</div>';
+ if(regional.last)html+='<p class="smallnote">'+esc(regional.last.message)+'</p>';
+ html+='</div>';}
+ const election=merchantElectionView(g,realm);
+ if(election){html+='<div class="rule"><b>Merchant assembly elections</b><p class="paragraph">Invest in two different merchant houses to begin competitive elections for the assembly chair. The chair improves trade; this office does not alter crown succession.</p><div class="smallnote">Chair: '+esc(election.chair?.name||'Vacant')+' · '+(election.next===null?'Awaiting competing families':'Election in '+Math.max(0,election.next-g.turn)+' months')+'</div>';
+ for(const c of election.candidates)html+='<div class="smallnote">'+esc(c.house)+' · '+esc(c.name)+' · '+c.score+' election score ('+c.base+' reputation + '+c.fund/5+' campaign) </div>';
+ const eligible=election.candidates.filter(c=>c.fund<150);
+ if(election.canFund&&eligible.length)html+='<select class="select" id="merchant-election-person">'+eligible.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+' · '+c.fund+'/150g</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="merchant:campaign" data-second="merchant-election-person"'+(g.factions[realm].treasury<50?' disabled':'')+'>Fund campaign (50g)</button>';
+ html+='</div>';}
+ const pasture=steppePastureView(g,realm);
+ if(pasture){html+='<div class="rule"><b>Clan pasture reserves</b><p class="paragraph">Secure seasonal grazing rights to reduce herd losses in shortages and accelerate herd recovery. The reserve lasts twelve months.</p><div class="smallnote">'+esc(pasture.season)+' · '+(pasture.active?Math.max(0,pasture.until-g.turn)+' months of protected pasture':'No reserve')+'</div><button class="rowbtn" data-action="institution" data-id="steppe:pasture"'+(pasture.active||pasture.herds<10||g.factions[realm].treasury<80?' disabled':'')+'>Reserve pasture (80g)</button></div>';}
+ const civil=civilServiceView(g,realm);
+ if(civil){html+='<div class="rule"><b>Imperial civil service</b><p class="paragraph">Examinations grant ranks based on learning and stewardship. Qualified governors improve tax administration; unqualified governors can accumulate corruption. Audits cost gold and can antagonize landed officials.</p>';
+ const candidates=civil.candidates.filter(c=>c.canSit);
+ if(candidates.length)html+='<select class="select" id="imperial-exam-person">'+candidates.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+' · merit '+c.score+'/100</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="civil:exam" data-second="imperial-exam-person"'+(g.factions[realm].treasury<90?' disabled':'')+'>Hold civil examination (90g)</button>';
+ for(const c of civil.candidates.filter(c=>c.last!==null))html+='<div class="smallnote">'+esc(c.name)+' · rank '+c.rank+'/3 · '+c.service+' months of service</div>';
+ for(const o of civil.offices)html+='<div class="smallnote">'+esc(place(o.id))+' · '+esc(name(o.person))+' · corruption '+o.corruption+'%</div>';
+ const audit=civil.offices.filter(o=>o.corruption>=10);
+ if(audit.length)html+='<select class="select" id="imperial-audit-province">'+audit.map(o=>'<option value="'+esc(o.id)+'">'+esc(place(o.id))+' · '+o.corruption+'% corruption</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="civil:audit" data-second="imperial-audit-province"'+(g.factions[realm].treasury<75?' disabled':'')+'>Conduct audit (75g)</button>';
+ if(civil.last)html+='<p class="smallnote">'+esc(civil.last.message)+'</p>';html+='</div>';}
+ const v=governmentMotionView(g,realm);
+ if(v){const d=v.definition;html+='<div class="rule"><b>'+esc(d.name)+'</b><p class="paragraph">'+esc(d.desc)+'</p><div class="smallnote">'+(v.active?'Enacted':'Not enacted')+' · Tax '+Math.round(d.tax*100)+'% · Levies '+Math.round(d.levy*100)+'% · Trade '+Math.round(d.trade*100)+'% while enacted</div>';
+ if(v.motion){html+='<div class="smallnote">Debate: '+(v.motion.enact?'Enact':'Repeal')+' · '+Math.max(0,v.motion.ends-g.turn)+' months remaining</div>';}
+ html+='<div class="smallnote">Projected support '+v.yes+' / '+v.weight+' voting weight · strict majority required</div>';
+ if(v.last)html+='<div class="smallnote">Last vote: '+(v.last.passed?'Passed':'Rejected')+' ('+v.last.yes+'/'+v.last.total+')</div>';
+ if(!v.motion)html+='<button class="rowbtn" data-action="institution" data-id="motion:propose"'+(v.blocked?' disabled':'')+'>'+ (v.active?'Propose repeal':'Propose enactment')+' ('+d.cost+'g)</button>'+(v.blocked?'<div class="smallnote">'+esc(v.blocked)+'</div>':'');
+ for(const e of v.electors)html+='<div class="smallnote">'+esc(e.name)+' · '+e.weight+' votes · '+e.support+'% support score · '+(e.support>=55?'Supports':'Opposes')+(e.lobbied?' · Lobbied':'')+'</div>';
+ const available=v.electors.filter(e=>!e.lobbied);
+ if(v.motion&&available.length)html+='<select class="select" id="institution-lobby-person">'+available.map(e=>'<option value="'+esc(e.id)+'">'+esc(e.name)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="motion:lobby" data-second="institution-lobby-person"'+(g.factions[realm].treasury<35?' disabled':'')+'>Seek support (35g)</button>';
+ html+='</div>';}
+
  return html+'</details>';
 }
 

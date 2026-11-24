@@ -11,3 +11,154 @@ test('herds generate food and lose stock during shortages',()=>{const g=fixture(
 test('community reserves respond to shortages without endless food generation',()=>{const g=fixture('kinship');assert.ok(governmentAction(g,{}).ok);g.factions.a.food=50;g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.food,80);assert.equal(institutionState(g,'a').reserves,10);g.factions.a.food=0;g.turn=6;tickInstitutions(g);assert.equal(institutionState(g,'a').reserves,0);assert.equal(g.factions.a.food,10);});
 test('tribute transfers gold without creation and stops at war',()=>{const g=fixture('tributary');assert.ok(governmentAction(g,{},'b').ok);const total=g.factions.a.treasury+g.factions.b.treasury;g.turn=1;tickInstitutions(g);assert.equal(g.factions.a.treasury,905);assert.equal(g.factions.b.treasury,995);assert.equal(g.factions.a.treasury+g.factions.b.treasury,total);g.conflict.wars.w={status:'active',attacker:'a',defender:'b'};g.turn=2;tickInstitutions(g);assert.equal(institutionState(g,'a').tributes.b,undefined);assert.equal(g.factions.b.treasury,995);});
 test('newly formed realms initialize institutions and saved records persist',()=>{const g=fixture('steppe');assert.ok(governmentAction(g,{}).ok);const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);assert.equal(institutionState(copy,'a').herds,25);copy.civic.realms.c={government:'city'};initInstitutions(copy);assert.equal(institutionState(copy,'c').mode,'merchants');});
+
+import {GOVERNMENT_MOTIONS,governmentMotionView} from '../src/government-deliberations.js';
+test('government-specific motions cover all profiles and preserve the existing institutions',()=>{assert.deepEqual(Object.keys(GOVERNMENT_MOTIONS).sort(),Object.keys(INSTITUTION_TYPES).sort());assert.equal(new Set(Object.values(GOVERNMENT_MOTIONS).map(x=>x.name)).size,13);});
+test('assembly votes are delayed, weighted, save-safe and can enact or repeal a policy',()=>{
+ const g=fixture('feudal');g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;
+ const v=governmentMotionView(g,'a');assert.equal(v.weight,4);assert.equal(v.yes,4);
+ assert.ok(governmentAction(g,{},'motion:propose').ok);assert.equal(g.factions.a.treasury,870);
+ assert.equal(governmentAction(g,{},'motion:propose').ok,false);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=2;tickInstitutions(copy);assert.equal(governmentMotionView(copy,'a').active,false);
+ copy.turn=3;tickInstitutions(copy);assert.equal(governmentMotionView(copy,'a').active,true);assert.equal(institutionModifiers(copy,'a').levy,1.10);assert.equal(institutionModifiers(copy,'a').tax,.94);
+ assert.equal(governmentAction(copy,{},'motion:propose').ok,false);copy.turn=15;assert.ok(governmentAction(copy,{},'motion:propose').ok);
+ copy.turn=18;tickInstitutions(copy);assert.equal(governmentMotionView(copy,'a').active,false);assert.equal(institutionModifiers(copy,'a').tax,1);
+});
+test('failed votes, duplicate lobbying and prisoner exclusion cannot mint money or bypass debate',()=>{
+ const g=fixture('imperial');g.politics.holdings.p.loyalty=10;g.politics.holdings.q.loyalty=10;
+ assert.ok(governmentAction(g,{},'motion:propose').ok);const total=g.factions.a.treasury+g.politics.people.n.wealth;
+ assert.ok(governmentAction(g,{},'motion:lobby','n').ok);assert.equal(g.factions.a.treasury+g.politics.people.n.wealth,total);
+ assert.equal(governmentAction(g,{},'motion:lobby','n').ok,false);g.feudal.prisoners.n={status:'held'};
+ assert.equal(governmentMotionView(g,'a').electors.some(e=>e.id==='n'),false);
+ g.turn=3;tickInstitutions(g);assert.equal(governmentMotionView(g,'a').last.passed,false);assert.equal(institutionModifiers(g,'a').tax,1);
+});
+test('AI assemblies make and resolve motions through the same rules',()=>{
+ const g=fixture('feudal');g.player='b';g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;g.turn=12;tickInstitutions(g);
+ assert.ok(governmentMotionView(g,'a').motion);g.turn=15;tickInstitutions(g);assert.equal(governmentMotionView(g,'a').active,true);
+});
+test('occupation and government changes invalidate old policy benefits',()=>{
+ const g=fixture('feudal');g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;governmentAction(g,{},'motion:propose');g.turn=3;tickInstitutions(g);
+ assert.equal(governmentMotionView(g,'a').active,true);g.campaignWar={occupations:{p:{by:'b'},q:{by:'b'}}};assert.equal(institutionModifiers(g,'a').tax,1);delete g.campaignWar;
+ g.civic.realms.a.government='regional';initInstitutions(g);assert.equal(governmentMotionView(g,'a').active,false);assert.equal(institutionModifiers(g,'a').tax,1);
+ g.civic.realms.a.government='feudal';initInstitutions(g);assert.equal(governmentMotionView(g,'a').active,false);
+});
+
+import {civilServiceView,examinationRank} from '../src/imperial-civil-service.js';
+test('imperial exams qualify existing characters and improve governor administration after save/load',()=>{
+ const g=fixture('imperial');g.politics.people.n.skills.learning=4;assert.ok(governmentAction(g,{},'civil:exam','n').ok);assert.equal(examinationRank(g,'a','n'),3);assert.equal(g.factions.a.treasury,910);
+ assert.equal(governmentAction(g,{},'civil:exam','m').ok,false);assert.ok(governmentAction(g,{},'p','n').ok);
+ const plain=fixture('imperial');assert.ok(governmentAction(plain,{},'p','n').ok);assert.ok(institutionModifiers(g,'a').tax>institutionModifiers(plain,'a').tax);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=3;tickInstitutions(copy);assert.equal(civilServiceView(copy,'a').candidates.find(c=>c.id==='n').service,3);
+});
+test('unqualified imperial governors accumulate corruption and audits have a political and financial cost',()=>{
+ const g=fixture('imperial');g.politics.people.n.skills.stewardship=2;assert.ok(governmentAction(g,{},'p','n').ok);const initial=institutionModifiers(g,'a').tax;
+ for(let turn=3;turn<=12;turn+=3){g.turn=turn;tickInstitutions(g);}
+ assert.equal(institutionState(g,'a').offices.p.corruption,12);assert.ok(institutionModifiers(g,'a').tax<initial);
+ const treasury=g.factions.a.treasury,loyalty=g.politics.holdings.p.loyalty;
+ assert.ok(governmentAction(g,{},'civil:audit','p').ok);assert.equal(g.factions.a.treasury,treasury-75);assert.equal(g.politics.holdings.p.loyalty,loyalty-8);assert.equal(institutionState(g,'a').offices.p.corruption,0);
+ assert.equal(governmentAction(g,{},'civil:audit','p').ok,false);
+});
+test('civil service excludes prisoners and non-imperial governments',()=>{
+ const g=fixture('imperial');g.feudal.prisoners.n={status:'held'};assert.equal(governmentAction(g,{},'civil:exam','n').ok,false);
+ const f=fixture('centralized');assert.equal(governmentAction(f,{},'civil:exam','n').ok,false);
+});
+
+import {merchantElectionView,steppePastureView} from '../src/regional-institutions.js';
+test('merchant elections use competing funded houses, campaign spending and a separate assembly office',()=>{
+ const g=fixture('republic');g.politics.people.n.house='North';g.politics.people.m.house='South';g.politics.people.m.skills.stewardship=4;
+ assert.ok(governmentAction(g,{},'n').ok);g.turn=6;assert.ok(governmentAction(g,{},'m').ok);tickInstitutions(g);
+ const v=merchantElectionView(g,'a');assert.equal(v.candidates.length,2);assert.equal(v.next,18);
+ assert.ok(governmentAction(g,{},'merchant:campaign','m').ok);assert.equal(merchantElectionView(g,'a').candidates[0].id,'m');
+ const before=institutionModifiers(g,'a').trade;g.turn=18;tickInstitutions(g);assert.equal(merchantElectionView(g,'a').chair.id,'m');assert.ok(institutionModifiers(g,'a').trade>before);assert.equal(g.politics.realms.a.ruler,'r');
+ g.feudal.prisoners.m={status:'held'};assert.equal(merchantElectionView(g,'a').chair,null);
+});
+test('same-house merchants cannot manufacture rival election candidates',()=>{
+ const g=fixture('republic');g.politics.people.n.house='North';g.politics.people.m.house='North';governmentAction(g,{},'n');g.turn=6;governmentAction(g,{},'m');tickInstitutions(g);
+ assert.equal(merchantElectionView(g,'a').candidates.length,1);assert.equal(governmentAction(g,{},'merchant:campaign','m').ok,false);
+});
+test('steppe pasture reserves cost gold, prevent excess herd loss and expire',()=>{
+ const g=fixture('steppe');governmentAction(g,{});assert.ok(governmentAction(g,{},'steppe:pasture').ok);assert.equal(g.factions.a.treasury,800);assert.equal(governmentAction(g,{},'steppe:pasture').ok,false);
+ g.factions.a.food=-10;g.turn=3;tickInstitutions(g);assert.equal(institutionState(g,'a').herds,22);
+ g.turn=12;tickInstitutions(g);assert.equal(steppePastureView(g,'a').active,false);assert.equal(institutionState(g,'a').herds,14);
+});
+
+import {regionalPoliticalView} from '../src/regional-politics.js';
+function regionalFixture(mode){const g=fixture(mode);g.civic.realms.a={government:mode,faith:'Court faith',authority:70,patronage:50};g.civic.provinces={p:{localTrust:50},q:{localTrust:60}};g.identity={realms:{a:{faithAuthority:45}}};g.factions.a.legitimacy=60;g.provinces.p.unrest=20;g.provinces.q.unrest=20;g.politics.people.n.house='North';g.politics.people.m.house='South';return g;}
+test('regional land grants affect local trust and crown tradeoffs without transferring titles',()=>{
+ const g=regionalFixture('regional');assert.ok(governmentAction(g,{},'regional:grant','p').ok);assert.equal(g.factions.a.treasury,870);
+ assert.equal(g.politics.holdings.p.lord,'n');assert.equal(g.civic.provinces.p.localTrust,58);assert.equal(institutionModifiers(g,'a').tax,.94);assert.equal(institutionModifiers(g,'a').levy,1.04);
+ assert.equal(governmentAction(g,{},'regional:grant','q').ok,false);g.turn=3;tickInstitutions(g);assert.equal(g.civic.provinces.p.localTrust,60);assert.equal(g.provinces.p.unrest,18);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);assert.equal(regionalPoliticalView(copy,'a').grants.length,1);copy.politics.holdings.p.lord='m';copy.turn=4;tickInstitutions(copy);assert.equal(regionalPoliticalView(copy,'a').grants.length,0);assert.equal(institutionModifiers(copy,'a').tax,1);
+});
+test('sultanate scholarship has qualifications, a paid stipend, authority effects and faith-specific termination',()=>{
+ const g=regionalFixture('sultanate');g.politics.people.n.skills.learning=4;g.politics.people.n.civic={faith:'Court faith'};
+ assert.equal(governmentAction(g,{},'sultanate:scholar','m').ok,false);assert.ok(governmentAction(g,{},'sultanate:scholar','n').ok);assert.equal(g.factions.a.treasury,880);assert.equal(g.politics.people.n.wealth,160);
+ g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.treasury,868);assert.equal(g.politics.people.n.wealth,172);assert.equal(g.identity.realms.a.faithAuthority,46);assert.equal(g.factions.a.legitimacy,61);
+ g.civic.realms.a.faith='New faith';g.turn=6;tickInstitutions(g);assert.equal(regionalPoliticalView(g,'a').scholar,null);assert.equal(g.factions.a.treasury,868);
+});
+test('shogunal rivals threaten authority and mediation improves loyalty without changing the ruler',()=>{
+ const g=regionalFixture('shogunate');g.politics.holdings.p.loyalty=10;g.politics.holdings.q.loyalty=10;
+ g.turn=6;tickInstitutions(g);assert.equal(g.civic.realms.a.authority,68);assert.equal(g.provinces.p.unrest,23);assert.ok(regionalPoliticalView(g,'a').tension>=75);
+ assert.ok(governmentAction(g,{},'shogunate:mediate').ok);assert.equal(g.politics.holdings.p.loyalty,20);assert.equal(g.factions.a.treasury,850);assert.equal(g.politics.realms.a.ruler,'r');
+ g.turn=12;tickInstitutions(g);assert.equal(g.civic.realms.a.authority,68);assert.equal(g.provinces.p.unrest,23);
+ g.turn=24;tickInstitutions(g);assert.equal(g.civic.realms.a.authority,66);assert.equal(g.provinces.p.unrest,26);
+});
+test('AI regional rulers negotiate with disloyal chiefs and government transition removes arrangements',()=>{
+ const g=regionalFixture('regional');g.player='b';g.turn=12;tickInstitutions(g);assert.ok(regionalPoliticalView(g,'a').grants.length);
+ g.civic.realms.a.government='feudal';initInstitutions(g);assert.equal(institutionState(g,'a').regionalPolitics,undefined);assert.equal(regionalPoliticalView(g,'a'),null);
+});
+
+test('regional agreements exclude occupied estates and changed faith invalidates a scholar immediately',()=>{
+ const g=regionalFixture('regional');g.campaignWar={occupations:{p:{by:'b'}}};assert.equal(governmentAction(g,{},'regional:grant','p').ok,false);assert.ok(governmentAction(g,{},'regional:grant','q').ok);
+ const s=regionalFixture('sultanate');s.politics.people.n.skills.learning=4;s.politics.people.n.civic={faith:'Court faith'};governmentAction(s,{},'sultanate:scholar','n');s.civic.realms.a.faith='New faith';assert.equal(regionalPoliticalView(s,'a').scholar,null);
+});
+
+import {crownInspectionView,memberAssemblyView} from '../src/institution-procedures.js';
+test('centralized crowns commission delayed inspector reports and choose whether to fund them',()=>{
+ const g=regionalFixture('centralized');assert.ok(governmentAction(g,{},'p','n').ok);assert.ok(governmentAction(g,{},'crown:inspect','p').ok);assert.equal(g.factions.a.treasury,820);
+ assert.equal(governmentAction(g,{},'crown:fund').ok,false);g.turn=3;tickInstitutions(g);assert.equal(crownInspectionView(g,'a').report.relief,15);
+ assert.ok(governmentAction(g,{},'crown:fund').ok);assert.equal(g.provinces.p.unrest,5);assert.equal(g.factions.a.treasury,720);assert.equal(crownInspectionView(g,'a').report,null);
+});
+test('central inspection cancels on territorial loss and refusal is a distinct consequence',()=>{
+ const g=regionalFixture('centralized');governmentAction(g,{},'p','n');governmentAction(g,{},'crown:inspect','p');g.turn=3;tickInstitutions(g);
+ const loyalty=g.politics.holdings.p.loyalty;assert.ok(governmentAction(g,{},'crown:dismiss').ok);assert.equal(g.politics.holdings.p.loyalty,loyalty-4);
+ g.turn=6;assert.ok(governmentAction(g,{},'crown:inspect','p').ok);g.provinces.p.owner='b';g.turn=7;tickInstitutions(g);assert.equal(crownInspectionView(g,'a').report,null);
+});
+test('confederate members vote equally and a strict majority is required for collective relief',()=>{
+ const g=regionalFixture('confederation');g.politics.holdings.p.loyalty=80;assert.equal(memberAssemblyView(g,'a').support,1);
+ assert.ok(governmentAction(g,{},'confed:assembly').ok);g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.stability,60);assert.equal(g.provinces.p.unrest,20);
+ g.turn=15;g.politics.holdings.q.loyalty=80;assert.ok(governmentAction(g,{},'confed:assembly').ok);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=18;tickInstitutions(copy);assert.equal(copy.factions.a.stability,63);assert.equal(copy.provinces.p.unrest,15);assert.equal(copy.politics.holdings.q.loyalty,86);
+});
+
+import {localProgramView} from '../src/local-institution-programs.js';
+test('military service commissions require funded households and deliver delayed benefits',()=>{
+ const g=regionalFixture('military');assert.equal(governmentAction(g,{},'military:commission','p').ok,false);assert.ok(governmentAction(g,{},'n').ok);
+ const wealth=g.politics.people.n.wealth,loyalty=g.politics.holdings.p.loyalty;assert.ok(governmentAction(g,{},'military:commission','p').ok);
+ assert.equal(g.factions.a.treasury,740);assert.equal(g.politics.people.n.wealth,wealth);g.turn=3;tickInstitutions(g);assert.equal(g.politics.people.n.wealth,wealth+40);assert.equal(g.politics.holdings.p.loyalty,loyalty+16);
+});
+test('urban works resolve only after six months and survive a save',()=>{
+ const g=regionalFixture('city');assert.ok(governmentAction(g,{},'city:works','p').ok);assert.equal(g.factions.a.treasury,840);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=3;tickInstitutions(copy);assert.equal(copy.provinces.p.unrest,20);copy.turn=6;tickInstitutions(copy);assert.equal(copy.provinces.p.unrest,12);assert.equal(copy.civic.provinces.p.localTrust,60);
+ assert.equal(localProgramView(copy,'a').active,null);assert.equal(governmentAction(copy,{},'city:works','q').ok,false);
+});
+test('kinship relief consumes real stores and refunds reserved food on lost target',()=>{
+ const g=regionalFixture('kinship');assert.ok(governmentAction(g,{},undefined).ok);assert.ok(governmentAction(g,{},'kinship:relief','p').ok);
+ assert.equal(institutionState(g,'a').reserves,10);g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.food,130);assert.equal(g.civic.provinces.p.localTrust,62);
+ g.turn=12;assert.ok(governmentAction(g,{},undefined).ok);assert.ok(governmentAction(g,{},'kinship:relief','q').ok);g.provinces.q.owner='b';g.turn=13;tickInstitutions(g);assert.equal(institutionState(g,'a').reserves,50);assert.equal(localProgramView(g,'a').active,null);
+});
+
+import {estateReviewView,tributeAccounts} from '../src/government-institutions.js';
+test('feudal compacts bind the actual lord and require near-expiry consent for renewal',()=>{
+ const g=fixture('feudal');assert.ok(governmentAction(g,{},'p').ok);assert.equal(governmentAction(g,{},'estate:renew','p').ok,false);
+ g.turn=24;assert.ok(governmentAction(g,{},'estate:renew','p').ok);assert.equal(g.factions.a.treasury,770);assert.equal(estateReviewView(g,'a')[0].until,60);
+ g.politics.holdings.p.lord='m';assert.equal(estateReviewView(g,'a').length,0);assert.equal(institutionModifiers(g,'a').levy,1);
+ g.turn=25;tickInstitutions(g);assert.equal(institutionState(g,'a').compacts.p,undefined);
+});
+test('tribute default and recovery conserve treasury and forgiveness clears debt without payment',()=>{
+ const g=fixture('tributary');assert.ok(governmentAction(g,{},'b').ok);g.factions.b.treasury=0;g.turn=1;tickInstitutions(g);
+ assert.equal(tributeAccounts(g,'a')[0].arrears,5);g.factions.b.treasury=100;const total=g.factions.a.treasury+g.factions.b.treasury;g.turn=2;tickInstitutions(g);
+ assert.equal(tributeAccounts(g,'a')[0].arrears,0);assert.equal(g.factions.b.treasury,90);assert.equal(g.factions.a.treasury+g.factions.b.treasury,total);
+ g.factions.b.treasury=0;g.turn=3;tickInstitutions(g);assert.equal(tributeAccounts(g,'a')[0].arrears,5);const money=g.factions.a.treasury;
+ assert.ok(governmentAction(g,{},'tribute:waive','b').ok);assert.equal(g.factions.a.treasury,money);assert.equal(tributeAccounts(g,'a')[0].arrears,0);
+});
