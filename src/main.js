@@ -1,4 +1,4 @@
-import {resolvePersonalDilemma,personalDilemmas} from './character-agency.js';
+import {resolvePersonalDilemma,personalDilemmas,playerLifeAction} from './character-agency.js';
 import {personalUnion,unionPartners,unionTerms} from './personal-unions.js';
 import {CAREER_TABS,campaignTab,careerPriorities,renderCareerCharacter,renderCareerProvince,renderCareerLinks} from './campaign-access.js';
 import {careerAction,careerView,vassalCareer,renderCareer,renderCareerEntry} from './player-career.js';
@@ -258,6 +258,7 @@ el('tab-content').addEventListener('change',e=>{if(e.target.id==='people-scope'|
 });
 document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selected=Number(unit.dataset.unit);battle.report();return;}
  const btn=e.target.closest('[data-action]');if(!btn||!game||battle)return;const action=btn.dataset.action,type=btn.dataset.type;
+ if(action==='player-life'){clickResult(playerLifeAction(game,btn.dataset.id,type,btn.dataset.extra));return;}
  if(action==='personal-life'){clickResult(resolvePersonalDilemma(game,btn.dataset.id,type));return;}
  if(action==='career'){const id=btn.dataset.input?el(btn.dataset.input)?.value:btn.dataset.id;const result=careerAction(game,type,id,btn.dataset.extra);if(result.ok&&type==='start'){cancelMarch();pageHistory.reset();tab='realm';characterId=null;}clickResult(result);return;}
  if(action==='pin'){clickResult(toggleCampaignPin(game,type,btn.dataset.id));return;}
