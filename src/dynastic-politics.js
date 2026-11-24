@@ -1,3 +1,4 @@
+import {personalOpinion} from './chronicle-systems.js';
 import {councilPermission} from './political-conflict.js';
 // Persistent fictional characters and provincial political institutions.
 // No external services; all state is plain JSON. Province ownership stays sovereign-level.
@@ -115,7 +116,7 @@ export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTic
   // Royal AI chooses partners with existing relations; domestic matches keep family lines alive.
   for(const [realm,s] of Object.entries(p.realms)){const r=p.people[s.ruler];if(realm===g.player)continue;for(const a of [r,...children(p,r)]){if(a.age<18||a.spouse||roll(p)>.45)continue;const match=marriageCandidates(g,realm).find(x=>x.a===a.id&&x.realm!==g.player&&(g.factions[realm].relations[x.realm]||0)>=20);if(match)marry(g,a,p.people[match.b]);else{const b=person(g,world,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:'House of '+realm+' consorts'});link(a,b);}}}
  }
- if(g.turn%3===0){for(const [id,v] of Object.entries(p.holdings)){const f=g.factions[v.realm],lord=p.people[v.lord];if(!f||!lord)continue;const target=clamp(55+(f.legitimacy-50)*.4+(f.stability-50)*.25-(v.tax-1)*15-(v.levy-1)*10+(v.autonomy-1)*10-(lord.traits.includes('ambitious')?12:0),0,100);v.loyalty=clamp(v.loyalty+clamp(target-v.loyalty,-4,4),0,100);v.wealth+=Math.max(0,Math.round(g.provinces[id].development*(3-v.tax)));if(v.realm!==g.player&&v.loyalty<35&&f.treasury>=150){f.treasury-=150;v.loyalty+=20;v.autonomy=2;}
+ if(g.turn%3===0){for(const [id,v] of Object.entries(p.holdings)){const f=g.factions[v.realm],lord=p.people[v.lord];if(!f||!lord)continue;const target=clamp(55+(f.legitimacy-50)*.4+(f.stability-50)*.25-(v.tax-1)*15-(v.levy-1)*10+(v.autonomy-1)*10-(lord.traits.includes('ambitious')?12:0)+personalOpinion(g,p.realms[v.realm].ruler,lord.id)*.20,0,100);v.loyalty=clamp(v.loyalty+clamp(target-v.loyalty,-4,4),0,100);v.wealth+=Math.max(0,Math.round(g.provinces[id].development*(3-v.tax)));if(v.realm!==g.player&&v.loyalty<35&&f.treasury>=150){f.treasury-=150;v.loyalty+=20;v.autonomy=2;}
   const key='grievance:'+id,old=p.situations[key];if(v.loyalty<35){p.situations[key]={id:key,realm:v.realm,province:id,lord:v.lord,phase:v.loyalty<20?'ultimatum':'grievance',started:old?.started??g.turn};if(!old&&v.realm===g.player)log(g,lord.name+' is organizing opposition to the crown.');if(v.loyalty<15&&g.turn-p.situations[key].started>=12&&roll(p)<.25){g.provinces[id].unrest=clamp(g.provinces[id].unrest+25,0,100);f.stability=clamp(f.stability-8,0,100);v.loyalty=25;log(g,lord.name+' resisted royal authority; provincial unrest increased.');}}else if(old)delete p.situations[key];
  }}
  for(const realm of Object.keys(p.realms)){
