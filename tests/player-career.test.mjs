@@ -80,7 +80,7 @@ test('an autonomous liege responds to low cohesion while a sovereign retains pol
  const {tickCivic}=await import('../src/civic-systems.js');
  for(const vassal of [false,true]){
   const g=vassal?fixture().g:createGame(world,'england'),s=g.civic.realms.england;
-  s.policy='assimilation';s.cohesion=15;g.turn=3;tickCivic(g,world);
-  assert.equal(s.policy,vassal?'pluralism':'assimilation');
+  s.policy='coercion';s.cohesion=15;g.turn=3;tickCivic(g,world);
+  assert.equal(s.policy,vassal?'pluralism':'coercion');
  }
 });
