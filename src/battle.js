@@ -6,7 +6,7 @@ import {fieldScenery,suppressFortScenery,battleContactShadow} from './field-scen
 import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {participatingArmies,aggregateForce,regimentTroops,combinedFieldStats} from './field-forces.js';
 import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from './battle-presentation.js';
-import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
+import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
 import {BattleModelArt} from './glb-art.js';
@@ -145,7 +145,7 @@ export class BattleGame{
  }
 
  const playerFaction=game.factions[game.player],enemy=game.factions[descriptor.enemy],fieldArmy=game.armies[descriptor.attacker];
- const garrison=startingTroops(playerFaction,descriptor.defenseMode?(descriptor.defenseGarrison||90):0);
+ const garrison=startingTroops(playerFaction,descriptor.defenseMode?(descriptor.defenseGarrison??90):0);
  const alliedFieldArmies=participatingArmies(game,descriptor.playerArmies||[descriptor.attacker],game.player,descriptor.defenseMode?descriptor.to:descriptor.from,descriptor.showcase?null:descriptor.enemy),hostileFieldArmies=participatingArmies(game,descriptor.enemyArmies||[descriptor.enemyArmy],descriptor.enemy,descriptor.defenseMode?descriptor.from:descriptor.to,descriptor.showcase?null:game.player),hostileGarrison=startingTroops(enemy,descriptor.defenseMode?0:descriptor.defenseGarrison||0),fieldStats=(armies,reserve,type)=>combinedFieldStats(armies,reserve,a=>armyReadiness(game,a),(a,t)=>regimentProfile(game,a,t),type);
  const a=descriptor.fieldBattle?aggregateForce(alliedFieldArmies,garrison):fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
  const enemyArmy=descriptor.enemyArmy&&game.armies[descriptor.enemyArmy];
@@ -159,7 +159,7 @@ export class BattleGame{
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
   g.routed=unitCount<1;if(descriptor.fieldBattle)Object.assign(g,fieldStats(alliedFieldArmies,garrison,type));else{g.profile=regimentProfile(game,a,type);g.readiness=armyReadiness(game,a);}g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
-  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
+  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;if(descriptor.interactive&&!g.routed)issueFieldOrder(g,'hold');}this.groups.push(g);
  }
  for(let i=0;i<6;i++){
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
@@ -170,14 +170,14 @@ export class BattleGame{
   g.routed=unitCount<1;if(descriptor.fieldBattle&&!descriptor.showcase)Object.assign(g,fieldStats(hostileFieldArmies,hostileGarrison,type));else{g.profile=regimentProfile(game,enemyArmy||enemies,type);g.readiness=armyReadiness(game,enemyArmy||enemies);}g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,enemy,militaryDoctrine(enemy).formations[i%militaryDoctrine(enemy).formations.length]);
   if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
  }
- this.selected=0;
+ this.selected=Math.max(0,this.groups.findIndex(g=>g.side==='attacker'&&!g.routed));
  this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
  for(let i=0;i<105;i++){let x=(rng()-.5)*125,z=(rng()-.5)*100;if(Math.abs(z)<33&&Math.abs(x)<44)continue;this.terrain.push({x,z,h:1.4+rng()*5,r:rng(),type:rng()>.55?'tree':'rock'});}
  this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){if(!this.deployment&&!this.done)this.togglePause();e.preventDefault();}};
  this._onKeyUp=e=>this.keys.delete(e.key.toLowerCase());this._onWheel=e=>{e.preventDefault();this.cameraGoal=null;this.camera.distance=clamp(this.camera.distance+e.deltaY*.065,35,165);};
  this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){if(this.descriptor.fieldBattle){this.command(this.selected,'move',[target[0],target[2]]);return;}group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0,pointer:e.pointerId};canvas.setPointerCapture?.(e.pointerId);}};
  this._onMove=e=>{if(this.drag&&this.drag.pointer===e.pointerId){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;this.drag.moved+=Math.hypot(dx,dy);if(this.drag.moved>3){this.cameraGoal=null;this.camera.target[0]-=dx*.08;this.camera.target[2]-=dy*.08;}}};
- this._onUp=e=>{if(this.drag?.pointer!==e.pointerId)return;if(this.drag.moved<8){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;if(this.tapMove){const p=this.rayGround(x,y);this.tapMove=false;if(p)this.command(this.selected,'move',[p[0],p[2]]);this.report();this.drag=null;return;}let best=-1,d=24;for(let i=0;i<6;i++){const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-x,p[1]-y);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
+ this._onUp=e=>{if(this.drag?.pointer!==e.pointerId)return;if(this.drag.moved<8){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;if(this.tapMove){const p=this.rayGround(x,y);this.tapMove=false;if(p)this.command(this.selected,'move',[p[0],p[2]]);this.report();this.drag=null;return;}let best=-1,d=24;for(let i=0;i<6;i++){if(this.groups[i].routed)continue;const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-x,p[1]-y);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
  window.addEventListener('keydown',this._onKeyDown);window.addEventListener('keyup',this._onKeyUp);canvas.addEventListener('wheel',this._onWheel,{passive:false});canvas.addEventListener('contextmenu',this._onContext);canvas.addEventListener('pointerdown',this._onDown);window.addEventListener('pointermove',this._onMove);window.addEventListener('pointerup',this._onUp);this._onCancel=()=>{this.drag=null;};canvas.addEventListener('pointercancel',this._onCancel);
  this._onContextLost=e=>{e.preventDefault();this.renderLost=true;this.paused=true;this.audio?.silence();this.report();};canvas.addEventListener('webglcontextlost',this._onContextLost);
  this._onVisibility=()=>{this.last=performance.now();this.frameRemainder=0;if(document.hidden)this.audio?.silence();};document.addEventListener('visibilitychange',this._onVisibility);this.report();this.loop=this.loop.bind(this);this.raf=requestAnimationFrame(this.loop);
@@ -199,7 +199,7 @@ export class BattleGame{
   const g=this.groups[index];if(!g||g.side!=='attacker'||g.routed)return false;
   g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;g.deploymentRevision=(g.deploymentRevision||0)+1;this.report();return true;
  }
- command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed){this.audio?.play('order');this.report();}return changed;}
+ command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];const points=all&&order==='move'?formationMovePoints(groups,point):null;let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,points?points.get(g.id):point))changed=true;if(changed){this.audio?.play('order');this.report();}return changed;}
  startAssault(){if(!this.deployment||this.renderLost)return false;this.deployment=false;this.paused=false;this.frameRemainder=0;this.audio?.unlock();this.audio?.play('horn');this.last=performance.now();this.report();return true;}
  update(dt){this.elapsed+=dt;
  if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);this.audio?.update(this.groups,this.elapsed,this.camera);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}

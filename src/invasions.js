@@ -71,14 +71,26 @@ export function findInvasionOptions(g,world){
  }
  return candidates.sort((a,b)=>b.threatScore-a.threatScore||a.by.localeCompare(b.by)||a.province.localeCompare(b.province));
 }
+// Recovery is measured in campaign months. Existing mobilizations remain valid.
+export function invasionRecovery(g,rival=null){
+ const k=g.kingdom||{},turn=g.turn||0;
+ return Math.max(0,(k.invasionRecoveryUntil||0)-turn,rival?(k.rivalRecoveryUntil?.[rival]||0)-turn:0);
+}
+export function recordInvasionRecovery(g,rival,repelled){
+ const k=g.kingdom,turn=g.turn||0;
+ const global=k.difficulty==='hard'?4:k.difficulty==='peaceful'?0:6;
+ k.invasionRecoveryUntil=Math.max(k.invasionRecoveryUntil||0,turn+global);
+ k.rivalRecoveryUntil??={};
+ if(rival)k.rivalRecoveryUntil[rival]=Math.max(k.rivalRecoveryUntil[rival]||0,turn+(repelled?12:6));
+}
 export function planEnemyInvasion(g,world){
- if(g.kingdom.threats.length||g.kingdom.difficulty==='peaceful')return null;
+ if(g.kingdom.threats.length||g.kingdom.difficulty==='peaceful'||invasionRecovery(g)>0)return null;
  const choices=findInvasionOptions(g,world);
  if(!choices.length)return null;
  const difficulty=g.kingdom.difficulty;
  // Strategic AI can gamble on difficult raids; it is not required to
  // always defeat the player's army in a pre-battle strength check.
- const viable=choices.filter(c=>c.advantage>=Math.max(.35,(difficulty==='hard'?.47:.66)+(raidThreshold(g,c.by,g.player)-.48)*.5));
+ const viable=choices.filter(c=>invasionRecovery(g,c.by)===0&&c.advantage>=Math.max(.35,(difficulty==='hard'?.47:.66)+(raidThreshold(g,c.by,g.player)-.48)*.5));
  if(!viable.length)return null;
  const chosen=viable[0];
  g.kingdom.threats.push(chosen);
@@ -167,7 +179,7 @@ export function resolveInvasion(g,world,threat,result){
   g.factions[found.by].prestige+=8;
  }
  recordCampaignBattle(g,found.by,g.player,found.province,!defended);recordStrategicBattle(g,found.by,g.player,!defended,1-enemyRatio);recordStrategicBattle(g,g.player,found.by,defended,1-playerRatio);
- g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);
+ g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);recordInvasionRecovery(g,found.by,defended);
  const msg=defended?'Your defenders repelled '+g.factions[found.by].name+' at '+found.province:
   g.factions[found.by].name+' captured '+found.province+' after a successful assault';
  return {ok:true,defended,msg};

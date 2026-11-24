@@ -42,7 +42,10 @@ import {renderCampaignSearch,renderDiplomaticAgreements,renderIdentity,renderFeu
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,recruitmentQuote,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 import {artIcon,setupMenuVideo,portraitImage,realmArt,assetImage} from './game-art.js';
+import {CampaignMusic,campaignMusicMode} from './campaign-music.js';
 const el=id=>document.getElementById(id);
+const music=new CampaignMusic();
+let musicRuler=null,musicRulerRealm=null;
 setupMenuVideo();for(const n of document.querySelectorAll('[data-resource-art]'))n.innerHTML=artIcon('resources',n.dataset.resourceArt);
 const fmt=n=>Math.round(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -62,8 +65,8 @@ const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();save(false);}}
-function start(id){pageHistory.reset();characterId=null;tab='realm';useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);render();save(false);}
-function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{persistCampaign(localStorage,snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();if(!openIncomingBattle())message('Saved campaign restored.');}
+function start(id){musicRuler=null;musicRulerRealm=null;pageHistory.reset();characterId=null;tab='realm';useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);render();save(false);}
+function loadRaw(raw,portable=false){musicRuler=null;musicRulerRealm=null;pageHistory.reset();characterId=null;tab='realm';if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{persistCampaign(localStorage,snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();if(!openIncomingBattle())message('Saved campaign restored.');}
 function load(){try{loadRaw(localStorage.getItem(SAVE_KEY));}catch(e){message('Unable to load save: '+e.message);}}
 function save(notify=true){if(!game||battle)return false;try{persistCampaign(localStorage,snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){if(notify!==false)message('Save failed: '+e.message);return false;}}
 function exportSave(){if(!game||battle)return;const blob=new Blob([snapshot(game)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=saveFilename(game);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Campaign backup exported.');}
@@ -71,7 +74,7 @@ function setDrawer(next){const open=next==='management'||next==='province';docum
 function cancelMarch(){marchFrom=null;map.setMarchOrigin(null);el('cancel-march').hidden=true;el('map-target-help').textContent='Tap a province to inspect';}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);cancelMarch();if(r.ok&&r.type==='battle'){if(openBattle(r))return;message('Could not open battle. No campaign casualties were applied.');return;}clickResult(r);}
  selected=id;map.select(id);renderInspector();setDrawer('province');}
-function render(){if(!game)return;const f=player(),s=empireStats(game,game.player),career=careerView(game);
+function render(){if(!game)return;const scoreRuler=game.politics?.realms?.[game.player]?.ruler;const scoreSuccession=musicRulerRealm===game.player&&musicRuler&&scoreRuler&&scoreRuler!==musicRuler;musicRuler=scoreRuler;musicRulerRealm=game.player;if(!battle)music.select(scoreSuccession?'succession':campaignMusicMode(game));const scoreOptions=document.querySelector('.map-options');if(scoreOptions&&musicButton.parentElement!==scoreOptions)scoreOptions.append(musicButton);const f=player(),s=empireStats(game,game.player),career=careerView(game);
  el('resource-prestige').textContent=fmt(f.prestige||0);el('resource-legitimacy').textContent=fmt(f.legitimacy||0)+'%';el('resource-gold').parentElement.parentElement.title=career?'Personal gold; estate funds shown in career panel':'Treasury '+fmt(f.treasury)+' · monthly balance '+fmt(s.balance);el('resource-gold').textContent=fmt(career?career.person?.wealth||0:f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
  const ruler=career?career.person:game.politics?.people?.[game.politics?.realms?.[game.player]?.ruler],mark=portraitMark(ruler);el('hud-ruler').hidden=!ruler;el('hud-ruler-name').textContent=(ruler?.name||'—')+(ruler&&personalDilemmas(game,ruler.id).length?' · !':'');el('hud-portrait').innerHTML=portraitImage(ruler)||esc(mark.initials);el('hud-portrait').style.background=mark.color;el('quick-nav').hidden=false;el('open-management').textContent=career?'Manage career':'Manage kingdom';for(const b of el('quick-nav').querySelectorAll('[data-priority-tab]'))b.hidden=!!career&&!CAREER_TABS.includes(b.dataset.priorityTab);const outliner=campaignOutliner(game,world);el('outliner-count').textContent=outliner.count;el('outliner-list').innerHTML=renderCampaignOutliner(outliner,esc);el('faction-name').textContent=f.name;el('faction-government').textContent=career?'Vassal career':f.government;
  el('faction-flag').style.background=f.color;el('faction-flag').innerHTML=assetImage(realmArt(f.id),'realm-emblem')||'♛';
@@ -156,11 +159,12 @@ function renderInspector(){if(!game)return;if(vassalCareer(game)){el('province-p
 }
 let battleSound=true;try{battleSound=localStorage.getItem('crown-of-nations.battle-sound')!=='off';}catch{}
 function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pressed',String(battleSound));b.textContent=battleSound?'Sound on':'Sound off';}
-function openBattle(desc){setDrawer(null);desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
+function pauseCampaignClock(){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}
+function openBattle(desc){pauseCampaignClock();setDrawer(null);desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
  el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='tactical';el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
  if(desc.alliedTroops)el('battle-meta').textContent+=' · '+fmt(desc.alliedTroops)+' ALLIED TROOPS';
- battleDescriptor=desc;try{battle=new BattleGame(freshBattleCanvas(el('battle-canvas')),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';return true;}catch(e){battleDescriptor=null;el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);return false;}}
+ battleDescriptor=desc;try{battle=new BattleGame(freshBattleCanvas(el('battle-canvas')),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';music.select('battle');return true;}catch(e){battleDescriptor=null;el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);return false;}}
 function onBattleStatus(status){
  const roster=status.roster;if(roster){const a=roster.attacker,b=roster.defender;el('battle-strength').textContent='YOUR FORCE '+fmt(a.surviving)+' / '+fmt(a.initial)+' · ENEMY '+fmt(b.surviving)+' / '+fmt(b.initial)+(status.enemyPosture?' · '+status.enemyPosture.toUpperCase():'');}
  el('battle-move-tap').setAttribute('aria-pressed',String(!!status.tapMove));el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';el('battle-pause').disabled=!!status.renderLost;el('battle-start').disabled=!!status.renderLost;el('battle-strength').dataset.renderer=status.rendererMode||'';if(status.renderLost)el('battle-strength').textContent='Graphics context lost. Retreat to return to campaign.';
@@ -173,7 +177,7 @@ function onBattleStatus(status){
  el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;el('battle-cancel').hidden=!status.deployment||!!battleDescriptor?.defenseMode;const comparison=el('battle-comparison');comparison.hidden=!status.deployment;if(status.deployment){const c=battleComparison(status.groups),line=(s,name)=>'<div><b>'+name+' · '+fmt(s.troops)+'</b><small>Inf '+fmt(s.mix.infantry)+' / Arch '+fmt(s.mix.archers)+' / Cav '+fmt(s.mix.cavalry)+' · Morale '+fmt(s.morale)+'% · Readiness '+fmt(s.power*100)+'%</small></div>';comparison.innerHTML=line(c.attacker,'Your force')+line(c.defender,'Enemy force')+'<small>Numerical ratio '+(c.ratio===null?'No opposing soldiers':c.ratio.toFixed(1)+':1')+' · Terrain, tactics and readiness affect outcomes.</small>';}
 }
 function onBattleFinished(result){
- const defense=!!battleDescriptor?.defenseMode,practice=!!battleDescriptor?.showcase,win=result.victory;
+ const defense=!!battleDescriptor?.defenseMode,practice=!!battleDescriptor?.showcase,win=result.victory;music.select(win?'menu':'succession');
  el('battle-result').hidden=false;
  const title=defense?(win?'THE INVADERS WERE REPELLED':'THE DEFENDERS WERE DEFEATED'):(win?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS');
  const explanation=practice?'Practice battle; your campaign will not be changed.':
@@ -187,7 +191,7 @@ function onBattleFinished(result){
    if(defense){const r=resolveInvasion(game,world,battleDescriptor.threat,result);if(!r.ok)message(r.msg);}
    else {const r=concludeBattle(game,battleDescriptor,result,world);if(r&&!r.ok)message(r.msg);}
   }
-  battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;
+  battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;pauseCampaignClock();
   document.body.style.overflow='';render();if(!practice)save();
  };
 }
@@ -208,12 +212,14 @@ function openIncomingBattle(){
 function advanceWithInvasions(){
  if(!game||battle)return;
  if(vassalCareer(game)){const threat=game.kingdom?.threats?.find(t=>t.status==='ready');if(threat)autoResolveInvasion(game,world,threat);advanceMonth(game,world);render();save(false);return;}
- if(openIncomingBattle())return;
+ if(openIncomingBattle()){pauseCampaignClock();return;}
  advanceMonth(game,world);render();save(false);
  if(openIncomingBattle()&&speedInterval){
   clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';
  }
 }
+// Music is independently controlled and unlocked by a real user gesture.
+const musicButton=document.createElement('button');musicButton.type='button';musicButton.className='goldbtn';musicButton.textContent=music.enabled?'Music on':'Music off';musicButton.setAttribute('aria-pressed',String(music.enabled));musicButton.addEventListener('click',()=>{music.setEnabled(!music.enabled);musicButton.textContent=music.enabled?'Music on':'Music off';musicButton.setAttribute('aria-pressed',String(music.enabled));});el('start-screen').append(musicButton);document.addEventListener('pointerdown',()=>music.unlock(),{once:true});document.addEventListener('keydown',()=>music.unlock(),{once:true});document.addEventListener('visibilitychange',()=>music.visibility(document.hidden));
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-world-count').textContent=atlasWorld.factions.length+' REALMS · '+atlasWorld.provinces.length+' DISTRICTS';
 function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value);el('start-new').disabled=!f;if(!f){el('start-faction-info').textContent='No matching kingdoms. Try another name or region.';return;}const d=militaryDoctrine(f),count=atlasWorld.provinces.filter(p=>p.owner===f.id).length;const history=historicalContext(f.id);el('start-faction-info').innerHTML=assetImage(realmArt(f.id),'realm-emblem start-emblem')+esc(f.continent+' · '+count+' districts · '+d.name+(history?' · '+history.context:''));}
