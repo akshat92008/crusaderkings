@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
+import {initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
 import {armyFormationSlots} from '../src/military-doctrines.js';
 function unit(id,side,type,x,z,extra={}){return initializeFieldGroup({id,side,type,x,z,order:0,troopCount:40,morale:85,damage:10,armor:1,speed:4,range:type==='archers'?14:2.5,cooldown:0,phase:0,...extra});}
 test('hold and move orders persist rather than returning to automatic pursuit',()=>{const a=unit('a','attacker','infantry',0,20),b=unit('b','defender','infantry',0,-20),s={groups:[a,b],projectiles:[]};assert.ok(issueFieldOrder(a,'hold'));for(let i=0;i<20;i++)stepField(s,.1);assert.equal(a.z,20);assert.ok(issueFieldOrder(a,'move',[10,20]));for(let i=0;i<60;i++)stepField(s,.1);assert.equal(a.fieldOrder,'hold');assert.ok(Math.abs(a.x-10)<.4);});
@@ -34,4 +34,26 @@ test('safe stationary regroup restores morale without exceeding initial morale o
 });
 test('regiments cannot rally while within hostile weapons reach or while moving',()=>{
  const a=unit('a','attacker','infantry',0,0),b=unit('b','defender','archers',0,12);a.morale=40;b.cooldown=99;issueFieldOrder(a,'hold');issueFieldOrder(b,'hold');const s={groups:[a,b],projectiles:[]};stepField(s,.5);assert.equal(a.morale,40);b.z=-30;issueFieldOrder(b,'hold');issueFieldOrder(a,'move',[20,0]);stepField(s,.5);assert.equal(a.morale,40);
+});
+
+test('whole army move preserves spacing even at map boundaries',()=>{
+ const a=unit('a','attacker','infantry',-12,20),b=unit('b','attacker','archers',12,28),points=formationMovePoints([a,b],[64,46]);
+ assert.deepEqual(points.get('b'),[64,46]);assert.deepEqual(points.get('a'),[40,38]);
+});
+test('holding cavalry strikes reachable enemies instead of ignoring them for distant archers',()=>{
+ const a=unit('a','attacker','cavalry',0,0),b=unit('b','defender','infantry',0,2,{formationId:'pike_square'}),c=unit('c','defender','archers',0,12);
+ for(const g of [a,b,c])issueFieldOrder(g,'hold');b.cooldown=c.cooldown=99;
+ stepField({groups:[a,b,c],projectiles:[]},.1);assert.ok(b.life<100);assert.equal(c.life,100);
+});
+test('empty regiments cannot receive orders or fight',()=>{
+ const a=unit('a','attacker','infantry',0,0,{troopCount:0}),b=unit('b','defender','infantry',1,0);
+ assert.ok(a.routed);assert.equal(issueFieldOrder(a,'charge'),false);stepField({groups:[a,b]},.1);assert.equal(b.life,100);
+});
+test('weak infantry-only AI advances against a stationary opposing army',()=>{
+ const a=unit('a','attacker','infantry',0,0,{troopCount:300}),b=unit('b','defender','infantry',0,-12,{troopCount:40});
+ issueFieldOrder(a,'hold');coordinateFieldAI({groups:[a,b]});assert.equal(b.fieldOrder,'advance');
+});
+test('exactly overlapping friendly advancing regiments separate',()=>{
+ const a=unit('a','attacker','infantry',0,20),b=unit('b','attacker','infantry',0,20),c=unit('c','defender','infantry',0,-20);
+ stepField({groups:[a,b,c],projectiles:[]},.1);assert.ok(Math.abs(a.x-b.x)>0);
 });
