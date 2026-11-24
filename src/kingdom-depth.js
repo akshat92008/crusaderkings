@@ -1,3 +1,4 @@
+import {initCivic,tickCivic,civicModifiers} from './civic-systems.js';
 import {initConflict,tickConflict} from './political-conflict.js';
 /**
  * Crown of Nations — alternate-history kingdom systems.
@@ -37,13 +38,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -56,7 +57,7 @@ export function tradeIncome(g,id){
   const other=pact.partners.find(x=>x!==id);
   value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2);
  }
- return Math.round(value);
+ return Math.round(value*civicModifiers(g,id).trade);
 }
 export function courtDecision(g,world,action){
  initializeKingdomSystems(g,world);const f=g.factions[g.player],c=currentCourt(g);
@@ -280,9 +281,9 @@ function tickTrade(g){
 }
 export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
- tickTrade(g);
+ // Trade is already included in the campaign balance.
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickConflict(g,world);
+ tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
