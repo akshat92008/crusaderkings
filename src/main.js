@@ -1,3 +1,4 @@
+import {councilTaskAction} from './council-tasks.js';
 import {armyOutliner,battleComparison,portraitMark} from './campaign-hud.js';
 import {characterLink,contextualButton,realmWarContext,sectionLink} from './campaign-context.js';
 import {marriageCandidates} from './dynastic-politics.js';
@@ -98,7 +99,7 @@ function renderTab(){if(!game)return;if(characterId){el('tab-content').innerHTML
  const sovereign=game.politics?.people?.[game.politics?.realms?.[other.id]?.ruler],matches=marriageCandidates(game,game.player).filter(m=>m.realm===other.id);html+='<div class="rule"><b>Foreign sovereign</b><p>'+characterLink(sovereign,esc)+'</p>'+(matches.length?'<details><summary>Choose a dynastic marriage</summary>'+matches.slice(0,30).map(m=>contextualButton('politics','marry',m.a,m.label+' (180g)',esc,m.b)).join('')+'</details>':'<p class="smallnote">No eligible dynastic match.</p>')+'</div>'+renderDiplomaticAgreements(game,other.id,esc);const wars=realmWarContext(game,other.id);if(wars.length)html+='<div class="rule"><b>Active wars with this realm</b>'+wars.map(w=>'<p class="smallnote">War score '+w.ourScore+'</p>').join('')+sectionLink('political','Negotiate peace',esc,'WARS AND PEACE')+'</div>';else html+=sectionLink('political','Territorial claims and formal war',esc,'TERRITORIAL CLAIMS');
  }else if(tab==='characters'){html=renderCharacterDirectory(game,esc,directoryState);
  }else if(tab==='dynasty'){html=renderDynasty(game,esc);
- }else if(tab==='council'){html=renderCouncilDirectory(game,esc);
+ }else if(tab==='council'){html=renderCouncilDirectory(game,esc,liveWorld);
  }else if(tab==='vassals'){html=renderVassalDirectory(game,liveWorld,esc,vassalSort);
  }else if(tab==='court'){
   html=renderCourt(game,esc);
@@ -232,6 +233,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='build')clickResult(build(game,selected,type));
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
+ if(action==='council-task'){const target=btn.dataset.input?el(btn.dataset.input)?.value:btn.dataset.extra;clickResult(councilTaskAction(game,btn.dataset.id,type,target));}
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='living'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(livingAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value));}
  if(action==='identity'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(identityAction(game,world,type,input?.value??btn.dataset.id,btn.dataset.extra));}
