@@ -65,7 +65,8 @@ export function armyFormationSlots(faction,army,slots=6){
  const d=militaryDoctrine(faction),values=['infantry','archers','cavalry'];
  let count={infantry:0,archers:0,cavalry:0};
  const ratio=Math.max(1,(army?.infantry||0)+(army?.archers||0)+(army?.cavalry||0));
- for(let n=0;n<slots;n++){
+ const present=values.filter(t=>(army?.[t]||0)>0);let assigned=0;if(slots>=present.length)for(const t of present){count[t]=1;assigned++;}
+ for(let n=assigned;n<slots;n++){
   // Greedy proportional allocation avoids every kingdom getting the same 4/1/1 lineup.
   const type=values.map(t=>({t,score:(army?.[t]||0)/ratio*(n+1)-count[t]})).sort((a,b)=>b.score-a.score)[0].t;
   count[type]++;

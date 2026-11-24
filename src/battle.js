@@ -1,3 +1,4 @@
+import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
 import {BattleModelArt} from './glb-art.js';
@@ -148,7 +149,7 @@ export class BattleGame{
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
   g.routed=unitCount<1;g.profile=regimentProfile(game,a,type);g.readiness=armyReadiness(game,a);g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
-  this.groups.push(g);
+  if(descriptor.fieldBattle)initializeFieldGroup(g);this.groups.push(g);
  }
  for(let i=0;i<6;i++){
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
@@ -157,14 +158,14 @@ export class BattleGame{
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?50:type==='archers'?32:22)*100,10,100);
   g.routed=unitCount<1;g.profile=regimentProfile(game,enemyArmy||enemies,type);g.readiness=armyReadiness(game,enemyArmy||enemies);g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,enemy,militaryDoctrine(enemy).formations[i%militaryDoctrine(enemy).formations.length]);
-  this.groups.push(g);
+  if(descriptor.fieldBattle)initializeFieldGroup(g);this.groups.push(g);
  }
  this.selected=0;
  this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
  for(let i=0;i<105;i++){let x=(rng()-.5)*125,z=(rng()-.5)*100;if(Math.abs(z)<33&&Math.abs(x)<44)continue;this.terrain.push({x,z,h:1.4+rng()*5,r:rng(),type:rng()>.55?'tree':'rock'});}
- this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){this.paused=!this.paused;e.preventDefault();this.report();}};
+ this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){if(!this.deployment&&!this.done)this.paused=!this.paused;e.preventDefault();this.report();}};
  this._onKeyUp=e=>this.keys.delete(e.key.toLowerCase());this._onWheel=e=>{e.preventDefault();this.camera.distance=clamp(this.camera.distance+e.deltaY*.065,35,165);};
- this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0};}};
+ this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){if(this.descriptor.fieldBattle){this.command(this.selected,'move',[target[0],target[2]]);return;}group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0};}};
  this._onMove=e=>{if(this.drag){this.drag.moved+=Math.hypot(e.movementX,e.movementY);if(e.buttons&1&&this.drag.moved>3){this.camera.target[0]-=e.movementX*.08;this.camera.target[2]-=e.movementY*.08;}}};
  this._onUp=e=>{if(this.drag&&this.drag.moved<8){let best=-1,d=24;for(let i=0;i<6;i++){const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-e.offsetX,p[1]-e.offsetY);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
  window.addEventListener('keydown',this._onKeyDown);window.addEventListener('keyup',this._onKeyUp);canvas.addEventListener('wheel',this._onWheel,{passive:false});canvas.addEventListener('contextmenu',this._onContext);canvas.addEventListener('pointerdown',this._onDown);window.addEventListener('pointermove',this._onMove);window.addEventListener('pointerup',this._onUp);
@@ -183,13 +184,15 @@ export class BattleGame{
  setLane(index,lane){
   if(!this.deployment||![0,1,2].includes(lane))return false;
   const g=this.groups[index];if(!g||g.side!=='attacker'||g.routed)return false;
-  g.x=(lane-1)*26+(index%2?2:-2);g.orderX=g.x;g.targetX=g.x;this.report();return true;
+  g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;this.report();return true;
  }
+ command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed)this.report();return changed;}
  startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.last=performance.now();this.report();return true;}
  update(dt){this.elapsed+=dt;const c=this.camera;
  if(this.keys.has('q'))c.yaw-=dt*.9;if(this.keys.has('e'))c.yaw+=dt*.9;
  if(this.keys.has('w'))c.target[2]-=dt*22;if(this.keys.has('s'))c.target[2]+=dt*22;
  if(this.keys.has('a'))c.target[0]-=dt*22;if(this.keys.has('d'))c.target[0]+=dt*22;
+ if(this.descriptor?.fieldBattle){if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
  for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
   const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
   const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];
@@ -245,11 +248,11 @@ export class BattleGame{
  }
  loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
  finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;
-  const fractionFor=side=>{const units=this.groups.filter(g=>g.side===side),total=units.reduce((n,g)=>n+(g.troopCount||0),0);return clamp(units.reduce((n,g)=>n+(g.routed?0:(g.troopCount||0)*g.life/Math.max(1,g.initialLife||100)),0)/Math.max(1,total),0,1);};
+  const fractionFor=side=>{const units=this.groups.filter(g=>g.side===side),total=units.reduce((n,g)=>n+(g.troopCount||0),0);return clamp(units.reduce((n,g)=>n+(g.routed?(this.descriptor?.fieldBattle?(g.troopCount||0)*g.life/Math.max(1,g.initialLife||100)*.65:0):(g.troopCount||0)*g.life/Math.max(1,g.initialLife||100)),0)/Math.max(1,total),0,1);};
   const fraction=fractionFor('attacker'),enemies=fractionFor('defender');
   this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,fieldBattle:!!this.descriptor?.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
  }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
- togglePause(){this.paused=!this.paused;this.report();}
+ togglePause(){if(this.deployment||this.done)return;this.paused=!this.paused;this.report();}
  stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.scenery?.dispose();this.ctx?.dispose?.();}
 }

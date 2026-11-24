@@ -114,10 +114,10 @@ function openBattle(desc){desc.interactive=true;desc.fieldBattle=true;el('battle
 function onBattleStatus(status){
  el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
- el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
+ el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% HP · '+Math.round(g.morale)+'% MORALE · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
  const choices=availableFormations(game.factions[game.player]);
  el('battle-formation').innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' · '+Math.round(o.damage*100)+'% attack / '+Math.round(o.defense*100)+'% defense</option>').join('');
- if(unit)el('battle-formation').value=unit.formationId;
+ if(unit)el('battle-formation').value=unit.formationId;const order=el('battle-order');if(unit&&unit.fieldOrder!=='move'&&[...order.options].some(o=>o.value===unit.fieldOrder))order.value=unit.fieldOrder;
  const fort=el('battle-fort-status');if(fort){fort.hidden=!status.siege;fort.textContent=status.siege?status.siege.structures.map(q=>q.name+' '+Math.round(q.hp/q.max*100)+'%').join(' · '):'';}
  el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;
 }
@@ -224,6 +224,8 @@ el('battle-start').addEventListener('click',()=>battle?.startAssault());
 el('battle-formation').addEventListener('change',e=>{
  if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
 });
+el('battle-order').addEventListener('change',e=>battle?.command(battle.selected,e.target.value));
+el('battle-all-order').addEventListener('click',()=>battle?.command(battle.selected,el('battle-order').value,null,true));
 el('battle-lanes').addEventListener('click',e=>{
  const target=e.target.closest('[data-lane]');if(target&&battle)battle.setLane(battle.selected,Number(target.dataset.lane));
 });
