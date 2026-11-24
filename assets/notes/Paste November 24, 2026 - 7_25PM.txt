@@ -1,0 +1,487 @@
+# **Crown Monarch — CK3-level completion master plan**
+
+I have checked the current repository, including its complete file tree, major simulation systems, existing implementation documents and latest GitHub verification results.
+
+Our target should no longer be a grand-strategy prototype with features inspired by Crusader Kings. **Crown Monarch must become a complete character-driven grand-strategy game with comparable mechanical depth, meaningful political consequences and a polished interface.**
+
+We should preserve our two differentiators: the worldwide 1450 campaign setting and playable Bannerlord-inspired army battles, without siege or base-building gameplay.
+
+## **1. Current development position**
+
+Starting playable realms
+
+# **56**
+
+Playable districts
+
+# **576**
+
+JavaScript source files
+
+# **57**
+
+Automated test suites
+
+# **62**
+
+Source and unit tests
+
+Passed
+
+Campaign regression
+
+Passed
+
+Desktop and mobile browser QA
+
+Passed
+
+Playable build packaging
+
+Passed
+
+Latest main commit: 332424c. All four workflows have now passed, including the previously pending feudal hierarchy and outliner upgrades.
+
+[Current repository](https://github.com/akshat92008/crusaderkings?utm_source=chatgpt.com) · [Verification results](https://github.com/akshat92008/crusaderkings/actions?utm_source=chatgpt.com)
+
+The foundation is considerably more advanced than our original build. However, having a system implemented is different from having that system at CK3's depth.
+
+The latest build has passed **355 out of 355 automated tests**. I also found 287 event definitions and 99 decision definitions in the expanded content system alone.
+
+## **2. Where we stand against Crusader Kings**
+
+I am using the current CK3, including its major expansions, as the benchmark—not merely its original 2020 release.
+
+That includes administrative governments, nomadic rulers, landless adventurers, Asian political systems, religious institutions and merchant republics introduced through its subsequent expansions.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://www.paradoxinteractive.com\&sz=32)
+
+Paradox Interactive+4
+
+
+
+| System                    | Crown Monarch currently | Required upgrade |
+| ------------------------- | ----------------------- | ---------------- |
+| Character simulation      | Functional              | Major            |
+| Dynasties                 | Functional              | Major            |
+| Marriage and inheritance  | Functional              | Major            |
+| Vassals and contracts     | Functional              | Major            |
+| Title hierarchy           | Basic hierarchy         | Major            |
+| Royal council             | Functional              | Moderate         |
+| Political factions        | Functional              | Major            |
+| Intrigue and hooks        | Functional              | Major            |
+| Government systems        | 13 government profiles  | Major            |
+| Religion                  | Partial                 | Extensive        |
+| Culture and innovations   | Functional              | Major            |
+| Economy and commerce      | Functional              | Major            |
+| Diplomacy                 | Functional              | Major            |
+| Wars and peace treaties   | Functional              | Major            |
+| Strategic AI              | Functional              | Extensive        |
+| Real-time army battles    | Playable                | Extensive        |
+| Events and decisions      | Substantial foundation  | Extensive        |
+| Activities and travel     | Functional              | Major            |
+| Landless gameplay         | Largely missing         | Extensive        |
+| Historical accuracy       | Approximate             | Extensive        |
+| UI and UX                 | Functional              | Extensive        |
+| Graphics and presentation | Prototype quality       | Extensive        |
+
+The biggest problem is no longer missing feature names. It is the **depth, interconnection, variety and presentation of those features.**
+
+# **3. The complete development plan**
+
+## **Phase 1 — Rebuild the core political architecture**
+
+**Priority: Critical**
+
+Establish one authoritative simulation for characters, houses, titles, governments and armies.
+
+- Individual character wealth, influence, prestige, piety and legitimacy.
+- Proper ownership of multiple titles.
+- Baron, count, duke, king and emperor equivalents.
+- De jure and de facto territories.
+- Multiple crowns and personal unions.
+- Independent and subordinate rulers using compatible political rules.
+- Consistent ownership changes during inheritance, rebellion and conquest.
+- Playable subordinate rulers rather than only independent kingdoms.
+
+This is essential because CK3 is fundamentally a game about people holding power, not countries moving armies.
+
+## **Phase 2 — Complete character simulation**
+
+[What To Do With Daughters in CK3 – FandomSpot](https://images.openai.com/static-rsc-4/2DZIHrolGPoSN3zBLiLdYgdhc1lhXfr7NOR4SVm9wttBMu-_TYFC7Ye5fqDDt8RC-QNGqZ5PIc3NZb3TR7Fib5JhYhGsyojeT8fAwZrhKM4_n0GT-WMVFzwkXztxw_LIS3QE3aOd5TsND2NjYRDEyFuk_VmHz5HLhEBqKZbROXA?purpose=inline)
+
+[Crusader Kings III, Crusader Kings 3, CK3 - Game Database - gamepressure.com](https://images.openai.com/static-rsc-4/vcriWfIEtreOvULg8r3cuY-S41pjMzPMMBnQT8wa7Kt7OEd-d_s47f-fN9x2eS0zNZBoTs5qvgqU0tHOPJFBx2xQvDX_w5dmadeK42YbMosou9J1r1ByNoRXA_UQAlL-sjYPP1svJjfGiZP-l5ajTqggoBaxyqRuT8-sq8EQYwg?purpose=inline)
+
+[Crusader Kings III Steam'de](https://images.openai.com/static-rsc-4/rwOvu_BaDOA-I0pWq6yOjuxHpeDCIQRN9FNhs-99HtygkdbcfpNEP-vstEF-z_VEq1FUl8M4Pmkh9tkacMkwEfMODrSWclAEKSmjT6-N7A0IoyNDbZJJ1zj5qrrUquwiQyYOa4v-AxAb6KNp73gr0o6IlwT_shrroO6sUt-71o4?purpose=inline)
+
+15
+
+Every important character should have a meaningful life outside the player's actions.
+
+Implement personality-driven decisions, childhood education, guardians, inherited characteristics, physical health, injuries, stress, coping mechanisms, ambitions, friendships, rivalries, lovers, grievances, personal memories and lifestyle progression.
+
+Characters must actively pursue their own interests. An ambitious duke should behave differently from a cautious duke, even when their military strength is identical.
+
+**Acceptance:** Two characters with different personalities placed in the same political situation consistently exhibit different behavior.
+
+## **Phase 3 — Dynasties, marriage and succession**
+
+[Crusader Kings III sur Steam](https://images.openai.com/static-rsc-4/-X8hcaK3_0GD0PAYhM8KUx6wcko9iNzEkTu37Iaqoohak53hZ2jPLwmfw72PBP_5viDKFA8goSOXwtPwvO0NdDLK5D-rwxzx-2KsOZnzt3B-qTHke5bsNs1R1bFDKm9SETxO9XAxRGDQnZgR4aCBcJJw-4OLDiKNZ_c1nHajf1E?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/KNvWc6fnOm8oFIm8yxuj9omGlQokFDAGEdoT3AmXoGMG7DTn1L5KhnKmyWJcnnbdF0aq2I3PclkDvgVJGR0YUHusGkkT9Srwq-2Z65gSH9hyxFc19ucc-8vLuKaWVRwc2V-Kgn6jvJT16SBRHFfN0L7dN719kR0IPtRmTEZGerM?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/eZzB8mLj1_4Sb7b6j2LGHYmva0xluUVcUvrYEFYJg-n0Su0LJiNDp29-Seio6wqk-zUXpLpfubtmHPUNuUUbF6fE-eGNBv8r3DX2tFptcZVP-b0T3O1zNyDg2O_wVL_hvMjCC8zFW5uJ-jzgXdzcRP80taDWyItGBsw4-zpv3zY?purpose=inline)
+
+10
+
+Expand our existing inheritance system into genuine dynastic politics.
+
+Include:
+
+- Houses, cadet branches and dynasty heads.
+- Betrothals, marriage negotiations, dowries and marriage types.
+- Legitimacy of children and inheritance eligibility.
+- Disinheritance and disputed succession.
+- Partition, primogeniture, seniority, elective and government-specific laws.
+- Title-specific elections and voting.
+- Regencies for children and incapacitated rulers.
+- Succession crises and rival claimants.
+- Dynastic extinction and meaningful game-over conditions.
+
+A ruler's death should potentially change the entire political landscape.
+
+## **Phase 4 — Complete feudal and vassal politics**
+
+[封建契約について（番外編） | Crusader Kings III AAR](https://images.openai.com/static-rsc-4/ChPHRf7GH5xsk5RDx0V-XprLl--MZcj2NHK3bb9oAsb3d4EhkZeajK9ucMMgVlJcbYaedrcORDi6z-bm83qHLNl7qtvWfxsZuJkK_ATC0mSU6JrK719xDo6gqaNnGWruhBI9Z7X60k00s3hKWXQ0gRCW64RU86LKvXOj-JqN6SA?purpose=inline)
+
+[CK3: What To Do With More Powerful Vassals Than Council Seats – FandomSpot](https://images.openai.com/static-rsc-4/MIFEOR9EFdcmyY1H2s2nDbjy9v1fF3t3hnPwoGZfqjLZJTkCGE7NSR2Hj1aYCZ2cy8xoDbK63Z-tKDCYoERqR9B0yveqT5_wpYfpL0KdykZ5w_FTBzd463y1B9c-rIxD4ztdhRYL0jE3izSaH2jVLvMJ2USVdQixr0CL5x6KXjU?purpose=inline)
+
+[Crusader Kings 3: First steps - gamepressure.com](https://images.openai.com/static-rsc-4/2laCg3JjosuNrP-kSIeMKjODMXIlIYrYuSuccp5FAQQuu17rWPFlWrmWWYsHFFBYYUF6ZbDcFArpXTW05KVk9CQPoVEatbTUTp42IH37MugoRaJqnew34EaGu-xukll13Ie3GoTBPisk8PaTO2mADOHetiNWiA5wALjNZp7PEb0?purpose=inline)
+
+8
+
+Build upon the recently implemented nested feudal obligations, powerful vassals and estate disputes.
+
+Required depth includes individualized contracts, tax exemptions, military exemptions, council rights, title revocation, tyranny, legal imprisonment, vassal alliances, autonomous internal wars, direct and indirect obligations, faction recruitment and negotiated settlements.
+
+A powerful subject must be capable of becoming a political threat without immediately becoming a military enemy.
+
+**Acceptance:** A player can lose political control of a kingdom through mismanagement even when commanding its largest army.
+
+## **Phase 5 — Royal court, council and regency**
+
+[Crusader Kings 3: Royal Court - Screenshots aus dem Addon](https://images.openai.com/static-rsc-4/s_Cx6lUHBSzHZLtZrJxTZQJEDXilGo_rrK3glI0C6T5v-ldkrEJPq45indjAwdFT_fvvGeCgwdQV1FRXBxzMf7v96b3skL1uHjSj7xHfZecDDoJ3JNM3Kfof6Vup09FWYOqoiWmLxZYN13gN6HAEb_M91Iqd818wFyQxHyL7ItM?purpose=inline)
+
+[Crusader Kings III kommt im März für Konsolen - Gamers.at](https://images.openai.com/static-rsc-4/z1jfBA0kz5INRpx4am6m8dx0l4Txmb2FyhEw-_QQaNgn9RhQerfGzlbJPJlfEOVE5T5E-9LoGVKqM6PS9kivaPII4AYgcbI-kFWo0dbWu8Z_zhH7NDK1_sk7BA7REZXzAyBdZfO4ygvlYxjftCFhqzWOMb4_YtJe9Se3FyT20vc?purpose=inline)
+
+[Crusader Kings 3: Royal Court makes the Middle Ages more tangible than ever - Global Esport News](https://images.openai.com/static-rsc-4/vUV064SC_kAqyyrPsa2kM8rKbESlLFk1NqCuYevCLetQr4ANinQf23NMJYu7msJqE4GWGDfmtiL-h-Gk5Xximr1pDHSI-PQKdDpUfoXYcy7Hjf743rOZkohRcEbK3iby9cOb_FSzHlcaEbdJ3eDfhCY9bUECr51Co52osE9agss?purpose=inline)
+
+11
+
+Expand council assignments into a fully functioning government.
+
+Each councillor should have skills, loyalty, ambitions, political connections and personal incentives. Council votes, rival candidates, corruption, court grandeur, salaries, court positions, petitions, royal audiences, artifacts and patronage should influence the simulation.
+
+Regents should accumulate influence and potentially resist surrendering their authority.
+
+The royal court must feel like the center of power rather than a page of buttons.
+
+## **Phase 6 — Intrigue and political manipulation**
+
+Build a comprehensive character interaction system with personal, hostile and political schemes.
+
+Include agent recruitment, scheme preparation, intelligence networks, secrets, blackmail, hooks, counterintelligence, bribery, fabrication of evidence, imprisonment, ransom, escape, assassination plots, succession manipulation and faction conspiracies.
+
+Each scheme needs visible risk, progress, potential consequences and reasons for acceptance or rejection.
+
+AI characters must also plot against each other and against the player.
+
+## **Phase 7 — Distinct government systems**
+
+This is particularly important because our game covers the entire world.
+
+CK3's expanded government mechanics distinguish administrative empires, nomads, Japanese political structures, Chinese bureaucracy and Southeast Asian tributary states.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://store.steampowered.com\&sz=32)
+
+store.steampowered.com+2
+
+
+
+Our existing 13 government profiles need to become genuinely different gameplay systems.
+
+| Government                  | Unique gameplay                                               |
+| --------------------------- | ------------------------------------------------------------- |
+| European feudalism          | Hereditary titles, contracts and noble factions               |
+| Imperial bureaucracy        | Governors, appointments, merit and political influence        |
+| Sultanates                  | Military households, succession politics and patronage        |
+| Indian kingdoms             | Regional land grants, subordinate rulers and competing courts |
+| Steppe khanates             | Clans, herds, migration and tribal leadership                 |
+| Chinese imperial government | Examinations, bureaucracy and imperial legitimacy             |
+| Japanese shogunate          | Military houses, regional lords and political dominance       |
+| Merchant republics          | Elections, merchant families and commercial competition       |
+| Tributary kingdoms          | Tribute networks and competing overlords                      |
+| Confederations              | Member autonomy, assemblies and negotiated leadership         |
+
+Different countries should require different strategies, not simply provide different starting bonuses.
+
+## **Phase 8 — Religion, culture and institutions**
+
+Implement independent religious authorities, doctrines, tenets, holy sites, clergy, religious legitimacy, conversion, schisms, religious reform, tolerance, cultural acceptance, traditions, language, cultural divergence and innovation trees.
+
+Faith must influence marriage, political legitimacy, diplomacy, character behavior and regional stability.
+
+This is a substantial part of the modern CK3 benchmark, particularly following its September 2026 religious expansion.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://www.paradoxinteractive.com\&sz=32)
+
+Paradox Interactive+1
+
+
+
+## **Phase 9 — Complete diplomacy and warfare**
+
+Replace overly simple territorial conflicts with a full diplomatic and legal framework.
+
+Include multiple reasons for declaring war, territorial and dynastic claims, independence wars, claimant wars, coalition wars, tributary conflicts, negotiated alliances, calls to war, military access, truces, war contribution, occupation, peace negotiations, reparations and prisoner exchanges.
+
+Allied kingdoms should send actual campaign armies where appropriate, rather than merely contributing invisible numerical bonuses.
+
+Every war should have clear objectives and consequences.
+
+## **Phase 10 — Bannerlord-level tactical army battles**
+
+[Mount & Blade II: Bannerlord](https://images.openai.com/static-rsc-4/lsNAPnMPreNlHKbt5vZYqdHySw8JHzka1jqhE5-RcHm75PKcwERTNf2Cp3oWM5c09zCiPqAhf7CBy7crWdB6qPALaEEpST8kbo29nDEvqT-Xf1RYifEucXhZfnFS0jtwY1gBvjjq6gBuSV0Wlnur9bSR5nmWzGxa43qWkCPMouI?purpose=inline)
+
+[Mount and Blade II: Bannerlord Will Become the Greatest Medieval Sim | TechRaptor](https://images.openai.com/static-rsc-4/Z1mfunZHxUeQO-2d0Nmpj9rgTpygTj_c9JKMjl6_1vSTCXxVbab0d3cWa112S6FvmGioYvLrdjbmhR_KGWzE6G75j-KTYKigKTmqdf0ZqcorEN3wXzceEsiuXh8LFMSWU0HdUkY1TSFUIdR30EyebADgsp0csbAKGVOEIeANgWY?purpose=inline)
+
+[Mount & Blade II: Bannerlord Review (PS5) | Push Square](https://images.openai.com/static-rsc-4/3tq_RYG401xIQamD3BXhQUP3vtuF0rYu3Rib1ef3pY0y8472YjVmkbGX0RKZIkfZpEKrOCjUAM6cgcF86Bu28XbugtvxcODD3VNa-jRaucO-4jG8-E3TKOEsNNVWomGIhRQFOBXLm0VJiFblqYlg9PAbQa13Q2qfH2w23FdYNzQ?purpose=inline)
+
+13
+
+This is where Crown Monarch differentiates itself from Crusader Kings.
+
+Our existing field battles already contain formations, morale, numerical strength calculations, commanders and cultural military doctrines. They need substantial refinement.
+
+The final combat system should include:
+
+- Individual regiment selection and group commands.
+- Infantry, cavalry, ranged units and regional specialists.
+- Flanking, encirclement, reinforcement and reserves.
+- Terrain-dependent combat effectiveness.
+- Formation counters, fatigue, morale and routing.
+- Commander abilities and leadership consequences.
+- Proper numerical superiority and proportional casualties.
+- Enemy commanders that react to battlefield conditions.
+- Cinematic battlefield presentation and responsive controls.
+
+**No siege gameplay. No Clash of Clans-style base building. Pure strategic army combat.**
+
+A 6,000-versus-300 encounter must reflect the real participating force sizes. A smaller army should only overcome extreme numerical inferiority under genuinely exceptional circumstances—not because our simulation ignores troop counts.
+
+## **Phase 11 — Autonomous strategic AI**
+
+This is potentially the most important development phase.
+
+Our current AI already recruits armies, attacks, invests, forms political relationships, remembers campaign defeats and coordinates forces. However, it is still comparatively limited.
+
+Introduce a shared decision-making architecture:
+
+Proposed decision cycle for every autonomous ruler and relevant political character.
+
+AI rulers must be capable of creating alliances, preparing wars, exploiting weak neighbors, recovering from defeats, manipulating succession, managing finances, confronting dangerous vassals and pursuing long-term ambitions.
+
+The world should remain interesting even when the player simply observes it for decades.
+
+## **Phase 12 — Economy, trade and logistics**
+
+Expand the existing production, trade, loans and economic crisis systems.
+
+Implement regional resource dependencies, market demand, merchant families, commercial leagues, taxation networks, trade competition, economic sanctions, military supply, debt, inflation, famine and economic recovery.
+
+Include actual commercial gameplay for republics and merchant characters, consistent with the expanded CK3 benchmark.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://www.paradoxinteractive.com\&sz=32)
+
+Paradox Interactive+1
+
+
+
+A wealthy commercial kingdom should be capable of competing politically with a much larger territorial empire.
+
+## **Phase 13 — Events, decisions and evolving situations**
+
+Our repository already contains hundreds of event and decision definitions. The next goal is quality and meaningful variation.
+
+Proposed content targets:
+
+Expanded event definitions
+
+287 / 2,000
+
+Expanded decision definitions
+
+99 / 400
+
+Proposed Crown Monarch content milestones, not verified CK3 content totals or overall completion percentages.
+
+Events must respond to actual relationships, traits, regional conditions, laws, wars and previous decisions. Avoid generating hundreds of nearly identical treasury-and-prestige choices.
+
+There should be interconnected situations involving disputed crowns, civil wars, religious conflicts, epidemics, migration, rival houses, merchant disputes and regional power struggles.
+
+## **Phase 14 — Activities, travel and legends**
+
+[Client Challenge](https://images.openai.com/static-rsc-4/045SfBB8ChYQFtIsa2Eo5EVEVH71PLBDY4HaA2vBl8HA0s-ds6a5iZLIEf8nwSjniKBRccEvZRTYm4Qfy2iL2tXfauRTJgvCOSCLitwvmWD6Rx9R0qRuFeO-GUNDNH_Yf7yTo5Q1K11YgN_bnhlSRNWRMJjUzSgDozPNGV3TUbc?purpose=inline)
+
+[Crusader Kings III Chapter II - Paradox Interactive](https://images.openai.com/static-rsc-4/bLlLps9yB3fNDR3_IBigC4fdWqlMh02ne-ZHvCedSNwSXM1jq_s44aLdhDSZO2rBirtmwLfNCk-p3wSRsLU6lT0irADB2CpJyGzZKY0kpBeHm5qaVUj99SKXH4qecycbxvFkYJPIQJrATQYgZiTHUPePC3W11BGOFEVvlc66YFY?purpose=inline)
+
+[Crusader Kings III’te Büyük Düğünler ve Büyük Ziyafetler - Strategyturk](https://images.openai.com/static-rsc-4/rS1dL98dgB0vRFLYSWkPJV1LMsPJXzF2JYHL_f8MnWsns4kKS_tlaIlJgZNtgk_iPp_4Q_POQhKY_269cr0F1j1H7kaJeD-MDn6bV9t3LOz328H3vPwsZv_jOlup2uvb6dprrI-TywjH552JuO5P-4KApXCIdG2E7RaSQqGBWps?purpose=inline)
+
+13
+
+Implement complete activities with preparations, journeys, participants, risks and long-term consequences.
+
+Include coronations, feasts, tournaments, hunts, pilgrimages, grand tours, royal weddings, diplomatic summits, scholarly gatherings and legendary achievements.
+
+Our existing activity framework should support individual participants developing friendships, rivalries, injuries, memories and political relationships through their experiences.
+
+## **Phase 15 — Landless characters and alternative careers**
+
+Allow players to begin or continue as unlanded nobles, adventurers, military captains, displaced claimants, influential courtiers or merchant families.
+
+Include contracts, patronage, household management, military service, travel, political appointments and routes to acquiring titles.
+
+Losing territory should not necessarily mean the end of the campaign.
+
+# **4. Complete UI and graphical overhaul**
+
+This should happen alongside system development, not be postponed until everything else is finished.
+
+## **Phase 16 — CK3-quality campaign interface**
+
+[Crusader Kings 3’s New Legends Beautifully Canonise the Weird Stuff | by Pascal Wagner | Medium](https://images.openai.com/static-rsc-4/6lDZdlr3eVAChSMv1gYGNP1SJqbDxQcK_GgKLNbZDnVZFtlwloGT_DW3dch0gHcRbGVhUF0HfIkGqT16u6uqj4nJFxhKHTcpfJ0h_tDV_9l6_YiAiNjIKdE4Eq9Egso64ob4yrwxRKUZtvRCtWQNbNPxqNupNY0-6zTKCH0JnBE?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/NZnhVdLwhGJuKJ6iIdc-IP4wIo-yKxdrvGONmmWcvgRqUV71Ls8UtA0_D2Uu4ZDfYd2jK7ClMTEgOXPFBsPk5UU5EvSemb59ra3pIr-mlzmxeRoy6PxwrlqWVd0bAfJpFwXQBlddlgMZJCXykA7VvYAqNMC0Gu9wOceTpwD5JGw?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/6xV2AS3LXevTnxaWH7ZkjH__BWGvLm7abPCwLIj4Dat6p93TInQGxNQlrwgwJ3FpWkhCsBGUo_ZOve_FN55Ay7c55Rs76SGTnNrjQmtNfnTombm-xRkIN4zXlcjaBAHWMEMrgTxGJA3ChFyKNQ-plnul3OBckO1-sPGzpV6Db7U?purpose=inline)
+
+12
+
+The UI should offer deep mechanics without overwhelming the player.
+
+The following is my proposed layout for Crown Monarch, retaining our original visual identity.
+
+Proposed interface wireframe — not a screenshot of the current game.
+
+The new interface needs persistent ruler information, contextual character interactions, expandable tooltips explaining every numerical modifier, dedicated political and military panels, actionable alerts, detailed character portraits, family trees, search, filtering, map modes and a customizable outliner.
+
+Every important action should explain its cost, requirements, consequences and reasons for being unavailable.
+
+## **Phase 17 — World map and historical depth**
+
+[Review - Crusader Kings III - WayTooManyGames](https://images.openai.com/static-rsc-4/ZJmnO63GVgDFAlgm0_6xiEd2eV3ia4OiZe1T7tNsOT79TTVMabpfvDJTGwHV5WX_nZLszIO5Q6JgOe6QfYfc5DbWJY98N2aLNBI0YA0SPRj09KdU1jyhk6Beu4Qjv3EdrZ84RgSZ2kyJPBBdXi9XY3BJPCkvRHTrQmVr9VJQJnI?purpose=inline)
+
+[Crusader Kings III \[Console Edition\] for PlayStation 5](https://images.openai.com/static-rsc-4/9YwGlliH9EC3Y0RnkgJJcFWhDqmIL5GaTX6FCCmZHVchq74mFFHclVJi1XEfrGUsC5H6GxL8TYmexm_RgaU57Phu6ipBf6UR7xSX4UU4dQo3W9uE0kInupYtzjftF34z-Wy2R9mVCZLlshZrkDjlL6TXHJ2qng8HUuez0_XclzY?purpose=inline)
+
+[Crusader Kings 3 Map - Scope, Features and Modes | GameWatcher](https://images.openai.com/static-rsc-4/7YsFHSBw03j76S0AIM--k09R1Twkq77_ASzkG4VAK3VBzgen-f1QNqZQlAVmBV7C8Ia7KMS7M00RlN7Sc9QI5vGBno6MgaNnmg2IHcRuikjJ-lwWHZTyXEq68A94lGDe-7uO-61fwnbCY5_Ic6EX5YxmHsogArJVqXQbIGmO_WE?purpose=inline)
+
+12
+
+Upgrade the existing 576-district map into a detailed historical atlas.
+
+Proposed goals include thousands of meaningful territories, more playable rulers, historical capitals, authentic regional names, smaller political entities, terrain effects, culturally differentiated settlements, multiple map modes and accurate historical borders wherever sources permit.
+
+I would retain the 1450 setting initially rather than introduce multiple underdeveloped historical start dates.
+
+## **Phase 18 — Production quality, optimization and release**
+
+The final phase is not simply fixing syntax errors.
+
+It requires testing hundreds of campaign years across different governments, succession systems, military conditions and economic crises.
+
+| Release requirement       | Acceptance target                                       |
+| ------------------------- | ------------------------------------------------------- |
+| Automated tests           | All passing                                             |
+| Long-duration simulations | 100–300 campaign years                                  |
+| Save integrity            | No corrupted or invalid campaigns                       |
+| Battle balance            | Representative numerical and tactical scenarios         |
+| Performance               | Measured on your M3 MacBook Air                         |
+| Browser compatibility     | Chrome, Firefox and Safari                              |
+| UI usability              | New players can understand actions without outside help |
+| Historical content        | Verified sources and documented approximations          |
+| Gameplay quality          | No major broken or placeholder mechanics                |
+| Distribution              | Complete downloadable playable build                    |
+
+# **5. How I would execute development**
+
+I would use four coordinated development tracks.
+
+Track A · Phases 1–9
+
+**Simulation and political systems**
+
+Track B · Phases 10–12
+
+**Warfare, AI and economy**
+
+Track C · Phases 13–15
+
+**Content and character experiences**
+
+Track D · Phases 16–17
+
+**Interface, map and presentation**
+
+**Integration and final release**
+
+Phase 18 · Testing, balancing and optimization
+
+Instead of repeatedly adding disconnected modules, each development pass must follow the same process: implement, integrate, connect to AI, expose through UI, test, fix regressions and verify before merging.
+
+# **6. How much is actually complete?**
+
+My approximate assessment, based on the repository rather than a completed hands-on playtest:
+
+Technical foundation
+
+75%
+
+Political and character depth
+
+40%
+
+Content depth
+
+30%
+
+Military and tactical gameplay
+
+45%
+
+Strategic AI
+
+40%
+
+UI and visual quality
+
+25%
+
+Production readiness
+
+25%
+
+Estimated overall completion against the full CK3-quality target
+
+# **30–40%**
+
+Engineering assessment, not an objectively measured completion score.
+
+We have a substantial playable foundation. We do not need to restart the game or switch engines immediately.
+
+However, matching a mature commercial grand-strategy game with years of expansions is not realistically achievable in one day. We can execute substantial integrated development today, but content quality, historical research, graphics, balancing and extended playtesting cannot be substituted with code generation alone.
+
+**I would keep CK3-level quality as the completion target. I would not lower that target simply to declare the game finished today.**
+
+No code has been modified during this particular audit. I reviewed the complete repository inventory and selected core implementations, but have not independently inspected every source line, asset or live gameplay path. The latest automated checks are green; that does not establish that all gameplay is bug-free.
+
+The 18 phases above are the proposed master roadmap for completing Crown Monarch.
