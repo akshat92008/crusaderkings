@@ -158,11 +158,7 @@ export function advanceMonth(g,world){
   }
   const provinces=Math.max(1,s.provinces);f.stability=clamp(f.stability+Math.sign(52-avgUnrest/provinces)*.6-(f.treasury<0?3:0)-(f.food<0?2:0),0,100);
   if(f.treasury<0&&rand(g)<.14){f.legitimacy=clamp(f.legitimacy-3,0,100);}
-  // Court AI: invest reserves. No fake historical scripting.
-  if(f.id!==g.player&&g.turn%4===0&&f.treasury>700&&s.provinces){
-   const own=controlled(g,f.id).filter(p=>controller(g,p.id)===f.id);const p=own[Math.floor(rand(g)*own.length)];
-   if(p){const cost=Math.round(240*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);if(f.treasury>cost&&p.buildings.market<3){f.treasury-=cost;p.buildings.market=clamp(p.buildings.market+1,0,3);p.development=clamp(p.development+1,1,20);}}
-  }
+  // Court investment is handled once in advanceKingdomSystems.
  }
  // Rival rulers periodically recruit and contest border provinces. Player wars remain manual.
  if(g.turn%8===0){
@@ -187,13 +183,7 @@ export function advanceMonth(g,world){
    }
   }
  }
- if(g.turn%6===0){
-  for(const f of world.factions){
-   if(f.id===g.player)continue;
-   let troops=Object.values(g.armies).filter(a=>a.owner===f.id&&!embarked(g,a.id));const a=troops[0];
-   if(a&&f.id!=='independent'&&g.factions[f.id].treasury>600&&armySize(a)<190){g.factions[f.id].treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];}
-  }
- }
+ // Recruitment is handled once in advanceKingdomSystems.
  if(g.turn%12===0)makeLog(g,`A new year begins: ${g.year}. Courts across the world revise their ambitions.`);
  if(g.turn%8===0){
   const me=g.factions[g.player];if(me){me.prestige+=1;makeLog(g,`The royal council convenes to review the realm's affairs.`);}

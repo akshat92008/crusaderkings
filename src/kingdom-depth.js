@@ -1,3 +1,4 @@
+import {aiRecruitmentBudget} from './campaign-balance.js';
 import {initRoyalCourt} from './royal-court.js';
 import {initExpanded,tickExpanded} from './expanded-content.js';
 import {initLiving,tickLiving} from './living-systems.js';
@@ -11,7 +12,7 @@ import {initChronicles,tickChronicles} from './chronicle-systems.js';
 import {initStrategy,tickStrategy,strategicPlan,temperament} from './strategic-ai.js';
 import {controller,initCampaignWar,tickCampaignWar} from './campaign-war.js';
 import {embarked,initNaval,tickNaval,portBlocked} from './naval-systems.js';
-import {initMilitary,tickMilitary} from './military-systems.js';
+import {initMilitary,tickMilitary,syncRegiments} from './military-systems.js';
 import {initEconomy,tickEconomy,economyModifiers} from './economy-systems.js';
 import {initHeritage,tickHeritage,heritageModifiers} from './heritage-systems.js';
 import {initCivic,tickCivic,civicModifiers} from './civic-systems.js';
@@ -21,7 +22,7 @@ import {initConflict,tickConflict} from './political-conflict.js';
  * Generated rulers, court names and stories are fictional game content.
  * AI is deterministic rule-based gameplay, NOT an external language model.
  */
-import {startingTroops} from './military-doctrines.js';
+import {startingTroops,militaryDoctrine} from './military-doctrines.js';
 import {politicalLevy,initPolitics,tickPolitics,marryRealm,removePoliticalCharacter} from './dynastic-politics.js';
 import {planEnemyInvasion,progressEnemyInvasions} from './invasions.js';
 export const VICTORY_YEAR=1500;
@@ -277,9 +278,12 @@ function aiMonthly(g,world){
    const base={farm:180,fort:440,market:260,barracks:300}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
-  if(g.turn%6===0&&nation.treasury>450){
-   const a=armies(g,f.id).filter(a=>!embarked(g,a.id)).sort((x,y)=>size(x)-size(y))[0];
-   if(a&&size(a)<(['conquer','defend'].includes(strategicPlan(g,f.id)?.goal)?650:260)){nation.treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];a.morale=clamp(a.morale+1,0,100);}
+  if(g.turn%6===0){
+   const all=armies(g,f.id),friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id)),eligible=all.filter(a=>!embarked(g,a.id)&&controller(g,a.province)===f.id&&!g.kingdom.threats.some(t=>t.army===a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
+   const budget=aiRecruitmentBudget({treasury:nation.treasury,food:nation.food,population:land.reduce((n,p)=>n+p.population,0),armySize:all.reduce((n,a)=>n+size(a),0),goal:strategicPlan(g,f.id)?.goal,levy:politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy});
+   if(budget&&friendly.length){let a=eligible[0];if(!a&&!all.some(a=>size(a)>0)){const id='a'+g.nextId++;a={id,owner:f.id,province:friendly[0].id,infantry:0,archers:0,cavalry:0,experience:0,morale:70,commander:'Newly appointed general',doctrine:militaryDoctrine(f).id};g.armies[id]=a;}
+    if(a){nation.treasury-=budget.cost;const mix=startingTroops(f,budget.count);for(const t of ['infantry','archers','cavalry'])a[t]+=mix[t];a.morale=clamp(a.morale+1,0,100);syncRegiments(g,a);}
+   }
   }
   if(g.turn%12===0&&nation.treasury>450){
    const peers=world.factions.filter(p=>p.continent===f.continent&&p.id!==f.id);

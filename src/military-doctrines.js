@@ -1,3 +1,4 @@
+import {allocateTroops} from './campaign-balance.js';
 /**
  * Crown of Nations original army doctrines. These are gameplay archetypes
  * inspired by broad medieval military practices, not a historically validated
@@ -58,7 +59,7 @@ export function militaryDoctrine(faction){
 }
 export function startingTroops(faction,total){
  const d=militaryDoctrine(faction),[i,a,c]=d.mix;const size=Math.max(0,Math.round(total));
- const infantry=Math.round(size*i),archers=Math.round(size*a),cavalry=size-infantry-archers;
+ const [infantry,archers,cavalry]=allocateTroops(size,[i,a,c]);
  return {infantry,archers,cavalry};
 }
 export function armyFormationSlots(faction,army,slots=6){

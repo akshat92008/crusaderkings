@@ -19,7 +19,7 @@ const trace=(world,start,goal,owner,g)=>{
   const byId=new Map(world.provinces.map(p=>[p.id,p])),queue=[[start]],seen=new Set([start]);
   while(queue.length){const path=queue.shift();if(path.length>=7)continue;
     for(const next of byId.get(path.at(-1))?.neighbors||[]){
-      if(seen.has(next)||g.provinces[next]?.owner!==owner)continue;
+      if(seen.has(next)||g.provinces[next]?.owner!==owner||controller(g,next)!==owner)continue;
       if(next===goal)return [...path,next];
       seen.add(next);queue.push([...path,next]);
     }
@@ -72,7 +72,7 @@ export function progressEnemyInvasions(g,world){
  const remaining=[];
  for(const threat of g.kingdom.threats||[]){
   const enemy=g.armies[threat.army],province=g.provinces[threat.province];
-  if(!enemy||enemy.owner!==threat.by||!province||province.owner!==g.player||controller(g,threat.province)!==g.player||embarked(g,enemy.id)||nonAggression(g,threat.by,g.player)||hasTruce(g,threat.by,g.player))continue;
+  if(!enemy||enemy.owner!==threat.by||!province||province.owner!==g.player||controller(g,threat.province)!==g.player||embarked(g,enemy.id)||troops(enemy)<1||nonAggression(g,threat.by,g.player)||hasTruce(g,threat.by,g.player)||['alliance','marriage'].includes(g.factions[threat.by]?.treaties?.[g.player]))continue;
   if(threat.status==='ready'){
    // If the user advances time again instead of defending, allow an
    // automated resolution. Never leave an invisible permanent siege.
@@ -81,7 +81,7 @@ export function progressEnemyInvasions(g,world){
   }
   if(threat.path?.length&&enemy.province!==threat.staging){
    const next=threat.path.shift();
-   if(g.provinces[next]?.owner!==threat.by)continue;
+   if(g.provinces[next]?.owner!==threat.by||controller(g,next)!==threat.by||!world.provinces.find(p=>p.id===enemy.province)?.neighbors.includes(next))continue;
    onArmyMarch(g,enemy);enemy.province=next;
   }
   threat.eta=Math.max(0,threat.eta-1);
@@ -120,11 +120,11 @@ export function resolveInvasion(g,world,threat,result){
   attacker.province=found.province;
   // Surviving defenders retreat to an owned neighboring province if possible.
   const local=world.provinces.find(p=>p.id===found.province);
-  const retreat=(local?.neighbors||[]).find(id=>g.provinces[id]?.owner===g.player);
+  const retreat=(local?.neighbors||[]).find(id=>g.provinces[id]?.owner===g.player&&controller(g,id)===g.player);
   for(const a of human){
    if(playerRatio<.3)captureCommander(g,found.by,a);
    if(retreat)a.province=retreat;
-   else {const fallback=Object.values(g.provinces).find(p=>p.id!==found.province&&p.owner===g.player&&controller(g,p.id)===g.player);if(fallback)a.province=fallback.id;else delete g.armies[a.id];}
+   else {captureCommander(g,found.by,a);delete g.armies[a.id];}
   }
   g.factions[found.by].prestige+=8;
  }
