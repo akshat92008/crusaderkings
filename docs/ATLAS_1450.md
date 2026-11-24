@@ -46,3 +46,6 @@ Large owned polygons are selectively split using a two-crossing straight cut (si
 
 ### Phase 18 — strategic sea access
 Atlas v4 adds bounded, abstract regional sea hubs for Aragon, Ashikaga Japan, Majapahit, Kalmar, Māori, Fiji and Australian First Nations gameplay profiles. Hubs represent owned land groups in configured coastal/island regions, not verified historical ports. Voyages use a 1–8 month duration based on great-circle distance; blockade approach time follows the estimate. Older maps retain existing ports and travel duration. Existing v4 saves receive the new hubs once without resetting fleets. No artificial land bridges are added. Naval transport remains limited to friendly ports sharing a basin.
+
+### Phase 18 — map readability and stable geographic names
+Atlas v4 labels every district with a broad geographic region and deterministic ordinal, independent of its changing political owner. At close zoom the political map displays collision-filtered district labels; realm markers follow a still-owned playable seat and eliminated realms disappear. Embarked armies no longer appear as land banners. Geographic labels are approximate, not verified historical county names.
