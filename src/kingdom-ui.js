@@ -33,7 +33,7 @@ import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {FAITH_CHARTER,faithCharterView,faithConfidence,faithExchangeView,pilgrimageSanctuary} from './faith-institutions.js';
 import {cultureView,cultureProfile} from './culture-systems.js';
-import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
+import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions,regionalTitleCandidates} from './feudal-systems.js';
 import {regionalDecision,AMBITIONS,currentChain,relationshipList,personalOpinion,ambitionAvailable,ambitionProgress} from './chronicle-systems.js';
 import {temperament,strategicPlan,threatAssessment,borderRealms,militaryStrength,defenseSupport} from './strategic-ai.js';
 import {occupation,controller} from './campaign-war.js';
@@ -298,7 +298,7 @@ export function renderFeudal(g,world,esc){
  const adults=Object.values(g.politics.people).filter(p=>p.alive&&p.realm===realm&&p.age>=18&&!isImprisoned(g,p.id)&&p.id!==r);
  const crown=titles.filter(t=>t.tier==='province'&&t.holder===r);
  let html=section('TITLE HIERARCHY')+'<div class="rule"><h3>'+esc(g.factions[realm].name)+'</h3><p class="paragraph">Sovereign: '+esc(name(r))+' · '+crown.length+' personally held provinces. Crown → regional titles → provincial titles. Districts use the prototype map; they are not historical duchy boundaries.</p></div>';
- for(const t of titles.filter(t=>t.tier==='regional')){const field='regional-'+t.id.replaceAll(':','-'),lords=adults.filter(p=>t.members.some(id=>g.politics.holdings[id].lord===p.id));html+='<details class="rule"><summary>'+esc(t.name)+' · '+esc(name(t.holder))+'</summary><p class="paragraph">Regional loyalty effect: '+regionalLoyalty(g,t.members[0]).toFixed(1)+'</p>'+(lords.length?'<select class="select" id="'+field+'">'+lords.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select>'+btn('regional',t.id,'Grant regional title (120g)',field):'');
+ for(const t of titles.filter(t=>t.tier==='regional')){const field='regional-'+t.id.replaceAll(':','-'),lords=regionalTitleCandidates(g,realm,t.id);html+='<details class="rule"><summary>'+esc(t.name)+' · '+esc(name(t.holder))+'</summary><p class="paragraph">Regional loyalty effect: '+regionalLoyalty(g,t.members[0]).toFixed(1)+'</p>'+(lords.length?'<select class="select" id="'+field+'">'+lords.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select>'+btn('regional',t.id,'Grant regional title (120g)',field):'');
  for(const id of t.members){const v=g.politics.holdings[id],p=titles.find(x=>x.province===id),grant='grant-'+id;html+='<div class="rule"><b>'+provinceLink(id,world,esc)+' · '+characterLink(g.politics.people[v.lord],esc)+'</b><div class="smallnote">Loyalty '+Math.round(v.loyalty)+'%'+(isImprisoned(g,v.lord)?' · imprisoned':'')+'</div>';
  if(v.lord===r&&adults.length)html+='<select class="select" id="'+grant+'">'+adults.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>').join('')+'</select>'+btn('grant',p.id,'Grant province',grant);
  else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');html+=renderEstateSuccession(g,id,esc,'titles');}html+='</div>';}html+='</details>';}
