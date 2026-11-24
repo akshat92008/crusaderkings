@@ -43,3 +43,6 @@ Twelve additional playable starting profiles are derived from the bundled named 
 
 ## Phase 18 — denser atlas v4
 Large owned polygons are selectively split using a two-crossing straight cut (single-ring polygons only). Each split conserves total fictional district population, ownership and fort count; children inherit the parent's historical classification instead of claiming new historical evidence. Original IDs remain on one child. New internal land edges are geometry-based, and preexisting external connections are checked. All four world versions remain supported by the save selector. Subdivisions are gameplay districts, not real medieval county boundaries.
+
+### Phase 18 — strategic sea access
+Atlas v4 adds bounded, abstract regional sea hubs for Aragon, Ashikaga Japan, Majapahit, Kalmar, Māori, Fiji and Australian First Nations gameplay profiles. Hubs represent owned land groups in configured coastal/island regions, not verified historical ports. Voyages use a 1–8 month duration based on great-circle distance; blockade approach time follows the estimate. Older maps retain existing ports and travel duration. Existing v4 saves receive the new hubs once without resetting fleets. No artificial land bridges are added. Naval transport remains limited to friendly ports sharing a basin.
