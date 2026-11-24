@@ -34,11 +34,21 @@ try:
    box=page.locator('#world-map').bounding_box();assert box['height']>=height*.45,box
    page.screenshot(path=str(OUT/(name+'-map.png')))
    assert page.locator('#hud-ruler').is_visible()
+   assert page.locator('#game-speed').is_visible()
+   page.select_option('#game-speed','750')
+   page.select_option('#game-speed','1500')
+   if name=='desktop':
+    assert page.locator('#resource-prestige').is_visible()
+    assert page.locator('#resource-legitimacy').is_visible()
    page.locator('#quick-nav [data-priority-tab="search"]').click()
    page.fill('#campaign-query','military');assert page.locator('.finder-row').count()>0
    page.fill('#campaign-query','no-such-result-xyz');assert page.locator('.finder-row').count()==0
    page.fill('#campaign-query','council');page.locator('.finder-row[data-priority-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
    page.locator('[data-workspace="realm"]').click();assert page.locator('.campaign-hub').is_visible()
+   assert page.locator('.first-steps').count()==1
+   assert page.locator('.historical-context').count()==1
+   page.click('#nav-back');assert page.locator('[id^="council-candidate-"]').count()>0
+   page.click('#nav-forward');assert page.locator('.campaign-hub').is_visible()
    page.click('#close-management')
    page.locator('#quick-nav [data-priority-tab="characters"]').click()
    page.fill('#people-query','no-matching-person-xyz');assert page.locator('.directory-list .person-row').count()==0
