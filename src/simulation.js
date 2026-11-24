@@ -1,3 +1,4 @@
+import {campaignWorld} from './independence-systems.js';
 import {captureCommander} from './feudal-systems.js';
 import {strategicTargetScore,raidThreshold,defenseSupport} from './strategic-ai.js';
 import {controller,occupation,occupationTax,captureProvince} from './campaign-war.js';
@@ -136,6 +137,7 @@ export function negotiate(g,other,action,world={factions:[]}){
 // Reproducible pseudo-random outcomes. No Math.random in the simulation core.
 function rand(g){g.seed=(1664525*g.seed+1013904223)>>>0;return g.seed/4294967296;}
 export function advanceMonth(g,world){
+ world=campaignWorld(g,world);
  g.turn++;g.month++;if(g.month===12){g.month=0;g.year++;}
  for(const f of Object.values(g.factions)){
   if(f.id==='independent')continue;
