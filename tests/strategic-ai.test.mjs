@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {createGame,snapshot,restoreGame,advanceMonth,startMarch} from '../src/simulation.js';
-import {temperament,strategicPlan,threatAssessment,strategicTargetScore,raidThreshold,defenseSupport,defensivePartners,strategyAction,tickStrategy,militaryStrength,borderRealms} from '../src/strategic-ai.js';
+import {temperament,strategicPlan,threatAssessment,strategicTargetScore,raidThreshold,defenseSupport,defensivePartners,strategyAction,tickStrategy,militaryStrength,borderRealms,strategicFronts} from '../src/strategic-ai.js';
 import {renderStrategy} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=(realm='england')=>{const g=createGame(world,realm);g.factions[realm].treasury=10000;return g;};
@@ -31,3 +31,5 @@ test('new and ended wars invalidate plans before the scheduled quarterly review,
  assert.equal(strategicPlan(copy,'england').goal,'recover');
  assert.equal(strategicPlan(copy,'england').target,null);
 });
+
+test('new defensive front interrupts the previous offensive plan before its scheduled review',()=>{const g=start(),mine=Object.values(g.provinces).find(p=>p.owner==='england'),theirs=Object.values(g.provinces).find(p=>p.owner==='france');g.conflict.wars.old={id:'old',attacker:'england',defender:'france',status:'active',goal:theirs.id,started:0,score:10};g.turn=3;tickStrategy(g,world);assert.equal(strategicPlan(g,'england').target,'france');g.conflict.wars.new={id:'new',attacker:'burgundy',defender:'england',status:'active',goal:mine.id,started:4,score:70};g.campaignWar.occupations[mine.id]={by:'burgundy',owner:'england',war:'new'};g.turn=6;tickStrategy(g,world);const fronts=strategicFronts(g,world,'england');assert.equal(fronts[0].target,'burgundy');assert.equal(fronts[0].occupied,true);assert.equal(strategicPlan(g,'england').goal,'defend');assert.equal(strategicPlan(g,'england').fronts.length,2);assert.match(renderStrategy(g,world,String),/ACTIVE FRONTS/);g.conflict.wars.new.status='white peace';delete g.campaignWar.occupations[mine.id];g.turn=9;tickStrategy(g,world);assert.equal(strategicPlan(g,'england').target,'france');});
