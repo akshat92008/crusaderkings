@@ -1,3 +1,4 @@
+import {politicalEstates} from './realm-authority.js';
 // Five workspaces retain every existing panel and its original action handlers.
 export const WORKSPACES=[
  {id:'realm',name:'Realm',tabs:['realm','decrees','economy','trade']},
@@ -14,6 +15,7 @@ export function realmPriorities(g,stats,royalEvent=false,expandedEvents=0){const
  if(f.food<30||stats.foodDelta<0)add('economy','Food supply',f.food<30?'Food reserves are low.':'Food reserves are falling.');
  if(uncommanded)add('military','Unassigned commanders',uncommanded+' field army/armies need a commander.');
  if(f.stability<45)add('decrees','Low stability','Review your laws and provincial unrest.');
+ const est=politicalEstates(g,g.player);if(est.excess)add('vassals','Domain limit exceeded',est.domain+' direct holdings; limit '+est.limit+'. Grant a title.');const neglected=est.rows.filter(x=>x.grievance).length;if(neglected)add('council','Powerful vassals seek office',neglected+' influential lord(s) lack council representation.');
  if(royalEvent)add('court','Royal court decision','A court decision is waiting.');
  if(expandedEvents>0)add('stories','Campaign events waiting',expandedEvents+' pending campaign event(s).');
  const factions=Object.values(g.conflict?.factions||{}).filter(x=>x.realm===g.player&&['organizing','ultimatum','civil war'].includes(x.status)&&x.pressure>=65);if(factions.length)add('political','Faction pressure','Review powerful internal opposition.','urgent');
