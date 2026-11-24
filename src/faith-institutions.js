@@ -1,3 +1,4 @@
+import {civilianAccess,journeyDistrict} from './court-travel.js';
 // Religious institutions use existing civic faith labels, actual characters and local institution records.
 // Charter options are alternate-history player policies, not assertions about real-world doctrines.
 import {controller} from './campaign-war.js';
@@ -193,14 +194,15 @@ function tickFaithExchange(g,r){
  delete i.faithExchange;note(g,r,state(g,r,true),'The religious exchange concluded; institutional backing and mutual relations improved.');
 }
 // The existing activity system owns travel and completion. A recognized destination adds a faith-specific result.
-export function pilgrimageSanctuary(g,r,id){
- const local=g.civic?.provinces[id],i=g.identity?.institutions[id],faith=court(g,r)?.faith;
- return own(g,r,id)&&local?.faith===faith&&i?.faith===faith&&i.level>=2&&i.sanctuary?.faith===faith?{province:id,faith}:null;
+export function pilgrimageSanctuary(g,r,id,allowForeign=false){
+ const local=g.civic?.provinces[id],i=g.identity?.institutions[id],faith=court(g,r)?.faith,host=g.provinces[id]?.owner;
+ return (own(g,r,id)||(allowForeign&&host!==r&&journeyDistrict(g,r,id,true)&&civilianAccess(g,r,host)))&&local?.faith===faith&&i?.faith===faith&&i.level>=2&&i.sanctuary?.faith===faith?{province:id,faith,host}:null;
 }
 export function completeSacredJourney(g,r,activity){
- const x=activity.sanctuary,actual=x&&pilgrimageSanctuary(g,r,x.province),head=ruler(g,r);
- if(!actual||actual.faith!==x.faith||head?.id!==activity.host)return false;
+ const x=activity.sanctuary,actual=x&&pilgrimageSanctuary(g,r,x.province,true),head=ruler(g,r);
+ if(!actual||actual.faith!==x.faith||(x.host&&actual.host!==x.host)||head?.id!==activity.host)return false;
  const i=g.identity.realms[r],local=g.civic.provinces[x.province],bonus=Math.max(1,Math.round((activity.quality??50)/20));
  i.faithAuthority=clamp(i.faithAuthority+bonus,0,100);local.devotion=clamp((local.devotion??50)+bonus*2,0,100);local.localTrust=clamp(local.localTrust+bonus,0,100);
+ if(actual.host!==r){const a=g.factions[r],b=g.factions[actual.host];a.relations[actual.host]=clamp((a.relations[actual.host]||0)+5,-100,100);b.relations[r]=clamp((b.relations[r]||0)+5,-100,100);}
  head.memories??=[];head.memories.push('Completed a sacred journey to '+x.province+' in '+g.year+'.');note(g,r,state(g,r,true),'The ruler completed a sacred journey to a recognized sanctuary.');return true;
 }
