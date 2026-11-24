@@ -5,7 +5,7 @@ const own=(g,realm)=>Object.values(g.provinces).filter(p=>p.owner===realm);
 export function initCampaignWar(g){return g.campaignWar??={version:1,occupations:{},history:[],lastTick:-1};}
 export function controller(g,id){return g.campaignWar?.occupations[id]?.by||g.provinces[id]?.owner;}
 export function occupation(g,id){return g.campaignWar?.occupations[id]||null;}
-export function occupationTax(g,id){return occupation(g,id)?.by!==undefined?.35:1;}
+export function occupationTax(g,id){return occupation(g,id)?0.35:1;}
 export function captureProvince(g,war,realm,id,from){const p=g.provinces[id];if(!p)return false;const c=initCampaignWar(g),old=c.occupations[id];
  if(old&&old.by!==realm&&p.owner===realm){delete c.occupations[id];return true;}
  if(old&&old.by!==realm&&p.owner!==realm)return false;
