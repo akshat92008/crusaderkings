@@ -10,7 +10,7 @@ const free=(g,p)=>p?.alive&&p.age>=18&&!isImprisoned(g,p.id);
 const crown=(g,r)=>g.politics.realms[r]?.ruler;
 export const vassalCareer=g=>g?.playerCareer?.mode==='vassal'?g.playerCareer:null;
 export const humanControlsRealm=(g,r)=>r===g.player&&!vassalCareer(g);
-export const humanControlsCharacter=(g,id)=>vassalCareer(g)?.person===id;
+export const humanControlsCharacter=(g,id)=>vassalCareer(g)?vassalCareer(g).person===id:g.politics?.realms?.[g.player]?.ruler===id;
 function estates(g,r,id,controlled=true){return Object.entries(g.politics.holdings).filter(([key,h])=>h.realm===r&&h.lord===id&&g.provinces[key]?.owner===r&&(!controlled||controller(g,key)===r));}
 function note(g,msg){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}
 export function careerCandidates(g){

@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {amendEstateCharter,tickEstateCharters} from './estate-succession.js';
 import {partitionRepresentatives} from './succession-systems.js';
 // Crown, regional title and provincial title hierarchy, based on prototype geography.
@@ -89,7 +90,7 @@ export function feudalAction(g,world,action,id,extra){const f=initFeudal(g,world
  if(action==='release'||action==='ransom'){const x=f.prisoners[id];if(!x||x.captor!==realm||x.status!=='held')return no('Select your prisoner.');if(action==='ransom')return ransom(g,x);release(g,x);for(const [,h] of holdings(g,x.realm))if(h.lord===id)h.loyalty=cap(h.loyalty+15,0,100);return ok('Prisoner released.');}
  return no('Unknown title or prisoner action.');}
 export function tickFeudal(g,world){const f=initFeudal(g,world);if(f.lastTick===g.turn)return;f.lastTick=g.turn;syncTitles(g);
- for(const [id,x] of Object.entries(f.prisoners)){if(x.status==='held'){if(!live(g,id)||!holdings(g,x.captor).length){release(g,x);continue;}if(x.captor!==g.player&&g.turn-x.started>=12)ransom(g,x);if(x.status==='held'&&g.turn-x.started>=36)release(g,x);}else if(g.turn-x.ended>60)delete f.prisoners[id];}
+ for(const [id,x] of Object.entries(f.prisoners)){if(x.status==='held'){if(!live(g,id)||!holdings(g,x.captor).length){release(g,x);continue;}if(!humanControlsRealm(g,x.captor)&&g.turn-x.started>=12)ransom(g,x);if(x.status==='held'&&g.turn-x.started>=36)release(g,x);}else if(g.turn-x.ended>60)delete f.prisoners[id];}
  for(const [id,x] of Object.entries(f.claimants))if(!live(g,x.person)||g.turn-x.created>=180)delete f.claimants[id];
  tickEstateCharters(g);
 }

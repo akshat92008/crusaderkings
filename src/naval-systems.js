@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Sea basins are explicitly abstract routes attached to selected starting ports.
 // They are not inferred to be real-world coastlines from the synthetic map.
 import {controller} from './campaign-war.js';
@@ -63,5 +64,5 @@ export function tickNaval(g,world){const n=initNaval(g,world);if(n.lastTick===g.
  if(defender&&!navalFight(g,f,defender)){if(n.fleets[f.id])endBlockade(g,f);continue;}if(portBlocked(g,f.target)){endBlockade(g,f);continue;}f.status='blockade';n.blockades[f.target]={fleet:f.id,realm:f.realm,started:g.turn};note(g,f.realm,'Blockade established at '+f.target+'.');continue;}
  if(f.status==='blockade'){if(!portBlocked(g,f.target)){endBlockade(g,f);continue;}const p=g.provinces[f.target];p.unrest=cap(p.unrest+1,0,100);continue;}
  if(f.status==='docked'&&(g.provinces[f.port]?.owner!==f.realm||controller(g,f.port)!==f.realm)){const dest=returnPort(g,f);if(dest)f.port=dest;else delete n.fleets[f.id];}}
- if(g.turn%12===0)for(const p of Object.values(n.ports)){const realm=g.provinces[p.province]?.owner;if(!realm||realm===g.player||realm==='independent'||g.factions[realm]?.treasury<700)continue;const fleet=Object.values(n.fleets).find(f=>f.realm===realm&&f.port===p.province&&f.status==='docked');if(!fleet||fleetStats(fleet).count<3)buildShip(g,realm,p.province,'galley');else{const target=blockadeTargets(g,fleet)[0];if(target)startBlockade(g,fleet,target.province);}}
+ if(g.turn%12===0)for(const p of Object.values(n.ports)){const realm=g.provinces[p.province]?.owner;if(!realm||humanControlsRealm(g,realm)||realm==='independent'||g.factions[realm]?.treasury<700)continue;const fleet=Object.values(n.fleets).find(f=>f.realm===realm&&f.port===p.province&&f.status==='docked');if(!fleet||fleetStats(fleet).count<3)buildShip(g,realm,p.province,'galley');else{const target=blockadeTargets(g,fleet)[0];if(target)startBlockade(g,fleet,target.province);}}
 }

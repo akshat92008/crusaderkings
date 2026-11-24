@@ -1,16 +1,19 @@
+import {humanControlsRealm} from './player-career.js';
+import {unionPartners} from './personal-unions.js';
 // Explicit diplomatic treaties and paid military support, without creating free troops.
 import {REGIMENTS,initMilitary,onArmyMarch,syncRegiments} from './military-systems.js';
 import {controller} from './campaign-war.js';
 const pair=(a,b)=>[a,b].sort().join('|'),cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const land=(g,r)=>Object.values(g.provinces).some(p=>p.owner===r&&controller(g,p.id)===r);
 const war=(g,a,b)=>Object.values(g.conflict?.wars||{}).find(w=>w.status==='active'&&pair(w.attacker,w.defender)===pair(a,b));
-const allied=(g,a,b)=>['alliance','marriage'].includes(g.factions[a]?.treaties?.[b]);
+const allied=(g,a,b)=>unionPartners(g,a,b)||['alliance','marriage'].includes(g.factions[a]?.treaties?.[b]);
 const relation=(g,a,b)=>g.factions[a]?.relations?.[b]||0;
 const troops=a=>(a.infantry||0)+(a.archers||0)+(a.cavalry||0);
 export function initDiplomacy(g){return g.diplomacy??={version:1,pacts:{},guarantees:{},aid:{},history:[],lastTick:-1};}
 function note(g,r,message){const d=initDiplomacy(g);d.history.unshift({realm:r,turn:g.turn,message});d.history=d.history.slice(0,160);if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}}
 const passageKey=(traveler,host)=>traveler+':'+host;
 export function militaryAccess(g,traveler,host){
+ if(unionPartners(g,traveler,host))return {traveler,host,union:true,until:Number.MAX_SAFE_INTEGER};
  const pass=g.diplomacy?.passage?.[passageKey(traveler,host)];
  return pass?.until>g.turn&&!war(g,traveler,host)?pass:null;
 }
@@ -56,7 +59,7 @@ function reconcilePassage(g,d){
   note(g,army.owner,'An army withdrew to '+recovery+' after its military passage ended.');
  }
 }
-export function nonAggression(g,a,b){return (g.diplomacy?.pacts[pair(a,b)]?.until||0)>g.turn;}
+export function nonAggression(g,a,b){return unionPartners(g,a,b)||(g.diplomacy?.pacts[pair(a,b)]?.until||0)>g.turn;}
 export function guaranteePartners(g,realm,enemy){return Object.values(g.diplomacy?.guarantees||{}).filter(x=>x.protected===realm&&x.guarantor!==enemy&&x.until>g.turn&&land(g,x.guarantor)&&!war(g,x.guarantor,realm)&&!allied(g,x.guarantor,enemy)&&!nonAggression(g,x.guarantor,enemy)).map(x=>x.guarantor);}
 function validAid(g,x){
  return x?.until>g.turn&&g.conflict?.wars[x.war]?.status==='active'
@@ -211,5 +214,5 @@ export function diplomacyAction(g,world,action,id,extra){const r=g.player,d=init
  return offer?dispatchFieldAid(g,r,w,offer):no('Requires a willing ally with available troops and a controlled land route.');
  }if(action==='aid')return requestAid(g,r,g.conflict.wars[id],extra);if(action==='break'){const p=d.pacts[pair(r,id)];if(!p||p.until<=g.turn)return no('No active non-aggression agreement.');delete d.pacts[pair(r,id)];f.prestige=Math.max(0,f.prestige-15);f.legitimacy=cap(f.legitimacy-8,0,100);o.relations[r]=cap(relation(g,id,r)-30,-100,100);g.conflict.truces[pair(r,id)]=Math.max(g.conflict.truces[pair(r,id)]||0,g.turn+6);return ok('Agreement repudiated. Six-month withdrawal period begins.');}return no('Unknown diplomatic action.');}
 export function tickDiplomacy(g,world){const d=initDiplomacy(g);if(d.lastTick===g.turn)return;d.lastTick=g.turn;reconcilePassage(g,d);advanceFieldContingents(g,world);for(const [k,p] of Object.entries(d.pacts))if(p.until<=g.turn||p.members.some(id=>!land(g,id))||war(g,...p.members))delete d.pacts[k];for(const [k,p] of Object.entries(d.guarantees))if(p.until<=g.turn||!land(g,p.guarantor)||!land(g,p.protected)||war(g,p.guarantor,p.protected))delete d.guarantees[k];for(const [k,p] of Object.entries(d.aid))if(!g.conflict.wars[p.war]||g.conflict.wars[p.war].status!=='active')delete d.aid[k];
- if(g.turn%6!==0)return;for(const r of Object.keys(g.politics.realms)){if(r===g.player||!land(g,r))continue;const f=g.factions[r],w=Object.values(g.conflict.wars).find(w=>w.status==='active'&&[w.attacker,w.defender].includes(r));if(w){const expedition=fieldAidOptions(g,world,r,w).find(o=>o.donor!==g.player);if(expedition)dispatchFieldAid(g,r,w,expedition);else{const id=aidOptions(g,r,w).find(id=>id!==g.player);if(id)requestAid(g,r,w,id);}continue;}if(f.treasury<450||g.turn%12!==0)continue;const plan=g.strategy?.plans[r];const neighbors=[...new Set(world.provinces.filter(p=>controller(g,p.id)===r).flatMap(p=>p.neighbors.map(id=>controller(g,id))))].filter(id=>id&&id!==r&&id!==g.player&&g.politics.realms[id]&&!war(g,r,id));if(['recover','defend','diplomacy'].includes(plan?.goal)){const id=neighbors.find(id=>relation(g,id,r)>=15&&!nonAggression(g,r,id)&&!allied(g,r,id));if(id)sign(g,r,id);}else if(plan?.goal==='prosper'){const id=neighbors.find(id=>relation(g,id,r)>=35&&relation(g,r,id)>=35&&!d.guarantees[r+':'+id]);if(id)guarantee(g,r,id);}}
+ if(g.turn%6!==0)return;for(const r of Object.keys(g.politics.realms)){if(humanControlsRealm(g,r)||!land(g,r))continue;const f=g.factions[r],w=Object.values(g.conflict.wars).find(w=>w.status==='active'&&[w.attacker,w.defender].includes(r));if(w){const expedition=fieldAidOptions(g,world,r,w) .find(o=>!humanControlsRealm(g,o.donor));if(expedition)dispatchFieldAid(g,r,w,expedition);else{const id=aidOptions(g,r,w) .find(id=>!humanControlsRealm(g,id));if(id)requestAid(g,r,w,id);}continue;}if(f.treasury<450||g.turn%12!==0)continue;const plan=g.strategy?.plans[r];const neighbors=[...new Set(world.provinces.filter(p=>controller(g,p.id)===r).flatMap(p=>p.neighbors.map(id=>controller(g,id))))].filter(id=>id&&id!==r&&!humanControlsRealm(g,id)&&g.politics.realms[id]&&!war(g,r,id));if(['recover','defend','diplomacy'].includes(plan?.goal)){const id=neighbors.find(id=>relation(g,id,r)>=15&&!nonAggression(g,r,id)&&!allied(g,r,id));if(id)sign(g,r,id);}else if(plan?.goal==='prosper'){const id=neighbors.find(id=>relation(g,id,r)>=35&&relation(g,r,id)>=35&&!d.guarantees[r+':'+id]);if(id)guarantee(g,r,id);}}
 }

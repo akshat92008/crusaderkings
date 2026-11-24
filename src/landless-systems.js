@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Landless continuation: an existing sovereign can seek sanctuary, serve a
 // patron and negotiate the restoration of a former holding. No new character,
 // faction, army or treasury is created by this system.
@@ -115,7 +116,7 @@ export function tickLandless(g,world){
  for(const realm of Object.keys(g.politics.realms).sort()){
   const land=holdings.get(realm)||[],x=reconcile(g,world,realm,land),p=ruler(g,realm);
   if(x.contract)completeContract(g,realm,x,p);
-  if(land.length||realm===g.player||!free(g,p)||x.contract||g.turn%3!==0)continue;
+  if(land.length||humanControlsRealm(g,realm)||!free(g,p)||x.contract||g.turn%3!==0)continue;
   if(!x.host){const view=landlessView(g,world,realm);if(view.hosts.length)act(g,world,realm,'asylum',view.hosts[0].id);continue;}
   const targets=restorationTargets(g,realm,x);
   if(targets.length&&x.support>=60&&relation(g,x.host,realm)>=20&&p.wealth>=120){act(g,world,realm,'restore',targets[0]);continue;}

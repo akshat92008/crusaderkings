@@ -196,6 +196,22 @@ try:
     page.get_by_role('button',name='Begin vassal career',exact=True).click()
     assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
     assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).playerCareer.person")==person
+    page.locator('#tabs [data-tab="characters"]').click()
+    assert page.locator('#people-query').is_visible()
+    page.locator('.directory-list [data-character]').first.click()
+    assert page.locator('.character-hero').is_visible()
+    assert page.locator('#tab-content [data-action="politics"]').count()==0
+    page.locator('#tab-content [data-action="pin"]').click()
+    assert page.locator('#tab-content [data-action="pin"]').get_attribute('aria-pressed')=='true'
+    page.locator('#tabs [data-tab="search"]').click()
+    page.fill('#campaign-query','landless')
+    assert page.locator('.finder-row[data-priority-tab="realm"]').count()==1
+    page.fill('#campaign-query','military')
+    assert page.locator('.finder-row[data-priority-tab="military"]').count()==0
+    page.locator('#tabs [data-tab="chronicle"]').click()
+    assert page.get_by_text('CAMPAIGN CHRONICLE',exact=True).is_visible()
+    page.locator('#tabs [data-tab="realm"]').click()
+    assert page.get_by_text('Career connections',exact=True).is_visible()
     page.click('#close-management')
     page.click('#open-province')
     assert page.locator('[data-action="recruit"]').count()==0
