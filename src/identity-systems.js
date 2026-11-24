@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {researchPatronBonus} from './living-systems.js';
 import {faithCharterAction,faithCharterModifiers,tickFaithCharter} from './faith-institutions.js';
 import {cultureAction,cultureModifiers,tickCulture,cultureLeadership} from './culture-systems.js';
@@ -61,7 +62,7 @@ export function tickIdentity(g,world){const s=initIdentity(g,world);if(s.lastTic
  state.faithAuthority=cap(state.faithAuthority+cap((45+Math.min(40,backing*5)-state.faithAuthority)*.15,-3,3),0,100);if(state.faithAuthority>=70&&g.turn%12===0)f.legitimacy=cap(f.legitimacy+1,0,100);
  tickFaithCharter(g,r,land);tickCulture(g,r,land);
  if(state.research){const rr=state.research,d=INNOVATIONS[rr.id];rr.progress+=5+(ruler(g,r).skills.learning||1)+mod.research+researchPatronBonus(g,r);if(rr.progress>=d.cost){state.innovations.push(rr.id);state.research=null;note(g,r,d.name+' discovered.');}}
- if(r!==g.player&&g.turn%12===0&&f.treasury>700){if(!state.research){const opts=researchOptions(g,r);if(opts.length)research(g,r,opts[0]);}const p=land.find(p=>s.institutions[p.id].level===0&&g.civic.provinces[p.id].localTrust<80);if(p&&f.treasury>700)institution(g,r,p.id);if(f.treasury>1000&&f.prestige>=20&&state.traditions.length<4&&g.turn-state.lastTradition>=60){const options=Object.keys(TRADITIONS).filter(id=>!state.traditions.includes(id));const id=options.find(id=>id==='scholarly_patronage')||options[0];if(id){f.treasury-=350;f.prestige-=20;state.traditions.push(id);state.lastTradition=g.turn;}}}
+ if(!humanControlsRealm(g,r)&&g.turn%12===0&&f.treasury>700){if(!state.research){const opts=researchOptions(g,r);if(opts.length)research(g,r,opts[0]);}const p=land.find(p=>s.institutions[p.id].level===0&&g.civic.provinces[p.id].localTrust<80);if(p&&f.treasury>700)institution(g,r,p.id);if(f.treasury>1000&&f.prestige>=20&&state.traditions.length<4&&g.turn-state.lastTradition>=60){const options=Object.keys(TRADITIONS).filter(id=>!state.traditions.includes(id));const id=options.find(id=>id==='scholarly_patronage')||options[0];if(id){f.treasury-=350;f.prestige-=20;state.traditions.push(id);state.lastTradition=g.turn;}}}
  }
  for(const [id,x] of Object.entries(s.projects)){const p=g.provinces[id],l=g.civic.provinces[id],c=g.civic.realms[x.realm];if(!p||p.owner!==x.realm||controller(g,id)!==x.realm||c[x.kind]!==x.target||l[x.kind]!==x.original||c.policy==='coercion'){delete s.projects[id];continue;}if(l.acceptance<65||l.localTrust<60){x.progress=Math.max(0,x.progress-5);continue;}x.progress+=6+Math.floor(l.localTrust/20);if(x.progress>=100){l[x.kind]=x.target;delete s.projects[id];note(g,x.realm,'Community dialogue completed at '+id+'. Local '+x.kind+' identity changed in the simulation.');}}
 }

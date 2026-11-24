@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Provincial charters govern the estate. Personal wealth and crown succession
 // keep their own inheritance rules.
 import {controller} from './campaign-war.js';
@@ -96,7 +97,7 @@ export function amendEstateCharter(g,realm,id,law){
 export function tickEstateCharters(g){
  if(g.turn%12!==0)return;
  for(const [realm,f] of Object.entries(g.factions)){
-  if(realm===g.player||f.treasury<600||f.legitimacy<75||authorityLevel(g,realm)<2)continue;
+  if(humanControlsRealm(g,realm)||f.treasury<600||f.legitimacy<75||authorityLevel(g,realm)<2)continue;
   if(!sovereign(g,realm)?.traits?.includes('ambitious'))continue;
   for(const [id,h] of Object.entries(g.politics.holdings)){
    if(h.realm!==realm||!(h.leverageUntil>g.turn)||h.loyalty>55||estateLaw(g,id)!=='customary')continue;

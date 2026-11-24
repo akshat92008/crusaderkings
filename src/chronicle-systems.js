@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {ADDITIONAL_AMBITIONS,ambitionBaseline,additionalAmbitionAvailable,additionalAmbitionProgress} from './ambition-goals.js';
 // Original alternate-history decisions; not scripted claims of historical events.
 import {controller} from './campaign-war.js';
@@ -126,9 +127,9 @@ function schedule(g,realm){const c=g.chronicles,s=c.realms[realm],f=g.factions[r
 export function tickChronicles(g,world){const c=initChronicles(g,world);if(c.lastTick===g.turn)return;c.lastTick=g.turn;
  for(const [realm,s] of Object.entries(c.realms)){const r=ruler(g,realm),f=g.factions[realm];if(!r||!land(g,realm).length)continue;if(s.ruler!==r.id){s.ruler=r.id;s.successionAt=g.civic.realms[realm].government==='republic'?null:g.turn;s.ambition=null;if(s.chain&&CHAINS.find(x=>x.id===s.chain.id)?.persistent){s.chain.ruler=r.id;note(g,realm,'The new ruler inherited the ongoing political situation.');}else{s.chain=null;if(g.civic.realms[realm].government!=='republic')schedule(g,realm);}}
  if(s.ambition&&ambitionComplete(g,realm,s.ambition)){const a=s.ambition,d=AMBITIONS[a.id];f.prestige+=d.reward;f.legitimacy=cap(f.legitimacy+6,0,100);const dyn=g.heritage.dynasties[realm+'|'+r.house];if(dyn)dyn.renown+=d.reward;s.completed.push({ambition:a.id,ruler:r.id,turn:g.turn});s.completed=s.completed.slice(-20);s.ambition=null;note(g,realm,r.name+' fulfilled '+d.name+'.');}
- const x=currentChain(g,realm);if(x&&g.turn>=x.due&&(realm!==g.player||g.turn-x.due>=9)){const cautious=r.traits?.includes('cautious')||r.traits?.includes('just'),reserve=r.traits?.includes('greedy')?450:cautious?100:250;const idx=realm!==g.player&&f.treasury>x.choices[0][1]+reserve?0:1;resolve(g,realm,idx);}
- if(g.turn%6===0){schedule(g,realm);if(realm!==g.player&&!s.ambition){const choices=Object.keys(AMBITIONS),offset=hash(realm+g.turn)%choices.length;for(let i=0;i<choices.length;i++){const id=choices[(offset+i)%choices.length];if(ambitionAvailable(g,realm,id)){s.ambition={id,ruler:r.id,started:g.turn,base:baseline(g,realm,id)};break;}}}}
- if(g.turn%12===0&&realm!==g.player&&f.treasury>500&&g.turn-s.decisionAt>=36)decision(g,realm);
+ const x=currentChain(g,realm);if(x&&g.turn>=x.due&&(!humanControlsRealm(g,realm)||g.turn-x.due>=9)){const cautious=r.traits?.includes('cautious')||r.traits?.includes('just'),reserve=r.traits?.includes('greedy')?450:cautious?100:250;const idx=!humanControlsRealm(g,realm)&&f.treasury>x.choices[0][1]+reserve?0:1;resolve(g,realm,idx);}
+ if(g.turn%6===0){schedule(g,realm);if(!humanControlsRealm(g,realm)&&!s.ambition){const choices=Object.keys(AMBITIONS),offset=hash(realm+g.turn)%choices.length;for(let i=0;i<choices.length;i++){const id=choices[(offset+i)%choices.length];if(ambitionAvailable(g,realm,id)){s.ambition={id,ruler:r.id,started:g.turn,base:baseline(g,realm,id)};break;}}}}
+ if(g.turn%12===0&&!humanControlsRealm(g,realm)&&f.treasury>500&&g.turn-s.decisionAt>=36)decision(g,realm);
  if(g.turn%12===0){for(const id of Object.values(g.politics.realms[realm].council)){const p=g.politics.people[id];if(!p?.alive||p.id===r.id)continue;const delta=p.traits.some(t=>r.traits.includes(t))?5:-3;changeOpinion(g,r.id,id,delta);}}
  }
  if(g.turn%12===0)for(const [key,x] of Object.entries(c.relationships))if(!g.politics.people[x.a]?.alive||!g.politics.people[x.b]?.alive)delete c.relationships[key];

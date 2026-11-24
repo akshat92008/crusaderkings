@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {controller} from './campaign-war.js';
 import {portBlocked} from './naval-systems.js';
 // Regional goods, settlement industries, treasury credit and local crises.
@@ -98,7 +99,7 @@ export function tickEconomy(g,world){const e=initEconomy(g,world);if(e.lastTick=
  for(const id of Object.keys(g.provinces))produce(g,id);
  setPrices(g);for(const r of Object.values(e.routes))if(r.status==='active')flow(g,world,r);serviceLoans(g);stepCrises(g,world);
  if(g.turn%12===0)for(const [realm,s] of Object.entries(e.realms)){if(g.factions[realm].treasury>=0){s.inflation=cap(s.inflation-1,0,40);s.credit=cap(s.credit+1,0,100);}}
- if(g.turn%6===0)for(const [realm,s] of Object.entries(e.realms)){if(realm===g.player)continue;const f=g.factions[realm],land=own(g,realm);if(!land.length)continue;
+ if(g.turn%6===0)for(const [realm,s] of Object.entries(e.realms)){if(humanControlsRealm(g,realm))continue;const f=g.factions[realm],land=own(g,realm);if(!land.length)continue;
  if(f.treasury>400){const p=land.find(p=>e.crises[p.id]&&e.crises[p.id].severity>=35);if(p){f.treasury-=120;e.crises[p.id].severity=cap(e.crises[p.id].severity-18,0,90);add(local(g,p.id),'grain',12);}}
  if(f.treasury>700){const p=land[hash(realm+g.turn)%land.length],l=local(g,p.id),kind=l.shortage>0?'irrigation':l.resources.includes('ore')?'mine':l.resources.includes('fiber')?'loom':l.resources.includes('timber')?'sawmill':'granary';const cost=industryCost(g,realm,p.id,kind);if(l.industries[kind]<2&&f.treasury>cost+300){f.treasury-=cost;l.industries[kind]++;}}
  if(f.treasury>700&&g.turn%12===0&&random(e)<.35){const from=land[0],dest=tradeDestinations(g,world,realm,from.id).find(p=>p.owner!==realm);if(dest)createRoute(g,world,realm,from.id,dest.id,local(g,from.id).resources[0]);}
