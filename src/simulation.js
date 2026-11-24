@@ -145,7 +145,7 @@ export function advanceMonth(g,world){
   // Court AI: invest reserves. No fake historical scripting.
   if(f.id!==g.player&&g.turn%4===0&&f.treasury>700&&s.provinces){
    const own=controlled(g,f.id);const p=own[Math.floor(rand(g)*own.length)];
-   if(p){const cost=240;if(f.treasury>cost){f.treasury-=cost;p.buildings.market=clamp(p.buildings.market+1,0,3);p.development=clamp(p.development+1,1,20);}}
+   if(p){const cost=Math.round(240*civicModifiers(g,f.id).build);if(f.treasury>cost&&p.buildings.market<3){f.treasury-=cost;p.buildings.market=clamp(p.buildings.market+1,0,3);p.development=clamp(p.development+1,1,20);}}
   }
  }
  // Rival rulers periodically recruit and contest border provinces. Player wars remain manual.
@@ -175,7 +175,7 @@ export function advanceMonth(g,world){
   for(const f of world.factions){
    if(f.id===g.player)continue;
    let troops=Object.values(g.armies).filter(a=>a.owner===f.id);const a=troops[0];
-   if(a&&f.id!=='independent'&&g.factions[f.id].treasury>600&&armySize(a)<190){g.factions[f.id].treasury-=120;a.infantry+=35;}
+   if(a&&f.id!=='independent'&&g.factions[f.id].treasury>600&&armySize(a)<190){g.factions[f.id].treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];}
   }
  }
  if(g.turn%12===0)makeLog(g,`A new year begins: ${g.year}. Courts across the world revise their ambitions.`);
