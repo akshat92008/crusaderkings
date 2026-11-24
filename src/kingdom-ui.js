@@ -1,3 +1,4 @@
+import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty} from './feudal-systems.js';
 import {regionalDecision,AMBITIONS,currentChain,relationshipList,personalOpinion} from './chronicle-systems.js';
 import {temperament,strategicPlan,threatAssessment,borderRealms,militaryStrength,defenseSupport} from './strategic-ai.js';
@@ -223,5 +224,19 @@ export function renderFeudal(g,world,esc){
  else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');}html+='</div>';}html+='</details>';}
  html+=section('CROWN CLAIMANTS')+'<p class="paragraph">Other eligible children inherit claims on succession. Discontented vassals may support an adult claimant when legitimacy is low.</p>';for(const c of claimantCandidates(g,realm))html+='<div class="rule"><b>'+esc(name(c.person))+'</b><div class="smallnote">Claim from '+esc(name(c.from))+' · expires in '+Math.max(0,180-g.turn+c.created)+' months</div></div>';
  html+=section('PRISONERS AND RANSOM');for(const x of Object.values(g.feudal.prisoners).filter(x=>x.status==='held'&&(x.captor===realm||x.realm===realm)))html+='<div class="rule"><b>'+esc(name(x.person))+'</b><div class="smallnote">'+esc(x.reason)+' · held by '+esc(g.factions[x.captor]?.name||x.captor)+' · '+(g.turn-x.started)+' months</div>'+(x.captor===realm?btn('release',x.person,'Release prisoner')+btn('ransom',x.person,'Ransom (100g)'):'')+'</div>';
+ return html;
+}
+
+export function renderIdentity(g,world,esc){
+ const realm=g.player,s=g.identity.realms[realm],c=g.civic.realms[realm],place=id=>world.provinces.find(p=>p.id===id)?.name||id;
+ const btn=(action,id,label,extra='',input='')=>'<button class="rowbtn" data-action="identity" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ const mod=identityModifiers(g,realm);let html=section('FAITH AND LOCAL INSTITUTIONS')+'<div class="rule"><h3>'+esc(c.faith)+'</h3><p class="paragraph">Court culture: '+esc(c.culture)+' · Institutional backing '+Math.round(s.faithAuthority)+'/100</p><p class="paragraph">Institutions support existing local communities. Dialogue projects require trust and non-coercive policy. Local identities are simplified gameplay abstractions.</p></div>';
+ const faiths=localIdentities(g,realm).faith.filter(id=>id!==c.faith);if(faiths.length)html+='<select class="select" id="identity-faith">'+faiths.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('')+'</select>'+btn('adopt-faith','','Adopt a local faith (250g)','','identity-faith');
+ for(const p of Object.values(g.provinces).filter(p=>p.owner===realm)){const l=g.civic.provinces[p.id],inst=g.identity.institutions[p.id],x=g.identity.projects[p.id];html+='<details class="rule"><summary>'+esc(place(p.id))+' · '+esc(l.faith)+'</summary><div class="smallnote">'+esc(l.culture)+' · Acceptance '+Math.round(l.acceptance)+' · Trust '+Math.round(l.localTrust)+' · Institution '+inst.level+'/3</div>'+btn('institution',p.id,'Expand local institution ('+180*(inst.level+1)+'g)')+btn('consult',p.id,'Consult community (100g)');
+ if(x)html+='<p class="paragraph">'+esc(x.kind)+' dialogue · '+Math.round(x.progress)+'%</p>'+btn('cancel',p.id,'End dialogue');else{if(l.faith!==c.faith)html+=btn('dialogue',p.id,'Begin voluntary faith dialogue (180g)','faith');if(l.culture!==c.culture)html+=btn('dialogue',p.id,'Begin voluntary cultural dialogue (180g)','culture');}html+='</details>';}
+ html+=section('CULTURAL TRADITIONS')+'<p class="paragraph">'+s.traditions.length+'/4 slots · tax '+Math.round(mod.tax*100)+'% · levy '+Math.round(mod.levy*100)+'% · trade '+Math.round(mod.trade*100)+'% · construction '+Math.round(mod.build*100)+'%</p>';
+ for(const [id,d] of Object.entries(TRADITIONS))html+='<div class="rule"><b>'+esc(d.name)+(s.traditions.includes(id)?' · adopted':'')+'</b><p class="paragraph">'+esc(d.desc)+'</p>'+(s.traditions.includes(id)?'':btn('tradition',id,'Adopt (350g, 20 prestige)'))+'</div>';
+ html+=section('INNOVATION TREE');const available=researchOptions(g,realm);if(s.research)html+='<div class="rule"><b>Researching '+esc(INNOVATIONS[s.research.id].name)+'</b><p class="paragraph">'+Math.round(s.research.progress)+' / '+INNOVATIONS[s.research.id].cost+' research points</p></div>';
+ for(const [id,d] of Object.entries(INNOVATIONS))html+='<div class="rule"><b>'+esc(d.name)+' · '+(s.innovations.includes(id)?'Discovered':available.includes(id)?'Available':'Locked')+'</b><p class="paragraph">'+esc(d.desc)+'</p>'+(d.requires.length?'<div class="smallnote">Requires '+d.requires.map(k=>esc(INNOVATIONS[k].name)).join(', ')+'</div>':'')+(!s.research&&available.includes(id)?btn('research',id,'Commission (150g)'):'')+'</div>';
  return html;
 }
