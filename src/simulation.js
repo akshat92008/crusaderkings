@@ -1,3 +1,4 @@
+import {economyModifiers} from './economy-systems.js';
 import {heritageModifiers} from './heritage-systems.js';
 import {civicModifiers,civicProvinceUnrest} from './civic-systems.js';
 import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
@@ -35,7 +36,7 @@ export function empireStats(g,owner){
  const tax=[.65,1,1.5][f?.policies.tax??1];
  const trade=tradeIncome(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const taxIncome=Math.round(economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade;
  const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0));
  const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
@@ -56,7 +57,7 @@ export function build(g,provinceId,kind){
  if(!b)return {ok:false,msg:'Unknown building'};
  const level=p.buildings[kind]||0;
  if(level>=3)return {ok:false,msg:'Maximum building level reached'};
- const price=Math.round(b.cost*(level+1)*civicModifiers(g,g.player).build);
+ const price=Math.round(b.cost*(level+1)*civicModifiers(g,g.player).build*economyModifiers(g,g.player).cost);
  if(f.treasury<price)return {ok:false,msg:`Need ${price} gold`};
  f.treasury-=price;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);
  if(kind==='farm')p.unrest=clamp(p.unrest-3,0,100);
@@ -71,7 +72,7 @@ export function recruit(g,provinceId,type='infantry'){
  const doctrine=militaryDoctrine(g.player);
  const primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
  const discount=type===primary?0.82:1;
- const cost=Math.round(prices[type]*discount*(1-(p.buildings.barracks*.06)));
+ const cost=Math.round(prices[type]*discount*(1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost);
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
@@ -146,7 +147,7 @@ export function advanceMonth(g,world){
   // Court AI: invest reserves. No fake historical scripting.
   if(f.id!==g.player&&g.turn%4===0&&f.treasury>700&&s.provinces){
    const own=controlled(g,f.id);const p=own[Math.floor(rand(g)*own.length)];
-   if(p){const cost=Math.round(240*civicModifiers(g,f.id).build);if(f.treasury>cost&&p.buildings.market<3){f.treasury-=cost;p.buildings.market=clamp(p.buildings.market+1,0,3);p.development=clamp(p.development+1,1,20);}}
+   if(p){const cost=Math.round(240*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);if(f.treasury>cost&&p.buildings.market<3){f.treasury-=cost;p.buildings.market=clamp(p.buildings.market+1,0,3);p.development=clamp(p.development+1,1,20);}}
   }
  }
  // Rival rulers periodically recruit and contest border provinces. Player wars remain manual.
