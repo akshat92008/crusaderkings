@@ -28,7 +28,7 @@ export function syncTitles(g){const f=g.feudal;if(!f)return;const next={};for(co
  for(const d of Object.values(f.districts)){const realms=new Set(d.members.map(id=>g.politics.holdings[id]?.realm).filter(Boolean));for(const realm of realms){const members=d.members.filter(id=>g.politics.holdings[id]?.realm===realm&&g.provinces[id]?.owner===realm);if(!members.length)continue;const id=d.id+':'+realm,old=f.titles[id],lords=[...new Set(members.map(p=>g.politics.holdings[p].lord))].filter(c=>live(g,c)),holder=lords.includes(old?.holder)?old.holder:lords.sort((a,b)=>members.filter(p=>g.politics.holdings[p].lord===b).length-members.filter(p=>g.politics.holdings[p].lord===a).length||a.localeCompare(b))[0]||g.politics.realms[realm].ruler;
  next[id]={id,tier:'regional',realm,deJureRealm:d.deJureRealm,holder,parent:'k:'+realm,name:d.name,members};for(const p of members)next['c:'+p]={id:'c:'+p,tier:'province',realm,deJureRealm:d.deJureRealm,holder:g.politics.holdings[p].lord,parent:id,name:p,province:p};}}
  // Evidence is personal, not a privilege inherited by an unrelated successor.
- for(const [id,t] of Object.entries(next)){const previous=f.titles[id];if(t.tier==='province'&&previous&&(previous.holder!==t.holder||previous.realm!==t.realm))delete g.politics.holdings[t.province].leverageUntil;}
+ for(const [id,t] of Object.entries(next)){const previous=f.titles[id];if(t.tier==='province'&&previous&&(previous.holder!==t.holder||previous.realm!==t.realm)){delete g.politics.holdings[t.province].leverageUntil;if(g.estateConflicts?.retinues)delete g.estateConflicts.retinues[t.province];}}
  f.titles=next;}
 export function titleList(g,realm){return Object.values(g.feudal?.titles||{}).filter(t=>t.realm===realm);}
 export function regionalTitleCandidates(g,realm,id){
