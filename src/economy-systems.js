@@ -38,17 +38,17 @@ function routeAllowed(g,world,realm,from,to){const a=g.provinces[from],b=g.provi
 export function tradeDestinations(g,world,realm,from){return Object.values(g.provinces).filter(p=>routeAllowed(g,world,realm,from,p.id));}
 function createRoute(g,world,realm,from,to,good){const e=g.economy,f=g.factions[realm];if(!GOODS[good]||!routeAllowed(g,world,realm,from,to))return no('Select a connected domestic destination or a foreign trade-treaty partner.');
  if(Object.values(e.routes).some(r=>r.realm===realm&&r.from===from&&r.to===to&&r.good===good&&r.status==='active'))return no('This trade route already exists.');
- if(Object.values(e.routes).filter(r=>r.realm===realm&&r.status==='active').length>=Math.max(2,own(g,realm).length*2))return no('Trade route limit reached.');
+ if(Object.values(e.routes).filter(r=>r.realm===realm&&r.status==='active').length>=Math.max(2,own(g,realm).length*2)+(e.realms[realm].merchantGuild?2:0))return no('Trade route limit reached.');
  if(f.treasury<90)return no('Need 90 gold to establish a route.');f.treasury-=90;const id='t'+e.next++;e.routes[id]={id,realm,from,to,good,status:'active',lastVolume:0,lastValue:0,total:0,started:g.turn};return ok('Merchant route established.');}
 function flow(g,world,r){const e=g.economy,a=local(g,r.from),b=local(g,r.to),owner=g.provinces[r.to]?.owner;
  r.lastVolume=0;r.lastValue=0;if(!routeAllowed(g,world,r.realm,r.from,r.to)){r.status='closed';r.closed=g.turn;return;}
  const available=Math.max(0,a.stock[r.good]-8),room=Math.max(0,capacity(b,r.good)-b.stock[r.good]);let qty=Math.floor(Math.min(available,room,5+3*(a.industries.caravan+b.industries.caravan)+a.tier+b.tier));
- const price=costOf(g,r.good),seller=g.factions[r.realm],buyer=g.factions[owner],tax=owner===r.realm?0:Math.max(0,e.realms[owner].tariff-1)*.1;
- if(owner!==r.realm)qty=Math.min(qty,Math.floor(Math.max(0,buyer.treasury)/(price*(1+tax))));
+ const price=costOf(g,r.good),seller=g.factions[r.realm],buyer=g.factions[owner],tax=owner===r.realm?0:[0,.05,.12][e.realms[owner].tariff];
+ if(owner!==r.realm)qty=Math.min(qty,Math.floor(Math.max(0,buyer.treasury)/price));
  if(qty<=0)return;add(a,r.good,-qty);add(b,r.good,qty);const value=qty*price;
- if(owner!==r.realm){const fee=Math.round(value*tax);buyer.treasury-=value+fee;seller.treasury+=value;buyer.treasury+=fee;e.realms[owner].tradeNet-=value;e.realms[r.realm].tradeNet+=value;}
+ if(owner!==r.realm){const fee=Math.round(value*tax);buyer.treasury-=value-fee;seller.treasury+=value-fee;e.realms[owner].tradeNet-=value-fee;e.realms[r.realm].tradeNet+=value-fee;}
  r.lastVolume=qty;r.lastValue=owner===r.realm?0:value;r.total+=qty;}
-function loan(g,realm,amount){const e=g.economy,s=e.realms[realm],f=g.factions[realm];if(![300,600,1200].includes(amount)||s.credit<30||Object.values(e.loans).some(l=>l.realm===realm&&l.status==='active'))return no('One loan at a time, with credit of at least 30.');if(amount>Math.max(300,own(g,realm).length*450))return no('Loan exceeds the realm credit limit.');
+function loan(g,realm,amount){const e=g.economy,s=e.realms[realm],f=g.factions[realm];if(![300,600,1200].includes(amount)||s.credit<30||Object.values(e.loans).some(l=>l.realm===realm&&['active','defaulted'].includes(l.status)))return no('One loan at a time, with credit of at least 30.');if(amount>Math.max(300,own(g,realm).length*450))return no('Loan exceeds the realm credit limit.');
  const id='l'+e.next++,rate=s.credit>=70?1:s.credit>=45?2:3;e.loans[id]={id,realm,principal:amount,remaining:amount,rate,interest:0,start:g.turn,due:g.turn+24,status:'active'};f.treasury+=amount;note(g,realm,'A '+amount+' gold loan was issued at '+rate+'% monthly interest.');return ok('Loan received. Interest accrues monthly; repay within 24 months.');}
 function repay(g,realm,id){const e=g.economy,l=e.loans[id],f=g.factions[realm],s=e.realms[realm];if(!l||l.realm!==realm||l.status!=='active'||f.treasury<l.remaining+l.interest)return no('Insufficient funds or no active loan.');f.treasury-=l.remaining+l.interest;l.status='repaid';l.closed=g.turn;s.credit=cap(s.credit+8,0,100);return ok('Loan repaid in full.');}
 function serviceLoans(g){const e=g.economy;for(const l of Object.values(e.loans)){if(l.status!=='active')continue;const f=g.factions[l.realm],s=e.realms[l.realm];if(g.turn>l.start)l.interest+=Math.ceil(l.remaining*l.rate/100);
@@ -62,7 +62,7 @@ function stepCrises(g,world){const e=g.economy,active=Object.values(e.crises);
  if(x.kind==='fire'&&g.turn===x.started+1&&severity>=30){const kind=Object.keys(l.industries).find(k=>l.industries[k]>0);if(kind)l.industries[kind]--;}
  if(x.kind==='flood'||x.kind==='drought')add(l,'grain',-Math.ceil(severity/12));
  if(f&&p.owner!=='independent'&&x.kind==='famine')f.food=cap(f.food-5,-1000,50000);
- if(x.kind==='epidemic'&&severity>=45&&random(e)<.14){const neighbors=world.provinces.find(q=>q.id===p.id)?.neighbors||[];const target=neighbors.find(id=>!e.crises[id]);if(target)crisis(g,target,'epidemic',Math.max(20,Math.floor(severity*.65)));}
+ if(x.kind==='epidemic'&&severity>=45&&Object.keys(e.crises).length<20&&random(e)<.14){const neighbors=world.provinces.find(q=>q.id===p.id)?.neighbors||[];const target=neighbors.find(id=>!e.crises[id]);if(target)crisis(g,target,'epidemic',Math.max(20,Math.floor(severity*.65)));}
  x.severity=cap(x.severity-(2+protection*.3),0,90);x.remaining--;if(x.remaining<=0||x.severity<=0){delete e.crises[p.id];note(g,p.owner,CRISES[x.kind].name+' subsided in '+p.id+'.');}
  }
  if(g.turn%6===0&&Object.keys(e.crises).length<12){const candidates=world.provinces.filter(p=>!e.crises[p.id]&&g.provinces[p.id]?.owner!=='independent');if(candidates.length&&random(e)<.65){const p=candidates[Math.floor(random(e)*candidates.length)],k=['epidemic','drought','fire','flood'][Math.floor(random(e)*4)];crisis(g,p.id,k,30+Math.floor(random(e)*25));}}
@@ -71,7 +71,7 @@ function produce(g,id){const p=g.provinces[id],l=local(g,id);if(!p||!l)return;co
  for(const good of RAW){let qty=good==='grain'?3+p.buildings.farm*2:1; if(l.resources.includes(good))qty+=4;qty=Math.max(0,Math.floor(qty*factor));add(l,good,qty);l.output[good]=qty;}
  for(const [kind,rule] of Object.entries(INDUSTRIES)){const level=l.industries[kind];if(!level||!rule.output)continue;let n=level;if(rule.input){n=Math.min(n,Math.floor(l.stock[rule.input]/rule.use));if(rule.second)n=Math.min(n,Math.floor(l.stock[rule.second]));add(l,rule.input,-n*rule.use);if(rule.second)add(l,rule.second,-n);}
  const qty=Math.floor(n*rule.amount*factor);add(l,rule.output,qty);l.output[rule.output]=(l.output[rule.output]||0)+qty;}
- const demand=Math.max(3,Math.ceil(p.population/12));if(l.stock.grain<demand){const missing=demand-l.stock.grain;add(l,'grain',-l.stock.grain);const supplied=Math.min(missing,l.stock.provisions);add(l,'provisions',-supplied);l.shortage=supplied<missing?l.shortage+1:Math.max(0,l.shortage-1);}else{add(l,'grain',-demand);l.shortage=Math.max(0,l.shortage-1);}
+ const demand=Math.max(3,Math.ceil(p.population/35));if(l.stock.grain<demand){const missing=demand-l.stock.grain;add(l,'grain',-l.stock.grain);const supplied=Math.min(missing,l.stock.provisions);add(l,'provisions',-supplied);l.shortage=supplied<missing?l.shortage+1:Math.max(0,l.shortage-1);}else{add(l,'grain',-demand);l.shortage=Math.max(0,l.shortage-1);}
  for(const good of ['cloth','tools','salt'])add(l,good,-Math.min(l.stock[good],Math.max(1,l.tier)));
  if(l.shortage>=4){p.unrest=cap(p.unrest+2,0,100);if(l.shortage>=8&&!g.economy.crises[id]&&p.owner!=='independent')crisis(g,id,'famine',30);}
 }
@@ -80,7 +80,7 @@ export function economyAction(g,world,action,id,extra,third){const e=initEconomy
  if(action==='route')return createRoute(g,world,realm,id,extra,third);
  if(action==='close-route'){const r=e.routes[id];if(!r||r.realm!==realm||r.status!=='active')return no('No active route.');r.status='closed';r.closed=g.turn;return ok('Trade route closed.');}
  if(action==='loan')return loan(g,realm,Number(id));
- if(action==='repay')return repay(g,realm,id);
+ if(action==='repay'){const l=e.loans[id];if(l?.realm===realm&&l.status==='defaulted'){if(f.treasury<l.remaining)return no('Insufficient gold to settle arrears.');f.treasury-=l.remaining;l.remaining=0;l.status='settled';l.closed=g.turn;s.credit=cap(s.credit+12,0,100);return ok('Defaulted loan arrears settled.');}return repay(g,realm,id);}
  if(action==='debase'){if(g.turn-s.lastDebase<24||s.inflation>=30)return no('Debasement limited to once every two years and below 30% inflation.');s.lastDebase=g.turn;s.inflation=cap(s.inflation+8,0,40);f.treasury+=250;f.legitimacy=cap(f.legitimacy-3,0,100);return ok('250 gold raised through debasement; inflation increased.');}
  if(action==='stabilize'){if(f.treasury<180||s.inflation<=0)return no('Need inflation and 180 gold.');f.treasury-=180;s.inflation=cap(s.inflation-6,0,40);return ok('Currency stabilized.');}
  if(action==='guild'){if(s.merchantGuild||f.treasury<250)return no('Guild already chartered or need 250 gold.');f.treasury-=250;s.merchantGuild=true;s.credit=cap(s.credit+10,0,100);return ok('Merchant guild chartered; credit improved.');}
@@ -100,7 +100,7 @@ export function tickEconomy(g,world){const e=initEconomy(g,world);if(e.lastTick=
  if(f.treasury>400){const p=land.find(p=>e.crises[p.id]&&e.crises[p.id].severity>=35);if(p){f.treasury-=120;e.crises[p.id].severity=cap(e.crises[p.id].severity-18,0,90);add(local(g,p.id),'grain',12);}}
  if(f.treasury>700){const p=land[hash(realm+g.turn)%land.length],l=local(g,p.id),kind=l.shortage>0?'irrigation':l.resources.includes('ore')?'mine':l.resources.includes('fiber')?'loom':l.resources.includes('timber')?'sawmill':'granary';const cost=industryCost(g,realm,p.id,kind);if(l.industries[kind]<2&&f.treasury>cost+300){f.treasury-=cost;l.industries[kind]++;}}
  if(f.treasury>700&&g.turn%12===0&&random(e)<.35){const from=land[0],dest=tradeDestinations(g,world,realm,from.id).find(p=>p.owner!==realm);if(dest)createRoute(g,world,realm,from.id,dest.id,local(g,from.id).resources[0]);}
- if(f.treasury<100&&s.credit>=55&&g.turn%12===0)loan(g,realm,300);
+ const arrears=Object.values(e.loans).find(l=>l.realm===realm&&l.status==='defaulted');if(arrears&&f.treasury>arrears.remaining+150){f.treasury-=arrears.remaining;arrears.remaining=0;arrears.status='settled';arrears.closed=g.turn;s.credit=cap(s.credit+12,0,100);}else if(f.treasury<100&&s.credit>=55&&g.turn%12===0)loan(g,realm,300);
  }
- for(const map of [e.routes,e.loans])for(const [id,x] of Object.entries(map))if(x.closed!==undefined&&g.turn-x.closed>120)delete map[id];
+ for(const map of [e.routes,e.loans])for(const [id,x] of Object.entries(map))if(x.closed!==undefined&&x.status!=='defaulted'&&g.turn-x.closed>120)delete map[id];
 }
