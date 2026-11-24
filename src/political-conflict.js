@@ -103,7 +103,7 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  for(const w of Object.values(c.wars))if(w.status==='active'){if(occupiedGoal(g,w)){w.score=cap(w.score+2,-100,100);if(w.score>=100)endWar(g,w,'claim enforced');}else if(g.turn-w.started>=48)endWar(g,w,'white peace');}
  if(g.turn%3!==0)return;
  for(const [realm,s] of Object.entries(g.politics.realms)){
- const f=g.factions[realm],local=holdings(g,realm),members=local.filter(([,v])=>v.loyalty<42&&!isImprisoned(g,v.lord)).map(([id])=>id);let x=Object.values(c.factions).find(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
+ const f=g.factions[realm],local=holdings(g,realm),members=local.filter(([,v])=>v.loyalty<42&&v.lord!==s.ruler&&!isImprisoned(g,v.lord)).map(([id])=>id);let x=Object.values(c.factions).find(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
  if(x?.kind==='claimant'&&!claimantCandidates(g,realm).some(c=>c.person===x.claimant)){settleFaction(g,x,'dissolved');continue;}
  if(x?.status==='civil war'){x.members=x.members.filter(id=>g.provinces[id]?.owner===realm);if(!x.members.length)settleFaction(g,x,'dissolved');else campaignRound(g,x);continue;}
  if(!members.length){if(x)settleFaction(g,x,'dissolved');continue;}
