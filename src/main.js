@@ -1,3 +1,4 @@
+import {expandedAction} from './expanded-content.js';
 import {livingAction} from './living-systems.js';
 import {diplomacyAction} from './diplomacy-systems.js';
 import {governmentAction} from './government-institutions.js';
@@ -188,6 +189,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='living'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(livingAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value));}
  if(action==='identity'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(identityAction(game,world,type,input?.value??btn.dataset.id,btn.dataset.extra));}
  if(action==='feudal'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(feudalAction(game,world,type,btn.dataset.id,input?.value));}
+ if(action==='expanded'){clickResult(expandedAction(game,campaignWorld(game,world),type,btn.dataset.id));}
  if(action==='story'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(chronicleAction(game,world,type,input?.value??btn.dataset.id));}
  if(action==='strategy'){const first=btn.dataset.input?el(btn.dataset.input):null,second=btn.dataset.second?el(btn.dataset.second):null;clickResult(strategyAction(game,world,type,first?.value??btn.dataset.id,second?.value??btn.dataset.extra));}
  if(action==='naval'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(navalAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
