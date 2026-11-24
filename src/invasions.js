@@ -1,3 +1,4 @@
+import {hasTruce,recordCampaignBattle} from './political-conflict.js';
 /**
  * Enemy-initiated wars for the existing Crown of Nations campaign.
  * Bound to real rival treasury, armies, connected provinces and three-month
@@ -27,7 +28,7 @@ export function findInvasionOptions(g,world){
   for(const neighborId of target.neighbors||[]){
    const rival=g.provinces[neighborId]?.owner;
    if(!rival||rival===player||rival==='independent'||!g.factions[rival])continue;
-   if(['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
+   if(hasTruce(g,rival,player)||['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
    const warChest=g.factions[rival].treasury;
    if(warChest<90)continue;
    for(const army of armiesOf(g,rival)){
