@@ -17,6 +17,7 @@ keep += ['assets/icons/Strategy_game_trait_icon_sheet_807567b6.jpg','assets/icon
 keep += ['assets/favicon.svg','assets/court-theme.css','assets/court-compass.svg','assets/monarch-crest.svg','docs/HISTORICAL_CONTEXT.md']
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/battle/characters').rglob('*') if p.is_file()]
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/game-art').rglob('*') if p.is_file()]
+keep += ['assets/characters_3d/ashigaru-foot-soldier-806707.glb','assets/characters_3d/daimyo-lord-78364a.glb','assets/characters_3d/LICENSE-Polyfork.txt']
 text = ('CROWN OF NATIONS: 1450 — CULTURAL WARFARE PLAYTEST\n'
         'This is a playable development preview, not a finished game.\n\n'
         'Extract the ZIP. In a terminal inside crown-of-nations run:\n'

@@ -4,6 +4,9 @@ from zipfile import ZipFile
 ROOT=Path(__file__).resolve().parents[1]
 zip_path=ROOT/'dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip'
 required=[
+ 'crown-of-nations/assets/characters_3d/ashigaru-foot-soldier-806707.glb',
+ 'crown-of-nations/assets/characters_3d/daimyo-lord-78364a.glb',
+ 'crown-of-nations/assets/characters_3d/LICENSE-Polyfork.txt',
  'crown-of-nations/assets/game-art/manifest.json',
  'crown-of-nations/assets/game-art/portraits/western-00.webp',
  'crown-of-nations/assets/game-art/events/council-00.webp',
