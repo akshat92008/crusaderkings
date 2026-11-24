@@ -301,7 +301,7 @@ export function renderCommunityCouncil(g,esc){if(!g.living?.realms[g.player])ret
 export function renderExpanded(g,world,esc){
  if(!g.expanded?.realms[g.player])return '';
  const r=g.player,place=id=>world.provinces.find(p=>p.id===id)?.name||id;
- const target=t=>t.province?place(t.province):t.partner?g.politics.people[t.person]?.name+' & '+g.politics.people[t.partner]?.name:t.person?g.politics.people[t.person]?.name:t.other?g.factions[t.other]?.name:t.army?'Field army at '+place(g.armies[t.army]?.province):'';
+ const target=t=>t.faction?(g.conflict.factions[t.faction]?.kind||'Local')+' faction':t.province?place(t.province):t.partner?g.politics.people[t.person]?.name+' & '+g.politics.people[t.partner]?.name:t.person?g.politics.people[t.person]?.name:t.other?g.factions[t.other]?.name:t.army?'Field army at '+place(g.armies[t.army]?.province):'';
  const effect=e=>Object.entries(e).map(([k,v])=>esc(k.replace(/([A-Z])/g,' $1'))+' '+(v>0?'+':'')+v).join(' · ');
  const btn=(type,id,label)=>'<button class="rowbtn" data-action="expanded" data-type="'+esc(type)+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
  let html=section('CAMPAIGN EVENTS'),x=currentExpandedEvent(g,r);
