@@ -74,19 +74,20 @@ export function build(g,provinceId,kind){
  makeLog(g,`${b.name} level ${p.buildings[kind]} completed in province ${provinceId}.`);
  return {ok:true,msg:`Built ${b.name}`};
 }
+export function recruitmentQuote(g,provinceId,type='infantry'){
+ const p=g.provinces[provinceId],f=g.factions[g.player],prices={infantry:110,archers:150,cavalry:240};if(!p||!f||!Object.hasOwn(prices,type))return null;
+ const doctrine=militaryDoctrine(f),primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
+ return {cost:Math.round(prices[type]*(type===primary?.82:1)*(1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy)),doctrine};
+}
 export function recruit(g,provinceId,type='infantry'){
  const p=g.provinces[provinceId],f=g.factions[g.player];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
- const prices={infantry:110,archers:150,cavalry:240};if(!Object.hasOwn(prices,type))return {ok:false,msg:'Unknown troop type'};
- const doctrine=militaryDoctrine(g.player);
- const primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
- const discount=type===primary?0.82:1;
- const cost=Math.round(prices[type]*discount*(1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost);
+ const quote=recruitmentQuote(g,provinceId,type);if(!quote)return {ok:false,msg:'Unknown troop type'};const {cost,doctrine,count:recruited}=quote;
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
- const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy));a[type]+=recruited;initMilitary(g);syncRegiments(g,a);
+ a[type]+=recruited;initMilitary(g);syncRegiments(g,a);
  a.doctrine=doctrine.id;
  makeLog(g,`${recruited} ${type} recruited in ${provinceId}.`);
  return {ok:true,msg:doctrine.unique+' tradition: regiment recruited'};
