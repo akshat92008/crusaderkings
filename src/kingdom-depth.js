@@ -1,3 +1,4 @@
+import {initEconomy,tickEconomy,economyModifiers} from './economy-systems.js';
 import {initHeritage,tickHeritage,heritageModifiers} from './heritage-systems.js';
 import {initCivic,tickCivic,civicModifiers} from './civic-systems.js';
 import {initConflict,tickConflict} from './political-conflict.js';
@@ -40,13 +41,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -258,7 +259,7 @@ function aiMonthly(g,world){
    const neighbor=world.provinces.find(x=>x.id===p.id)?.neighbors||[];
    const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
    const kind=nation.food<130?'farm':frontier&&(p.buildings.fort||0)<2?'fort':(p.buildings.market||0)<2?'market':'farm';
-   const base={farm:180,fort:440,market:260}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build);
+   const base={farm:180,fort:440,market:260}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
   if(g.turn%6===0&&nation.treasury>450){
@@ -285,7 +286,7 @@ export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  // Trade is already included in the campaign balance.
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);
+ tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
