@@ -163,13 +163,13 @@ export function advanceMonth(g,world){
   for(const a of shuffled){
    if(campaigns>=3)break;
    const origin=world.provinces.find(p=>p.id===a.province);if(!origin||controller(g,origin.id)!==a.owner)continue;
-   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&!occupation(g,p.id)&&p.owner!==a.owner&&p.owner!==g.player&&!hasTruce(g,a.owner,p.owner)&&g.factions[a.owner].treaties[p.owner]!=='alliance');
+   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&controller(g,p.id)!==a.owner&&controller(g,p.id)!==g.player&&(!occupation(g,p.id)||p.owner===a.owner)&&!hasTruce(g,a.owner,controller(g,p.id))&&g.factions[a.owner].treaties[controller(g,p.id)]!=='alliance');
    if(!potential.length||rand(g)>.48)continue;
-   const target=potential.find(p=>activeWar(g,a.owner,p.owner)?.goal===p.id)||potential[Math.floor(rand(g)*potential.length)];
-   const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,target.owner).reduce((sum,v)=>sum+armySize(v),0);
+   const target=potential.find(p=>(p.owner===a.owner||activeWar(g,a.owner,controller(g,p.id))?.goal===p.id))||potential[Math.floor(rand(g)*potential.length)];
+   const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,controller(g,target.id)).reduce((sum,v)=>sum+armySize(v),0);
    const attack=armySize(a)*armyReadiness(g,a).power*(0.75+rand(g)*.7);
    if(attack>defense*.88){
-    const previous=target.owner,war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
+    const previous=controller(g,target.id),war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
     const losses=clamp(defense/Math.max(1,attack)*.29,.07,.44);
     a.infantry=Math.round(a.infantry*(1-losses));a.archers=Math.round(a.archers*(1-losses));a.cavalry=Math.round(a.cavalry*(1-losses));
     for(const defender of armiesAt(g,target.id,previous))delete g.armies[defender.id];
