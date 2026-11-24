@@ -1,3 +1,4 @@
+import {characterInteraction} from './character-agency.js';
 import {reconcileRegency,tickRegency,regencyAction} from './regency-systems.js';
 import {successionCandidates,nominateSuccessor,hereditaryLine} from './succession-systems.js';
 import {feudalHierarchy,obligationProfile,creditEstateIncome} from './feudal-obligations.js';
@@ -57,6 +58,7 @@ function marry(g,a,b){const p=g.politics;if(!eligible(p,a,b)||isImprisoned(g,a.i
 export function negotiatedMarriage(g,realm,a,b){if(!marriageCandidates(g,realm).some(x=>x.a===a&&x.b===b))return {ok:false,msg:'The proposed pair is no longer eligible.'};return marry(g,g.politics.people[a],g.politics.people[b]);}
 export function marryRealm(g,other){const option=marriageCandidates(g,g.player).find(x=>x.realm===other);if(!option)return {ok:false,msg:'No eligible adult royal relatives in these houses.'};return marry(g,g.politics.people[option.a],g.politics.people[option.b]);}
 export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,world),s=p.realms[g.player],f=g.factions[g.player],v=p.holdings[id],r=p.people[s.ruler];
+ if(['personal-gift','personal-patronage','personal-rebuke'].includes(action))return characterInteraction(g,g.player,id,action);
  if(action.startsWith('regency-'))return regencyAction(g,g.player,action,extra||id);
  if(action==='nominate-successor'){const result=nominateSuccessor(g,g.player,id);if(result.ok)sync(g,g.player);return result;}
  if(action==='estate-dispute')return estateDisputeAction(g,g.player,id,extra);

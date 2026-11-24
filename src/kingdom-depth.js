@@ -1,3 +1,4 @@
+import {initAgency,tickAgency} from './character-agency.js';
 import {initRegencies} from './regency-systems.js';
 import {initEstateConflicts,tickEstateConflicts} from './estate-conflicts.js';
 import {initVassalCourts,tickVassalCourts} from './vassal-courts.js';
@@ -61,13 +62,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initAgency(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initAgency(g);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -312,7 +313,7 @@ export function advanceKingdomSystems(g,world){
  // Trade is already included in the campaign balance.
  tickStrategy(g,world);
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);tickChronicles(g,world);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);
+ tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);tickChronicles(g,world);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');

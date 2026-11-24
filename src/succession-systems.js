@@ -1,3 +1,4 @@
+import {characterInfluence} from './character-agency.js';
 // One succession calculation for preview, actual inheritance and political elections.
 const num=n=>Number.isFinite(n)?n:0;
 const free=(g,p)=>p?.alive&&g.feudal?.prisoners?.[p.id]?.status!=='held';
@@ -25,7 +26,7 @@ export function electionView(g,realm){
  for(const id of council){add(people[id]);if(id!==head.id)addVote(id,1);}
  const nominee=candidates.has(s.nominee)?s.nominee:null,heirs=new Set(hereditaryLine(g,head).map(p=>p.id)),electors=[],votes=new Map();
  for(const [id,raw] of weights){const voter=people[id],weight=Math.min(raw,8);if(!voter||!candidates.size)continue;
- const score=p=>num(p.skills?.diplomacy)*3+num(p.skills?.martial)*2+num(p.skills?.stewardship)+opinion(g,id,p.id)*.45+(heirs.has(p.id)?6:0)+(voter.house===p.house?8:0)+(p.traits?.includes('just')?4:0)-(p.traits?.includes('deceitful')?3:0)+(p.id===id?5:0)+(p.id===nominee?(id===head.id?100:Math.max(0,opinion(g,id,head.id)*.12+4)):0);
+ const score=p=>num(p.skills?.diplomacy)*3+num(p.skills?.martial)*2+num(p.skills?.stewardship)+characterInfluence(g,p.id)*.12+opinion(g,id,p.id)*.45+(heirs.has(p.id)?6:0)+(voter.house===p.house?8:0)+(p.traits?.includes('just')?4:0)-(p.traits?.includes('deceitful')?3:0)+(p.id===id?5:0)+(p.id===nominee?(id===head.id?100:Math.max(0,opinion(g,id,head.id)*.12+4)):0);
  const ranked=[...candidates.values()].map(p=>({id:p.id,score:score(p)})).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));const pick=ranked[0];votes.set(pick.id,(votes.get(pick.id)||0)+weight);electors.push({id,weight,vote:pick.id,score:Math.round(pick.score)});}
  const rows=[...candidates.values()].map(p=>({id:p.id,votes:votes.get(p.id)||0,skill:num(p.skills?.diplomacy)+num(p.skills?.martial)})).sort((a,b)=>b.votes-a.votes||b.skill-a.skill||a.id.localeCompare(b.id));
  return {candidates:rows,electors,winner:rows[0]?.id||null,nominee};
