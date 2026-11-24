@@ -5,7 +5,8 @@ import {resolveInvasion,autoResolveInvasion} from './invasions.js';
 import {politicsAction} from './dynastic-politics.js';
 import {conflictAction} from './political-conflict.js';
 import {civicAction,civicModifiers} from './civic-systems.js';
-import {renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {heritageAction} from './heritage-systems.js';
+import {renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -59,6 +60,7 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
   html=renderCourt(game,esc);
  }else if(tab==='political'){html=renderConflict(game,world,esc);
  }else if(tab==='society'){html=renderCivic(game,world,esc);
+ }else if(tab==='heritage'){html=renderHeritage(game,world,esc);
  }else if(tab==='trade'){
   html=renderTrade(game,world,esc);
  }else if(tab==='legacy'){
@@ -159,6 +161,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='heritage'){const input=btn.dataset.input?el(btn.dataset.input):null,guest=btn.dataset.guest?el(btn.dataset.guest):null;clickResult(heritageAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,guest?.value));}
  if(action==='civic'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(civicAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='royal-choice')clickResult(resolveRoyalEvent(game,world,Number(btn.dataset.choice)));
