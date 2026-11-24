@@ -24,3 +24,14 @@ test('equal-score targets use deterministic identifier tie-breaking',()=>{const 
 
 test('numerical strength respects actual remaining numbers, not a capped regiment ratio',()=>{const a=unit('a','attacker','infantry',0,0,{troopCount:1000}),b=unit('b','defender','infantry',1,0,{troopCount:50});assert.equal(numericalPower(a,b),20);assert.equal(numericalPower(b,a),.05);a.life=50;assert.equal(numericalPower(a,b),10);});
 for(const reverse of [false,true])test('6000 versus 300: overwhelming force wins on open ground '+(reverse?'as defender':'as attacker'),()=>{const groups=[];for(const side of ['attacker','defender'])for(let i=0;i<6;i++){const large=(side==='attacker')!==reverse;groups.push(unit(side+i,side,['infantry','infantry','infantry','archers','archers','cavalry'][i],(i-2.5)*7,side==='attacker'?24:-24,{order:i,troopCount:large?1000:50}));}const s={groups,projectiles:[]};for(let i=0;i<6600;i++){if(i%120===0)coordinateFieldAI(s);stepField(s,1/30);if(!fieldStrength(groups,'attacker')||!fieldStrength(groups,'defender'))break;}const winner=reverse?'defender':'attacker',loser=reverse?'attacker':'defender';assert.ok(fieldStrength(groups,winner)>fieldStrength(groups,loser));assert.ok(groups.filter(g=>g.side===winner).reduce((n,g)=>n+g.troopCount*g.life/100,0)>5100);});
+
+test('simultaneous concentrated attacks are additive and independent of input order',()=>{
+ function run(count,reverse=false){const target=unit('target','defender','infantry',0,0,{troopCount:100});target.cooldown=99;const attackers=[unit('a','attacker','infantry',0,1,{troopCount:100}),unit('b','attacker','infantry',0,1,{troopCount:100})].slice(0,count);const groups=[...attackers,target];for(const g of groups)issueFieldOrder(g,'hold');const s={groups:reverse?groups.reverse():groups,projectiles:[],fieldSeed:99};stepField(s,.1);return {life:target.life,morale:target.morale};}
+ const both=run(2),one=run(1);assert.deepEqual(both,run(2,true));assert.ok(both.life<one.life);assert.ok(both.morale<one.morale);
+});
+test('safe stationary regroup restores morale without exceeding initial morale or reviving routed units',()=>{
+ const a=unit('a','attacker','infantry',0,20),b=unit('b','defender','infantry',0,-20);a.morale=30;issueFieldOrder(a,'hold');issueFieldOrder(b,'hold');const s={groups:[a,b],projectiles:[]};stepField(s,5);assert.equal(a.morale,36);a.morale=84;stepField(s,5);assert.equal(a.morale,85);a.routed=true;a.morale=10;stepField(s,5);assert.equal(a.morale,10);
+});
+test('regiments cannot rally while within hostile weapons reach or while moving',()=>{
+ const a=unit('a','attacker','infantry',0,0),b=unit('b','defender','archers',0,12);a.morale=40;b.cooldown=99;issueFieldOrder(a,'hold');issueFieldOrder(b,'hold');const s={groups:[a,b],projectiles:[]};stepField(s,.5);assert.equal(a.morale,40);b.z=-30;issueFieldOrder(b,'hold');issueFieldOrder(a,'move',[20,0]);stepField(s,.5);assert.equal(a.morale,40);
+});
