@@ -9,6 +9,7 @@ on:
       - 'src/regional-institutions.js'
       - 'src/regional-politics.js'
       - 'src/institution-procedures.js'
+      - 'src/local-institution-programs.js'
       - 'src/kingdom-ui.js'
       - 'scripts/government_browser_smoke.py'
       - '.github/workflows/government-browser.yml'

@@ -130,3 +130,20 @@ test('confederate members vote equally and a strict majority is required for col
  g.turn=15;g.politics.holdings.q.loyalty=80;assert.ok(governmentAction(g,{},'confed:assembly').ok);
  const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=18;tickInstitutions(copy);assert.equal(copy.factions.a.stability,63);assert.equal(copy.provinces.p.unrest,15);assert.equal(copy.politics.holdings.q.loyalty,86);
 });
+
+import {localProgramView} from '../src/local-institution-programs.js';
+test('military service commissions require funded households and deliver delayed benefits',()=>{
+ const g=regionalFixture('military');assert.equal(governmentAction(g,{},'military:commission','p').ok,false);assert.ok(governmentAction(g,{},'n').ok);
+ const wealth=g.politics.people.n.wealth,loyalty=g.politics.holdings.p.loyalty;assert.ok(governmentAction(g,{},'military:commission','p').ok);
+ assert.equal(g.factions.a.treasury,740);assert.equal(g.politics.people.n.wealth,wealth);g.turn=3;tickInstitutions(g);assert.equal(g.politics.people.n.wealth,wealth+40);assert.equal(g.politics.holdings.p.loyalty,loyalty+16);
+});
+test('urban works resolve only after six months and survive a save',()=>{
+ const g=regionalFixture('city');assert.ok(governmentAction(g,{},'city:works','p').ok);assert.equal(g.factions.a.treasury,840);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=3;tickInstitutions(copy);assert.equal(copy.provinces.p.unrest,20);copy.turn=6;tickInstitutions(copy);assert.equal(copy.provinces.p.unrest,12);assert.equal(copy.civic.provinces.p.localTrust,60);
+ assert.equal(localProgramView(copy,'a').active,null);assert.equal(governmentAction(copy,{},'city:works','q').ok,false);
+});
+test('kinship relief consumes real stores and refunds reserved food on lost target',()=>{
+ const g=regionalFixture('kinship');assert.ok(governmentAction(g,{},undefined).ok);assert.ok(governmentAction(g,{},'kinship:relief','p').ok);
+ assert.equal(institutionState(g,'a').reserves,10);g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.food,130);assert.equal(g.civic.provinces.p.localTrust,62);
+ g.turn=12;assert.ok(governmentAction(g,{},undefined).ok);assert.ok(governmentAction(g,{},'kinship:relief','q').ok);g.provinces.q.owner='b';g.turn=13;tickInstitutions(g);assert.equal(institutionState(g,'a').reserves,50);assert.equal(localProgramView(g,'a').active,null);
+});

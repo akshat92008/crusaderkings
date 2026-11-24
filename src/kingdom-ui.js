@@ -23,6 +23,7 @@ import {civilServiceView} from './imperial-civil-service.js';
 import {merchantElectionView,steppePastureView} from './regional-institutions.js';
 import {regionalPoliticalView} from './regional-politics.js';
 import {crownInspectionView,memberAssemblyView} from './institution-procedures.js';
+import {localProgramView} from './local-institution-programs.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -324,6 +325,14 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const program=localProgramView(g,realm);
+ if(program){const info={military:['Household service commissions','Commission a funded landed household for political service. After three months the serving lord receives a reward and increased loyalty.','military:commission','Commission household (100g)'],city:['Urban public works','Fund a six-month civic works project to improve community trust and reduce unrest.','city:works','Fund public works (160g)'],kinship:['Community relief allocations','Set aside 30 food from community stores for a three-month local relief program.','kinship:relief','Allocate relief (30 food)']}[program.kind];
+ html+='<div class="rule"><b>'+esc(info[0])+'</b><p class="paragraph">'+esc(info[1])+'</p>';
+ if(program.active)html+='<div class="smallnote">'+esc(place(program.active.province))+' · '+Math.max(0,program.active.ends-g.turn)+' months remaining</div>';
+ else if(program.targets.length)html+='<select class="select" id="institution-program-target">'+program.targets.map(x=>'<option value="'+esc(x.id)+'">'+esc(place(x.id))+' · '+(x.person?esc(name(x.person))+' · loyalty '+Math.round(x.loyalty):'trust '+Math.round(x.trust))+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="'+info[2]+'" data-second="institution-program-target"'+(program.canStart?'':' disabled')+'>'+esc(info[3])+'</button>';
+ else html+='<div class="smallnote">No eligible controlled province or household.</div>';
+ if(program.wait&&!program.active)html+='<div class="smallnote">Next program in '+program.wait+' months</div>';
+ if(program.last)html+='<p class="smallnote">'+esc(program.last.message)+'</p>';html+='</div>';}
  const inspection=crownInspectionView(g,realm);
  if(inspection){html+='<div class="rule"><b>Royal inspection reports</b><p class="paragraph">Commission an appointed inspector to review local order. After three months, implement or decline the recommendations. Funding reduces unrest; refusal may anger the local estate.</p>';
  if(inspection.report){const x=inspection.report;html+='<div class="smallnote">'+esc(place(x.province))+' · '+esc(name(x.person))+' · '+(x.status==='ready'?'Report ready: reduce unrest by '+x.relief:'Investigating · '+Math.max(0,x.ends-g.turn)+' months')+'</div>';
