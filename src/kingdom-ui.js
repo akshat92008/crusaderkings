@@ -19,6 +19,7 @@ import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} fr
 import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
 import {governmentMotionView} from './government-deliberations.js';
+import {civilServiceView} from './imperial-civil-service.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -320,6 +321,15 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const civil=civilServiceView(g,realm);
+ if(civil){html+='<div class="rule"><b>Imperial civil service</b><p class="paragraph">Examinations grant ranks based on learning and stewardship. Qualified governors improve tax administration; unqualified governors can accumulate corruption. Audits cost gold and can antagonize landed officials.</p>';
+ const candidates=civil.candidates.filter(c=>c.canSit);
+ if(candidates.length)html+='<select class="select" id="imperial-exam-person">'+candidates.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+' · merit '+c.score+'/100</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="civil:exam" data-second="imperial-exam-person"'+(g.factions[realm].treasury<90?' disabled':'')+'>Hold civil examination (90g)</button>';
+ for(const c of civil.candidates.filter(c=>c.last!==null))html+='<div class="smallnote">'+esc(c.name)+' · rank '+c.rank+'/3 · '+c.service+' months of service</div>';
+ for(const o of civil.offices)html+='<div class="smallnote">'+esc(place(o.id))+' · '+esc(name(o.person))+' · corruption '+o.corruption+'%</div>';
+ const audit=civil.offices.filter(o=>o.corruption>=10);
+ if(audit.length)html+='<select class="select" id="imperial-audit-province">'+audit.map(o=>'<option value="'+esc(o.id)+'">'+esc(place(o.id))+' · '+o.corruption+'% corruption</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="civil:audit" data-second="imperial-audit-province"'+(g.factions[realm].treasury<75?' disabled':'')+'>Conduct audit (75g)</button>';
+ if(civil.last)html+='<p class="smallnote">'+esc(civil.last.message)+'</p>';html+='</div>';}
  const v=governmentMotionView(g,realm);
  if(v){const d=v.definition;html+='<div class="rule"><b>'+esc(d.name)+'</b><p class="paragraph">'+esc(d.desc)+'</p><div class="smallnote">'+(v.active?'Enacted':'Not enacted')+' · Tax '+Math.round(d.tax*100)+'% · Levies '+Math.round(d.levy*100)+'% · Trade '+Math.round(d.trade*100)+'% while enacted</div>';
  if(v.motion){html+='<div class="smallnote">Debate: '+(v.motion.enact?'Enact':'Repeal')+' · '+Math.max(0,v.motion.ends-g.turn)+' months remaining</div>';}

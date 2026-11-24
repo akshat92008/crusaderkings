@@ -42,3 +42,23 @@ test('occupation and government changes invalidate old policy benefits',()=>{
  g.civic.realms.a.government='regional';initInstitutions(g);assert.equal(governmentMotionView(g,'a').active,false);assert.equal(institutionModifiers(g,'a').tax,1);
  g.civic.realms.a.government='feudal';initInstitutions(g);assert.equal(governmentMotionView(g,'a').active,false);
 });
+
+import {civilServiceView,examinationRank} from '../src/imperial-civil-service.js';
+test('imperial exams qualify existing characters and improve governor administration after save/load',()=>{
+ const g=fixture('imperial');g.politics.people.n.skills.learning=4;assert.ok(governmentAction(g,{},'civil:exam','n').ok);assert.equal(examinationRank(g,'a','n'),3);assert.equal(g.factions.a.treasury,910);
+ assert.equal(governmentAction(g,{},'civil:exam','m').ok,false);assert.ok(governmentAction(g,{},'p','n').ok);
+ const plain=fixture('imperial');assert.ok(governmentAction(plain,{},'p','n').ok);assert.ok(institutionModifiers(g,'a').tax>institutionModifiers(plain,'a').tax);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=3;tickInstitutions(copy);assert.equal(civilServiceView(copy,'a').candidates.find(c=>c.id==='n').service,3);
+});
+test('unqualified imperial governors accumulate corruption and audits have a political and financial cost',()=>{
+ const g=fixture('imperial');g.politics.people.n.skills.stewardship=2;assert.ok(governmentAction(g,{},'p','n').ok);const initial=institutionModifiers(g,'a').tax;
+ for(let turn=3;turn<=12;turn+=3){g.turn=turn;tickInstitutions(g);}
+ assert.equal(institutionState(g,'a').offices.p.corruption,12);assert.ok(institutionModifiers(g,'a').tax<initial);
+ const treasury=g.factions.a.treasury,loyalty=g.politics.holdings.p.loyalty;
+ assert.ok(governmentAction(g,{},'civil:audit','p').ok);assert.equal(g.factions.a.treasury,treasury-75);assert.equal(g.politics.holdings.p.loyalty,loyalty-8);assert.equal(institutionState(g,'a').offices.p.corruption,0);
+ assert.equal(governmentAction(g,{},'civil:audit','p').ok,false);
+});
+test('civil service excludes prisoners and non-imperial governments',()=>{
+ const g=fixture('imperial');g.feudal.prisoners.n={status:'held'};assert.equal(governmentAction(g,{},'civil:exam','n').ok,false);
+ const f=fixture('centralized');assert.equal(governmentAction(f,{},'civil:exam','n').ok,false);
+});
