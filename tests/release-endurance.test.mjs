@@ -32,6 +32,7 @@ function assertCampaignLinks(game){
  }
 }
 function assertTitles(game){
+ for(const t of Object.values(game.feudal.titles))if(t.tier==='holding'){assert.ok(game.politics.holdings[t.province],t.id);assert.equal(game.feudal.titles[t.parent]?.tier,'province',t.id);}
  for(const province of Object.values(game.provinces)){
   const holding = game.politics.holdings[province.id];
   const title = game.feudal.titles['c:' + province.id];
@@ -44,6 +45,16 @@ function assertTitles(game){
   assert.equal(title?.holder,holding.lord,province.id);
   assert.equal(game.politics.people[holding.lord]?.alive,true,province.id);
   assert.equal(game.feudal.titles[title.parent]?.realm,province.owner,province.id);
+  for(const kind of ['castle','city','temple']){
+   const seat=holding.subholdings?.[kind],key='b:'+province.id+':'+kind,t=game.feudal.titles[key];
+   assert.ok(seat&&Number.isInteger(seat.level)&&seat.level>=0&&seat.level<=3,'Subholding level: '+key);
+   if(kind==='castle')assert.ok(seat.level>=1,'County castle: '+key);
+   if(!seat.level){assert.equal(t,undefined,'Unbuilt title: '+key);continue;}
+   assert.equal(t?.tier,'holding',key);assert.equal(t?.parent,title.id,key);
+   assert.equal(t?.holder,seat.holder||holding.lord,key);
+   assert.equal(game.politics.people[t.holder]?.alive,true,key);
+   assert.equal(t?.realm,holding.realm,key);
+  }
  }
 }
 
