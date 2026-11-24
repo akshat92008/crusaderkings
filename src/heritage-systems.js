@@ -45,7 +45,7 @@ function route(g,world,realm,to){const f=world.factions.find(f=>f.id===realm),la
 export function activityDestinations(g,world,realm=g.player){return own(g,realm).map(p=>({id:p.id,route:route(g,world,realm,p.id)})).filter(x=>x.route);}
 function recentMarriage(g,realm){const s=g.heritage.realms[realm],p=g.politics;return p.marriages.find(m=>g.year-m.year<=3&&!s.celebrated.includes(m.a+'|'+m.b)&&[m.a,m.b].some(id=>p.people[id]?.realm===realm)&&p.people[m.a]?.spouse===m.b);}
 function start(g,world,realm,kind,to,guest){const a=g.heritage,s=a.realms[realm],f=g.factions[realm],r=ruler(g,realm),rule=ACTIVITIES[kind],path=route(g,world,realm,to);
- if(!rule||!r?.alive||r.age<16||!path)return no('Choose a reachable owned destination and an eligible ruler.');
+ if(!rule||!r?.alive||r.age<18||!path)return no('Choose a reachable owned destination and an eligible ruler.');
  if(a.activities[realm]||g.turn-(s.last[kind]??-1000)<24)return no('One activity at a time; each type has a two-year cooldown.');
  if(kind==='coronation'&&s.lastCoronation===r.id)return no('This ruler has already been crowned.');
  if(kind==='wedding'&&!recentMarriage(g,realm))return no('A recent uncelebrated dynastic marriage is required.');
@@ -69,14 +69,14 @@ const INCIDENTS=[
  {id:'relief',title:'An appeal for assistance',desc:'Local residents petition for relief during the visit.',choices:[['Provide assistance',60,14,0],['Refer them to local officials',0,-9,0]]}
 ];
 export function activityIncident(g,realm=g.player){const x=g.heritage?.activities[realm];return INCIDENTS.find(e=>e.id===x?.event?.id)||null;}
-function incident(g,realm,index){const x=g.heritage.activities[realm],e=activityIncident(g,realm),ch=e?.choices[index],f=g.factions[realm];if(!Number.isInteger(index)||!ch||f.treasury<ch[1])return no('No affordable activity response.');f.treasury-=ch[1];x.quality=cap(x.quality+ch[2],0,100);x.remaining+=ch[3];if(ch[3]&&x.phase==='travel')x.delay=(x.delay||0)+ch[3];x.event=null;return ok('Activity decision recorded.');}
+function incident(g,realm,index){const x=g.heritage.activities[realm],e=activityIncident(g,realm),ch=e?.choices[index],f=g.factions[realm];if(!Number.isInteger(index)||!ch||f.treasury<ch[1])return no('No affordable activity response.');f.treasury-=ch[1];x.quality=cap(x.quality+ch[2],0,100);x.remaining+=ch[3];if(ch[3]&&x.phase==='travel'){x.delay=(x.delay||0)+ch[3];x.remaining-=ch[3];}x.event=null;return ok('Activity decision recorded.');}
 function finish(g,realm,x){const a=g.heritage,s=a.realms[realm],f=g.factions[realm],r=ruler(g,realm),rule=ACTIVITIES[x.kind],quality=x.quality/100+.5,d=dynasty(g,realm);f.prestige+=Math.round(rule.prestige*quality);f.legitimacy=cap(f.legitimacy+Math.round(rule.legitimacy*quality),0,100);if(r.civic)r.civic.stress=cap(r.civic.stress+rule.stress,0,100);d.renown+=Math.round(rule.renown*quality);s.completed++;
  if(x.kind==='coronation')s.lastCoronation=r.id;if(x.kind==='wedding'&&x.marriage)s.celebrated.push(x.marriage);
  if(x.kind==='feast'||x.kind==='tour')for(const [id,h] of Object.entries(g.politics.holdings))if(h.realm===realm&&g.provinces[id]?.owner===realm)h.loyalty=cap(h.loyalty+(x.kind==='tour'?7:5),0,100);
  if(x.kind==='tournament')for(const a of Object.values(g.armies))if(a.owner===realm)a.experience=cap(a.experience+.05,0,1);
  if(x.kind==='pilgrimage')g.civic.realms[realm].patronage=cap(g.civic.realms[realm].patronage+10,0,100);
  if(x.kind==='summit'&&g.factions[x.guest]){const other=g.factions[x.guest];f.relations[x.guest]=cap((f.relations[x.guest]||0)+15,-100,100);other.relations[realm]=cap((other.relations[realm]||0)+15,-100,100);}
- if(s.completed>=5&&!d.achievements.includes('Patron of gatherings')){d.achievements.push('Patron of gatherings');d.renown+=10;}
+ d.gatherings=(d.gatherings||0)+1;if(d.gatherings>=5&&!d.achievements.includes('Patron of gatherings')){d.achievements.push('Patron of gatherings');d.renown+=10;}
  delete a.activities[realm];record(g,realm,rule.name+' concluded with '+x.quality+'% quality.');}
 function stepActivity(g,realm,x){const a=g.heritage;if(ruler(g,realm)?.id!==x.host||x.path.some(id=>g.provinces[id]?.owner!==realm)){delete a.activities[realm];record(g,realm,'The activity was canceled because the ruler or route changed.');return;}
  if(x.event){if(realm===g.player&&g.turn-x.event.turn<2)return;const e=activityIncident(g,realm);incident(g,realm,realm!==g.player&&g.factions[realm].treasury>400?0:e.choices.findIndex(ch=>ch[1]===0));return;}
@@ -84,7 +84,7 @@ function stepActivity(g,realm,x){const a=g.heritage;if(ruler(g,realm)?.id!==x.ho
  if(x.phase==='travel'){x.index++;if(x.index>=x.path.length-1)x.phase='gathering';return;}
  if(--x.remaining<=0)finish(g,realm,x);}
 export function struggleView(g,realm=g.player){return STRUGGLES.filter(d=>d.members.includes(realm)).map(d=>({...d,state:g.heritage.struggles[d.id]}));}
-function struggleAction(g,realm,id,kind){const a=g.heritage,x=a.struggles[id],def=STRUGGLES.find(s=>s.id===id),f=g.factions[realm];if(!x||!def.members.includes(realm)||x.ended!==null||!own(g,realm).length)return no('No active regional struggle for this realm.');if(g.turn-(x.last[realm]??-1000)<12)return no('Regional initiatives have a yearly cooldown.');
+function struggleAction(g,realm,id,kind){const a=g.heritage,x=a.struggles[id],def=STRUGGLES.find(s=>s.id===id),f=g.factions[realm];if(!x||!def?.members.includes(realm)||x.ended!==null||!own(g,realm).length)return no('No active regional struggle for this realm.');if(g.turn-(x.last[realm]??-1000)<12)return no('Regional initiatives have a yearly cooldown.');
  const rules={mediation:[120,-12,20,10],pressure:[140,18,-8,16],commerce:[150,-5,14,12]};const r=rules[kind];if(!r||f.treasury<r[0])return no('Invalid or unaffordable regional initiative.');f.treasury-=r[0];x.last[realm]=g.turn;x.tension=cap(x.tension+r[1],0,100);x.cooperation=cap(x.cooperation+r[2],0,100);x.influence[realm]+=r[3];if(kind==='mediation')f.legitimacy=cap(f.legitimacy+3,0,100);if(kind==='commerce')f.prestige+=4;record(g,realm,def.name+': '+kind+' initiative.');return ok('Regional initiative completed.');}
 function stepStruggles(g){const a=g.heritage;for(const def of STRUGGLES){const x=a.struggles[def.id],members=def.members.filter(id=>g.factions[id]&&own(g,id).length);
  if(x.ended!==null){if(g.turn-x.ended>=60&&members.length>=2){x.ended=null;x.phase='competition';x.tension=30;x.cooperation=30;x.cycle++;x.influence=Object.fromEntries(def.members.map(id=>[id,0]));}continue;}
