@@ -37,3 +37,6 @@ test('empty armies consume no grain and release their assigned commanders',()=>{
  assert.equal(record.commander,null);
  assert.equal(militaryAction(g,{},'resupply','a').ok,false);
 });
+
+import {captureCommander} from '../src/feudal-systems.js';
+test('a stale or friendly commander assignment cannot imprison a foreign character',()=>{const {g,army}=fixture();g.politics.realms.france={ruler:'other'};g.politics.realms.england.ruler='head';g.politics.people.c.realm='france';assert.equal(captureCommander(g,'france',army),false);assert.equal(g.feudal.prisoners.c,undefined);g.politics.people.c.realm='england';assert.equal(captureCommander(g,'england',army),false);assert.equal(g.feudal.prisoners.c,undefined);});
