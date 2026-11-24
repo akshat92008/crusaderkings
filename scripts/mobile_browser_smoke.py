@@ -142,9 +142,11 @@ try:
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     with page.expect_download() as info: page.click('#export-save')
     backup=info.value.path().read_bytes();assert b'"player":"england"' in backup
-    page.reload(wait_until='domcontentloaded');page.locator('#realm-search').wait_for(state='visible')
+    page.reload(wait_until='domcontentloaded');page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
     page.locator('#save-file').set_input_files({'name':'campaign.json','mimeType':'application/json','buffer':backup})
-    page.locator('#start-screen').wait_for(state='hidden');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
+    try:page.locator('#start-screen').wait_for(state='hidden',timeout=45000)
+    except Exception as e:raise AssertionError('Backup import failed: '+page.locator('#import-status').inner_text()+'; browser errors: '+str(errors)) from e
+    assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    if chromium and name=='desktop':
     allied_save=page.evaluate('''async () => {
      const {createGame,snapshot}=await import('/src/simulation.js');
