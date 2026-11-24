@@ -7,7 +7,7 @@ const rows=[
   "granary_network",
   "Economy",
   "Secure the grain stores",
-  "Build two additional granary levels in controlled provinces.",
+  "Build two additional granary levels in districts controlled when the ambition begins.",
   "granary",
   2,
   18
@@ -16,7 +16,7 @@ const rows=[
   "irrigation_patron",
   "Economy",
   "Patron of irrigation",
-  "Build two additional irrigation levels in controlled provinces.",
+  "Build two additional irrigation levels in districts controlled when the ambition begins.",
   "irrigation",
   2,
   18
@@ -25,7 +25,7 @@ const rows=[
   "metalworking",
   "Economy",
   "Develop metalworking",
-  "Build two additional smithy levels.",
+  "Build two additional smithy levels in your starting controlled districts.",
   "smithy",
   2,
   18
@@ -34,7 +34,7 @@ const rows=[
   "textile_patron",
   "Economy",
   "Patron of weavers",
-  "Build two additional weaving workshop levels.",
+  "Build two additional weaving workshop levels in your starting controlled districts.",
   "loom",
   2,
   16
@@ -43,7 +43,7 @@ const rows=[
   "medical_endowment",
   "Economy",
   "Improve public care",
-  "Build two additional infirmary levels.",
+  "Build two additional infirmary levels in your starting controlled districts.",
   "infirmary",
   2,
   18
@@ -52,7 +52,7 @@ const rows=[
   "storage_network",
   "Economy",
   "Expand public storage",
-  "Build two additional warehouse levels.",
+  "Build two additional warehouse levels in your starting controlled districts.",
   "warehouse",
   2,
   16
@@ -332,8 +332,9 @@ function live(g,r,id){const p=g.politics.people[id];return p?.alive&&p.realm===r
 function snapshot(g,r,metric,base){
  const f=g.factions[r],head=g.politics.people[g.politics.realms[r]?.ruler],land=Object.values(g.provinces).filter(p=>p.owner===r&&controller(g,p.id)===r),holdings=land.map(p=>g.politics.holdings[p.id]).filter(h=>h?.realm===r&&h.lord!==head?.id),court=g.royalCourt?.realms[r],eco=g.economy?.realms[r],other=['alliances','tradePacts','trusted'].includes(metric)?[...new Set(Object.values(g.provinces).map(p=>p.owner))].filter(id=>id!==r&&g.factions[id]):[];
  const started=base?.turn??g.turn;
+ const districtIds=base?.districtIds||land.map(p=>p.id),estateIds=base?.estateIds||land.filter(p=>g.politics.holdings[p.id]?.realm===r&&g.politics.holdings[p.id].lord!==head?.id).map(p=>p.id),districtSet=new Set(districtIds),estateSet=new Set(estateIds),startingLand=land.filter(p=>districtSet.has(p.id)),startingEstates=land.filter(p=>estateSet.has(p.id)).map(p=>g.politics.holdings[p.id]).filter(h=>h?.realm===r&&h.lord!==head?.id);
  let value=0,extra={};
- if(industries.has(metric))value=sum(land,p=>g.economy?.provinces[p.id]?.industries?.[metric]);
+ if(industries.has(metric)){value=sum(startingLand,p=>g.economy?.provinces[p.id]?.industries?.[metric]);extra.districtIds=districtIds;extra.provinces=startingLand.length;extra.capacity=sum(startingLand,p=>{const e=g.economy?.provinces[p.id];return e?Math.max(0,3-(e.industries?.[metric]||0)):0;});}
  else if(activities.has(metric)){const records=g.heritage?.realms[r]?.activityRecords||[];value=count(records,x=>x.host===head?.id&&x.kind===metric&&x.turn>started&&x.quality>=(metric==='feast'?55:metric==='tournament'?65:0));}
  else switch(metric){
  case 'routes':value=count(Object.values(g.economy?.routes||{}),x=>x.realm===r&&x.status==='active');break;
@@ -353,22 +354,22 @@ function snapshot(g,r,metric,base){
  case 'legacies':value=g.heritage?.dynasties?.[r+'|'+head?.house]?.legacies?.length??0;break;
  case 'childSkills':extra.children=base?.children||(head?.children||[]).filter(id=>{const p=g.politics.people[id];return p?.alive&&p.age>=6&&p.age<18&&p.realm===r;});value=sum(extra.children,id=>{const p=g.politics.people[id];return p?.alive&&p.realm===r?sum(Object.values(p.skills||{}),x=>x):0;});break;
  case 'legitimacy':value=f.legitimacy;extra.stability=f.stability;break;
- case 'unrest':value=avg(land,p=>p.unrest);extra.provinces=land.length;break;
- case 'trust':value=avg(land,p=>g.civic.provinces[p.id]?.localTrust);break;
- case 'loyalty':value=avg(holdings,h=>h.loyalty);extra.estates=holdings.length;break;
+ case 'unrest':value=avg(startingLand,p=>p.unrest);extra.provinces=startingLand.length;extra.districtIds=districtIds;break;
+ case 'trust':value=avg(startingLand,p=>g.civic.provinces[p.id]?.localTrust);extra.provinces=startingLand.length;extra.districtIds=districtIds;break;
+ case 'loyalty':value=avg(startingEstates,h=>h.loyalty);extra.estates=startingEstates.length;extra.estateIds=estateIds;break;
  case 'settlement':value=count(Object.values(g.heritage?.struggles||{}),x=>x.outcome?.kind==='negotiated'&&x.outcome.turn>started&&Object.hasOwn(x.influence||{},r));break;
  case 'disruptions':value=count(Object.values(g.intrigue?.plots||{}),x=>x.targetRealm===r&&x.disrupted&&x.disruptedAt>started);break;
  }
  return {value,turn:started,...extra};
 }
 export function ambitionBaseline(g,r,id){const d=Object.hasOwn(ADDITIONAL_AMBITIONS,id)?ADDITIONAL_AMBITIONS[id]:null;return d?snapshot(g,r,d.metric):null;}
-export function additionalAmbitionAvailable(g,r,id){const d=ADDITIONAL_AMBITIONS[id];if(!d)return false;const m=d.metric,b=snapshot(g,r,m);if(zero.has(m))return b.value>0;if(capped.has(m)&&b.value>=100)return false;if(m==='unrest')return b.value>=10&&b.provinces>0;if(m==='loyalty')return b.estates>0&&b.value<100;if(m==='childSkills')return b.children.length>0;if(m==='grandeur')return b.value<=90;if(m==='offices')return b.value<=3;if(m==='artifacts')return b.value<=3;if(m==='legacies')return b.value<=10;if(m==='settlement')return Object.values(g.heritage?.struggles||{}).some(x=>x.ended===null&&x.phase!=='dormant'&&Object.hasOwn(x.influence||{},r));return true;}
+export function additionalAmbitionAvailable(g,r,id){const d=ADDITIONAL_AMBITIONS[id];if(!d)return false;const m=d.metric,b=snapshot(g,r,m);if(zero.has(m))return b.value>0;if(capped.has(m)&&b.value>=100)return false;if(industries.has(m))return b.capacity>=d.amount;if(m==='trust')return b.provinces>0;if(m==='unrest')return b.value>=10&&b.provinces>0;if(m==='loyalty')return b.estates>0&&b.value<100;if(m==='childSkills')return b.children.length>0;if(m==='grandeur')return b.value<=90;if(m==='offices')return b.value<=3;if(m==='artifacts')return b.value<=3;if(m==='legacies')return b.value<=10;if(m==='settlement')return Object.values(g.heritage?.struggles||{}).some(x=>x.ended===null&&x.phase!=='dormant'&&Object.hasOwn(x.influence||{},r));return true;}
 export function additionalAmbitionProgress(g,r,id,base){const d=ADDITIONAL_AMBITIONS[id];if(!d||!base?.goal)return null;const b=base.goal,m=d.metric,x=snapshot(g,r,m,b);let target=b.value+d.amount,done=false,detail='';if(capped.has(m))target=Math.min(100,target);if(m==='grandeur')target=Math.max(65,target);if(zero.has(m))target=0;if(m==='unrest')target=Math.max(0,b.value-d.amount);if(activities.has(m)||['collection','settlement','disruptions'].includes(m))target=d.amount;
  done=m==='unrest'||zero.has(m)?x.value<=target:x.value>=target;
  if(m==='credit'){done&&=x.debt===0;detail='Outstanding loans: '+x.debt;}
  if(m==='debt'){done&&=x.gold>=300;detail='Treasury: '+Math.round(x.gold)+'/300';}
  if(m==='wars'||m==='legitimacy'){const required=m==='wars'?65:70;done&&=x.stability>=required;detail='Stability: '+Math.round(x.stability)+'/'+required;}
- if(m==='unrest'){done&&=x.provinces>=b.provinces;detail='Controlled districts: '+x.provinces+'/'+b.provinces;}
- if(m==='loyalty'){done&&=x.estates>=b.estates;detail='Landed estates: '+x.estates+'/'+b.estates;}
+ if(m==='unrest'||m==='trust'||industries.has(m)){const required=b.districtIds?.length??b.provinces??0;done&&=x.provinces>=required;detail='Original controlled districts: '+x.provinces+'/'+required;}
+ if(m==='loyalty'){const required=b.estateIds?.length??b.estates;done&&=x.estates>=required;detail='Original landed estates: '+x.estates+'/'+required;}
  return {value:Math.round(x.value*10)/10,target:Math.round(target*10)/10,done,detail};
 }
