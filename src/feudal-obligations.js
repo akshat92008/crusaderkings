@@ -2,7 +2,7 @@
 import {authorityModifiers} from './realm-authority.js';
 import {controller} from './campaign-war.js';
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),num=n=>Number.isFinite(n)?n:0;
-export function feudalHierarchy(g,r){const ruler=g.politics?.realms?.[r]?.ruler,people=g.politics?.people||{},regions=Object.values(g.feudal?.titles||{}).filter(t=>t.realm===r&&t.tier==='regional'&&people[t.holder]?.alive&&g.feudal?.prisoners?.[t.holder]?.status!=='held'),regionalLords=new Set(regions.map(t=>t.holder)),byHolding={},byLord={},directCount=0,subCount=0;
+export function feudalHierarchy(g,r){const ruler=g.politics?.realms?.[r]?.ruler,people=g.politics?.people||{},regions=Object.values(g.feudal?.titles||{}).filter(t=>t.realm===r&&t.tier==='regional'&&people[t.holder]?.alive&&g.feudal?.prisoners?.[t.holder]?.status!=='held'),regionalLords=new Set(regions.map(t=>t.holder)),byHolding={},byLord={};let directCount=0,subCount=0;
  const regionByProvince=new Map();for(const t of regions)for(const id of t.members||[])regionByProvince.set(id,t);
  for(const [id,h] of Object.entries(g.politics?.holdings||{})){if(h.realm!==r||g.provinces?.[id]?.owner!==r)continue;let liege=ruler;if(h.lord===ruler)liege=null;else if(!regionalLords.has(h.lord)){const t=regionByProvince.get(id);if(t?.holder&&t.holder!==h.lord&&t.holder!==ruler)liege=t.holder;}
  const row={id,lord:h.lord,liege,kind:h.lord===ruler?'domain':liege&&liege!==ruler?'indirect':'direct'};byHolding[id]=row;if(row.kind==='indirect')subCount++;else if(row.kind==='direct')directCount++;if(!byLord[h.lord])byLord[h.lord]={liege,holdings:[],subjects:[]};byLord[h.lord].holdings.push(id);if(row.kind==='direct')byLord[h.lord].liege=ruler;
