@@ -1,3 +1,4 @@
+import {initConflict,tickConflict} from './political-conflict.js';
 /**
  * Crown of Nations — alternate-history kingdom systems.
  * Generated rulers, court names and stories are fictional game content.
@@ -36,13 +37,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);
+ initPolitics(g,world);initConflict(g);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -281,7 +282,7 @@ export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  tickTrade(g);
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);
+ tickPolitics(g,world);tickConflict(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
