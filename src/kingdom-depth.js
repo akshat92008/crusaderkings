@@ -111,7 +111,7 @@ export function royalDiplomacy(g,world,other,action){
   log(g,'Trade treaty signed between '+f.name+' and '+o.name+'.');
   return {ok:true,msg:'Merchant treaty signed; monthly trade income increased'};
  }
- if(action==='marriage')return marryRealm(g,other);
+ if(action==='marriage'){if(f.treaties[other]==='marriage'||o.treaties[g.player]==='marriage')return {ok:false,msg:'A dynastic court tie already exists; arrange further individual marriages through the family panel.'};return marryRealm(g,other);}
  return {ok:false,msg:'Unknown diplomatic mission'};
 }
 export const EVENTS=[
