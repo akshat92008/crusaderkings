@@ -3,6 +3,7 @@ import {characterContext,characterLink,provinceLink,sectionLink} from './campaig
 import {renderPinButton} from './campaign-outliner.js';
 import {characterInfluence} from './character-agency.js';
 import {controller} from './campaign-war.js';
+import {personalOpinion} from './chronicle-systems.js';
 
 // The same navigation rules drive the tabs, finder, quick links and alerts.
 export const CAREER_TABS=['realm','search','characters','chronicle'];
@@ -20,8 +21,8 @@ export function careerPriorities(g){
 }
 export function renderCareerCharacter(g,world,id,esc){
  const x=characterContext(g,id);if(!x)return '<p>Character unavailable.</p>';
- const p=x.person,career=vassalCareer(g);
- return '<button class="rowbtn" data-character-back>‹ Back to previous screen</button>'+renderPinButton(g,'character',id,esc)+'<div class="character-hero"><h2>'+esc(p.name)+'</h2><p>'+esc(p.house)+' · '+p.age+' years · '+(p.alive?(x.prisoner?'Imprisoned':'Living'):'Deceased')+'</p><p>'+esc(g.factions[p.realm]?.name||p.realm)+'</p></div><div class="character-skills">'+Object.entries(p.skills||{}).map(([skill,value])=>'<div><small>'+esc(skill)+'</small><b>'+value+'/5</b></div>').join('')+'</div><div class="rule"><h3>Personal resources</h3><p>Personal gold: '+Math.floor(p.wealth||0)+' · Influence: '+characterInfluence(g,id)+'/100</p></div><div class="rule"><h3>Family</h3>'+x.family.map(y=>'<p>'+esc(y.relation)+' · '+characterLink(g.politics.people[y.id],esc)+'</p>').join('')+'</div><div class="rule"><h3>Titles and estates</h3>'+x.titles.filter(t=>t.tier!=='province').map(t=>'<p>'+esc(t.name)+'</p>').join('')+x.holdings.map(h=>'<p>'+provinceLink(h.id,world,esc)+' · '+Math.floor(h.wealth||0)+' estate gold</p>').join('')+'</div>'+(id===career?.person?sectionLink('realm','Manage your career',esc):'');
+ const p=x.person,career=vassalCareer(g),actor=g.politics.people[career?.person],interact=actor?.alive&&actor.age>=18&&actor.realm===p.realm&&actor.id!==p.id&&p.alive&&p.age>=18&&!g.feudal?.prisoners?.[actor.id]?.status?.includes('held')&&!x.prisoner;const personal=interact?'<div class="rule"><h3>Personal relationship</h3><p>Opinion: '+personalOpinion(g,actor.id,p.id)+'</p><button class="rowbtn" data-action="career" data-type="personal-gift" data-id="'+esc(id)+'">Send personal gift (40 gold)</button><button class="rowbtn" data-action="career" data-type="personal-rebuke" data-id="'+esc(id)+'">Rebuke (5 influence)</button></div>':'';
+ return '<button class="rowbtn" data-character-back>‹ Back to previous screen</button>'+renderPinButton(g,'character',id,esc)+'<div class="character-hero"><h2>'+esc(p.name)+'</h2><p>'+esc(p.house)+' · '+p.age+' years · '+(p.alive?(x.prisoner?'Imprisoned':'Living'):'Deceased')+'</p><p>'+esc(g.factions[p.realm]?.name||p.realm)+'</p></div><div class="character-skills">'+Object.entries(p.skills||{}).map(([skill,value])=>'<div><small>'+esc(skill)+'</small><b>'+value+'/5</b></div>').join('')+'</div><div class="rule"><h3>Personal resources</h3><p>Personal gold: '+Math.floor(p.wealth||0)+' · Influence: '+characterInfluence(g,id)+'/100</p></div><div class="rule"><h3>Family</h3>'+x.family.map(y=>'<p>'+esc(y.relation)+' · '+characterLink(g.politics.people[y.id],esc)+'</p>').join('')+'</div><div class="rule"><h3>Titles and estates</h3>'+x.titles.filter(t=>t.tier!=='province').map(t=>'<p>'+esc(t.name)+'</p>').join('')+x.holdings.map(h=>'<p>'+provinceLink(h.id,world,esc)+' · '+Math.floor(h.wealth||0)+' estate gold</p>').join('')+'</div>' +personal+(id===career?.person?sectionLink('realm','Manage your career',esc):'');
 }
 export function renderCareerProvince(g,world,id,esc){
  const p=world.provinces.find(q=>q.id===id),pr=g.provinces[id],h=g.politics.holdings[id];

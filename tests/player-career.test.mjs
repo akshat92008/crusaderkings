@@ -84,3 +84,6 @@ test('an autonomous liege responds to low cohesion while a sovereign retains pol
   assert.equal(s.policy,vassal?'pluralism':'coercion');
  }
 });
+
+import {personalOpinion} from '../src/chronicle-systems.js';
+test('vassal personal gifts use the actual player character and improve relations with the liege',()=>{const {g,p}=fixture(),liege=g.politics.people[g.politics.realms.england.ruler],cash=g.factions.england.treasury;liege.age=40;const wealth=liege.wealth,opinion=personalOpinion(g,p.id,liege.id);assert.ok(careerAction(g,'personal-gift',liege.id).ok);assert.equal(p.wealth,460);assert.equal(liege.wealth,wealth+40);assert.equal(g.factions.england.treasury,cash);assert.ok(personalOpinion(g,p.id,liege.id)>opinion);assert.equal(careerAction(g,'personal-rebuke',liege.id).ok,false);assert.equal(careerAction(g,'personal-patronage',liege.id).ok,false);const copy=restoreGame(snapshot(g),world);assert.equal(personalOpinion(copy,p.id,liege.id),personalOpinion(g,p.id,liege.id));});
