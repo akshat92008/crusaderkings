@@ -4,6 +4,7 @@ import {partitionRepresentatives} from './succession-systems.js';
 // Crown, regional title and provincial title hierarchy, based on prototype geography.
 // Provincial holders remain authoritative in g.politics.holdings.
 import {controller} from './campaign-war.js';
+import {SUBHOLDING_TYPES,syncSubholdingSeats,subholdingKey,subholdingAction,tickSubholdings} from './subholdings.js';
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const ruler=(g,realm)=>g.politics.people[g.politics.realms[realm]?.ruler];
 const live=(g,id)=>g.politics.people[id]?.alive?g.politics.people[id]:null;
@@ -29,6 +30,7 @@ export function syncTitles(g){const f=g.feudal;if(!f)return;const next={};for(co
  next[id]={id,tier:'regional',realm,deJureRealm:d.deJureRealm,holder,parent:'k:'+realm,name:d.name,members};for(const p of members)next['c:'+p]={id:'c:'+p,tier:'province',realm,deJureRealm:d.deJureRealm,holder:g.politics.holdings[p].lord,parent:id,name:p,province:p};}}
  // Evidence is personal, not a privilege inherited by an unrelated successor.
  for(const [id,t] of Object.entries(next)){const previous=f.titles[id];if(t.tier==='province'&&previous&&(previous.holder!==t.holder||previous.realm!==t.realm)){delete g.politics.holdings[t.province].leverageUntil;if(g.estateConflicts?.retinues)delete g.estateConflicts.retinues[t.province];}}
+ for(const [id,t] of Object.entries(next)){if(t.tier!=='province')continue;for(const seat of syncSubholdingSeats(g,t.province)){const key=subholdingKey(t.province,seat.kind);next[key]={id:key,tier:'holding',holdingType:seat.kind,level:seat.level,realm:t.realm,deJureRealm:t.deJureRealm,holder:seat.holder,parent:id,province:t.province,name:SUBHOLDING_TYPES[seat.kind].name+' of '+(g.provinces[t.province]?.name||t.province)};}}
  f.titles=next;}
 export function titleList(g,realm){return Object.values(g.feudal?.titles||{}).filter(t=>t.realm===realm);}
 export function regionalTitleCandidates(g,realm,id){
@@ -82,6 +84,7 @@ function exchangePrisoners(g,realm,offeredId,requestedId){
 }
 function ransom(g,x){const p=live(g,x.person),f=g.factions[x.captor];if(!p||!f)return no('Prisoner unavailable.');const estates=holdings(g,x.realm).filter(([,h])=>h.lord===p.id),amount=100,wealth=p.wealth+estates.reduce((n,[,h])=>n+h.wealth,0);if(wealth<amount)return no('Prisoner and estates cannot afford 100 gold.');let due=amount,take=Math.min(due,p.wealth);p.wealth-=take;due-=take;for(const [,h] of estates){take=Math.min(due,h.wealth);h.wealth-=take;due-=take;}f.treasury+=amount;release(g,x);return ok('Prisoner ransomed for 100 gold.');}
 export function feudalAction(g,world,action,id,extra){const f=initFeudal(g,world),realm=g.player,nation=g.factions[realm],s=g.politics.realms[realm],r=ruler(g,realm),t=f.titles[id],p=live(g,extra);
+ if(action.startsWith('subholding-')){const result=subholdingAction(g,realm,r.id,action,id,extra);if(result.ok){syncTitles(g);note(g,realm,result.msg);}return result;}
  if(action==='grant'||action==='reclaim'){if(t?.tier!=='province'||t.realm!==realm||controller(g,t.province)!==realm)return no('Select a controlled provincial title.');const v=g.politics.holdings[t.province];
  if(action==='grant'){if(v.lord!==r.id||!p||p.realm!==realm||p.age<18||p.id===r.id||isImprisoned(g,p.id))return no('Grant a personally held province to a free adult subject.');v.lord=p.id;v.loyalty=80;v.tax=1;v.levy=1;v.autonomy=1;nation.prestige+=3;}
  else{if(v.lord===r.id||nation.legitimacy<55||!(v.leverageUntil>g.turn||isImprisoned(g,v.lord)))return no('Reclaim requires 55 legitimacy and proven leverage or an imprisoned lord.');nation.legitimacy-=8;v.lord=r.id;v.loyalty=100;v.tax=1;v.levy=1;v.autonomy=1;}
@@ -100,4 +103,5 @@ export function tickFeudal(g,world){const f=initFeudal(g,world);if(f.lastTick===
  for(const [id,x] of Object.entries(f.prisoners)){if(x.status==='held'){if(!live(g,id)||!holdings(g,x.captor).length){release(g,x);continue;}if(!humanControlsRealm(g,x.captor)&&g.turn-x.started>=12)ransom(g,x);if(x.status==='held'&&g.turn-x.started>=36)release(g,x);}else if(g.turn-x.ended>60)delete f.prisoners[id];}
  for(const [id,x] of Object.entries(f.claimants))if(!live(g,x.person)||g.turn-x.created>=180)delete f.claimants[id];
  tickEstateCharters(g);
+ if(tickSubholdings(g))syncTitles(g);
 }
