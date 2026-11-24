@@ -1,9 +1,12 @@
+import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters} from './battle-presentation.js';
 import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
 import {BattleModelArt} from './glb-art.js';
 import {armyFormationSlots,militaryDoctrine,startingTroops,combatStatistics,chooseCounterFormation,availableFormations} from './military-doctrines.js';
-import {ThreeBattleScene} from './three-battle.bundle.js';
+import {ThreeBattleScene as BundledBattleScene} from './three-battle.bundle.js';
+// The shipped bundle stays self-hosted; field animation uses the shared runtime adapter.
+class ThreeBattleScene extends BundledBattleScene{updateCharacters(groups,dt){if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);return super.updateCharacters(groups,dt);}}
 const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vec=(x=0,y=0,z=0)=>[x,y,z];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -231,16 +234,17 @@ export class BattleGame{
  if(!this.descriptor.fieldBattle)for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
  }
  if(this.siege)for(const q of this.siege.structures){const height=q.hp>0?1+3*q.hp/q.max:.35;instance(obj,q.x,height/2,q.z,q.id==='gate'?9:5,height,3,q.hp>0?C.stone:C.earth);}
- for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
+ for(let k=0;k<this.groups.length;k++){const g=this.groups[k],field=!!this.descriptor.fieldBattle;if(g.routed&&(!field||(g.routAge||0)>=3))continue;const n=field?visibleSoldierCount(g,Math.round(g.initial*(this.ctx instanceof CanvasFallback?.65:1))):Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const offsets=field?formationOffsets(n,g.formationId,g.type):null;const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
   const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   if(!(this.ctx.isThreeBattle&&this.ctx.modelsReady))for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
-   const px=g.x+ox,pz=g.z+oz,walk=Math.sin(this.elapsed*7+i*.55)*.045;
+   const pose=field?soldierWorldPose(g,offsets[i]):null,px=pose?.x??g.x+ox,pz=pose?.z??g.z+oz,walk=(!field||visualMode(g)==='walk')?Math.sin(this.elapsed*7+i*.55)*.045:0;
    if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27],'sphere');instance(obj,px,1.15+walk,pz,.48,.76,.43,base,'cylinder');instance(obj,px,1.68+walk,pz,.31,.29,.31,head,'sphere');instance(obj,px,1.87+walk,pz,.40,.28,.42,C.steel,'cone');
    } else {instance(obj,px,.75+walk,pz,.44,.80,.38,base,'cylinder');instance(obj,px,1.30+walk,pz,.29,.29,.29,head,'sphere');instance(obj,px,1.52+walk,pz,.36,.29,.36,C.steel,'cone');instance(obj,px-.15,.18+walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');instance(obj,px+.15,.18-walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');}
    if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel,'cylinder');}
    if(g.type==='archers'){instance(obj,px+.30,.85+walk,pz,.12,1.0,.1,C.trunk,'cylinder');}
   }
-  const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  if(g.routed)continue;const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  if(field&&k===this.selected&&['move','fallback','hold'].includes(g.fieldOrder)){const x=g.anchorX,z=g.anchorZ;instance(obj,x,.09,z,2.2,.12,2.2,[.90,.76,.30]);for(let i=1;i<=5;i++){const t=i/6;instance(obj,mix(g.x,x,t),.06,mix(g.z,z,t),.28,.07,.28,[.90,.76,.30]);}}
   if(k===this.selected){instance(obj,g.x,.08,g.z,5,.14,5,[.95,.79,.42]);instance(obj,g.x,.11,g.z,4.3,.15,4.3,[.28,.35,.32]);}
  }
  for(const p of this.projectiles){let t=p.t;instance(obj,mix(p.sx,p.tx,t),.8+Math.sin(t*Math.PI)*3,mix(p.sz,p.tz,t),.1,.1,.6,C.arrow);}
