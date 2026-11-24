@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Merchant assemblies and steppe seasonal management use existing houses, herds and treasury.
 import {controller} from './campaign-war.js';
 import {isImprisoned} from './feudal-systems.js';
@@ -51,7 +52,7 @@ export function tickMerchantElections(g,r){
   for(const [id,h] of Object.entries(g.politics.holdings)){if(h.realm!==r||!owned(g,r,id))continue;const candidate=v.candidates.find(c=>c.id===h.lord);if(candidate)h.loyalty=cap((h.loyalty??50)+(candidate.id===winner.id?8:candidate.fund>0?-6:0),0,100);}
   e.funds={};e.next=g.turn+24;note(g,r,winner.house+' won the merchant assembly election.');return;
  }
- if(r!==g.player&&g.turn%3===0&&e.next-g.turn<=6&&g.factions[r].treasury>800&&v.candidates.length>=2){
+ if(!humanControlsRealm(g,r)&&g.turn%3===0&&e.next-g.turn<=6&&g.factions[r].treasury>800&&v.candidates.length>=2){
   const preferred=v.candidates.slice().sort((a,b)=>b.level-a.level||b.base-a.base||a.id.localeCompare(b.id))[0];
   if(preferred.score<v.candidates[0].score&&preferred.fund<150)merchantCampaign(g,r,preferred.id);
  }
@@ -69,5 +70,5 @@ export function tickSteppePasture(g,r,s){
  const f=g.factions[r],v=steppePastureView(g,r);
  if(f.food<0)s.herds=Math.max(0,s.herds-(v.active?3:8));
  else{f.food+=Math.floor(s.herds/5);s.herds=Math.min(100,s.herds+(v.active?4:2));}
- if(r!==g.player&&g.turn%12===0&&f.treasury>650&&s.herds>=40&&!v.active)reservePasture(g,r);
+ if(!humanControlsRealm(g,r)&&g.turn%12===0&&f.treasury>650&&s.herds>=40&&!v.active)reservePasture(g,r);
 }

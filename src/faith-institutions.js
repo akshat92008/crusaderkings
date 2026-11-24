@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Religious institutions use existing civic faith labels, actual characters and local institution records.
 // Charter options are alternate-history player policies, not assertions about real-world doctrines.
 import {controller} from './campaign-war.js';
@@ -147,7 +148,7 @@ export function tickFaithCharter(g,r,land){
   const sanctuaryCount=local.filter(x=>x.l.faith===c.faith&&x.i.sanctuary?.faith===c.faith).length;
   if(sanctuaryCount&&g.turn%12===0)i.faithAuthority=clamp(i.faithAuthority+Math.min(3,sanctuaryCount),0,100);
  }
- if(r===g.player||!a||!land.length||g.turn<24||g.turn%24!==0||f.treasury<1100)return;
+ if(humanControlsRealm(g,r)||!a||!land.length||g.turn<24||g.turn%24!==0||f.treasury<1100)return;
  // AI uses the same council and recognition rules; no forced conversions or automatic schisms.
  const v=faithCharterView(g,r,land);
  if(v.canSite){faithCharterAction(g,r,'faith-site',v.candidates[0].id);return;}

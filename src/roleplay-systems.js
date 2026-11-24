@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Ruler roleplay is stored on the authoritative civic character record.
 import {isImprisoned} from './feudal-systems.js';
 import {changeOpinion,personalOpinion} from './chronicle-systems.js';
@@ -21,12 +22,12 @@ export function roleplayAction(g,r,action,id){const p=ruler(g,r);if(!available(g
  if(action==='roleplay-unlock'){const b=s.branches[f+':'+id];if(!def||!b||s.selected[f]!==id||b.rank>=3||b.xp<45)return no('The selected branch needs 45 experience and an available perk.');b.xp-=45;b.rank++;note(g,r,p,p.name+' learned '+def.perks[b.rank-1]+'.');return ok('Branch perk unlocked.');}
  if(action==='roleplay-cope'){const d=COPING[id],money=g.factions[r];if(!d||!view.copingReady||view.stress<20||money.treasury<d.cost||id==='conversation'&&!view.companion)return no('Coping requires stress of at least 20, resources, a yearly cooldown and a companion for conversation.');const affinity=d.traits.some(t=>p.traits?.includes(t));money.treasury-=d.cost;p.civic.stress=cap(p.civic.stress-d.relief-(affinity?6:0),0,100);s.lastCoping=g.turn;if(id==='conversation'&&g.chronicles)changeOpinion(g,p.id,view.companion,8);note(g,r,p,p.name+' found relief through '+d.name.toLowerCase()+'.');return ok('Stress reduced.');}
  return no('Unknown roleplay action.');}
-export function tickRoleplay(g,r,p){if(!available(g,r,p))return;const f=p.civic.focus,defs=ROLEPLAY_BRANCHES[f];if(!defs)return;const s=state(p,true);if(!s.selected[f]&&r!==g.player){const choices=Object.keys(defs);s.selected[f]=choices[(p.id.length+g.turn)%choices.length];s.lastBranch[f]=g.turn;}
- const id=s.selected[f];if(id&&defs[id]){const b=s.branches[f+':'+id]??={xp:0,rank:0};b.xp=Math.min(180,b.xp+5+(p.skills?.[f]||1));if(r!==g.player&&b.rank<3&&b.xp>=45)roleplayAction(g,r,'roleplay-unlock',id);}
+export function tickRoleplay(g,r,p){if(!available(g,r,p))return;const f=p.civic.focus,defs=ROLEPLAY_BRANCHES[f];if(!defs)return;const s=state(p,true);if(!s.selected[f]&&!humanControlsRealm(g,r)){const choices=Object.keys(defs);s.selected[f]=choices[(p.id.length+g.turn)%choices.length];s.lastBranch[f]=g.turn;}
+ const id=s.selected[f];if(id&&defs[id]){const b=s.branches[f+':'+id]??={xp:0,rank:0};b.xp=Math.min(180,b.xp+5+(p.skills?.[f]||1));if(!humanControlsRealm(g,r)&&b.rank<3&&b.xp>=45)roleplayAction(g,r,'roleplay-unlock',id);}
  const m=roleplayModifiers(g,r),cash=g.factions[r];if(m.legitimacy)cash.legitimacy=cap(cash.legitimacy+m.legitimacy,0,100);if(m.prestige&&g.turn%12===0)cash.prestige+=m.prestige;
  if(m.morale)for(const a of Object.values(g.armies))if(a.owner===r)a.morale=cap(a.morale+m.morale,0,100);
  if(m.education)for(const id of p.children||[]){const child=g.politics.people[id];if(child?.alive&&child.age>=6&&child.age<18&&child.civic)child.civic.education=cap(child.civic.education+m.education,0,100);}
  if(m.research&&g.identity?.realms[r]?.research)g.identity.realms[r].research.progress+=m.research;if(m.faith&&g.identity?.realms[r])g.identity.realms[r].faithAuthority=cap(g.identity.realms[r].faithAuthority+m.faith,0,100);
  if(m.recovery&&g.living?.health?.[p.id]){const h=g.living.health[p.id];h.severity=cap(h.severity-m.recovery,0,100);if(!h.severity)h.condition='well';}
- if(r!==g.player&&p.civic.stress>=60&&cash.treasury>=200&&g.turn-s.lastCoping>=12)roleplayAction(g,r,'roleplay-cope','reflection');
+ if(!humanControlsRealm(g,r)&&p.civic.stress>=60&&cash.treasury>=200&&g.turn-s.lastCoping>=12)roleplayAction(g,r,'roleplay-cope','reflection');
 }

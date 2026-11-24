@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Character health, cadet house records, and realm-specific cultural institutions.
 // These are abstract fictional game mechanics, not historical or medical advice.
 import {controller} from './campaign-war.js';
@@ -34,6 +35,6 @@ export function tickLiving(g,world,removeCharacter){const s=initLiving(g);if(s.l
  }
  for(const [r,x] of Object.entries(s.realms)){const f=g.factions[r],land=own(g,r);if(!land.length)continue;for(const role of ['physician','faithAdvisor','culturePatron'])if(x[role]&&(!adult(g,r,x[role])||x[role]===ruler(g,r)?.id))x[role]=null;
  const advisor=office(g,r,'faithAdvisor');if(advisor){const supported=land.filter(p=>g.identity.institutions[p.id]?.level>0);for(const p of supported){const l=g.civic.provinces[p.id];if(x.policy==='relief')l.localTrust=cap(l.localTrust+2,0,100);if(x.policy==='mediation')l.acceptance=cap(l.acceptance+2,0,100);}if(supported.length&&g.identity.realms[r])g.identity.realms[r].faithAuthority=cap(g.identity.realms[r].faithAuthority+Math.floor(advisor.skills.learning/2),0,100);}
- if(r!==g.player){const sovereign=ruler(g,r);if(sovereign&&characterHealth(g,sovereign.id).severity>=35&&f.treasury>250)care(g,r,sovereign.id);if(g.turn%12===0&&f.treasury>700){const role=['physician','faithAdvisor','culturePatron'].find(k=>!x[k]),candidate=role&&officeOptions(g,r,role).sort((a,b)=>b.skills.learning-a.skills.learning)[0];if(candidate){f.treasury-=100;x[role]=candidate.id;}}}
+ if(!humanControlsRealm(g,r)){const sovereign=ruler(g,r);if(sovereign&&characterHealth(g,sovereign.id).severity>=35&&f.treasury>250)care(g,r,sovereign.id);if(g.turn%12===0&&f.treasury>700){const role=['physician','faithAdvisor','culturePatron'].find(k=>!x[k]),candidate=role&&officeOptions(g,r,role).sort((a,b)=>b.skills.learning-a.skills.learning)[0];if(candidate){f.treasury-=100;x[role]=candidate.id;}}}
  }
 }

@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Imperial civil service: qualifications and appointments remain distinct from hereditary titles.
 import {controller} from './campaign-war.js';
 import {isImprisoned} from './feudal-systems.js';
@@ -54,7 +55,7 @@ export function tickCivilService(g,r){
   o.corruption=cap((o.corruption??0)+growth,0,100);
   if(s?.exams[p.id]&&rank)s.exams[p.id].service+=3;
  }}
- if(r===g.player||g.turn<12||g.turn%6!==0||f.treasury<750)return;
+ if(humanControlsRealm(g,r)||g.turn<12||g.turn%6!==0||f.treasury<750)return;
  const v=civilServiceView(g,r),audit=v.offices.filter(o=>o.corruption>=25&&g.turn-(offices[o.id].lastAudit??-120)>=6).sort((a,b)=>b.corruption-a.corruption)[0];
  if(audit){civilServiceAction(g,r,'audit',audit.id);return;}
  const candidate=v.candidates.find(c=>c.canSit&&c.rank===0&&c.score>=40);

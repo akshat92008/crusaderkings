@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Cultural and linguistic gameplay built on existing civic culture and acceptance.
 // Regional categories and languages are campaign abstractions, not uniform historical demographics.
 import {controller} from './campaign-war.js';
@@ -126,7 +127,7 @@ export function tickCulture(g,r,land){
  if(s?.language&&knownLanguages(g,head).includes(s.language))for(const p of land){
   const l=g.civic.provinces[p.id];if(l?.culture!==c.culture&&cultureProfile(g,l?.culture).languages.includes(s.language)&&c.policy!=='coercion'){l.acceptance=clamp(l.acceptance+1,0,100);l.localTrust=clamp(l.localTrust+1,0,100);}
  }
- if(r===g.player||!land.length||g.turn<24||g.turn%24!==0||f.treasury<1000||!patron(g,r))return;
+ if(humanControlsRealm(g,r)||!land.length||g.turn<24||g.turn%24!==0||f.treasury<1000||!patron(g,r))return;
  const v=cultureView(g,r,land),target=v.contact.find(x=>x.acceptance<70);
  if(!target)return;const language=cultureProfile(g,target.culture).languages[0];
  if(v.canLanguage&&v.known.includes(language)&&language!==v.language)cultureAction(g,r,'culture-language',language);
