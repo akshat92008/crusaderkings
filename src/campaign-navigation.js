@@ -1,7 +1,7 @@
 import {politicalEstates} from './realm-authority.js';
 // Five workspaces retain every existing panel and its original action handlers.
 export const WORKSPACES=[
- {id:'realm',name:'Realm',tabs:['realm','decrees','economy','trade']},
+ {id:'realm',name:'Realm',tabs:['realm','decrees','economy','trade','search']},
  {id:'court',name:'Court',tabs:['court','characters','dynasty','council','vassals','political','titles','stories']},
  {id:'foreign',name:'Diplomacy',tabs:['diplomacy','strategy']},
  {id:'war',name:'Military',tabs:['military','naval']},
