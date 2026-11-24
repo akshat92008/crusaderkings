@@ -1,3 +1,4 @@
+import {estateDisputeAction} from './estate-conflicts.js';
 import {resolveVassalPetition} from './vassal-courts.js';
 import {marriageTerms,reconcileMarriageTreaties,inheritedClaims} from './dynastic-ties.js';
 import {authorityAction,authorityModifiers,politicalEstates} from './realm-authority.js';
@@ -53,6 +54,7 @@ function marry(g,a,b){const p=g.politics;if(!eligible(p,a,b)||isImprisoned(g,a.i
 export function negotiatedMarriage(g,realm,a,b){if(!marriageCandidates(g,realm).some(x=>x.a===a&&x.b===b))return {ok:false,msg:'The proposed pair is no longer eligible.'};return marry(g,g.politics.people[a],g.politics.people[b]);}
 export function marryRealm(g,other){const option=marriageCandidates(g,g.player).find(x=>x.realm===other);if(!option)return {ok:false,msg:'No eligible adult royal relatives in these houses.'};return marry(g,g.politics.people[option.a],g.politics.people[option.b]);}
 export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,world),s=p.realms[g.player],f=g.factions[g.player],v=p.holdings[id],r=p.people[s.ruler];
+ if(action==='estate-dispute')return estateDisputeAction(g,g.player,id,extra);
  if(action==='vassal-petition')return resolveVassalPetition(g,g.player,id,extra);
  if(action==='authority')return authorityAction(g,g.player,id,councilPermission(g,g.player,'law'));
  if(['court-appoint','court-dismiss'].includes(action))return courtAction(g,g.player,action,id,extra);
