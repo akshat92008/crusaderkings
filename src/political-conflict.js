@@ -1,3 +1,4 @@
+import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {hookStrength} from './intrigue-systems.js';
 import {independenceMembers,foundBreakaway} from './independence-systems.js';
 import {claimantCandidates,installClaimant,isImprisoned,capturePrisoner} from './feudal-systems.js';
@@ -34,7 +35,7 @@ export function recordCampaignBattle(g,attacker,defender,province,victory){const
 function declare(g,realm,id){
  const c=initConflict(g),claim=c.claims[claimKey(realm,id)],pr=g.provinces[id],f=g.factions[realm],other=pr?.owner;
  if(!claim||claim.expires<=g.turn||!pr||other===realm||!g.politics.realms[other])return no('A valid foreign territorial claim is required.');
- if(f.treaties[other]==='alliance'||hasTruce(g,realm,other)||activeWar(g,realm,other))return no('Alliance, truce or existing war prevents declaration.');
+ if(f.treaties[other]==='alliance'||nonAggression(g,realm,other)||hasTruce(g,realm,other)||activeWar(g,realm,other))return no('Alliance, truce or existing war prevents declaration.');
  if(!councilPermission(g,realm,'war'))return no('The council voted against this war.');
  if(f.prestige<5)return no('Need 5 prestige.');f.prestige-=5;
  const key='w'+c.next++;c.wars[key]={id:key,attacker:realm,defender:other,goal:id,score:0,battles:0,started:g.turn,status:'active'};
@@ -119,7 +120,7 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  }
  // AI prepares claims on neighboring realms and may declare wars it can afford.
  if(g.turn%12===0)for(const [realm,s] of Object.entries(g.politics.realms)){if(realm===g.player)continue;const f=g.factions[realm],r=g.politics.people[s.ruler];const plan=strategicPlan(g,realm);if((plan?.goal!=='conquer'&&!r.traits.includes('ambitious'))||f.treasury<400||plan?.goal==='recover')continue;
- const targets=[...new Set(holdings(g,realm).flatMap(([id])=>world.provinces.find(p=>p.id===id)?.neighbors||[]))].filter(id=>{const o=g.provinces[id]?.owner;return o&&o!==realm&&g.politics.realms[o]&&f.treaties[o]!=='alliance'&&!hasTruce(g,realm,o);});
+ const targets=[...new Set(holdings(g,realm).flatMap(([id])=>world.provinces.find(p=>p.id===id)?.neighbors||[]))].filter(id=>{const o=g.provinces[id]?.owner;return o&&o!==realm&&g.politics.realms[o]&&f.treaties[o]!=='alliance'&&!nonAggression(g,realm,o)&&!hasTruce(g,realm,o);});
  targets.sort((a,b)=>Number(g.provinces[b].owner===plan?.target)-Number(g.provinces[a].owner===plan?.target)||a.localeCompare(b));const claim=availableClaims(g,realm).find(x=>targets.includes(x.province)&&!activeWar(g,realm,g.provinces[x.province].owner)&&militaryStrength(g,realm)>=.65*(militaryStrength(g,g.provinces[x.province].owner)+defenseSupport(g,g.provinces[x.province].owner,realm)));if(claim){declare(g,realm,claim.province);continue;}
  if(targets.length&&rng(c)<.4)startScheme(g,realm,'fabricate',targets[0]);
  }
