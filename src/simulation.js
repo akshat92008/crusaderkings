@@ -1,3 +1,4 @@
+import {invasionReserved} from './invasion-reservations.js';
 import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison} from './border-battle.js';
 import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
@@ -204,7 +205,7 @@ export function advanceMonth(g,world){
  }
  // Rival rulers periodically recruit and contest border provinces. Player wars remain manual.
  if(g.turn%8===0){
-  const challengers=Object.values(g.armies).filter(a=>a.owner!==g.player && a.owner!=='independent'&&!a.contingent&&!embarked(g,a.id)&&!g.kingdom.threats.some(t=>t.army===a.id)&&armySize(a)>45);
+  const challengers=Object.values(g.armies).filter(a=>a.owner!==g.player && a.owner!=='independent'&&!a.contingent&&!embarked(g,a.id)&&!invasionReserved(g,a.id)&&armySize(a)>45);
   const shuffled=challengers.slice().sort((a,b)=>(a.id.length*17+g.turn)%31-(b.id.length*17+g.turn)%31);
   let campaigns=0;const acted=new Set();
   for(const a of shuffled){
