@@ -1,3 +1,4 @@
+import {disposeFieldMaterials} from './field-visuals.js';
 import {suppressFortScenery} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {updateFieldCharacters} from './battle-presentation.js';
@@ -192,7 +193,7 @@ export class ThreeBattleScene {
   return null;
  }
  dispose(){
-  this.disposed=true;
+  this.disposed=true;disposeFieldMaterials(this);
   for(const units of this.groups.values())for(const u of units){u.mixer.stopAllAction();this.scene.remove(u.root);}
   this.groups.clear();this.mixers.length=0;
   this.environment?.dispose();

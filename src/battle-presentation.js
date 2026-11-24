@@ -1,3 +1,4 @@
+import {styleFieldSquad,cavalryGait} from './field-visuals.js';
 // Shared formation geometry and renderer-independent skinned character update.
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function formationOffsets(count,id,type='infantry'){
@@ -13,13 +14,13 @@ export function visibleSoldierCount(g,count){if(g.routed&&(g.routAge||0)>=3)retu
 function turnToward(a,b,t){return a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*t;}
 export function updateFieldCharacters(scene,groups,dt){
  if(!scene.modelsReady)return;
- for(const g of groups||[]){scene.prepareSquad(g);const units=scene.groups.get(g.id);if(!units)continue;
+ for(const g of groups||[]){if(g.troopCount===0||g.routed&&(g.routAge||0)>=3){for(const u of scene.groups.get(g.id)||[])u.root.visible=false;continue;}scene.prepareSquad(g);styleFieldSquad(scene,g);const units=scene.groups.get(g.id);if(!units)continue;
  const n=visibleSoldierCount(g,units.length),offsets=formationOffsets(n,g.formationId,g.type),mode=visualMode(g),blend=1-Math.exp(-Math.max(0,dt)*14);
- for(let i=0;i<units.length;i++){const u=units[i];u.root.visible=i<n;if(!u.root.visible)continue;const p=soldierWorldPose(g,offsets[i]);if(!u.fieldReady||dt<=0){u.root.position.set(p.x,0,p.z);u.root.rotation.y=p.yaw;u.fieldReady=true;}else{u.root.position.set(u.root.position.x+(p.x-u.root.position.x)*blend,0,u.root.position.z+(p.z-u.root.position.z)*blend);u.root.rotation.y=turnToward(u.root.rotation.y,p.yaw,blend);}
- if(u.mount)for(let j=0;j<u.mount.legs.length;j++)u.mount.legs[j].rotation.x=mode==='walk'?Math.sin(u.mixer.time*10+u.phase+j*Math.PI*.6)*.36:0;
- if(mode!==u.mode){const action=u.actions[mode]||u.actions.walk||u.actions.idle;if(action&&action!==u.current){action.reset().fadeIn(.12).play();u.current?.fadeOut(.12);u.current=action;}u.mode=mode;}
- if(u.current&&mode==='walk')u.current.timeScale=g.fieldOrder==='charge'?1.25:1;else if(u.current)u.current.timeScale=1;
- u.mixer.update(dt);
+ for(let i=0;i<units.length;i++){const u=units[i];u.root.visible=i<n;if(!u.root.visible)continue;const p=soldierWorldPose(g,offsets[i]);if(!u.fieldReady){u.root.position.set(p.x,0,p.z);u.root.rotation.y=p.yaw;u.fieldReady=true;}else{u.root.position.set(u.root.position.x+(p.x-u.root.position.x)*blend,0,u.root.position.z+(p.z-u.root.position.z)*blend);u.root.rotation.y=turnToward(u.root.rotation.y,p.yaw,blend);}
+ if(u.mount){const gait=cavalryGait(u.mixer.time,u.phase||0,g.fieldOrder==='charge');for(let j=0;j<u.mount.legs.length;j++)u.mount.legs[j].rotation.x=mode==='walk'?gait.legs[j%4]:0;u.root.position.y=mode==='walk'?gait.bob:0;}
+ if(mode!==u.mode||mode==='attack'&&u.attackSerial!==g.attackSerial){const action=u.actions[mode]||u.actions.walk||u.actions.idle;if(action&&(action!==u.current||mode==='attack')){action.reset().fadeIn(.10).play();if(u.current!==action)u.current?.fadeOut(.12);u.current=action;if(mode==='attack'&&action.getClip){action.time=Math.min(.08,(u.phase||0)*.02);}}u.mode=mode;u.attackSerial=g.attackSerial;}
+ if(u.current&&mode==='walk')u.current.timeScale=g.fieldOrder==='charge'?1.25:1;else if(u.current&&mode==='attack'&&u.current.getClip){const duration=u.current.getClip().duration;u.current.timeScale=Math.max(.7,Math.min(3,duration/(g.type==='archers'?.45:.30)));}else if(u.current)u.current.timeScale=1;
+ if(dt>0)u.mixer.update(dt);
  }}
 }
 

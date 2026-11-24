@@ -1,3 +1,4 @@
+import {regimentPalette,projectileTrail,disposeFieldMaterials} from './field-visuals.js';
 import {fieldScenery,suppressFortScenery,battleContactShadow} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {participatingArmies,aggregateForce,regimentTroops} from './field-forces.js';
@@ -9,7 +10,7 @@ import {BattleModelArt} from './glb-art.js';
 import {armyFormationSlots,militaryDoctrine,startingTroops,combatStatistics,chooseCounterFormation,availableFormations} from './military-doctrines.js';
 import {ThreeBattleScene as BundledBattleScene} from './three-battle.bundle.js';
 // The shipped bundle stays self-hosted; field animation uses the shared runtime adapter.
-class ThreeBattleScene extends BundledBattleScene{constructor(canvas,config){super(canvas,config);if(config?.fieldBattle){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}}updateCharacters(groups,dt){if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);return super.updateCharacters(groups,dt);}}
+class ThreeBattleScene extends BundledBattleScene{constructor(canvas,config){super(canvas,config);if(config?.fieldBattle){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}}updateCharacters(groups,dt){if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);return super.updateCharacters(groups,dt);}dispose(){disposeFieldMaterials(this);return super.dispose();}}
 const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vec=(x=0,y=0,z=0)=>[x,y,z];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -239,7 +240,7 @@ export class BattleGame{
  }
  if(this.siege)for(const q of this.siege.structures){const height=q.hp>0?1+3*q.hp/q.max:.35;instance(obj,q.x,height/2,q.z,q.id==='gate'?9:5,height,3,q.hp>0?C.stone:C.earth);}
  for(let k=0;k<this.groups.length;k++){const g=this.groups[k],field=!!this.descriptor.fieldBattle;if(field){const shadow=battleContactShadow(g);if(shadow)obj.push(shadow);}if(g.routed&&(!field||(g.routAge||0)>=3))continue;const n=field?visibleSoldierCount(g,Math.round(g.initial*(this.ctx instanceof CanvasFallback?.65:1))):Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const offsets=field?formationOffsets(n,g.formationId,g.type):null;const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
-  const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
+  const palette=regimentPalette(g.side,g.type),base=field?palette.cloth:g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   if(!(this.ctx.isThreeBattle&&this.ctx.modelsReady))for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
    const pose=field?soldierWorldPose(g,offsets[i]):null,px=pose?.x??g.x+ox,pz=pose?.z??g.z+oz,walk=(!field||visualMode(g)==='walk')?Math.sin(this.elapsed*7+i*.55)*.045:0;
    if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27],'sphere');instance(obj,px,1.15+walk,pz,.48,.76,.43,base,'cylinder');instance(obj,px,1.68+walk,pz,.31,.29,.31,head,'sphere');instance(obj,px,1.87+walk,pz,.40,.28,.42,C.steel,'cone');
@@ -247,11 +248,11 @@ export class BattleGame{
    if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel,'cylinder');}
    if(g.type==='archers'){instance(obj,px+.30,.85+walk,pz,.12,1.0,.1,C.trunk,'cylinder');}
   }
-  if(g.routed)continue;const banner=g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);
+  if(g.routed)continue;const banner=field?palette.banner:g.side==='attacker'?[.91,.77,.46]:[.84,.49,.37];instance(obj,g.x,2.5,g.z,.16,5,.16,C.steel,'cylinder');instance(obj,g.x+.63,4.4,g.z,1.35,.74,.16,banner);if(field){instance(obj,g.x+.63,4.4,g.z,1.38,.15,.18,palette.accent);instance(obj,g.x,5.05,g.z,.29,.32,.29,C.gold,'sphere');}
   if(field&&k===this.selected&&['move','fallback','hold'].includes(g.fieldOrder)){const x=g.anchorX,z=g.anchorZ;instance(obj,x,.09,z,2.2,.12,2.2,[.90,.76,.30]);for(let i=1;i<=5;i++){const t=i/6;instance(obj,mix(g.x,x,t),.06,mix(g.z,z,t),.28,.07,.28,[.90,.76,.30]);}}
   if(k===this.selected){instance(obj,g.x,.08,g.z,5,.14,5,[.95,.79,.42]);instance(obj,g.x,.11,g.z,4.3,.15,4.3,[.28,.35,.32]);}
  }
- for(const p of this.projectiles){let t=p.t;instance(obj,mix(p.sx,p.tx,t),.8+Math.sin(t*Math.PI)*3,mix(p.sz,p.tz,t),.1,.1,.6,C.arrow);}
+ for(const p of this.projectiles){if(this.descriptor.fieldBattle){for(const q of projectileTrail(p,this.ctx instanceof CanvasFallback))instance(obj,q.x,q.y,q.z,q.size,q.size,q.size,q.head?[.94,.79,.49]:[.62,.49,.28],'sphere');}else{let t=p.t;instance(obj,mix(p.sx,p.tx,t),.8+Math.sin(t*Math.PI)*3,mix(p.sz,p.tz,t),.1,.1,.6,C.arrow);}}
  if(this.descriptor.fieldBattle)for(const effect of this.effects||[])for(const p of battleImpactParticles(effect)){const color=p.kind==='dust'?[.59,.51,.36]:p.kind==='rout'?[.80,.69,.47]:[1,.80,.39];instance(obj,p.x,p.y,p.z,p.size,p.size,p.size,color,'sphere');}
  const vp=this.ctx.render(obj,this.getCamera(),this.groups,this.elapsed);if(this.scenery&&vp)this.scenery.render(vp,this.sceneryPlacements);
  }
