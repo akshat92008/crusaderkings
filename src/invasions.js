@@ -1,4 +1,4 @@
-import {hasTruce,recordCampaignBattle} from './political-conflict.js';
+import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /**
  * Enemy-initiated wars for the existing Crown of Nations campaign.
  * Bound to real rival treasury, armies, connected provinces and three-month
@@ -40,7 +40,7 @@ export function findInvasionOptions(g,world){
     candidates.push({
       by:rival,army:army.id,province:target.id,staging:neighborId,
       path:path.slice(1),eta:3+distance,status:'approaching',
-      advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25
+      advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)
     });
    }
   }
