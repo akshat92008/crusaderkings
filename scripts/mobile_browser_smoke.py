@@ -30,6 +30,7 @@ try:
    page.fill('#campaign-query','military');assert page.locator('.finder-row').count()>0
    page.fill('#campaign-query','no-such-result-xyz');assert page.locator('.finder-row').count()==0
    page.fill('#campaign-query','council');page.locator('.finder-row[data-priority-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
+   page.locator('[data-workspace="realm"]').click();assert page.locator('.campaign-hub').is_visible()
    page.click('#close-management')
    page.locator('#quick-nav [data-priority-tab="characters"]').click()
    page.fill('#people-query','no-matching-person-xyz');assert page.locator('.directory-list .person-row').count()==0
