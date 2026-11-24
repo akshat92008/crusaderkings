@@ -439,7 +439,7 @@ export function unlockLegacy(g,realm,id){const d=dynasty(g,realm),l=LEGACIES[id]
 const artifactLand=(g,r)=>own(g,r).some(p=>!g.campaignWar?.occupations?.[p.id]||g.campaignWar.occupations[p.id].by===r);
 function artifactPeace(g,a,b){return !Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(a)&&[w.attacker,w.defender].includes(b));}
 function artifactReady(g,a,b,x){return !!(x&&ARTIFACTS[x.kind]&&x.realm===a&&x.durability>0&&a!==b&&g.factions[a]&&g.factions[b]&&ruler(g,a)?.alive&&ruler(g,b)?.alive&&artifactLand(g,a)&&artifactLand(g,b)&&artifactPeace(g,a,b)&&g.turn-(x.lastTransfer??-1000)>=12&&!Object.values(g.heritage.artifacts).some(v=>v.realm===b&&v.kind===x.kind&&v.durability>0));}
-export function artifactValue(x){const def=ARTIFACTS[x?.kind];return def?Math.max(20,Math.round(def.cost*(.35+.85*cap(x.durability,0,100)/100))):0;}
+export function artifactValue(x){const def=ARTIFACTS[x?.kind];return def?Math.max(20,Math.round(def.cost*(.25+.65*cap(x.durability,0,100)/100))):0;}
 export function artifactExchangeQuote(g,item,to,mode='gift',from=g.player){
  const x=g.heritage?.artifacts[item],price=artifactValue(x);
  if(!artifactReady(g,from,to,x))return {ok:false,price,reason:'Requires a unique intact artifact, two landed courts at peace, and a twelve-month transfer interval.'};
