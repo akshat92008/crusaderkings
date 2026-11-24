@@ -1,3 +1,4 @@
+import {roleplayModifiers} from './roleplay-systems.js';
 import {courtModifiers} from './royal-court.js';
 // Fictional character-level political schemes. All resolution is abstract and probabilistic.
 import {isImprisoned,capturePrisoner} from './feudal-systems.js';
@@ -62,11 +63,11 @@ export function plotTargets(g,r,kind){
  return [...local,...foreign].filter(p=>eligibleTarget(g,r,me,p,kind));
 }
 function security(g,r){return g.intrigue?.security[r]||{level:0,until:0};}
-function defense(g,r){const v=security(g,r),sp=free(g,g.politics.realms[r]?.council?.spymaster);return courtModifiers(g,r).defense+(v.until>g.turn?v.level*10:0)+(sp?.skills.intrigue||1)*3;}
+function defense(g,r){const v=security(g,r),sp=free(g,g.politics.realms[r]?.council?.spymaster);return roleplayModifiers(g,r).defense+courtModifiers(g,r).defense+(v.until>g.turn?v.level*10:0)+(sp?.skills.intrigue||1)*3;}
 export function plotOdds(g,p){
  const r=p.actor?free(g,p.actor):ruler(g,p.realm),target=live(g,p.target),sp=free(g,g.politics.realms[p.realm]?.council?.spymaster);if(!r||!target)return {chance:0,exposure:100};
  const agents=(p.agents||[]).filter(id=>free(g,id)&&g.politics.people[id].realm===p.realm),power=agents.reduce((n,id)=>n+(g.politics.people[id].skills?.intrigue||1)*3,0),security=defense(g,target.realm),category=plotCategory(p.kind),preparation=cap(p.preparation||0,-20,25);
- const chance=category==='personal'?45+(r.skills?.diplomacy||1)*6+personalOpinion(g,r.id,target.id)*.25+power*.5+preparation:35+(r.skills?.intrigue||1)*5+(sp?.skills.intrigue||1)*3+power-security+courtModifiers(g,p.realm).scheme+preparation+(p.kind==='investigate'?18:p.kind==='assassinate'?-12:0);
+ const chance=category==='personal'?45+(r.skills?.diplomacy||1)*6+personalOpinion(g,r.id,target.id)*.25+power*.5+preparation:35+(r.skills?.intrigue||1)*5+(sp?.skills.intrigue||1)*3+power-security+courtModifiers(g,p.realm).scheme+roleplayModifiers(g,p.realm).scheme+preparation+(p.kind==='investigate'?18:p.kind==='assassinate'?-12:0);
  return {chance:Math.round(cap(chance,8,90)),exposure:Math.round(cap((category==='personal'?10+Math.max(0,-personalOpinion(g,r.id,target.id))*.3:20+security+agents.length*5-(sp?.skills.intrigue||1)*4)+(p.discoveredAt!==undefined?15:0),8,85))};
 }
 function start(g,r,kind,id){const s=initIntrigue(g),f=g.factions[r],d=PLOTS[kind],me=ruler(g,r);if(!d||!me||isImprisoned(g,me.id)||me.age<18||!land(g,r)||!canStartPlot(g,r,kind)||!plotTargets(g,r,kind).some(p=>p.id===id)||f.treasury<d.cost)return no('Requires an eligible target, adult ruler, funds and an available scheme category.');f.treasury-=d.cost;const pid='p'+s.next++;s.plots[pid]={id:pid,realm:r,actor:me.id,target:id,targetRealm:live(g,id).realm,kind,category:d.category,agents:[],started:g.turn,due:g.turn+d.months,status:'active'};return ok(d.name+' plot begun.');}
@@ -104,7 +105,7 @@ function prepare(g,p){
 }
 function disrupt(g,r,p){
  if(!knownThreats(g,r).includes(p)||p.disrupted||g.factions[r].treasury<90)return no('Requires a discovered foreign plot, 90 gold and no prior disruption.');
- g.factions[r].treasury-=90;p.preparation=cap((p.preparation||0)-12,-20,25);p.due+=3;p.disrupted=true;note(g,r,'Counterintelligence disrupted a discovered political scheme.');return ok('Disruption completed.');
+ g.factions[r].treasury-=90;p.preparation=cap((p.preparation||0)-12,-20,25);p.due+=3;p.disrupted=true;p.disruptedAt=g.turn;note(g,r,'Counterintelligence disrupted a discovered political scheme.');return ok('Disruption completed.');
 }
 function recruit(g,p,id){const f=g.factions[p.realm];if(p.agents.length>=3||!agentOptions(g,p).some(c=>c.id===id)||f.treasury<60)return no('Requires an available court agent, 60 gold and a free agent slot.');f.treasury-=60;p.agents.push(id);return ok('Agent recruited.');}
 function generateSecret(g,r,target){const s=g.intrigue;let secret=Object.values(s.secrets).find(x=>x.person===target.id&&!x.exposed&&x.kind!=='contested');if(!secret){const kinds=Object.keys(SECRETS).filter(k=>k!=='contested'),kind=kinds[Math.floor(random(s)*kinds.length)],id='s'+s.next++;secret=s.secrets[id]={id,person:target.id,kind,known:[],created:g.turn,exposed:false};}if(!secret.known.includes(r))secret.known.push(r);return secret;}

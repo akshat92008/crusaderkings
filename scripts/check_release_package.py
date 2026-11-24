@@ -5,6 +5,7 @@ ROOT=Path(__file__).resolve().parents[1]
 zip_path=ROOT/'dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip'
 required=[
  'crown-of-nations/index.html','crown-of-nations/styles.css',
+ 'crown-of-nations/assets/court-theme.css','crown-of-nations/assets/court-compass.svg','crown-of-nations/assets/monarch-crest.svg','crown-of-nations/src/historical-context.js','crown-of-nations/src/interface-experience.js','crown-of-nations/src/roleplay-systems.js','crown-of-nations/src/supplemental-content.js','crown-of-nations/docs/HISTORICAL_CONTEXT.md',
  'crown-of-nations/src/battle.js','crown-of-nations/src/three-battle.bundle.js',
  'crown-of-nations/src/kingdom-depth.js','crown-of-nations/src/kingdom-ui.js',
  'crown-of-nations/src/invasions.js','crown-of-nations/src/military-doctrines.js',
@@ -23,5 +24,5 @@ with ZipFile(zip_path) as z:
   if data[:4]!=b'glTF' or len(data)<1000000:raise RuntimeError('Bad GLB '+name)
  if len(z.read('crown-of-nations/src/three-battle.bundle.js'))<200000:raise RuntimeError('Three bundle missing or stubbed')
  if b'CC0' not in z.read('crown-of-nations/assets/battle/characters/LICENSE.txt'):raise RuntimeError('CC0 license missing')
- if len(z.namelist())>130:raise RuntimeError('Unexpected bulk authoring assets accidentally included')
+ if any('/source/' in n or '/node_modules/' in n for n in z.namelist()):raise RuntimeError('Unexpected authoring assets in runtime package')
 print('Validated portable playtest:',zip_path,zip_path.stat().st_size,'bytes with',len(required),'required runtime files')
