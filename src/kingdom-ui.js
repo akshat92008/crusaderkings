@@ -1,3 +1,4 @@
+import {temperament,strategicPlan,threatAssessment,borderRealms,militaryStrength,defenseSupport} from './strategic-ai.js';
 import {occupation,controller} from './campaign-war.js';
 import {SHIPS,fleetStats,fleetDestinations,blockadeTargets,portBlocked,embarked,navalUpkeep} from './naval-systems.js';
 import {REGIMENTS,ENGINES,regimentOptions,armyReadiness} from './military-systems.js';
@@ -181,4 +182,16 @@ export function renderNaval(g,world,esc){
  if(targets.length)html+='<select class="select" id="'+b+'">'+targets.map(x=>'<option value="'+esc(x.province)+'">'+esc(place(x.province))+'</option>').join('')+'</select>'+btn('blockade',f.id,'Sail to blockade','',b);if(portBlocked(g,f.port))html+=btn('break-blockade',f.id,'Sortie to break blockade');}
  else if(['blockade','approach'].includes(f.status))html+=btn('recall',f.id,'Recall fleet');html+='</div>';}
  html+=section('NAVAL CHRONICLE')+n.history.filter(x=>x.realm===realm).slice(0,12).map(x=>'<div class="rule"><div class="smallnote">'+esc(x.message)+'</div></div>').join('');return html;
+}
+
+export function renderStrategy(g,world,esc){
+ const realm=g.player,s=g.strategy,name=id=>g.factions[id]?.name||id,others=world.factions.filter(f=>f.id!==realm&&Object.values(g.provinces).some(p=>p.owner===f.id));
+ const btn=(action,id,label,input='',second='')=>'<button class="rowbtn" data-action="strategy" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'" data-second="'+esc(second)+'">'+esc(label)+'</button>';
+ let html=section('STRATEGIC INTELLIGENCE')+'<p class="paragraph">Estimates reflect current forces, ruler temperament, relations and formal wars. Plans are reviewed every six months and change on succession.</p>';
+ const ranked=borderRealms(g,world,realm).map(id=>({id,risk:threatAssessment(g,world,realm,id)})).sort((a,b)=>b.risk-a.risk);
+ for(const {id,risk} of ranked){const t=temperament(g,id),p=strategicPlan(g,id);html+='<div class="rule"><h3>'+esc(name(id))+'</h3><div class="smallnote">'+esc(t.name)+' · Threat '+risk+'/100 · Field strength '+Math.round(militaryStrength(g,id))+'</div><p class="paragraph">Estimated objective: '+esc(p?.goal||'unassessed')+(p?.target?' · '+esc(name(p.target)):'')+'</p><div class="smallnote">Aggression '+t.aggression+' · Prudence '+t.prudence+' · Commerce '+t.commerce+' · Diplomacy '+t.diplomacy+'</div></div>';}
+ html+=section('DEFENSIVE PACTS')+'<p class="paragraph">Five-year agreements against a named threat. Partners contribute abstract defensive reserve strength, not separate controllable armies.</p><select class="select" id="pact-partner">'+others.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join('')+'</select><select class="select" id="pact-target">'+others.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join('')+'</select>'+btn('pact','','Propose defensive pact (100g)','pact-partner','pact-target');
+ for(const p of Object.values(s.pacts).filter(p=>p.members.includes(realm)&&p.expires>g.turn))html+='<div class="rule"><b>'+esc(p.members.filter(id=>id!==realm).map(name).join(', '))+' · Against '+esc(name(p.target))+'</b><div class="smallnote">'+Math.max(0,p.expires-g.turn)+' months remaining · Combined reserve support '+defenseSupport(g,realm,p.target)+'</div>'+btn('leave',p.id,'Dissolve pact')+'</div>';
+ html+=section('FOREIGN RULERS');for(const f of others){const p=strategicPlan(g,f.id),t=temperament(g,f.id);html+='<details class="rule"><summary>'+esc(f.name)+' · '+esc(t.name)+'</summary><p class="paragraph">Objective: '+esc(p?.goal||'unassessed')+(p?.target?' · '+esc(name(p.target)):'')+'</p><div class="smallnote">Aggression '+t.aggression+' · Prudence '+t.prudence+' · Commerce '+t.commerce+' · Diplomacy '+t.diplomacy+'</div></details>';}
+ return html;
 }

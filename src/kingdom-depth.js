@@ -1,3 +1,4 @@
+import {initStrategy,tickStrategy,strategicPlan,temperament} from './strategic-ai.js';
 import {controller,initCampaignWar,tickCampaignWar} from './campaign-war.js';
 import {embarked,initNaval,tickNaval,portBlocked} from './naval-systems.js';
 import {initMilitary,tickMilitary} from './military-systems.js';
@@ -44,13 +45,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -262,13 +263,13 @@ function aiMonthly(g,world){
    const p=choose(land.filter(p=>controller(g,p.id)===f.id),hash(f.id+g.turn));if(!p)continue;
    const neighbor=world.provinces.find(x=>x.id===p.id)?.neighbors||[];
    const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
-   const kind=nation.food<130?'farm':frontier&&(p.buildings.fort||0)<2?'fort':(p.buildings.market||0)<2?'market':'farm';
-   const base={farm:180,fort:440,market:260}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
+   const goal=strategicPlan(g,f.id)?.goal,kind=nation.food<130||goal==='recover'?'farm':goal==='defend'&&frontier&&(p.buildings.fort||0)<3?'fort':goal==='conquer'&&(p.buildings.barracks||0)<3?'barracks':(p.buildings.market||0)<3?'market':'farm';
+   const base={farm:180,fort:440,market:260,barracks:300}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
   if(g.turn%6===0&&nation.treasury>450){
    const a=armies(g,f.id).filter(a=>!embarked(g,a.id)).sort((x,y)=>size(x)-size(y))[0];
-   if(a&&size(a)<650){nation.treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];a.morale=clamp(a.morale+1,0,100);}
+   if(a&&size(a)<(['conquer','defend'].includes(strategicPlan(g,f.id)?.goal)?650:260)){nation.treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];a.morale=clamp(a.morale+1,0,100);}
   }
   if(g.turn%12===0&&nation.treasury>450){
    const peers=world.factions.filter(p=>p.continent===f.continent&&p.id!==f.id);
@@ -289,6 +290,7 @@ function tickTrade(g){
 export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  // Trade is already included in the campaign balance.
+ tickStrategy(g,world);
  if(g.turn%3===0)aiMonthly(g,world);
  tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);
  const incoming=progressEnemyInvasions(g,world);

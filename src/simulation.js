@@ -1,3 +1,4 @@
+import {strategicTargetScore,raidThreshold,defenseSupport} from './strategic-ai.js';
 import {controller,occupation,occupationTax,captureProvince} from './campaign-war.js';
 import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
 import {onArmyMarch,armyReadiness,syncRegiments,applyFortDamage,initMilitary} from './military-systems.js';
@@ -99,7 +100,7 @@ export function startMarch(g,world,fromId,toId){
  if(g.factions[g.player].treaties[opponent]==='alliance')return {ok:false,msg:'Cannot attack an ally'};
  const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
- const garrison=45+target.development*12+target.buildings.fort*45;
+ const garrison=45+target.development*12+target.buildings.fort*45+defenseSupport(g,opponent,g.player);
  return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
 export function concludeBattle(g,battle,result){
@@ -164,9 +165,9 @@ export function advanceMonth(g,world){
    if(campaigns>=3)break;
    const origin=world.provinces.find(p=>p.id===a.province);if(!origin||controller(g,origin.id)!==a.owner)continue;
    const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&controller(g,p.id)!==a.owner&&controller(g,p.id)!==g.player&&(!occupation(g,p.id)||p.owner===a.owner)&&!hasTruce(g,a.owner,controller(g,p.id))&&g.factions[a.owner].treaties[controller(g,p.id)]!=='alliance');
-   if(!potential.length||rand(g)>.48)continue;
-   const target=potential.find(p=>(p.owner===a.owner||activeWar(g,a.owner,controller(g,p.id))?.goal===p.id))||potential[Math.floor(rand(g)*potential.length)];
-   const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,controller(g,target.id)).reduce((sum,v)=>sum+armySize(v),0);
+   if(!potential.length)continue;
+   const target=potential.slice().sort((x,y)=>strategicTargetScore(g,world,a,y)-strategicTargetScore(g,world,a,x)||x.id.localeCompare(y.id))[0];if(rand(g)>1-raidThreshold(g,a.owner,controller(g,target.id))||strategicTargetScore(g,world,a,target)<-15)continue;
+   const defense=45+target.development*13+target.buildings.fort*48+defenseSupport(g,controller(g,target.id),a.owner)+armiesAt(g,target.id,controller(g,target.id)).reduce((sum,v)=>sum+armySize(v),0);
    const attack=armySize(a)*armyReadiness(g,a).power*(0.75+rand(g)*.7);
    if(attack>defense*.88){
     const previous=controller(g,target.id),war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);

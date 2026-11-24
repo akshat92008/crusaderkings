@@ -1,3 +1,4 @@
+import {strategyAction,defenseSupport} from './strategic-ai.js';
 import {CampaignMap} from './map.js';
 import {BattleGame} from './battle.js';
 import {militaryDoctrine,availableFormations} from './military-doctrines.js';
@@ -11,7 +12,7 @@ import {militaryAction} from './military-systems.js';
 import {navalAction,portBlocked} from './naval-systems.js';
 import {controller,occupation} from './campaign-war.js';
 import {activeWar} from './political-conflict.js';
-import {renderNaval,renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {renderStrategy,renderNaval,renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -69,6 +70,7 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
  }else if(tab==='economy'){html=renderEconomy(game,world,esc);
  }else if(tab==='military'){html=renderMilitary(game,world,esc);
  }else if(tab==='naval'){html=renderNaval(game,world,esc);
+ }else if(tab==='strategy'){html=renderStrategy(game,world,esc);
  }else if(tab==='trade'){
   html=renderTrade(game,world,esc);
  }else if(tab==='legacy'){
@@ -126,7 +128,7 @@ function openIncomingSiege(){
  const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
  const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
  openBattle({defenseMode:true,attacker:stationed?.id||null,enemyArmy:threat.army,enemy:threat.by,
-  to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison,
+  to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison+defenseSupport(game,game.player,threat.by),
   threat:{army:threat.army,province:threat.province}});
  return true;
 }
@@ -171,6 +173,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='strategy'){const first=btn.dataset.input?el(btn.dataset.input):null,second=btn.dataset.second?el(btn.dataset.second):null;clickResult(strategyAction(game,world,type,first?.value??btn.dataset.id,second?.value??btn.dataset.extra));}
  if(action==='naval'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(navalAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
  if(action==='military'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(militaryAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='economy'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(economyAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
