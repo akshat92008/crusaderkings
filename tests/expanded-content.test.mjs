@@ -71,3 +71,26 @@ test('new cultural stories target a live local culture and invalidate changed ta
 
 test('recent activity content is tied to the completed activity and updates real court reputation',()=>{const g=fixture();g.royalCourt={realms:{a:{reputation:40}}};g.heritage={realms:{a:{activityRecords:[{kind:'feast',host:'r',turn:0,destination:'p'}]}},struggles:{}};const d=expandedDecisions(g,world).find(x=>x.id==='decision_feast_guest_accounts');assert.ok(d);open(g,'feast_guest_accounts',d.target);assert.ok(expandedAction(g,world,'resolve',0).ok);assert.equal(g.royalCourt.realms.a.reputation,45);const copy=JSON.parse(JSON.stringify(g));copy.turn=3;copy.heritage.realms.a.activityRecords=[];assert.equal(currentExpandedEvent(copy),null);});
 test('lifestyle instruction modifies actual selected branch XP and cancels on a changed specialization',()=>{const g=fixture();g.politics.people.r.civic.focus='learning';g.politics.people.r.civic.roleplay={selected:{learning:'scholarship'},branches:{'learning:scholarship':{rank:1,xp:20}}};const d=expandedDecisions(g,world).find(x=>x.id==='decision_roleplay_reading');assert.ok(d);open(g,'roleplay_reading',d.target);assert.ok(expandedAction(g,world,'resolve',0).ok);assert.equal(g.politics.people.r.civic.roleplay.branches['learning:scholarship'].xp,34);g.politics.people.r.civic.roleplay.selected.learning='medicine';g.turn=3;assert.equal(currentExpandedEvent(g),null);});
+
+test('ordinary road events use personality and real cost instead of a fixed treasury threshold',()=>{
+ for(const [traits,expectedGold,expectedUnrest] of [[['generous'],880,36],[['greedy'],1035,47]]){
+  const g=fixture();g.player='b';g.politics.people.r.traits=traits;open(g,'road_levy',{province:'p'});g.turn=3;tickExpanded(g,world);
+  assert.equal(g.factions.a.treasury,expectedGold);assert.equal(g.provinces.p.unrest,expectedUnrest);assert.equal(currentExpandedEvent(g,'a'),null);
+ }
+});
+test('AI prioritizes disaster relief and care when affordable, and uses free care otherwise',()=>{
+ for(const [id,target,gold,expectedGold,read,expected] of [
+  ['flood_relief',{province:'p'},1000,880,g=>g.economy.crises.p.severity,25],
+  ['household_care',{person:'r'},1000,930,g=>g.living.health.r.severity,32],
+  ['household_care',{person:'r'},20,20,g=>g.living.health.r.severity,47]
+ ]){
+  const g=fixture();g.player='b';g.factions.a.treasury=gold;open(g,id,target);g.turn=3;tickExpanded(g,world);
+  assert.equal(g.factions.a.treasury,expectedGold);assert.equal(read(g),expected);assert.equal(currentExpandedEvent(g,'a'),null);
+ }
+});
+test('ordinary military event AI weighs supply and fatigue and preserves follow-up across serialization',()=>{
+ const g=fixture();g.player='b';open(g,'army_provision_chain',{army:'x'});g.turn=3;tickExpanded(g,world);
+ assert.equal(g.factions.a.treasury,900);assert.equal(g.military.armies.x.supply,65);assert.equal(g.military.armies.x.fatigue,32);
+ const copy=JSON.parse(JSON.stringify(g));assert.equal(currentExpandedEvent(copy,'a').id,'army_recovery');
+ assert.equal(currentExpandedEvent(copy,'a').availableAt,6);
+});
