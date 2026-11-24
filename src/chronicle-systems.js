@@ -83,10 +83,10 @@ function effect(g,realm,kind,value,target){const f=g.factions[realm],r=ruler(g,r
  case 'develop':{const p=ps.slice().sort((a,b)=>a.development-b.development)[0];if(p)p.development=cap(p.development+Math.max(1,Math.round(value/10)),1,20);break;}
  case 'authority':s.authority=cap(s.authority+value,0,100);f.legitimacy=cap(f.legitimacy+Math.round(value/2),0,100);break;
  case 'trade':{const e=g.economy.realms[realm];e.credit=cap(e.credit+value,0,100);s.charterUntil=Math.max(s.charterUntil||0,g.turn+18);break;}
- case 'craft':{const p=ps[0];if(p){const stock=g.economy.provinces[p.id].stock;stock.tools=Math.min(60,stock.tools+value);stock.cloth=Math.min(60,stock.cloth+value);}break;}
+ case 'craft':{const p=ps[0];if(p){const stock=g.economy.provinces[p.id].stock;stock.tools+=Math.min(value,Math.max(0,60-stock.tools));stock.cloth+=Math.min(value,Math.max(0,60-stock.cloth));}break;}
  case 'military':for(const a of Object.values(g.armies))if(a.owner===realm){a.morale=cap(a.morale+value,0,100);a.experience=cap(a.experience+value*.003,0,1);}break;
  case 'learning':r.skills.learning=cap(r.skills.learning+1,1,5);f.tech=cap(f.tech+1,1,10);break;
- case 'food':f.food+=value*8;for(const p of ps)g.economy.provinces[p.id].stock.grain=Math.min(60,g.economy.provinces[p.id].stock.grain+value);break;
+ case 'food':f.food+=value*8;for(const p of ps)g.economy.provinces[p.id].stock.grain+=Math.min(value,Math.max(0,60-g.economy.provinces[p.id].stock.grain));break;
  case 'stability':f.stability=cap(f.stability+value,0,100);break;
  case 'friend':changeOpinion(g,r.id,target,value);break;
  }}
@@ -105,7 +105,7 @@ function schedule(g,realm){const c=g.chronicles,s=c.realms[realm],f=g.factions[r
  const eligible=CHAINS.filter(x=>g.turn-(s.lastChain[x.id]??-120)>=48&&(x.trigger==='succession'?s.successionAt!==null&&g.turn-s.successionAt<=12:x.trigger==='loyalty'?v.some(([,h])=>h.loyalty<40):x.trigger==='crisis'?Object.values(g.economy.crises).some(z=>g.provinces[z.province]?.owner===realm):x.trigger==='trade'?Object.values(g.kingdom.tradePacts).some(p=>p.partners.includes(realm)):!!rival));
  if(!eligible.length)return;const def=eligible.find(x=>x.id==='succession')||eligible[Math.floor(random(c)*eligible.length)];s.chain={id:def.id,stage:0,due:g.turn,started:g.turn,ruler:r.id,target:def.id==='court'?rival?.other:null,score:0,outcomes:[]};note(g,realm,'A new story begins: '+def.name+'.');}
 export function tickChronicles(g,world){const c=initChronicles(g,world);if(c.lastTick===g.turn)return;c.lastTick=g.turn;
- for(const [realm,s] of Object.entries(c.realms)){const r=ruler(g,realm),f=g.factions[realm];if(!r||!land(g,realm).length)continue;if(s.ruler!==r.id){s.ruler=r.id;s.successionAt=g.turn;s.ambition=null;s.chain=null;if(g.civic.realms[realm].government!=='republic')schedule(g,realm);}
+ for(const [realm,s] of Object.entries(c.realms)){const r=ruler(g,realm),f=g.factions[realm];if(!r||!land(g,realm).length)continue;if(s.ruler!==r.id){s.ruler=r.id;s.successionAt=g.civic.realms[realm].government==='republic'?null:g.turn;s.ambition=null;s.chain=null;if(g.civic.realms[realm].government!=='republic')schedule(g,realm);}
  if(s.ambition&&ambitionComplete(g,realm,s.ambition)){const a=s.ambition,d=AMBITIONS[a.id];f.prestige+=d.reward;f.legitimacy=cap(f.legitimacy+6,0,100);const dyn=g.heritage.dynasties[realm+'|'+r.house];if(dyn)dyn.renown+=d.reward;s.completed.push({ambition:a.id,ruler:r.id,turn:g.turn});s.completed=s.completed.slice(-20);s.ambition=null;note(g,realm,r.name+' fulfilled '+d.name+'.');}
  const x=currentChain(g,realm);if(x&&g.turn>=x.due&&(realm!==g.player||g.turn-x.due>=9)){const idx=realm!==g.player&&f.treasury>x.choices[0][1]+250?0:1;resolve(g,realm,idx);}
  if(g.turn%6===0){schedule(g,realm);if(realm!==g.player&&!s.ambition){const options=Object.keys(AMBITIONS).filter(id=>!s.completed.some(x=>x.ambition===id&&x.ruler===r.id));if(options.length)s.ambition={id:options[hash(realm+g.turn)%options.length],ruler:r.id,started:g.turn,base:baseline(g,realm)};}}
