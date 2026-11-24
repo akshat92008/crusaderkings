@@ -189,7 +189,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='economy'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(economyAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
  if(action==='heritage'){const input=btn.dataset.input?el(btn.dataset.input):null,guest=btn.dataset.guest?el(btn.dataset.guest):null;clickResult(heritageAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,guest?.value));}
  if(action==='civic'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(civicAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
- if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='royal-choice')clickResult(resolveRoyalEvent(game,world,Number(btn.dataset.choice)));
  if(action==='show-diplomacy'){if(btn.dataset.target==='independent'){message('Independent polities have no central court to negotiate with.');return;}tab='diplomacy';diplomaticTarget=btn.dataset.target;renderTab();}
 });
