@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
+import {initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,stableFieldTarget,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
 import {armyFormationSlots} from '../src/military-doctrines.js';
 function unit(id,side,type,x,z,extra={}){return initializeFieldGroup({id,side,type,x,z,order:0,troopCount:40,morale:85,damage:10,armor:1,speed:4,range:type==='archers'?14:2.5,cooldown:0,phase:0,...extra});}
 test('hold and move orders persist rather than returning to automatic pursuit',()=>{const a=unit('a','attacker','infantry',0,20),b=unit('b','defender','infantry',0,-20),s={groups:[a,b],projectiles:[]};assert.ok(issueFieldOrder(a,'hold'));for(let i=0;i<20;i++)stepField(s,.1);assert.equal(a.z,20);assert.ok(issueFieldOrder(a,'move',[10,20]));for(let i=0;i<60;i++)stepField(s,.1);assert.equal(a.fieldOrder,'hold');assert.ok(Math.abs(a.x-10)<.4);});
@@ -56,4 +56,13 @@ test('weak infantry-only AI advances against a stationary opposing army',()=>{
 test('exactly overlapping friendly advancing regiments separate',()=>{
  const a=unit('a','attacker','infantry',0,20),b=unit('b','attacker','infantry',0,20),c=unit('c','defender','infantry',0,-20);
  stepField({groups:[a,b,c],projectiles:[]},.1);assert.ok(Math.abs(a.x-b.x)>0);
+});
+
+test('engaged target does not flip for a marginally closer enemy',()=>{
+ const a=unit('a','attacker','infantry',0,0),b=unit('b','defender','infantry',0,9),c=unit('c','defender','infantry',0,10);
+ assert.equal(stableFieldTarget(a,[b,c]).id,'b');c.z=7;assert.equal(stableFieldTarget(a,[b,c]).id,'b');c.z=1;assert.equal(stableFieldTarget(a,[b,c]).id,'c');
+});
+test('archers hold and fire instead of fleeing a cavalry charge automatically',()=>{
+ const a=unit('a','attacker','archers',0,0),b=unit('b','defender','cavalry',0,3);
+ issueFieldOrder(b,'charge');stepField({groups:[a,b],projectiles:[]},.1);assert.equal(a.z,0);assert.ok(a.attackSerial>0);
 });
