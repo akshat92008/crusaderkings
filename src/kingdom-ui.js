@@ -1,3 +1,4 @@
+import {renderSubholdings} from './subholdings.js';
 import {humanControlsCharacter} from './player-career.js';
 import {renderPersonalUnions} from './personal-unions.js';
 import {ROLEPLAY_BRANCHES,COPING,roleplayView} from './roleplay-systems.js';
@@ -302,7 +303,7 @@ export function renderFeudal(g,world,esc){
  for(const t of titles.filter(t=>t.tier==='regional')){const field='regional-'+t.id.replaceAll(':','-'),lords=regionalTitleCandidates(g,realm,t.id);html+='<details class="rule"><summary>'+esc(t.name)+' · '+esc(name(t.holder))+'</summary><p class="paragraph">Regional loyalty effect: '+regionalLoyalty(g,t.members[0]).toFixed(1)+'</p>'+(lords.length?'<select class="select" id="'+field+'">'+lords.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select>'+btn('regional',t.id,'Grant regional title (120g)',field):'');
  for(const id of t.members){const v=g.politics.holdings[id],p=titles.find(x=>x.province===id),grant='grant-'+id;html+='<div class="rule"><b>'+provinceLink(id,world,esc)+' · '+characterLink(g.politics.people[v.lord],esc)+'</b><div class="smallnote">Loyalty '+Math.round(v.loyalty)+'%'+(isImprisoned(g,v.lord)?' · imprisoned':'')+'</div>';
  if(v.lord===r&&adults.length)html+='<select class="select" id="'+grant+'">'+adults.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>').join('')+'</select>'+btn('grant',p.id,'Grant province',grant);
- else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');html+=renderEstateSuccession(g,id,esc,'titles');}html+='</div>';}html+='</details>';}
+ else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');html+=renderEstateSuccession(g,id,esc,'titles');}html+=renderSubholdings(g,id,r,esc);html+='</div>';}html+='</details>';}
  html+=section('CROWN CLAIMANTS')+'<p class="paragraph">Other eligible children inherit claims on succession. Discontented vassals may support an adult claimant when legitimacy is low.</p>';for(const c of claimantCandidates(g,realm))html+='<div class="rule"><b>'+esc(name(c.person))+'</b><div class="smallnote">Claim from '+esc(name(c.from))+' · expires in '+Math.max(0,180-g.turn+c.created)+' months</div></div>';
  html+=section('PRISONERS AND RANSOM');
  for(const x of Object.values(g.feudal.prisoners).filter(x=>x.status==='held'&&(x.captor===realm||x.realm===realm))){
