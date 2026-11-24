@@ -1,3 +1,4 @@
+import {CONDITIONAL_SITUATIONS,situationMeasure,respondToSituation} from './regional-situations.js';
 // Alternate-history regional politics and character activities. Serializable and deterministic.
 import {pilgrimageSanctuary,completeSacredJourney} from './faith-institutions.js';
 import {personalOpinion,changeOpinion} from './chronicle-systems.js';
@@ -21,6 +22,7 @@ export const ACTIVITIES={
  coming_age:{name:'Coming-of-age ceremony',cost:140,duration:2,prestige:8,legitimacy:4,stress:-5,renown:9}
 };
 export const STRUGGLE_MODELS={
+ ...Object.fromEntries(CONDITIONAL_SITUATIONS.map(x=>[x.id,x.model])),
  "western_succession": {
   "title": "Dynastic arbitration",
   "action": "Recognize the frontier delegations",
@@ -295,6 +297,7 @@ export const STRUGGLE_MODELS={
  }
 };
 export const STRUGGLES=[
+
  {id:'western_succession',name:'Western crowns and succession',members:['england','france','burgundy'],desc:'Rival royal houses contest legitimacy, frontier control and negotiated settlement.'},
  {id:'iberian_balance',name:'Iberian balance of power',members:['castile','aragon','portugal','morocco'],desc:'The western Mediterranean and Atlantic-facing crowns compete for influence and access.'},
  {id:'eastern_frontier',name:'Eastern European frontier',members:['poland','muscovy','novgorod','horde','imperial'],desc:'Neighboring crowns negotiate borders, tribute and the security of frontier communities.'},
@@ -310,7 +313,8 @@ export const STRUGGLES=[
 {"id":"english_houses","name":"English dynastic competition","members":["england"],"domestic":true,"desc":"A possible late-medieval succession crisis driven by actual claimants, faction pressure and estate loyalty."},
 {"id":"imperial_princes","name":"Imperial authority and princely autonomy","members":["imperial"],"domestic":true,"desc":"Imperial institutions must negotiate with local estates and political factions."},
 {"id":"japanese_houses","name":"Japanese military house competition","members":["ashikaga"],"domestic":true,"desc":"Military households and local estates contend for influence in the shogunate."},
-{"id":"ming_frontier","name":"Ming provincial and frontier administration","members":["ming"],"domestic":true,"desc":"Court institutions balance provincial administration and the confidence of local communities."}
+{"id":"ming_frontier","name":"Ming provincial and frontier administration","members":["ming"],"domestic":true,"desc":"Court institutions balance provincial administration and the confidence of local communities."},
+ ...CONDITIONAL_SITUATIONS
 ];
 const ARTIFACTS={regalia:{name:'Ceremonial regalia',cost:260,slot:'regalia',tax:0,levy:0,trade:0,prestige:2},standard:{name:'Royal battle standard',cost:230,slot:'standard',tax:0,levy:.06,trade:0,prestige:1},ledger:{name:'Master accounting manuscript',cost:210,slot:'book',tax:.06,levy:0,trade:0,prestige:1},charter:{name:'Illuminated merchant charter',cost:240,slot:'charter',tax:0,levy:0,trade:.12,prestige:1},chronicle:{name:'Dynastic chronicle',cost:250,slot:'book',tax:0,levy:0,trade:0,prestige:3}};
 export const RELICS=ARTIFACTS;
@@ -320,8 +324,8 @@ export const LEGACIES={statecraft:{name:'Statecraft',cost:45,tax:.04,levy:0,trad
 function record(g,realm,message){const a=g.heritage;a.history.unshift({realm,turn:g.turn,message});a.history=a.history.slice(0,200);if(realm===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}}
 function random(a){a.seed=(Math.imul(a.seed,1664525)+1013904223)>>>0;return a.seed/4294967296;}
 function dynasty(g,realm){const house=ruler(g,realm)?.house||realm,key=realm+'|'+house;return g.heritage.dynasties[key]??={realm,house,renown:0,legacies:[],achievements:[]};}
-function newStruggle(s){return {id:s.id,phase:'competition',tension:35,cooperation:30,cycle:1,influence:Object.fromEntries(s.members.map(id=>[id,0])),last:{},ended:null,outcome:null,history:[],catalysts:[]};}
-export function initHeritage(g,world){if(g.heritage?.version===1){for(const item of Object.values(g.heritage.artifacts||{})){item.owner??=ruler(g,item.realm)?.id||null;item.origin??=item.realm;item.culture??=g.civic?.realms[item.realm]?.culture||'Local traditions';item.history??=[{turn:0,message:'Treasury artifact recorded'}];}for(const s of Object.values(g.heritage.realms)){s.plans??=null;s.activityRecords??=[];s.honored??=[];s.celebratedAge??=[];}for(const s of STRUGGLES){const x=g.heritage.struggles[s.id]??=newStruggle(s);x.history??=[];x.catalysts??=[];x.outcome??=null;for(const id of s.members)x.influence[id]??=0;}return g.heritage;}const a=g.heritage={version:1,next:1,seed:145067,lastTick:-1,activities:{},realms:{},dynasties:{},struggles:{},artifacts:{},history:[]};
+function newStruggle(s){return {id:s.id,phase:s.conditional?'dormant':'competition',tension:s.conditional?0:35,cooperation:s.conditional?0:30,cycle:1,influence:Object.fromEntries(s.members.map(id=>[id,0])),last:{},ended:null,outcome:null,history:[],catalysts:[],healthyReviews:0};}
+export function initHeritage(g,world){if(g.heritage?.version===1){for(const item of Object.values(g.heritage.artifacts||{})){item.owner??=ruler(g,item.realm)?.id||null;item.origin??=item.realm;item.culture??=g.civic?.realms[item.realm]?.culture||'Local traditions';item.history??=[{turn:0,message:'Treasury artifact recorded'}];}for(const s of Object.values(g.heritage.realms)){s.plans??=null;s.activityRecords??=[];s.honored??=[];s.celebratedAge??=[];}for(const s of STRUGGLES){const x=g.heritage.struggles[s.id]??=newStruggle(s);x.history??=[];x.catalysts??=[];x.outcome??=null;x.healthyReviews??=0;for(const id of s.members)x.influence[id]??=0;}return g.heritage;}const a=g.heritage={version:1,next:1,seed:145067,lastTick:-1,activities:{},realms:{},dynasties:{},struggles:{},artifacts:{},history:[]};
  for(const f of world.factions){a.realms[f.id]={last:{},completed:0,lastCoronation:null,celebrated:[],equipped:{},plans:null,activityRecords:[],honored:[],celebratedAge:[],seenRuler:ruler(g,f.id)?.id};dynasty(g,f.id);}
  for(const s of STRUGGLES)a.struggles[s.id]=newStruggle(s);
  return a;}
@@ -377,7 +381,7 @@ function finish(g,realm,x){const a=g.heritage,s=a.realms[realm],f=g.factions[rea
  if(x.kind==='memorial'&&x.subject)s.honored.push(x.subject);
  if(x.kind==='coming_age'&&x.subject){const p=g.politics.people[x.subject];if(p?.alive&&p.realm===realm&&p.civic){p.civic.education=cap(p.civic.education+12,0,100);s.celebratedAge.push(p.id);}}
  const attended=(x.participants||[]).filter(id=>freeAdult(g,realm,id));for(const id of attended){const p=g.politics.people[id],delta=x.quality>=55?12:x.quality<30?-8:4;if(g.chronicles)changeOpinion(g,r.id,id,delta);p.memories??=[];p.memories.push('Attended '+rule.name+' in '+g.year+'.');p.memories=p.memories.slice(-40);}
- r.memories??=[];r.memories.push('Hosted '+rule.name+' in '+g.year+' ('+x.quality+'% quality).');r.memories=r.memories.slice(-40);s.activityRecords.unshift({kind:x.kind,host:r.id,destination:x.destination,participants:attended,quality:x.quality,turn:g.turn,cost:x.cost});s.activityRecords=s.activityRecords.slice(0,20);
+ r.memories??=[];r.memories.push('Hosted '+rule.name+' in '+g.year+' ('+x.quality+'% quality).');r.memories=r.memories.slice(-40);s.activityRecords.unshift({id:x.id,kind:x.kind,host:r.id,guest:x.guest,subject:x.subject,destination:x.destination,participants:attended,quality:x.quality,turn:g.turn,cost:x.cost});s.activityRecords=s.activityRecords.slice(0,20);
  if(x.kind==='wedding'&&x.marriage)s.celebrated.push(x.marriage);
  if(x.kind==='feast'||x.kind==='tour')for(const [id,h] of Object.entries(g.politics.holdings))if(h.realm===realm&&g.provinces[id]?.owner===realm)h.loyalty=cap(h.loyalty+(x.kind==='tour'?7:5),0,100);
  if(x.kind==='tournament')for(const a of Object.values(g.armies))if(a.owner===realm)a.experience=cap(a.experience+.05,0,1);
@@ -403,9 +407,22 @@ function regionalEffect(g,realm,def,model){const f=g.factions[realm],land=region
  if(['diplomacy','commerce'].includes(model.effect))for(const id of def.members){if(id===realm||!g.factions[id]||!own(g,id).length)continue;const o=g.factions[id];f.relations[id]=cap((f.relations[id]||0)+5,-100,100);o.relations[realm]=cap((o.relations[realm]||0)+5,-100,100);}
 }
 function struggleAction(g,realm,id,kind){const a=g.heritage,x=a.struggles[id],def=STRUGGLES.find(s=>s.id===id),f=g.factions[realm],model=STRUGGLE_MODELS[id];if(!x||!def?.members.includes(realm)||x.ended!==null||!regionalLand(g,realm).length)return no('No active regional struggle for this realm.');if(g.turn-(x.last[realm]??-1000)<12)return no('Regional initiatives have a yearly cooldown.');
+ if(def.conditional){if(x.phase==='dormant'||kind!=='special'||!respondToSituation(g,realm,def))return no('A live local pressure, eligible response and sufficient resources are required.');x.last[realm]=g.turn;x.cooperation=cap(x.cooperation+15,0,100);x.influence[realm]=(x.influence[realm]||0)+10;regionalHistory(g,x,realm+': '+model.title);record(g,realm,def.name+': '+model.action);return ok('Regional response funded.');}
  const rules={mediation:[120,-12,20,10],pressure:[140,18,-8,16],commerce:[150,-5,14,12]};if(kind==='special'){if(!model.phases.includes(x.phase))return no('The regional initiative is unavailable in the current phase.');rules.special=[model.cost,-14,16,15];}const r=rules[kind];if(!r||f.treasury<r[0])return no('Invalid or unaffordable regional initiative.');f.treasury-=r[0];x.last[realm]=g.turn;x.tension=cap(x.tension+r[1],0,100);x.cooperation=cap(x.cooperation+r[2],0,100);x.influence[realm]=(x.influence[realm]||0)+r[3];if(kind==='mediation')f.legitimacy=cap(f.legitimacy+3,0,100);if(kind==='commerce')f.prestige+=4;if(kind==='special')regionalEffect(g,realm,def,model);regionalHistory(g,x,realm+': '+(kind==='special'?model.title:kind));record(g,realm,def.name+': '+kind+' initiative.');return ok('Regional initiative completed.');}
 function settleRegional(g,a,def,x,members,kind,leader=null){x.phase=kind==='negotiated'?'settlement':'resolved';x.ended=g.turn;x.outcome={kind,leader,turn:g.turn,cycle:x.cycle};regionalHistory(g,x,'Outcome: '+kind+(leader?' · '+leader:''));for(const id of members){const f=g.factions[id];if(kind==='negotiated'){f.legitimacy=cap(f.legitimacy+6,0,100);dynasty(g,id).renown+=8;}else if(id===leader){f.prestige+=12;dynasty(g,id).renown+=12;}else if(kind==='dominance')f.stability=cap(f.stability-4,0,100);}if(members.includes(g.player))record(g,g.player,def.name+' resolved: '+kind+'.');}
-function stepStruggles(g){const a=g.heritage;for(const def of STRUGGLES){const x=a.struggles[def.id],model=STRUGGLE_MODELS[def.id],members=def.members.filter(id=>g.factions[id]&&regionalLand(g,id).length),minimum=def.domestic?1:2;
+function stepConditional(g,a,def,x,members,cache){
+ const m=situationMeasure(g,def,members,cache);x.catalysts=m.values.map(v=>({name:(g.factions[v.realm]?.name||v.realm)+' · '+m.label,value:Math.round(v.value)}));
+ if(!m.available||!members.length){if(x.phase!=='dormant'&&x.ended===null)settleRegional(g,a,def,x,members,'participant loss');return;}
+ if(x.ended!==null){if(g.turn-x.ended>=60&&m.bad){x.ended=null;x.outcome=null;x.phase='dormant';x.cycle++;x.last={};x.healthyReviews=0;x.influence=Object.fromEntries(def.members.map(id=>[id,0]));}else return;}
+ if(x.phase==='dormant'){if(!m.bad)return;x.phase='rivalry';x.cooperation=20;x.healthyReviews=0;regionalHistory(g,x,'Local pressure triggered the situation');if(members.includes(g.player))record(g,g.player,def.name+' began.');}
+ x.tension=m.severity;x.phase=m.healthy?'conciliation':m.severity>=70?'hostility':m.severity>=45?'rivalry':'competition';
+ x.healthyReviews=m.healthy?(x.healthyReviews||0)+1:0;
+ if(m.healthy)x.cooperation=cap(x.cooperation+30,0,100);else x.cooperation=cap(x.cooperation-3,0,100);
+ if(x.healthyReviews>=2){settleRegional(g,a,def,x,members,'negotiated');return;}
+ for(const id of members)if(id!==g.player&&g.turn%12===0&&g.factions[id].treasury>700&&random(a)<.30)struggleAction(g,id,def.id,'special');
+}
+function stepStruggles(g){const a=g.heritage,cache=new Map();for(const p of Object.values(g.provinces)){if(p.owner==='independent'||(g.campaignWar?.occupations?.[p.id]&&g.campaignWar.occupations[p.id].by!==p.owner))continue;if(!cache.has(p.owner))cache.set(p.owner,[]);cache.get(p.owner).push(p);}for(const def of STRUGGLES){const x=a.struggles[def.id],model=STRUGGLE_MODELS[def.id],members=def.members.filter(id=>g.factions[id]&&cache.get(id)?.length),minimum=def.domestic?1:2;
+ if(def.conditional){stepConditional(g,a,def,x,members,cache);continue;}
  if(x.ended!==null){if(g.turn-x.ended>=60&&members.length>=minimum){x.ended=null;x.phase='competition';x.tension=30;x.cooperation=30;x.cycle++;x.influence=Object.fromEntries(def.members.map(id=>[id,0]));x.last={};x.outcome=null;regionalHistory(g,x,'New regional cycle');}continue;}
  if(members.length<minimum){settleRegional(g,a,def,x,members,'participant loss',members[0]||null);continue;}let wars=0,treaties=0;for(let i=0;i<members.length;i++)for(let j=i+1;j<members.length;j++){const p=members[i],q=members[j];if(Object.values(g.conflict.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(p)&&[w.attacker,w.defender].includes(q)))wars++;if(g.factions[p].treaties[q]==='alliance'||g.kingdom.tradePacts[[p,q].sort().join('|')])treaties++;}
  const [warWeight,treatyWeight,cooperationWeight]=model.weights;let tension=wars*warWeight+treaties*treatyWeight+(wars?1:0),cooperation=treaties*cooperationWeight-wars*2;x.catalysts=[...(wars?[{name:'Active regional wars',value:wars}]:[]),...(treaties?[{name:'Regional agreements',value:treaties}]:[])];

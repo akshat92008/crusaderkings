@@ -1,3 +1,4 @@
+import {invasionReserved} from './invasion-reservations.js';
 import {campaignArmyPower,campaignGarrison,automaticDefense} from './border-battle.js';
 import {applyFieldForceLosses} from './field-forces.js';
 import {nonAggression,aidStrength,diplomaticSupport,fieldContingentsAt} from './diplomacy-systems.js';
@@ -16,6 +17,11 @@ const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
 const troops=a=>Math.max(0,(a?.infantry||0)+(a?.archers||0)+(a?.cavalry||0));
 const armyPower=(g,a)=>campaignArmyPower(a,armyReadiness(g,a));
 const armiesOf=(g,id)=>Object.values(g.armies).filter(a=>a.owner===id&&!a.contingent&&!embarked(g,a.id));
+export function nativeInvasionArmies(g,threat){
+ const primary=g.armies[threat.army];
+ if(!primary)return [];
+ return [...new Set([threat.army,...(threat.armies||[])])].map(id=>g.armies[id]).filter(a=>a&&a.owner===threat.by&&a.province===primary.province&&!a.contingent&&!embarked(g,a.id)&&troops(a)>0);
+}
 const trace=(world,start,goal,owner,g)=>{
   if(start===goal)return [start];
   const byId=new Map(world.provinces.map(p=>[p.id,p])),queue=[[start]],seen=new Set([start]);
@@ -40,15 +46,23 @@ export function findInvasionOptions(g,world){
    if(nonAggression(g,rival,player)||hasTruce(g,rival,player)||['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
    const warChest=g.factions[rival].treasury;
    if(warChest<90)continue;
-   for(const army of armiesOf(g,rival)){
-    if(troops(army)<65||embarked(g,army.id))continue;
+   const local=new Map();
+   for(const a of armiesOf(g,rival)){
+    if(troops(a)<=0||invasionReserved(g,a.id)||controller(g,a.province)!==rival||g.provinces[a.province]?.owner!==rival)continue;
+    if(!local.has(a.province))local.set(a.province,[]);
+    local.get(a.province).push(a);
+   }
+   for(const group of local.values()){
+    group.sort((a,b)=>troops(b)-troops(a)||a.id.localeCompare(b.id));
+    const army=group[0];
+    if(group.reduce((n,a)=>n+troops(a),0)<65)continue;
     const path=trace(world,army.province,neighborId,rival,g);
     if(!path)continue;
-    const power=armyPower(g,army)+aidStrength(g,rival,player)+fieldContingentsAt(g,rival,army.province,player).reduce((n,a)=>n+armyPower(g,a),0);
+    const power=group.reduce((n,a)=>n+armyPower(g,a),0)+aidStrength(g,rival,player)+fieldContingentsAt(g,rival,army.province,player).reduce((n,a)=>n+armyPower(g,a),0);
     const alliedDefense=fieldContingentsAt(g,player,target.id,rival).reduce((n,a)=>n+armyPower(g,a),0);
     const advantage=power/Math.max(1,defense+alliedDefense+defenseSupport(g,player,rival)),distance=path.length-1;
     candidates.push({
-      by:rival,army:army.id,province:target.id,staging:neighborId,
+      by:rival,army:army.id,armies:group.map(a=>a.id),province:target.id,staging:neighborId,
       path:path.slice(1),eta:3+distance,status:'approaching',
       advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)+(strategicPlan(g,rival)?.target===player&&strategicPlan(g,rival)?.goal==='conquer'?1:0)
     });
@@ -101,7 +115,7 @@ export function progressEnemyInvasions(g,world){
   if(threat.path?.length&&enemy.province!==threat.staging){
    const next=threat.path.shift();
    if(g.provinces[next]?.owner!==threat.by||controller(g,next)!==threat.by||!world.provinces.find(p=>p.id===enemy.province)?.neighbors.includes(next))continue;
-   for(const unit of [enemy,...fieldContingentsAt(g,threat.by,enemy.province,g.player)]){onArmyMarch(g,unit);unit.province=next;}
+   for(const unit of [...nativeInvasionArmies(g,threat),...fieldContingentsAt(g,threat.by,enemy.province,g.player)]){onArmyMarch(g,unit);unit.province=next;}
   }
   threat.eta=Math.max(0,threat.eta-1);
   if(threat.eta===0){
@@ -124,7 +138,7 @@ export function resolveInvasion(g,world,threat,result){
  const province=g.provinces[found.province],attacker=g.armies[found.army];
  if(!validReadyInvasion(g,world,found))return {ok:false,msg:'The invasion is no longer valid'};
  const human=[...armiesOf(g,g.player).filter(a=>a.province===found.province),...fieldContingentsAt(g,g.player,found.province,found.by)];
- const invaders=[attacker,...fieldContingentsAt(g,found.by,attacker.province,g.player)];
+ const invaders=[...nativeInvasionArmies(g,found),...fieldContingentsAt(g,found.by,attacker.province,g.player)];
  const playerRatio=clamp(result.attackerRemaining??.5,0,1);
  const enemyRatio=clamp(result.enemyRemaining??(result.victory?.45:.78),0,1);
  if(result.fieldBattle)applyFieldForceLosses(human,result,'attacker',playerRatio);
@@ -135,7 +149,7 @@ export function resolveInvasion(g,world,threat,result){
  const defended=Boolean(result.victory);
  const war=activeWar(g,found.by,g.player);
  if(defended){
-  if(enemyRatio<.3)captureCommander(g,g.player,attacker);
+  if(enemyRatio<.3)for(const a of invaders)captureCommander(g,g.player,a);
   g.factions[g.player].prestige+=8;
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
  }else{
@@ -165,6 +179,6 @@ export function autoResolveInvasion(g,world,threat){
  if(!target||!army)return {ok:false,msg:'Invasion no longer active'};
  const defense=campaignGarrison(target)+defenseSupport(g,g.player,threat.by)+
   [...armiesOf(g,g.player).filter(a=>a.province===threat.province),...fieldContingentsAt(g,g.player,threat.province,threat.by)].reduce((sum,a)=>sum+armyPower(g,a),0);
- const offense=[army,...fieldContingentsAt(g,threat.by,army.province,g.player)].reduce((sum,a)=>sum+armyPower(g,a),0)+aidStrength(g,threat.by,g.player);
+ const offense=[...nativeInvasionArmies(g,threat),...fieldContingentsAt(g,threat.by,army.province,g.player)].reduce((sum,a)=>sum+armyPower(g,a),0)+aidStrength(g,threat.by,g.player);
  return resolveInvasion(g,world,threat,automaticDefense(offense,defense));
 }

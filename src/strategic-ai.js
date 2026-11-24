@@ -1,3 +1,4 @@
+import {invasionReserved} from './invasion-reservations.js';
 import {humanControlsRealm} from './player-career.js';
 import {campaignArmyPower,campaignGarrison} from './border-battle.js';
 import {nearestOwnedRoute} from './campaign-balance.js';
@@ -21,7 +22,7 @@ export function temperament(g,realm){const r=ruler(g,realm),t=r?.traits||[],has=
 const lessonKey=(r,o)=>r+'|'+o;
 export function battleLesson(g,r,o){const x=g.strategy?.lessons?.[lessonKey(r,o)];return x&&g.turn-x.last<=36?x:null;}
 export function recordStrategicBattle(g,r,o,won,loss=0){if(!g.factions[r]||!g.factions[o]||r===o)return;const s=initStrategy(g),old=battleLesson(g,r,o);s.lessons[lessonKey(r,o)]={wins:(old?.wins||0)+(won?1:0),losses:(old?.losses||0)+(won?0:1),streak:won?0:Math.min(5,(old?.streak||0)+1),last:g.turn,loss:cap(loss,0,1),result:won?'victory':'defeat'};if(!won&&s.plans[r])s.plans[r].review=Math.min(s.plans[r].review,g.turn+3);}
-export function localCampaignForces(g,army){return Object.values(g.armies).filter(a=>a.owner===army.owner&&!a.contingent&&a.province===army.province&&size(a)>0&&!embarked(g,a.id)&&!g.kingdom?.threats?.some(t=>t.army===a.id)).sort((a,b)=>a.id.localeCompare(b.id));}
+export function localCampaignForces(g,army){return Object.values(g.armies).filter(a=>a.owner===army.owner&&!a.contingent&&a.province===army.province&&size(a)>0&&!embarked(g,a.id)&&!invasionReserved(g,a.id)).sort((a,b)=>a.id.localeCompare(b.id));}
 export function localCampaignPower(g,army){return localCampaignForces(g,army).reduce((n,a)=>n+campaignArmyPower(a,armyReadiness(g,a)),0);}
 export function militaryStrength(g,realm){return Object.values(g.armies).filter(a=>a.owner===realm&&!a.contingent&&!embarked(g,a.id)).reduce((n,a)=>n+campaignArmyPower(a,armyReadiness(g,a)),0);}
 export function borderRealms(g,world,realm){const set=new Set();for(const p of world.provinces){if(controller(g,p.id)!==realm)continue;for(const id of p.neighbors||[]){const other=controller(g,id);if(other&&other!==realm&&other!=='independent'&&g.factions[other])set.add(other);}}return [...set];}
@@ -40,7 +41,7 @@ export function strategyAction(g,world,action,id,extra){initStrategy(g,world);co
  return {ok:false,msg:'Unknown strategy order.'};}
 function positionArmy(g,world,realm,plan){
  if(!plan.target||!['defend','conquer'].includes(plan.goal))return;
- const armies=Object.values(g.armies).filter(a=>a.owner===realm&&!a.contingent&&!embarked(g,a.id)&&size(a)>45&&!g.kingdom.threats.some(t=>t.army===a.id)&&controller(g,a.province)===realm).sort((a,b)=>size(b)-size(a)||a.id.localeCompare(b.id));if(!armies.length)return;
+ const armies=Object.values(g.armies).filter(a=>a.owner===realm&&!a.contingent&&!embarked(g,a.id)&&size(a)>45&&!invasionReserved(g,a.id)&&controller(g,a.province)===realm).sort((a,b)=>size(b)-size(a)||a.id.localeCompare(b.id));if(!armies.length)return;
  const borders=world.provinces.filter(p=>controller(g,p.id)===realm&&p.neighbors.some(id=>controller(g,id)===plan.target));if(!borders.length)return;
  const principal=armies[0],objective=war(g,realm,plan.target)?.goal,ranked=borders.map(p=>({id:p.id,score:Math.max(...p.neighbors.filter(id=>controller(g,id)===plan.target).map(id=>strategicTargetScore(g,world,principal,g.provinces[id])))+(p.neighbors.includes(objective)?50:0)})).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
  const occupied=new Set(),escorted=new Set(),max=plan.goal==='conquer'?Math.min(armies.length,3):Math.min(armies.length,Math.max(1,borders.length));for(const a of armies.slice(0,max)){const destinations=plan.goal==='conquer'?ranked.map(x=>x.id):[...ranked.filter(x=>!occupied.has(x.id)).map(x=>x.id),...ranked.filter(x=>occupied.has(x.id)).map(x=>x.id)];let route=null;for(const dest of destinations){route=nearestOwnedRoute(world,a.province,[dest],id=>controller(g,id)===realm);if(route)break;}if(route){occupied.add(route.at(-1));if(route.length>1){for(const unit of [a,...fieldContingentsAt(g,realm,a.province,plan.target).filter(unit=>!escorted.has(unit.id))]){escorted.add(unit.id);onArmyMarch(g,unit);unit.province=route[1];}}}}
