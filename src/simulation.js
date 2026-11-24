@@ -1,3 +1,4 @@
+import {capitalDistrict} from './historical-world.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {campaignWorld} from './independence-systems.js';
 import {captureCommander} from './feudal-systems.js';
@@ -25,7 +26,7 @@ export function createGame(world,player='ottomans'){
  for(const faction of world.factions){
   let owned=world.provinces.filter(p=>p.owner===faction.id);if(!owned.length)continue;
   owned.sort((a,b)=>Math.hypot(a.centroid[0]-faction.capital[0],a.centroid[1]-faction.capital[1])-Math.hypot(b.centroid[0]-faction.capital[0],b.centroid[1]-faction.capital[1]));
-  const prov=owned[0];const qty=155+(faction.id.length*13)%60;
+  const seat=world.meta?.mapVersion?.startsWith('atlas-1450-')?capitalDistrict(world,faction.id):null,prov=owned.find(p=>p.id===seat?.id)||owned[0];const qty=155+(faction.id.length*13)%60;
   const troopMix=startingTroops(faction,qty);
   armies['a'+nextId]={id:'a'+nextId++,owner:faction.id,province:prov.id,...troopMix,experience:0.08,morale:78,commander:`Commander of ${faction.name}`,doctrine:militaryDoctrine(faction).id};
  }

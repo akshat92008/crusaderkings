@@ -29,21 +29,344 @@ function overlaps(a,b){for(const x of a.geometry.coordinates)for(const y of b.ge
 export function rebuildNeighbors(ps){const edges=new Map(),links=new Map(ps.map(p=>[p.id,new Set()]));for(const p of ps){for(const ring of p.geometry.coordinates){for(let i=1;i<ring.length;i++){const a=ring[i-1],b=ring[i];if(distance(a,b)<.002)continue;const k=edgeKey(a,b);if(!edges.has(k))edges.set(k,[]);edges.get(k).push(p.id);}}}for(const ids of edges.values())for(const a of ids)for(const b of ids)if(a!==b)links.get(a).add(b);
  const boxes=ps.map(p=>bounds(p.geometry.coordinates));for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){const a=boxes[i],b=boxes[j];if(links.get(ps[i].id).has(ps[j].id)||a[0]>b[1]+.002||b[0]>a[1]+.002||a[2]>b[3]+.002||b[2]>a[3]+.002)continue;if(overlaps(ps[i],ps[j])){links.get(ps[i].id).add(ps[j].id);links.get(ps[j].id).add(ps[i].id);}}
  for(const p of ps)p.neighbors=[...links.get(p.id)].sort();return ps;}
+// Select a playable seat without treating a nearest district as a verified capital.
+export function capitalDistrict(world,realm,state=null){const f=world.factions.find(f=>f.id===realm);if(!f)return null;const owns=p=>(state?state[p.id]?.owner:p.owner)===realm,owned=world.provinces.filter(owns);if(!owned.length)return null;
+ const matches=owned.filter(p=>rings(p.geometry).some(poly=>inPoly(...f.capital,poly)));const candidates=matches.length?matches:owned;const district=candidates.slice().sort((a,b)=>distance(a.centroid,f.capital)-distance(b.centroid,f.capital)||a.id.localeCompare(b.id))[0];return {id:district.id,method:matches.length?'contains reference center':'nearest owned district'};}
+// Connected components use actual playable land links. Never infer a land bridge from proximity.
+export function landComponents(world){const byId=new Map(world.provinces.map(p=>[p.id,p])),seen=new Set(),components=[];for(const p of world.provinces){if(seen.has(p.id))continue;const queue=[p.id];seen.add(p.id);for(let i=0;i<queue.length;i++)for(const n of byId.get(queue[i]).neighbors||[])if(byId.has(n)&&!seen.has(n)){seen.add(n);queue.push(n);}components.push(queue.sort());}return components.sort((a,b)=>b.length-a.length||a[0].localeCompare(b[0]));}
+export function realmGeography(world,realm,state=null){const owner=p=>(state?state[p.id]?.owner:p.owner),owned=world.provinces.filter(p=>owner(p)===realm),local=new Set(owned.map(p=>p.id)),components=landComponents({provinces:owned.map(p=>({...p,neighbors:p.neighbors.filter(n=>local.has(n))}))});return {districts:owned.length,components:components.length,largest:components[0]?.length||0,isolated:owned.filter(p=>p.neighbors.length===0).length};}
+export function historicalPolityIndex(world){const index=new Map();for(const p of world.provinces){if(!p.historicalPolity)continue;const row=index.get(p.historicalPolity)||{name:p.historicalPolity,districts:[],owners:{},unassigned:0};row.districts.push(p.id);row.owners[p.owner]=(row.owners[p.owner]||0)+1;if(p.owner==='independent')row.unassigned++;index.set(row.name,row);}return [...index.values()].sort((a,b)=>a.name.localeCompare(b.name));}
+export function atlasCoverage(world){const result={reference:0,'regional approximation':0,'playability approximation':0,unassigned:0,legacy:0,referencePolities:0,unmappedPolities:0,isolated:0};const named=new Set(),unmapped=new Set();for(const p of world.provinces){const k=p.ownershipSource||'legacy';if(Object.hasOwn(result,k))result[k]++;if(p.historicalPolity){named.add(p.historicalPolity);if(p.owner==='independent')unmapped.add(p.historicalPolity);}if(!p.neighbors.length)result.isolated++;}result.referencePolities=named.size;result.unmappedPolities=unmapped.size;return result;}
 export function buildHistoricalWorld(legacy,history){if(!history?.features?.length)return legacy;
  const factions=legacy.factions.map(f=>({...f,capital:capitals[f.id]||f.capital.slice()})),byName=new Map(Object.entries(aliases).flatMap(([id,names])=>names.map(n=>[n,id]))),byId=new Map(factions.map(f=>[f.id,f]));
  const refs=history.features.filter(f=>f.geometry&&f.properties?.name).flatMap(f=>rings(f.geometry).map(poly=>({name:f.properties.name,owner:byName.get(f.properties.name)||'independent',poly,b:bounds(poly),area:area(poly)}))).sort((a,b)=>a.area-b.area);
  const ps=[];for(const src of legacy.provinces){const parts=rings(src.geometry).slice().sort((a,b)=>area(b)-area(a));for(let i=0;i<parts.length;i++){const poly=parts[i];if(area(poly)<=1e-8)continue;const pts=samples(poly),c=center(poly,pts),votes=new Map();for(const point of pts){const ref=refs.find(f=>insideBox(point,f.b)&&inPoly(...point,f.poly));const name=ref?.name||'';votes.set(name,(votes.get(name)||0)+1);}
  const voted=[...votes].filter(([n])=>n).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0],ref=voted&&voted[1]>=Math.max(1,Math.ceil(pts.length*.25))?voted[0]:'',historicalOwner=byName.get(ref)||'independent';let owner=historicalOwner,source=owner==='independent'?'unassigned':'reference';
  if(!ref){const candidates=Object.keys(fallback).filter(id=>insideBox(c,fallback[id])).sort((a,b)=>distance(c,byId.get(a).capital)-distance(c,byId.get(b).capital));if(candidates.length){owner=candidates[0];source='regional approximation';}}
- ps.push({...src,id:i?src.id+'-'+i:src.id,owner,centroid:c,continent:region(c),geometry:{type:'Polygon',coordinates:poly},neighbors:[],historicalPolity:ref||null,ownershipSource:source,legacyId:src.id,population:i?Math.max(4,Math.round(src.population*.2)):src.population,development:i?1:src.development,fort:i?false:src.fort});}}
+ ps.push({...src,id:i?src.id+'-'+i:src.id,owner,centroid:c,continent:region(c),geometry:{type:'Polygon',coordinates:poly},neighbors:[],historicalPolity:ref||null,referenceSamples:pts.length,referenceMatches:voted?.[1]||0,ownershipSource:source,legacyId:src.id,population:i?Math.max(4,Math.round(src.population*.2)):src.population,development:i?1:src.development,fort:i?false:src.fort});}}
  // Ensure all starting playable profiles retain one district. Prefer a local
  // district from their reference/fallback region; never silently consume another
  // realm's last district. This is an explicit playability approximation.
  const count=id=>ps.filter(p=>p.owner===id).length;
- const volga=ps.find(p=>p.id==='p19'&&p.geometry.coordinates.length===1);if(volga&&!count('muscovy')&&volga.owner==='horde'){const south=[clipLatitude(volga.geometry.coordinates[0],54.5,false)],north=[clipLatitude(volga.geometry.coordinates[0],54.5,true)];if(south[0].length>=4&&north[0].length>=4){const original=volga.population,base={...volga};volga.geometry={type:'Polygon',coordinates:south};volga.centroid=center(south,samples(south));volga.population=Math.max(4,Math.round(original*.55));volga.ownershipSource='regional approximation';ps.push({...base,id:'p19-north',owner:'muscovy',geometry:{type:'Polygon',coordinates:north},centroid:center(north,samples(north)),population:Math.max(4,original-volga.population),historicalPolity:'Grand Principality of Moscow',ownershipSource:'regional approximation',neighbors:[]});}}
+ const volga=ps.find(p=>p.id==='p19'&&p.geometry.coordinates.length===1);if(volga&&!count('muscovy')&&volga.owner==='horde'){const south=[clipLatitude(volga.geometry.coordinates[0],54.5,false)],north=[clipLatitude(volga.geometry.coordinates[0],54.5,true)];if(south[0].length>=4&&north[0].length>=4){const original=volga.population,base={...volga};volga.geometry={type:'Polygon',coordinates:south};volga.centroid=center(south,samples(south));volga.population=Math.max(4,Math.round(original*.55));volga.ownershipSource='regional approximation';volga.referenceSamples=null;volga.referenceMatches=null;ps.push({...base,id:'p19-north',owner:'muscovy',geometry:{type:'Polygon',coordinates:north},centroid:center(north,samples(north)),population:Math.max(4,original-volga.population),historicalPolity:'Grand Principality of Moscow',referenceSamples:null,referenceMatches:null,ownershipSource:'regional approximation',neighbors:[]});}}
  for(const f of factions){if(count(f.id))continue;const options=ps.filter(p=>p.owner==='independent'||count(p.owner)>1).filter(p=>distance(p.centroid,f.capital)<12).sort((a,b)=>{const score=p=>distance(p.centroid,f.capital)+(p.owner==='independent'?0:4)-(inPoly(...f.capital,p.geometry.coordinates)?20:0)-(byName.get(p.historicalPolity)===f.id?12:0);return score(a)-score(b)||a.id.localeCompare(b.id);});const p=options[0];if(p){p.owner=f.id;p.ownershipSource='playability approximation';}}
  const labels={};for(const p of ps){const label=p.owner==='independent'?(p.historicalPolity||p.continent+' independent'):byId.get(p.owner)?.name||p.owner;const n=(labels[label]||0)+1;labels[label]=n;p.name=label+' · District '+n;}
  rebuildNeighbors(ps);
- return {meta:{...legacy.meta,title:'Crown of Nations 1450 — Historical Atlas',mapVersion:MAP_VERSION,provinceCount:ps.length,caveat:'Synthetic gameplay districts aligned approximately to incomplete 1450 polity references; aggregated realms and fallback regions are not verified historical boundaries.',mapSource:'Natural Earth public domain; Cliopatria/Seshat CC BY 4.0, adapted'},factions,provinces:ps};
+ const geography={factions,provinces:ps},components=landComponents(geography);for(const [i,ids] of components.entries())for(const id of ids){const p=ps.find(p=>p.id===id);p.landComponent=i+1;p.landComponentSize=ids.length;}for(const f of factions){f.startingSeat=capitalDistrict(geography,f.id);f.startingGeography=realmGeography(geography,f.id);}
+ return {meta:{...legacy.meta,coverage:atlasCoverage(geography),landConnectivity:{components:components.length,largest:components[0]?.length||0},title:'Crown of Nations 1450 — Historical Atlas',mapVersion:MAP_VERSION,provinceCount:ps.length,caveat:'Synthetic gameplay districts aligned approximately to incomplete 1450 polity references; aggregated realms and fallback regions are not verified historical boundaries.',mapSource:'Natural Earth public domain; Cliopatria/Seshat CC BY 4.0, adapted'},factions,provinces:ps};
 }
-export function worldForSave(raw,legacy,atlas){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;throw Error('Saved map version is unavailable');}
+// Version 3 adds reference-based starting profiles without altering version 2.
+export const EXPANDED_MAP_VERSION='atlas-1450-v3';
+export const ATLAS_ADDITIONS=[
+ {
+  "id": "scotland",
+  "name": "Kingdom of Scotland",
+  "continent": "Europe",
+  "capital": [
+   -3.19,
+   55.95
+  ],
+  "government": "Monarchy",
+  "color": "#476d96",
+  "specialty": "highland",
+  "doctrineProfile": "highland",
+  "civicProfile": [
+   "feudal",
+   "Scottish",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Kingdom of Scotland"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "brittany",
+  "name": "Duchy of Brittany",
+  "continent": "Europe",
+  "capital": [
+   -1.55,
+   47.22
+  ],
+  "government": "Duchy",
+  "color": "#a89b81",
+  "specialty": "chivalry",
+  "doctrineProfile": "chivalry",
+  "civicProfile": [
+   "feudal",
+   "Breton",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Duchy of Brittany"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "kalmar",
+  "name": "Kalmar Union",
+  "continent": "Europe",
+  "capital": [
+   12.57,
+   55.68
+  ],
+  "government": "Union monarchy",
+  "color": "#b6a25c",
+  "specialty": "maritime",
+  "doctrineProfile": "maritime",
+  "civicProfile": [
+   "feudal",
+   "Scandinavian",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Kalmar Union",
+   "(Kalmar Union)"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "genoa",
+  "name": "Republic of Genoa",
+  "continent": "Europe",
+  "capital": [
+   8.93,
+   44.41
+  ],
+  "government": "Merchant republic",
+  "color": "#97485e",
+  "specialty": "maritime",
+  "doctrineProfile": "maritime",
+  "civicProfile": [
+   "republic",
+   "Ligurian",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Republic of Genoa"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "venice",
+  "name": "Republic of Venice",
+  "continent": "Europe",
+  "capital": [
+   12.33,
+   45.44
+  ],
+  "government": "Merchant republic",
+  "color": "#985a35",
+  "specialty": "maritime",
+  "doctrineProfile": "maritime",
+  "civicProfile": [
+   "republic",
+   "Venetian",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Republic of Venice"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "cyprus",
+  "name": "Kingdom of Cyprus",
+  "continent": "Asia",
+  "capital": [
+   33.36,
+   35.17
+  ],
+  "government": "Monarchy",
+  "color": "#8c83ac",
+  "specialty": "chivalry",
+  "doctrineProfile": "chivalry",
+  "civicProfile": [
+   "feudal",
+   "Cypriot",
+   "Christian traditions"
+  ],
+  "referenceNames": [
+   "Kingdom of Cyprus"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "oirats",
+  "name": "Four Oirats",
+  "continent": "Asia",
+  "capital": [
+   96,
+   47
+  ],
+  "government": "Confederation",
+  "color": "#9a785a",
+  "specialty": "steppe",
+  "doctrineProfile": "steppe",
+  "civicProfile": [
+   "steppe",
+   "Oirat",
+   "Buddhist and local traditions"
+  ],
+  "referenceNames": [
+   "Four Oirats"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "chagatai",
+  "name": "Chagatai Khanate",
+  "continent": "Asia",
+  "capital": [
+   81.3,
+   43.9
+  ],
+  "government": "Khanate",
+  "color": "#727ca1",
+  "specialty": "steppe",
+  "doctrineProfile": "steppe",
+  "civicProfile": [
+   "steppe",
+   "Chagatai",
+   "Islamic and local traditions"
+  ],
+  "referenceNames": [
+   "Chagatai Khanate"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "tibet",
+  "name": "Tibetan polities",
+  "continent": "Asia",
+  "capital": [
+   91.13,
+   29.65
+  ],
+  "government": "Regional polities",
+  "color": "#9d8447",
+  "specialty": "highland",
+  "doctrineProfile": "highland",
+  "civicProfile": [
+   "regional",
+   "Tibetan",
+   "Tibetan Buddhism"
+  ],
+  "referenceNames": [
+   "Tibet"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "lanxang",
+  "name": "Lan Xang",
+  "continent": "Asia",
+  "capital": [
+   102.14,
+   19.89
+  ],
+  "government": "Monarchy",
+  "color": "#739753",
+  "specialty": "elephant",
+  "doctrineProfile": "elephant",
+  "civicProfile": [
+   "tributary",
+   "Lao",
+   "Theravada Buddhism"
+  ],
+  "referenceNames": [
+   "Lan Xang"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "sunda",
+  "name": "Sunda Kingdom",
+  "continent": "Asia",
+  "capital": [
+   106.8,
+   -6.6
+  ],
+  "government": "Monarchy",
+  "color": "#478b83",
+  "specialty": "river",
+  "doctrineProfile": "river",
+  "civicProfile": [
+   "regional",
+   "Sundanese",
+   "Hindu-Buddhist and local traditions"
+  ],
+  "referenceNames": [
+   "Sunda Kingdom"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "zayyanid",
+  "name": "Zayyanid realm",
+  "continent": "Africa",
+  "capital": [
+   -1.32,
+   34.88
+  ],
+  "government": "Sultanate",
+  "color": "#a97153",
+  "specialty": "chivalry",
+  "doctrineProfile": "chivalry",
+  "civicProfile": [
+   "sultanate",
+   "Maghrebi",
+   "Sunni Islam"
+  ],
+  "referenceNames": [
+   "Zayyanid dynasty"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ }
+];
+export function expandHistoricalWorld(atlas){
+ if(atlas.meta?.mapVersion!==MAP_VERSION)return atlas;
+ const world=JSON.parse(JSON.stringify(atlas)),added=[];
+ for(const profile of ATLAS_ADDITIONS){const districts=world.provinces.filter(p=>p.owner==='independent'&&profile.referenceNames.includes(p.historicalPolity)&&Number.isFinite(p.referenceSamples)&&p.referenceSamples>0&&p.referenceMatches/p.referenceSamples>=.5);if(!districts.length)continue;
+ const {referenceNames,...f}=JSON.parse(JSON.stringify(profile));f.initialTreasury=1000+Math.min(600,districts.length*50);f.referenceNames=referenceNames;f.referenceProfile=true;world.factions.push(f);added.push(f.id);
+ for(const [i,p] of districts.entries()){p.owner=f.id;p.ownershipSource='reference';p.name=f.name+' · District '+(i+1);}}
+ for(const f of world.factions){f.startingSeat=capitalDistrict(world,f.id);f.startingGeography=realmGeography(world,f.id);}
+ world.meta={...world.meta,mapVersion:EXPANDED_MAP_VERSION,coverage:atlasCoverage(world),addedProfiles:added,caveat:'Synthetic districts aligned approximately to incomplete 1450 polity references. Additional playable profiles and political-center coordinates are gameplay abstractions; borders are not verified.'};return world;
+}
+// v4 refines large gameplay polygons. These subdivisions are not historical counties.
+export const DENSE_MAP_VERSION='atlas-1450-v4';
+function splitRing(ring,axis,line,high){const inside=p=>high?p[axis]>=line:p[axis]<=line,out=[];let a=ring[ring.length-2];for(const b of ring.slice(0,-1)){if(inside(a)!==inside(b)){const t=(line-a[axis])/(b[axis]-a[axis]),q=[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])];q[axis]=line;out.push(q);}if(inside(b))out.push(b.slice());a=b;}if(out.length)out.push(out[0].slice());return out;}
+function splitDistrict(p){const poly=p.geometry.coordinates;if(poly.length!==1||p.population<8||area(poly)<1)return null;const b=bounds(poly);if(b[1]-b[0]>180)return null;const order=(b[1]-b[0])*Math.cos(p.centroid[1]*Math.PI/180)>b[3]-b[2]?[0,1]:[1,0],ring=poly[0],total=area(poly);
+ for(const axis of order)for(const fraction of [.5,.4,.6]){const line=b[axis*2]+(b[axis*2+1]-b[axis*2])*fraction;if(ring.some(q=>Math.abs(q[axis]-line)<1e-7))continue;let crossings=0;for(let i=1;i<ring.length;i++)if((ring[i-1][axis]<line)!==(ring[i][axis]<line))crossings++;if(crossings!==2)continue;
+ const parts=[[splitRing(ring,axis,line,false)],[splitRing(ring,axis,line,true)]],areas=parts.map(area);if(parts.some(q=>q[0].length<4)||areas.some(a=>a<total*.23)||Math.abs(areas[0]+areas[1]-total)>1e-6*Math.max(1,total))continue;
+ const pts=parts.map(samples);if(pts.some(a=>!a.length))continue;const centers=parts.map((q,i)=>center(q,pts[i]));if(centers.some((q,i)=>!inPoly(...q,parts[i])))continue;
+ const primary=inPoly(...p.centroid,parts[1])?1:0,minor=1-primary,majorPop=Math.max(4,Math.min(p.population-4,Math.round(p.population*areas[primary]/total))),make=(i,id,pop,fort)=>({...p,id,geometry:{type:'Polygon',coordinates:parts[i]},centroid:centers[i],population:pop,fort,neighbors:[],parentDistrict:p.id,subdivision:true,referenceSamples:null,referenceMatches:null,referenceInherited:true});return [make(primary,p.id,majorPop,p.fort),make(minor,p.id+'-sub',p.population-majorPop,false)];}
+ return null;}
+// Broad geographic descriptors, not historical administrative borders.
+const GEOGRAPHIC_REGIONS=[["Iceland",[-26,-12,62,68]],["British Isles",[-11,2,49,61]],["Iberia",[-10,4,35,44]],["Scandinavia",[4,32,55,72]],["Baltic",[13,32,51,60]],["Italy",[6,19,35,48]],["France",[-5,8,43,51]],["Central Europe",[5,22,46,55]],["Balkans",[18,30,36,47]],["Anatolia",[26,45,35,43]],["Caucasus",[39,51,40,46]],["Pontic Steppe",[28,51,44,52]],["Volga",[39,58,52,62]],["Eastern Europe",[22,45,49,67]],["Maghreb",[-12,12,28,37]],["Nile Valley",[27,35,16,32]],["Red Sea hinterland",[34,44,12,28]],["Horn of Africa",[36,52,2,15]],["Sahel",[-18,34,10,19]],["Sahara",[-18,35,19,30]],["East African coast",[35,45,-20,2]],["Congo Basin",[10,30,-12,6]],["Southern Africa",[10,40,-35,-15]],["Arabia",[35,60,12,32]],["Iranian Plateau",[45,64,25,40]],["Central Asian Steppe",[49,88,39,56]],["Siberia",[55,180,56,82]],["Himalayas",[73,98,27,36]],["Indus region",[66,77,23,33]],["Bengal Delta",[87,93,20,26]],["Gangetic Plain",[76,90,23,31]],["Deccan",[73,83,9,22]],["Mongolian Plateau",[87,121,39,55]],["North China",[100,124,33,42]],["South China",[100,123,19,33]],["Korean Peninsula",[124,131,33,43]],["Japanese Islands",[129,146,29,46]],["Mainland Southeast Asia",[92,109,8,27]],["Malay Peninsula",[98,105,0,8]],["Sumatra",[94,106,-6,6]],["Java",[105,115,-9,-5]],["Borneo",[108,119,-5,8]],["Philippines",[117,128,5,22]],["Eastern Indonesian Islands",[115,142,-12,2]],["New Guinea",[130,151,-11,1]],["Australia",[112,154,-45,-11]],["Aotearoa",[165,180,-48,-33]],["South Pacific",[155,180,-30,-10]],["Alaska",[-180,-130,52,75]],["North American Pacific Coast",[-130,-116,32,60]],["Great Lakes",[-93,-74,40,50]],["North American Interior",[-116,-82,30,60]],["Atlantic North America",[-82,-52,28,56]],["Mesoamerica",[-118,-76,8,32]],["Caribbean",[-86,-59,9,28]],["Northern Andes",[-82,-65,-5,12]],["Central Andes",[-82,-65,-24,-5]],["Amazon Basin",[-76,-48,-17,6]],["Brazilian Highlands",[-56,-34,-27,-5]],["Southern Andes",[-76,-65,-56,-24]],["Southern Plains",[-65,-50,-56,-23]]];
+export function districtRegion(p){const [x,y]=p.centroid;const found=GEOGRAPHIC_REGIONS.find(([,b])=>insideBox([x,y],b));if(found)return found[0];const lat=Math.abs(y)>=60?'Polar':Math.abs(y)>=35?'Temperate':Math.abs(y)>=23?'Subtropical':'Tropical';return lat+' '+p.continent;}
+export function nameAtlasDistricts(world){const groups=new Map();for(const p of world.provinces){p.regionName=districtRegion(p);const entries=groups.get(p.regionName)||[];entries.push(p);groups.set(p.regionName,entries);}for(const [name,entries] of groups){entries.sort((a,b)=>b.centroid[1]-a.centroid[1]||a.centroid[0]-b.centroid[0]||a.id.localeCompare(b.id));for(const [i,p] of entries.entries()){p.name=name+' · '+(i+1);p.nameSource='geographic gameplay label';}}return world;}
+export function densifyHistoricalWorld(expanded){if(expanded.meta?.mapVersion!==EXPANDED_MAP_VERSION)return expanded;const world=JSON.parse(JSON.stringify(expanded)),parents=new Map(),ordered=world.provinces.filter(p=>p.owner!=='independent').sort((a,b)=>area(b.geometry.coordinates)*Math.cos(b.centroid[1]*Math.PI/180)-area(a.geometry.coordinates)*Math.cos(a.centroid[1]*Math.PI/180)||a.id.localeCompare(b.id));
+ for(const p of ordered){if(parents.size>=90)break;const parts=splitDistrict(p);if(parts)parents.set(p.id,parts);}
+ world.provinces=world.provinces.flatMap(p=>parents.get(p.id)||[p]);rebuildNeighbors(world.provinces);
+ // Reject a split if either the internal link or a preexisting external land edge disappeared.
+ const oldBy=new Map(expanded.provinces.map(p=>[p.id,p])),find=new Map(world.provinces.map(p=>[p.id,p])),invalid=new Set();
+ for(const [id,parts] of parents){if(!find.get(id).neighbors.includes(parts[1].id)){invalid.add(id);continue;}for(const n of oldBy.get(id).neighbors){const other=parents.get(n)?.map(p=>p.id)||[n];if(!parts.some(p=>find.get(p.id).neighbors.some(x=>other.includes(x)))){invalid.add(id);if(parents.has(n))invalid.add(n);}}}
+ if(invalid.size){for(const id of invalid)parents.delete(id);world.provinces=JSON.parse(JSON.stringify(expanded.provinces)).flatMap(p=>parents.get(p.id)||[p]);rebuildNeighbors(world.provinces);}
+ const components=landComponents(world),byId=new Map(world.provinces.map(p=>[p.id,p])),labels={};for(const [i,ids] of components.entries())for(const id of ids){const p=byId.get(id);p.landComponent=i+1;p.landComponentSize=ids.length;}
+ for(const p of world.provinces){if(p.owner==='independent')continue;const f=world.factions.find(f=>f.id===p.owner),n=(labels[p.owner]||0)+1;labels[p.owner]=n;p.name=f.name+' · District '+n;}
+ for(const f of world.factions){f.startingSeat=capitalDistrict(world,f.id);f.startingGeography=realmGeography(world,f.id);}
+ nameAtlasDistricts(world);world.meta={...world.meta,mapVersion:DENSE_MAP_VERSION,provinceCount:world.provinces.length,subdividedParents:parents.size,coverage:atlasCoverage(world),landConnectivity:{components:components.length,largest:components[0]?.length||0},caveat:'Reference-informed starting realms with synthetic internal gameplay subdivisions. Inherited ownership is not fresh historical evidence; boundaries and district populations are approximate.'};return world;}
+export function worldForSave(raw,legacy,atlas,expanded=atlas,dense=expanded){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;if(version===EXPANDED_MAP_VERSION&&expanded.meta.mapVersion===EXPANDED_MAP_VERSION)return expanded;if(version===DENSE_MAP_VERSION&&dense.meta.mapVersion===DENSE_MAP_VERSION)return dense;throw Error('Saved map version is unavailable');}

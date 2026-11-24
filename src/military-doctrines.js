@@ -53,7 +53,7 @@ export const FORMATIONS={
 const clip=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function militaryDoctrine(faction){
  const id=typeof faction==='string'?faction:faction?.id||'';
- const key=specific[id]||(faction?.specialty==='gunpowder'?'gunpowder':faction?.continent==='Oceania'?'woodland':'generic');
+ const key=specific[id]||(DOCTRINES[faction?.doctrineProfile]?faction.doctrineProfile:null)||(faction?.specialty==='gunpowder'?'gunpowder':faction?.continent==='Oceania'?'woodland':'generic');
  return {id:key,...DOCTRINES[key]};
 }
 export function startingTroops(faction,total){
