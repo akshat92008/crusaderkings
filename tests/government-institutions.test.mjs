@@ -38,6 +38,7 @@ test('AI assemblies make and resolve motions through the same rules',()=>{
 });
 test('occupation and government changes invalidate old policy benefits',()=>{
  const g=fixture('feudal');g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;governmentAction(g,{},'motion:propose');g.turn=3;tickInstitutions(g);
- assert.equal(governmentMotionView(g,'a').active,true);g.civic.realms.a.government='regional';initInstitutions(g);
- assert.equal(governmentMotionView(g,'a').active,false);assert.equal(institutionModifiers(g,'a').tax,1);
+ assert.equal(governmentMotionView(g,'a').active,true);g.campaignWar={occupations:{p:{by:'b'},q:{by:'b'}}};assert.equal(institutionModifiers(g,'a').tax,1);delete g.campaignWar;
+ g.civic.realms.a.government='regional';initInstitutions(g);assert.equal(governmentMotionView(g,'a').active,false);assert.equal(institutionModifiers(g,'a').tax,1);
+ g.civic.realms.a.government='feudal';initInstitutions(g);assert.equal(governmentMotionView(g,'a').active,false);
 });

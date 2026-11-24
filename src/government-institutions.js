@@ -22,7 +22,7 @@ export const INSTITUTION_TYPES={
  city:{name:'Urban merchant houses',action:'Invest in merchant house',cost:180,mode:'merchants'},
  kinship:{name:'Community reserves',action:'Expand communal stores',cost:100,mode:'reserves'}
 };
-function state(g,r){const root=g.institutions??={version:1,realms:{},history:[],lastTick:-1};const type=g.civic.realms[r].government,mode=INSTITUTION_TYPES[type]?.mode||'estates';let s=root.realms[r];if(!s||s.mode!==mode){s=root.realms[r]={mode,last:-120,compacts:{},offices:{},houses:{},retainers:{},herds:0,reserves:0,tributes:{},lastCollection:-1};}return s;}
+function state(g,r){const root=g.institutions??={version:1,realms:{},history:[],lastTick:-1};const type=g.civic.realms[r].government,mode=INSTITUTION_TYPES[type]?.mode||'estates';let s=root.realms[r];if(!s||s.mode!==mode){s=root.realms[r]={mode,last:-120,compacts:{},offices:{},houses:{},retainers:{},herds:0,reserves:0,tributes:{},lastCollection:-1};}if(s.deliberation&&s.deliberation.government!==type)delete s.deliberation;return s;}
 export function initInstitutions(g){g.institutions??={version:1,realms:{},history:[],lastTick:-1};for(const r of Object.keys(g.civic.realms))state(g,r);return g.institutions;}
 export function institutionState(g,r){return g.institutions?.realms[r];}
 function note(g,r,msg){const h=g.institutions.history;h.unshift({realm:r,turn:g.turn,message:msg});if(h.length>120)h.length=120;if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}}

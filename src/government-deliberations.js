@@ -77,7 +77,8 @@ export function governmentMotionAction(g,r,command,id){
 }
 export function tickGovernmentMotions(g,r){
  const d=GOVERNMENT_MOTIONS[type(g,r)],f=g.factions[r];if(!d||!f)return;
- let s=state(g,r),v=governmentMotionView(g,r);
+ let s=state(g,r);if(!s?.motion&&(r===g.player||g.turn<12||g.turn%12!==0||s?.active||f.treasury<=700||g.turn-(s?.last??-120)<12))return;
+ const v=governmentMotionView(g,r);
  if(s?.motion&&g.turn>=s.motion.ends){
   const passed=v.weight>0&&v.yes*2>v.weight&&land(g,r).length>0;
   if(passed){s.active=s.motion.enact;
