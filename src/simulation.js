@@ -1,3 +1,4 @@
+import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
 import {politicalRevenue,politicalLevy} from './dynastic-politics.js';
 import {initializeKingdomSystems,advanceKingdomSystems,royalDiplomacy,tradeIncome} from './kingdom-depth.js';
@@ -87,6 +88,7 @@ export function startMarch(g,world,fromId,toId){
  const army=armiesAt(g,fromId,g.player)[0];
  if(!army||armySize(army)<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
  if(target.owner===g.player){army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
+ if(hasTruce(g,g.player,target.owner))return {ok:false,msg:'A peace treaty bars this attack.'};
  if(g.factions[g.player].treaties[target.owner]==='alliance')return {ok:false,msg:'Cannot attack an ally'};
  const defenders=armiesAt(g,toId,target.owner);
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
@@ -96,6 +98,7 @@ export function startMarch(g,world,fromId,toId){
 export function concludeBattle(g,battle,result){
  const src=g.armies[battle.attacker];if(!src)return;
  const dst=g.provinces[battle.to];const was=dst.owner;
+ recordCampaignBattle(g,g.player,was,battle.to,!!result.victory);
  const ratio=clamp(result.attackerRemaining??0,0,1);
  const oldsize=armySize(src);
  src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);
@@ -113,7 +116,7 @@ export function negotiate(g,other,action,world={factions:[]}){
   if(f.treasury<250)return {ok:false,msg:'Need 250 gold'};f.treasury-=250;o.treasury+=250;f.relations[other]=clamp(relation+20,-100,100);o.relations[g.player]=clamp((o.relations[g.player]||0)+20,-100,100);
   makeLog(g,`Envoys delivered a 250-gold gift to ${o.name}.`);return {ok:true,msg:'Relations improved'};
  }
- if(action==='alliance'){
+ if(action==='alliance'){if(activeWar(g,g.player,other))return {ok:false,msg:'Negotiate peace before seeking an alliance.'};
   if(relation<35)return {ok:false,msg:'Relations must reach +35 for an alliance'};
   f.treaties[other]='alliance';o.treaties[g.player]='alliance';makeLog(g,`Alliance sealed with ${o.name}.`);return {ok:true,msg:'Alliance signed'};
  }
@@ -152,13 +155,13 @@ export function advanceMonth(g,world){
   for(const a of shuffled){
    if(campaigns>=3)break;
    const origin=world.provinces.find(p=>p.id===a.province);if(!origin||g.provinces[origin.id].owner!==a.owner)continue;
-   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&p.owner!==a.owner&&p.owner!==g.player&&g.factions[a.owner].treaties[p.owner]!=='alliance');
+   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&p.owner!==a.owner&&p.owner!==g.player&&!hasTruce(g,a.owner,p.owner)&&g.factions[a.owner].treaties[p.owner]!=='alliance');
    if(!potential.length||rand(g)>.48)continue;
    const target=potential[Math.floor(rand(g)*potential.length)];
    const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,target.owner).reduce((sum,v)=>sum+armySize(v),0);
    const attack=armySize(a)*(0.75+rand(g)*.7);
    if(attack>defense*.88){
-    const previous=target.owner;target.owner=a.owner;target.unrest=clamp(target.unrest+25,0,100);
+    const previous=target.owner;recordCampaignBattle(g,a.owner,previous,target.id,true);target.owner=a.owner;target.unrest=clamp(target.unrest+25,0,100);
     const losses=clamp(defense/Math.max(1,attack)*.29,.07,.44);
     a.infantry=Math.round(a.infantry*(1-losses));a.archers=Math.round(a.archers*(1-losses));a.cavalry=Math.round(a.cavalry*(1-losses));
     for(const defender of armiesAt(g,target.id,previous))delete g.armies[defender.id];
