@@ -159,7 +159,7 @@ export class BattleGame{
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
   g.routed=unitCount<1;if(descriptor.fieldBattle)Object.assign(g,fieldStats(alliedFieldArmies,garrison,type));else{g.profile=regimentProfile(game,a,type);g.readiness=armyReadiness(game,a);}g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
-  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
+  if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;if(descriptor.interactive&&!g.routed)issueFieldOrder(g,'hold');}this.groups.push(g);
  }
  for(let i=0;i<6;i++){
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
