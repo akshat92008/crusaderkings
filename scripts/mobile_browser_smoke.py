@@ -51,6 +51,16 @@ try:
     assert page.locator('#province-drawer').is_hidden(),'Pinch must not select a province'
    page.click('#next-month');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    page.click('#save-game');assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).turn")==1
+   if name in ('desktop','mobile'):
+    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
+    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
+    assert page.locator('#battle-start').is_visible()
+    page.wait_for_timeout(500);page.screenshot(path=str(OUT/(name+'-battle-deployment.png')),timeout=45000)
+    page.click('#battle-start');page.wait_for_timeout(700)
+    page.click('#battle-zoom-in');page.click('#battle-zoom-out');page.click('#battle-move-tap');assert page.locator('#battle-move-tap').get_attribute('aria-pressed')=='true'
+    page.click('#battle-move-tap');page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
+    page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
+    print(name,'PASS: practice battle deployment, running battle, touch orders and return')
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    page.close()

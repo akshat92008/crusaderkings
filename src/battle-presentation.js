@@ -9,12 +9,12 @@ export function formationOffsets(count,id,type='infantry'){
 export function fieldFacing(g){const x=g.facingX??0,z=g.facingZ??(g.side==='attacker'?-1:1);return Math.atan2(x,z);}
 export function soldierWorldPose(g,offset){const angle=fieldFacing(g),c=Math.cos(angle),s=Math.sin(angle),rout=g.routed?Math.min(5,g.routAge||0)*2.4:0;return {x:g.x+offset[0]*c+offset[1]*s-Math.sin(angle)*rout,z:g.z-offset[0]*s+offset[1]*c-Math.cos(angle)*rout,yaw:g.routed?angle+Math.PI:angle};}
 export function visualMode(g){return g.routed?'walk':(g.attackPulse||0)>0?'attack':g.moving?'walk':'idle';}
-export function visibleSoldierCount(g,count){if(g.routed&&(g.routAge||0)>=3)return 0;if(g.life<=0)return 0;return Math.min(count,Math.max(1,Math.ceil(count*cap(g.life/100,0,1))));}
+export function visibleSoldierCount(g,count){if(g.routed&&(g.routAge||0)>=3)return 0;if(g.life<=0||g.troopCount===0)return 0;const available=Number.isFinite(g.troopCount)?Math.min(count,Math.max(0,Math.ceil(g.troopCount))):count;return Math.min(available,Math.max(1,Math.ceil(available*cap(g.life/100,0,1))));}
 function turnToward(a,b,t){return a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*t;}
 export function updateFieldCharacters(scene,groups,dt){
  if(!scene.modelsReady)return;
  for(const g of groups||[]){scene.prepareSquad(g);const units=scene.groups.get(g.id);if(!units)continue;
- const n=visibleSoldierCount(g,units.length),offsets=formationOffsets(units.length,g.formationId,g.type),mode=visualMode(g),blend=1-Math.exp(-Math.max(0,dt)*14);
+ const n=visibleSoldierCount(g,units.length),offsets=formationOffsets(n,g.formationId,g.type),mode=visualMode(g),blend=1-Math.exp(-Math.max(0,dt)*14);
  for(let i=0;i<units.length;i++){const u=units[i];u.root.visible=i<n;if(!u.root.visible)continue;const p=soldierWorldPose(g,offsets[i]);if(!u.fieldReady||dt<=0){u.root.position.set(p.x,0,p.z);u.root.rotation.y=p.yaw;u.fieldReady=true;}else{u.root.position.set(u.root.position.x+(p.x-u.root.position.x)*blend,0,u.root.position.z+(p.z-u.root.position.z)*blend);u.root.rotation.y=turnToward(u.root.rotation.y,p.yaw,blend);}
  if(u.mount)for(let j=0;j<u.mount.legs.length;j++)u.mount.legs[j].rotation.x=mode==='walk'?Math.sin(u.mixer.time*10+u.phase+j*Math.PI*.6)*.36:0;
  if(mode!==u.mode){const action=u.actions[mode]||u.actions.walk||u.actions.idle;if(action&&action!==u.current){action.reset().fadeIn(.12).play();u.current?.fadeOut(.12);u.current=action;}u.mode=mode;}

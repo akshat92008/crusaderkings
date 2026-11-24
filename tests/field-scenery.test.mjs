@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {fieldScenery,suppressFortScenery,battleContactShadow} from '../src/field-scenery.js';
+test('field scenery is deterministic, biome-specific and bounded in complexity',()=>{const a=fieldScenery(4,'temperate'),b=fieldScenery(4,'temperate'),c=fieldScenery(4,'desert'),d=fieldScenery(4,'temperate',true);assert.deepEqual(a,b);assert.notDeepEqual(a,c);assert.ok(d.items.length<a.items.length);assert.ok(a.items.length<180);assert.ok(a.items.every(o=>o.every(Number.isFinite)));});
+test('raised open-field scenery stays beyond the playable combat area',()=>{const a=fieldScenery(4);for(const o of a.items.filter(o=>o[4]>.1))assert.ok(Math.abs(o[0])>=68||Math.abs(o[2])>=53);});
+test('legacy fortress scenery is hidden while retaining the textured ground',()=>{const ground={name:'Illustrated battlefield ground',visible:true},wall={name:'Battle scenery box',visible:true},light={visible:true};assert.ok(suppressFortScenery({group:{children:[ground,wall,light]}}));assert.equal(ground.visible,true);assert.equal(wall.visible,false);assert.equal(light.visible,false);});
+test('contact shadows are bounded and removed for empty regiments',()=>{assert.ok(battleContactShadow({x:0,z:0,life:100,troopCount:50}));assert.equal(battleContactShadow({life:0}),null);assert.equal(battleContactShadow({life:100,routed:true,routAge:3}),null);});
