@@ -25,10 +25,11 @@ export const PLOTS={
  claimant:{name:'Negotiate claimant support',category:'political',cost:160,months:9},
  faction:{name:'Win over faction member',category:'political',cost:140,months:9}
 };
+export const SCHEME_APPROACHES={discreet:{name:'Discreet preparation',cost:45,chance:0,exposure:-12,months:2,discovery:-5},focused:{name:'Focused preparation',cost:80,chance:10,exposure:4,months:1,discovery:2},rapid:{name:'Accelerated timetable',cost:60,chance:-8,exposure:10,months:-2,discovery:4}};
 export const SECRETS={embezzlement:{name:'Misuse of estate funds',severity:2},conspiracy:{name:'Undisclosed political conspiracy',severity:3},patronage:{name:'Undisclosed patronage arrangement',severity:1},contested:{name:'Contested political allegation',severity:1}};
 function note(g,r,msg){const s=g.intrigue;s.history.unshift({realm:r,turn:g.turn,message:msg});s.history=s.history.slice(0,200);if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}}
 function random(s){s.seed=(Math.imul(s.seed,1664525)+1013904223)>>>0;return s.seed/4294967296;}
-export function initIntrigue(g){return g.intrigue??={version:1,next:1,seed:145063,plots:{},secrets:{},hooks:{},security:{},history:[],lastTick:-1};}
+export function initIntrigue(g){const s=g.intrigue??={version:1,next:1,seed:145063,plots:{},secrets:{},hooks:{},security:{},history:[],lastTick:-1};s.outcomes??={};return s;}
 export function hookStrength(g,r,id){const h=g.intrigue?.hooks[key(r,id)];return h&&h.expires>g.turn&&live(g,id)?h.strength:0;}
 export function knownSecrets(g,r){return Object.values(g.intrigue?.secrets||{}).filter(s=>s.known.includes(r)&&!s.exposed&&live(g,s.person));}
 export function activePlots(g,r){return Object.values(g.intrigue?.plots||{}).filter(p=>p.realm===r&&p.status==='active'&&!p.autonomous);}
@@ -68,9 +69,10 @@ export function plotOdds(g,p){
  const r=p.actor?free(g,p.actor):ruler(g,p.realm),target=live(g,p.target),sp=free(g,g.politics.realms[p.realm]?.council?.spymaster);if(!r||!target)return {chance:0,exposure:100};
  const agents=(p.agents||[]).filter(id=>free(g,id)&&g.politics.people[id].realm===p.realm),power=agents.reduce((n,id)=>n+(g.politics.people[id].skills?.intrigue||1)*3,0),security=defense(g,target.realm),category=plotCategory(p.kind),preparation=cap(p.preparation||0,-20,25);
  const chance=category==='personal'?45+(r.skills?.diplomacy||1)*6+personalOpinion(g,r.id,target.id)*.25+power*.5+preparation:35+(r.skills?.intrigue||1)*5+(sp?.skills.intrigue||1)*3+power-security+courtModifiers(g,p.realm).scheme+roleplayModifiers(g,p.realm).scheme+preparation+(p.kind==='investigate'?18:p.kind==='assassinate'?-12:0);
- return {chance:Math.round(cap(chance,8,90)),exposure:Math.round(cap((category==='personal'?10+Math.max(0,-personalOpinion(g,r.id,target.id))*.3:20+security+agents.length*5-(sp?.skills.intrigue||1)*4)+(p.discoveredAt!==undefined?15:0),8,85))};
+ const approach=SCHEME_APPROACHES[p.approach];
+ return {chance:Math.round(cap(chance+(approach?.chance||0),8,90)),exposure:Math.round(cap((category==='personal'?10+Math.max(0,-personalOpinion(g,r.id,target.id))*.3:20+security+agents.length*5-(sp?.skills.intrigue||1)*4)+(p.discoveredAt!==undefined?15:0)+(approach?.exposure||0),8,85))};
 }
-function start(g,r,kind,id){const s=initIntrigue(g),f=g.factions[r],d=PLOTS[kind],me=ruler(g,r);if(!d||!me||isImprisoned(g,me.id)||me.age<18||!land(g,r)||!canStartPlot(g,r,kind)||!plotTargets(g,r,kind).some(p=>p.id===id)||f.treasury<d.cost)return no('Requires an eligible target, adult ruler, funds and an available scheme category.');f.treasury-=d.cost;const pid='p'+s.next++;s.plots[pid]={id:pid,realm:r,actor:me.id,target:id,targetRealm:live(g,id).realm,kind,category:d.category,agents:[],started:g.turn,due:g.turn+d.months,status:'active'};return ok(d.name+' plot begun.');}
+function start(g,r,kind,id){const s=initIntrigue(g),f=g.factions[r],d=PLOTS[kind],me=ruler(g,r);if(!d||!me||isImprisoned(g,me.id)||me.age<18||!land(g,r)||!canStartPlot(g,r,kind)||!plotTargets(g,r,kind).some(p=>p.id===id)||f.treasury<d.cost)return no('Requires an eligible target, adult ruler, funds and an available scheme category.');f.treasury-=d.cost;const pid='p'+s.next++;s.plots[pid]={id:pid,realm:r,actor:me.id,target:id,targetRealm:live(g,id).realm,kind,category:d.category,agents:[],started:g.turn,due:g.turn+d.months,status:'active',spent:d.cost,history:[{turn:g.turn,label:'Scheme begun',cost:d.cost}]};return ok(d.name+' plot begun.');}
 function network(g,r,create=false){
  const s=g.intrigue;if(!s)return {};
  if(create){s.networks??={};return s.networks[r]??={};}
@@ -96,18 +98,23 @@ function addNetworkAgent(g,r,id){
 export function agentOptions(g,p){
  const r=ruler(g,p.realm);if(!r)return [];
  const ids=new Set([...Object.values(g.politics.realms[p.realm].council||{}),...Object.keys(network(g,p.realm))]);
- return [...ids].map(id=>free(g,id)).filter(c=>c&&c.realm===p.realm&&c.id!==p.target&&c.id!==r.id&&!(p.agents||[]).includes(c.id)&&(personalOpinion(g,r.id,c.id)>=-20||hookStrength(g,p.realm,c.id)));
+ return [...ids].map(id=>free(g,id)).filter(c=>c&&c.realm===p.realm&&c.id!==p.target&&c.id!==r.id&&!(p.agents||[]).includes(c.id)&&!Object.values(g.intrigue?.plots||{}).some(other=>other.id!==p.id&&other.status==='active'&&(other.agents||[]).includes(c.id))&&(personalOpinion(g,r.id,c.id)>=-20||hookStrength(g,p.realm,c.id)));
 }
 export function knownThreats(g,r){return Object.values(g.intrigue?.plots||{}).filter(p=>p.status==='active'&&p.targetRealm===r&&p.discoveredAt!==undefined&&p.realm!==r);}
+function plotExpense(g,p,cost,label){p.spent=(p.spent??PLOTS[p.kind].cost)+cost;p.history??=[];p.history.push({turn:g.turn,label,cost});p.history=p.history.slice(-20);}
+export function schemeApproachView(g,p){const f=g.factions[p.realm],options=Object.entries(SCHEME_APPROACHES).map(([id,d])=>({id,...d,ready:!p.approach&&!p.autonomous&&p.status==='active'&&p.due-g.turn>=3&&f.treasury>=d.cost}));return {selected:p.approach||null,options};}
+function setApproach(g,p,id){const v=schemeApproachView(g,p).options.find(x=>x.id===id);if(!v?.ready)return no('Choose an affordable approach before the final three months; one approach per scheme.');g.factions[p.realm].treasury-=v.cost;p.approach=id;p.due=Math.max(g.turn+1,p.due+v.months);plotExpense(g,p,v.cost,v.name);return ok('Scheme approach established.');}
+function saveSchemeOutcome(g,p){if(p.autonomous)return;const s=initIntrigue(g),list=s.outcomes[p.realm]??=[];if(list.some(x=>x.id===p.id))return;list.unshift({id:p.id,kind:p.kind,actor:p.actor,target:p.target,status:p.status,exposed:!!p.exposed,turn:g.turn,spent:p.spent??PLOTS[p.kind].cost,approach:p.approach||null,history:[...(p.history||[])]});s.outcomes[p.realm]=list.slice(0,40);}
+export function schemeOutcomes(g,r){return g.intrigue?.outcomes?.[r]||[];}
 function prepare(g,p){
  const f=g.factions[p.realm];if(f.treasury<80||g.turn-(p.lastPreparation??-120)<3||(p.preparation||0)>=25||p.due<=g.turn)return no('Preparation needs 80 gold, three months between reviews and an active unresolved scheme.');
- f.treasury-=80;p.preparation=cap((p.preparation||0)+8,-20,25);p.lastPreparation=g.turn;return ok('Scheme preparation improved.');
+ f.treasury-=80;plotExpense(g,p,80,'Preparation reviewed');p.preparation=cap((p.preparation||0)+8,-20,25);p.lastPreparation=g.turn;return ok('Scheme preparation improved.');
 }
 function disrupt(g,r,p){
  if(!knownThreats(g,r).includes(p)||p.disrupted||g.factions[r].treasury<90)return no('Requires a discovered foreign plot, 90 gold and no prior disruption.');
  g.factions[r].treasury-=90;p.preparation=cap((p.preparation||0)-12,-20,25);p.due+=3;p.disrupted=true;p.disruptedAt=g.turn;note(g,r,'Counterintelligence disrupted a discovered political scheme.');return ok('Disruption completed.');
 }
-function recruit(g,p,id){const f=g.factions[p.realm];if(p.agents.length>=3||!agentOptions(g,p).some(c=>c.id===id)||f.treasury<60)return no('Requires an available court agent, 60 gold and a free agent slot.');f.treasury-=60;p.agents.push(id);return ok('Agent recruited.');}
+function recruit(g,p,id){const f=g.factions[p.realm];if(p.agents.length>=3||!agentOptions(g,p).some(c=>c.id===id)||f.treasury<60)return no('Requires an available court agent, 60 gold and a free agent slot.');f.treasury-=60;plotExpense(g,p,60,'Agent recruited: '+(g.politics.people[id]?.name||id));p.agents.push(id);return ok('Agent recruited.');}
 function generateSecret(g,r,target){const s=g.intrigue;let secret=Object.values(s.secrets).find(x=>x.person===target.id&&!x.exposed&&x.kind!=='contested');if(!secret){const kinds=Object.keys(SECRETS).filter(k=>k!=='contested'),kind=kinds[Math.floor(random(s)*kinds.length)],id='s'+s.next++;secret=s.secrets[id]={id,person:target.id,kind,known:[],created:g.turn,exposed:false};}if(!secret.known.includes(r))secret.known.push(r);return secret;}
 function expose(g,r,s){const p=live(g,s.person);if(!p||s.exposed||!s.known.includes(r))return no('No known unexposed secret.');if(s.kind==='contested'){s.exposed=true;s.exposedTurn=g.turn;const accuser=g.factions[r];if(defense(g,p.realm)>=30){accuser.legitimacy=cap(accuser.legitimacy-8,0,100);note(g,r,'The contested allegation was publicly rejected.');return ok('Allegation rejected.');}const target=g.factions[p.realm];target.legitimacy=cap(target.legitimacy-5,0,100);note(g,r,'The contested allegation damaged the rival court’s standing.');return ok('Contested allegation publicized.');}s.exposed=true;s.exposedTurn=g.turn;for(const [id,h] of Object.entries(g.intrigue.hooks))if(h.secret===s.id)delete g.intrigue.hooks[id];p.memories.push('Secret exposed in '+g.year);const f=g.factions[p.realm];if(ruler(g,p.realm)?.id===p.id){f.legitimacy=cap(f.legitimacy-8*SECRETS[s.kind].severity,0,100);}else for(const v of Object.values(g.politics.holdings))if(v.lord===p.id){v.leverageUntil=Math.max(v.leverageUntil||0,g.turn+36);v.loyalty=cap(v.loyalty-8,0,100);}note(g,r,'A secret concerning '+p.name+' was exposed.');return ok('Secret revealed.');}
 function blackmail(g,r,s){const p=free(g,s.person);if(!p||s.kind==='contested'||s.exposed||!s.known.includes(r)||s.usedBy?.includes(r)||hookStrength(g,r,p.id))return no('Requires a known secret and no active hook.');(s.usedBy??=[]).push(r);g.intrigue.hooks[key(r,p.id)]={realm:r,person:p.id,secret:s.id,strength:SECRETS[s.kind].severity,expires:g.turn+36};return ok('Political leverage obtained for three years.');}
@@ -115,21 +122,23 @@ export function intrigueAction(g,world,action,id,extra){const s=initIntrigue(g),
  if(action==='start')return start(g,r,id,extra);
  if(action==='network-recruit')return addNetworkAgent(g,r,extra||id);
  if(action==='network-dismiss'){if(!network(g,r)[id])return no('No retained contact.');delete network(g,r)[id];return ok('Contact released.');}
+ if(action==='approach'){if(p?.realm!==r||p.status!=='active'||p.autonomous)return no('No active controlled scheme.');return setApproach(g,p,extra);}
+ if(action==='release-agent'){if(p?.realm!==r||p.status!=='active'||p.autonomous||!p.agents.includes(extra))return no('No recruited agent on this scheme.');p.agents=p.agents.filter(id=>id!==extra);plotExpense(g,p,0,'Agent released');return ok('Agent released without a refund.');}
  if(action==='prepare'){if(p?.realm!==r||p.status!=='active'||p.autonomous)return no('No active controlled scheme.');return prepare(g,p);}
  if(action==='disrupt')return disrupt(g,r,p);
  if(action==='agent'){if(p?.realm!==r||p.status!=='active'||p.autonomous)return no('No active plot.');return recruit(g,p,extra);}
- if(action==='cancel'){if(p?.realm!==r||p.status!=='active'||p.autonomous)return no('No active plot.');p.status='cancelled';p.ended=g.turn;return ok('Plot abandoned.');}
+ if(action==='cancel'){if(p?.realm!==r||p.status!=='active'||p.autonomous)return no('No active plot.');p.status='cancelled';p.ended=g.turn;saveSchemeOutcome(g,p);return ok('Plot abandoned.');}
  if(action==='expose')return secret?expose(g,r,secret):no('Unknown secret.');
  if(action==='blackmail')return secret?blackmail(g,r,secret):no('Unknown secret.');
  if(action==='favor'){const h=s.hooks[key(r,id)],v=Object.values(g.politics.holdings).filter(v=>v.realm===r&&v.lord===id);if(!hookStrength(g,r,id)||!v.length)return no('Requires leverage over a local vassal.');for(const x of v)x.loyalty=cap(x.loyalty+15*h.strength,0,100);delete s.hooks[key(r,id)];return ok('Hook spent on vassal compliance.');}
  if(action==='security'){if(f.treasury<120||security(g,r).until>g.turn)return no('Counterespionage costs 120 gold and lasts one year.');f.treasury-=120;s.security[r]={level:2,until:g.turn+12};return ok('Counterespionage activated.');}
  return no('Unknown intrigue action.');}
-function finish(g,world,p,removeCharacter){const s=g.intrigue,target=free(g,p.target),actor=free(g,p.actor);if(!target||target.realm!==p.targetRealm||!actor||actor.realm!==p.realm||(!p.autonomous&&ruler(g,p.realm)?.id!==actor.id)||(p.kind==='courtship'&&(actor.spouse||target.spouse||closeKin(actor,target)))){p.status='cancelled';p.ended=g.turn;return;}
+function finish(g,world,p,removeCharacter){const s=g.intrigue,target=free(g,p.target),actor=free(g,p.actor);if(!target||target.realm!==p.targetRealm||!actor||actor.realm!==p.realm||(!p.autonomous&&ruler(g,p.realm)?.id!==actor.id)||(p.kind==='courtship'&&(actor.spouse||target.spouse||closeKin(actor,target)))){p.status='cancelled';p.ended=g.turn;saveSchemeOutcome(g,p);return;}
  const odds=plotOdds(g,p),success=random(s)*100<odds.chance,exposed=random(s)*100<odds.exposure||p.discoveredAt!==undefined;p.status=success?'succeeded':'failed';p.ended=g.turn;p.exposed=exposed;
  if(success){if(p.kind==='investigate'){generateSecret(g,p.realm,target);}else if(p.kind==='discredit'){const f=g.factions[target.realm];if(ruler(g,target.realm)?.id===target.id)f.legitimacy=cap(f.legitimacy-15,0,100);else for(const v of Object.values(g.politics.holdings))if(v.lord===target.id)v.loyalty=cap(v.loyalty-15,0,100);target.memories.push('Public scandal in '+g.year);}else if(p.kind==='abduct'){if(!capturePrisoner(g,p.realm,target.id,'political plot'))p.status='failed';}else if(p.kind==='assassinate'){if(!removeCharacter(g,world,target.id))p.status='failed';}else applyNewOutcome(g,p,actor,target);}
  if(exposed&&p.autonomous&&plotCategory(p.kind)!=='personal'){actor.wealth=Math.max(0,(actor.wealth||0)-10);if(g.chronicles)changeOpinion(g,actor.id,target.id,-10);}else if(exposed&&plotCategory(p.kind)!=='personal'){const f=g.factions[p.realm];f.legitimacy=cap(f.legitimacy-7,0,100);if(target.realm!==p.realm){f.relations[target.realm]=cap((f.relations[target.realm]||0)-25,-100,100);const other=g.factions[target.realm];other.relations[p.realm]=cap((other.relations[p.realm]||0)-25,-100,100);}note(g,target.realm,'A political plot from '+f.name+' was exposed.');}
  if(!success&&plotCategory(p.kind)==='personal'&&g.chronicles)changeOpinion(g,actor.id,target.id,-5);
- note(g,p.realm,PLOTS[p.kind].name+' against '+target.name+': '+p.status+(exposed?' (exposed).':'.'));}
+ saveSchemeOutcome(g,p);note(g,p.realm,PLOTS[p.kind].name+' against '+target.name+': '+p.status+(exposed?' (exposed).':'.'));}
 function applyNewOutcome(g,p,actor,target){
  const kind=p.kind,relationship={sway:22,befriend:35,reconcile:30,patronage:28,courtship:25,influence:24,claimant:20,faction:18,undermine:-18}[kind];
  if(relationship&&g.chronicles)changeOpinion(g,actor.id,target.id,relationship);
@@ -146,7 +155,7 @@ function applyNewOutcome(g,p,actor,target){
 }
 function checkDiscovery(g,p,s){
  if(p.discoveredAt!==undefined||p.realm===p.targetRealm||plotCategory(p.kind)==='personal'||g.turn%3!==0||g.turn<=p.started)return;
- const chance=cap(defense(g,p.targetRealm)*.25+(p.agents||[]).length*3,4,35);
+ const chance=cap(defense(g,p.targetRealm)*.25+(p.agents||[]).length*3+(SCHEME_APPROACHES[p.approach]?.discovery||0),4,35);
  if(random(s)*100<chance){p.discoveredAt=g.turn;note(g,p.targetRealm,'Counterintelligence detected an active foreign political scheme.');}
 }
 function maintainNetwork(g,r){
