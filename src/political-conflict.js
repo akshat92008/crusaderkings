@@ -1,3 +1,4 @@
+import {claimantCandidates,installClaimant,isImprisoned,capturePrisoner} from './feudal-systems.js';
 import {personalOpinion} from './chronicle-systems.js';
 import {strategicPlan,temperament,militaryStrength,defenseSupport} from './strategic-ai.js';
 import {settleOccupations,occupiedGoal} from './campaign-war.js';
@@ -16,7 +17,7 @@ const councilKey=(realm,id)=>realm+':'+id;
 function history(g,entry){const c=initConflict(g);c.history.unshift({turn:g.turn,...entry});c.history=c.history.slice(0,200);}
 export function councilVotes(g,realm,proposal='law'){
  const c=initConflict(g),s=g.politics.realms[realm],f=g.factions[realm];if(!s||!f)return [];
- return Object.entries(s.council).filter(([,id])=>g.politics.people[id]?.alive).map(([role,id])=>{const person=g.politics.people[id],favor=(c.favors[councilKey(realm,id)]||0)>g.turn;
+ return Object.entries(s.council).filter(([,id])=>g.politics.people[id]?.alive&&!isImprisoned(g,id)).map(([role,id])=>{const person=g.politics.people[id],favor=(c.favors[councilKey(realm,id)]||0)>g.turn;
  const score=18+(f.legitimacy-50)*.7+(f.stability-50)*.3+(person.traits.includes('ambitious')?-20:0)+(person.traits.includes('content')?15:0)+(person.traits.includes('just')&&proposal==='revoke'?-28:0)+(person.traits.includes('cautious')&&proposal==='war'?-25:0)+(role==='marshal'&&proposal==='war'?22:0)+(favor?55:0)+personalOpinion(g,s.ruler,id)*.35;
  return {role,id,yes:score>=25,score:Math.round(score),favor};});
 }
@@ -61,8 +62,10 @@ function finishScheme(g,s){const c=initConflict(g),pr=g.provinces[s.target],v=g.
 }
 function settleFaction(g,x,result){
  const f=g.factions[x.realm],p=g.politics;x.status=result;x.ended=g.turn;
+ if(x.kind==='claimant'&&['concessions','rebel victory'].includes(result))installClaimant(g,x.realm,x.claimant);
+ if(x.kind==='claimant'&&result==='royal victory')capturePrisoner(g,x.realm,x.claimant,'failed claimant revolt');
  for(const id of x.members){const v=p.holdings[id];if(!v||v.realm!==x.realm||g.provinces[id]?.owner!==x.realm)continue;
-  if(result==='concessions'||result==='rebel victory'){if(x.kind==='tax')v.tax=0;else if(x.kind==='levy')v.levy=0;else v.autonomy=2;v.loyalty=cap(v.loyalty+30,0,100);}
+  if(result==='concessions'||result==='rebel victory'){if(x.kind==='tax')v.tax=0;else if(x.kind==='levy')v.levy=0;else if(x.kind==='liberty')v.autonomy=2;v.loyalty=cap(v.loyalty+30,0,100);}
   if(result==='royal victory'){v.loyalty=cap(v.loyalty+20,0,100);v.wealth=Math.floor(v.wealth*.65);}
   g.provinces[id].unrest=cap(g.provinces[id].unrest-10,0,100);
  }
@@ -100,10 +103,11 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  for(const w of Object.values(c.wars))if(w.status==='active'){if(occupiedGoal(g,w)){w.score=cap(w.score+2,-100,100);if(w.score>=100)endWar(g,w,'claim enforced');}else if(g.turn-w.started>=48)endWar(g,w,'white peace');}
  if(g.turn%3!==0)return;
  for(const [realm,s] of Object.entries(g.politics.realms)){
- const f=g.factions[realm],local=holdings(g,realm),members=local.filter(([,v])=>v.loyalty<42).map(([id])=>id);let x=Object.values(c.factions).find(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
+ const f=g.factions[realm],local=holdings(g,realm),members=local.filter(([,v])=>v.loyalty<42&&v.lord!==s.ruler&&!isImprisoned(g,v.lord)).map(([id])=>id);let x=Object.values(c.factions).find(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
+ if(x?.kind==='claimant'&&!claimantCandidates(g,realm).some(c=>c.person===x.claimant)){settleFaction(g,x,'dissolved');continue;}
  if(x?.status==='civil war'){x.members=x.members.filter(id=>g.provinces[id]?.owner===realm);if(!x.members.length)settleFaction(g,x,'dissolved');else campaignRound(g,x);continue;}
  if(!members.length){if(x)settleFaction(g,x,'dissolved');continue;}
- if(!x){const recent=Object.values(c.factions).some(x=>x.realm===realm&&x.ended!==undefined&&g.turn-x.ended<24);if(recent)continue;const key='f'+c.next++;const kind=local.filter(([id,v])=>members.includes(id)&&v.tax===2).length?'tax':local.filter(([id,v])=>members.includes(id)&&v.levy===2).length?'levy':'liberty';x=c.factions[key]={id:key,realm,kind,members,pressure:15,status:'organizing',started:g.turn};noteIf(g,realm,'Discontented vassals formed a '+kind+' faction.');}
+ if(!x){const recent=Object.values(c.factions).some(x=>x.realm===realm&&x.ended!==undefined&&g.turn-x.ended<24);if(recent)continue;const key='f'+c.next++;const claimant=f.legitimacy<48?claimantCandidates(g,realm).find(c=>g.politics.people[c.person].age>=18):null;const kind=claimant?'claimant':local.filter(([id,v])=>members.includes(id)&&v.tax===2).length?'tax':local.filter(([id,v])=>members.includes(id)&&v.levy===2).length?'levy':'liberty';x=c.factions[key]={id:key,realm,kind,claimant:claimant?.person||null,members,pressure:15,status:'organizing',started:g.turn};noteIf(g,realm,'Discontented vassals formed a '+kind+' faction.');}
  x.members=members;x.power=power(g,members);x.pressure=cap(x.pressure+Math.max(5,members.length*4),0,100);
  if(realm!==g.player&&x.pressure>=55){if(f.treasury>200&&x.power>army(g,realm).reduce((n,a)=>n+size(a),0)*.6)settleFaction(g,x,'concessions');else beginCivilWar(g,x);continue;}
  if(x.pressure>=70&&x.status==='organizing'){x.status='ultimatum';x.deadline=g.turn+6;noteIf(g,realm,'A faction issued an ultimatum. Respond within six months.');}

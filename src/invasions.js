@@ -1,3 +1,4 @@
+import {captureCommander} from './feudal-systems.js';
 import {defenseSupport,strategicPlan,raidThreshold} from './strategic-ai.js';
 import {controller,captureProvince} from './campaign-war.js';
 import {embarked} from './naval-systems.js';
@@ -108,6 +109,7 @@ export function resolveInvasion(g,world,threat,result){
  const defended=Boolean(result.victory);
  const war=activeWar(g,found.by,g.player);
  if(defended){
+  if(enemyRatio<.3)captureCommander(g,g.player,attacker);
   g.factions[g.player].prestige+=8;
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
  }else{
@@ -118,6 +120,7 @@ export function resolveInvasion(g,world,threat,result){
   const local=world.provinces.find(p=>p.id===found.province);
   const retreat=(local?.neighbors||[]).find(id=>g.provinces[id]?.owner===g.player);
   for(const a of human){
+   if(playerRatio<.3)captureCommander(g,found.by,a);
    if(retreat)a.province=retreat;
    else {const fallback=Object.values(g.provinces).find(p=>p.id!==found.province&&p.owner===g.player&&controller(g,p.id)===g.player);if(fallback)a.province=fallback.id;else delete g.armies[a.id];}
   }
