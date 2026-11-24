@@ -12,3 +12,5 @@ export function characterLink(p,esc,label){return p?'<button type="button" class
 export function provinceLink(id,world,esc){const p=world.provinces.find(p=>p.id===id);return '<button type="button" class="character-link" data-province-link="'+esc(id)+'">'+esc(p?.name||id)+'</button>';}
 export function sectionLink(tab,label,esc,section=''){return '<button class="rowbtn" data-priority-tab="'+esc(tab)+'" data-section-link="'+esc(section)+'">'+esc(label)+'</button>';}
 export function contextualButton(action,type,id,label,esc,extra='',input=''){return '<button class="rowbtn" data-action="'+esc(action)+'" data-type="'+esc(type)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';}
+
+export function realmWarContext(g,other=null){return Object.values(g.conflict?.wars||{}).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(g.player)&&(!other||[w.attacker,w.defender].includes(other))).map(w=>({...w,opponent:w.attacker===g.player?w.defender:w.attacker,ourScore:w.attacker===g.player?w.score:-w.score}));}
