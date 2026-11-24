@@ -1,3 +1,4 @@
+import {invasionReserved} from './invasion-reservations.js';
 import {initLandless,tickLandless} from './landless-systems.js';
 import {initAgency,tickAgency} from './character-agency.js';
 import {initRegencies} from './regency-systems.js';
@@ -286,7 +287,7 @@ function aiMonthly(g,world){
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
   if(g.turn%6===0){
-   const all=armies(g,f.id),friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id)),eligible=all.filter(a=>!a.contingent&&!embarked(g,a.id)&&controller(g,a.province)===f.id&&!g.kingdom.threats.some(t=>t.army===a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
+   const all=armies(g,f.id),friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id)),eligible=all.filter(a=>!a.contingent&&!embarked(g,a.id)&&controller(g,a.province)===f.id&&!invasionReserved(g,a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
    const budget=aiRecruitmentBudget({treasury:nation.treasury,food:nation.food,population:land.reduce((n,p)=>n+p.population,0),armySize:all.reduce((n,a)=>n+size(a),0),goal:strategicPlan(g,f.id)?.goal,levy:politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy});
    if(budget&&friendly.length){let a=eligible[0];if(!a&&!all.some(a=>size(a)>0)){const id='a'+g.nextId++;a={id,owner:f.id,province:friendly[0].id,infantry:0,archers:0,cavalry:0,experience:0,morale:70,commander:'Newly appointed general',doctrine:militaryDoctrine(f).id};g.armies[id]=a;}
     if(a){nation.treasury-=budget.cost;const mix=startingTroops(f,budget.count);for(const t of ['infantry','archers','cavalry'])a[t]+=mix[t];a.morale=clamp(a.morale+1,0,100);syncRegiments(g,a);}
