@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {createGame,snapshot,restoreGame} from '../src/simulation.js';
-import {chronicleAction,tickChronicles,currentChain,personalOpinion,relationshipList,regionalDecision,REGIONAL_DECISIONS,AMBITIONS,STORY_CHAINS} from '../src/chronicle-systems.js';
+import {chronicleAction,tickChronicles,currentChain,personalOpinion,relationshipList,regionalDecision,REGIONAL_DECISIONS,AMBITIONS,STORY_CHAINS,ambitionAvailable} from '../src/chronicle-systems.js';
 import {councilVotes} from '../src/political-conflict.js';
 import {renderStories} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
@@ -20,3 +20,24 @@ test('new specialization ambition tracks actual character branch ranks',()=>{con
 
 test('new ambitions measure actual industry construction and cannot complete from existing buildings',()=>{const g=start(),p=Object.values(g.provinces).find(p=>p.owner==='england'),stock=g.economy.provinces[p.id].industries;stock.granary=1;assert.ok(chronicleAction(g,world,'ambition','granary_network').ok);g.turn=1;tickChronicles(g,world);assert.ok(g.chronicles.realms.england.ambition);stock.granary=3;const copy=restoreGame(snapshot(g),world);copy.turn=2;tickChronicles(copy,world);assert.equal(copy.chronicles.realms.england.ambition,null);});
 test('debt ambition is only available when debt exists and requires payment and a treasury buffer',()=>{const g=start();assert.equal(chronicleAction(g,world,'ambition','repay_debt').ok,false);g.economy.loans.a={id:'a',realm:'england',status:'active',remaining:100};assert.ok(chronicleAction(g,world,'ambition','repay_debt').ok);g.economy.loans.a.status='repaid';g.factions.england.treasury=200;g.turn=1;tickChronicles(g,world);assert.ok(g.chronicles.realms.england.ambition);g.factions.england.treasury=400;g.turn=2;tickChronicles(g,world);assert.equal(g.chronicles.realms.england.ambition,null);});
+
+test('completed ambitions remain unavailable after the rolling story archive drops the record',()=>{
+ const g=start(),s=g.chronicles.realms.england,p=Object.values(g.provinces).find(p=>p.owner==='england');
+ assert.ok(chronicleAction(g,world,'ambition','security').ok);p.buildings.fort+=2;g.turn=1;tickChronicles(g,world);
+ const key=ruler(g).id+'|security';assert.equal(s.fulfilledAmbitions[key],1);
+ for(let i=0;i<25;i++)s.completed.push({id:'court',turn:i+2,outcomes:[],score:0});s.completed=s.completed.slice(-20);
+ const copy=restoreGame(snapshot(g),world);assert.equal(copy.chronicles.realms.england.fulfilledAmbitions[key],1);assert.equal(ambitionAvailable(copy,'england','security'),false);
+ assert.equal(chronicleAction(copy,world,'ambition','security').ok,false);
+});
+test('legacy completed ambitions migrate, but a new ruler can pursue the same goal',()=>{
+ const g=start(),s=g.chronicles.realms.england,old=ruler(g).id;delete s.fulfilledAmbitions;s.completed.push({ambition:'security',ruler:old,turn:0});
+ const copy=restoreGame(snapshot(g),world);assert.equal(ambitionAvailable(copy,'england','security'),false);
+ const next=Object.values(copy.politics.people).find(p=>p.realm==='england'&&p.alive&&p.age>=18&&p.id!==old);assert.ok(next);copy.politics.realms.england.ruler=next.id;copy.turn=1;tickChronicles(copy,world);
+ assert.equal(ambitionAvailable(copy,'england','security'),true);
+});
+test('a stale duplicate active ambition is discarded without another reward',()=>{
+ const g=start(),s=g.chronicles.realms.england,p=Object.values(g.provinces).find(p=>p.owner==='england');
+ assert.ok(chronicleAction(g,world,'ambition','security').ok);const duplicate=JSON.parse(JSON.stringify(s.ambition));p.buildings.fort+=2;g.turn=1;tickChronicles(g,world);
+ const prestige=g.factions.england.prestige;s.ambition=duplicate;g.turn=2;tickChronicles(g,world);
+ assert.equal(s.ambition,null);assert.equal(g.factions.england.prestige,prestige);
+});
