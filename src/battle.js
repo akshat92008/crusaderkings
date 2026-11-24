@@ -132,12 +132,9 @@ export class BattleGame{
   }catch(e){console.warn('Optional battle scenery disabled:',e);this.scenery=null;}
  }
 
- const a=game.armies[descriptor.attacker]||{
-  infantry:Math.round((descriptor.defenseGarrison||90)*.60),
-  archers:Math.round((descriptor.defenseGarrison||90)*.32),
-  cavalry:Math.round((descriptor.defenseGarrison||90)*.08)
- };
- const playerFaction=game.factions[game.player],enemy=game.factions[descriptor.enemy];
+ const playerFaction=game.factions[game.player],enemy=game.factions[descriptor.enemy],fieldArmy=game.armies[descriptor.attacker];
+ const garrison=startingTroops(playerFaction,descriptor.defenseMode?(descriptor.defenseGarrison||90):0);
+ const a=fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
  const enemyArmy=descriptor.enemyArmy&&game.armies[descriptor.enemyArmy];
  const enemies=enemyArmy?{...enemyArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(enemyArmy[t]||0)+(descriptor.defenseMode?0:startingTroops(enemy,descriptor.defenseGarrison||0)[t])]))}:startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseMode?0:descriptor.defenseGarrison||0)));
  this.siege=createSiegeState(game.provinces?.[descriptor.to]?.buildings?.fort||0,!!descriptor.defenseMode);this.groups=[];
@@ -195,7 +192,7 @@ export class BattleGame{
   const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
   const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];
   const structure=siegeTarget(this.siege,g);
-  if(structure){const distance=Math.hypot(g.x-structure.x,g.z-structure.z),range=Math.max(g.range, g.readiness?.siege>0?14:3);g.cooldown-=dt;if(distance<=range){if(g.cooldown<=0){g.cooldown=1.2;siegeDamage(this.siege,structure.id,g.damage*.36+(g.readiness?.siege||0)*.10);if(range>4)this.projectiles.push({sx:g.x,sz:g.z,tx:structure.x,tz:structure.z,t:0});}continue;}if(!g.manual){g.targetX=structure.x;g.targetZ=structure.z;}const d=Math.hypot(g.targetX-g.x,g.targetZ-g.z);if(d>.3){const step=Math.min(d,dt*g.speed);g.x+=(g.targetX-g.x)/d*step;g.z+=(g.targetZ-g.z)/d*step;}else g.manual=false;continue;}
+  if(structure){const distance=Math.hypot(g.x-structure.x,g.z-structure.z),range=Math.max(g.range, g.readiness?.siege>0?14:3);g.cooldown-=dt;if(distance<=range){if(g.cooldown<=0){g.cooldown=1.2;siegeDamage(this.siege,structure.id,g.damage*.36+(g.readiness?.siege||0)*.10/Math.max(1,this.groups.filter(o=>o.side===g.side&&!o.routed).length));if(range>4)this.projectiles.push({sx:g.x,sz:g.z,tx:structure.x,tz:structure.z,t:0});}continue;}if(!g.manual){g.targetX=structure.x;g.targetZ=structure.z;}const d=Math.hypot(g.targetX-g.x,g.targetZ-g.z);if(d>.3){const step=Math.min(d,dt*g.speed);g.x+=(g.targetX-g.x)/d*step;g.z+=(g.targetZ-g.z)/d*step;}else g.manual=false;continue;}
   if(!e)continue;
   // Manual player movement supersedes AI until arrival.
   let dd=dist([g.x,0,g.z],[e.x,0,e.z]);
@@ -217,7 +214,7 @@ export class BattleGame{
  }
  for(const p of this.projectiles)p.t+=dt*2.3;this.projectiles=this.projectiles.filter(p=>p.t<=1);
  const left=this.groups.filter(g=>g.side==='attacker'&&!g.routed),right=this.groups.filter(g=>g.side==='defender'&&!g.routed);
- if(left.length===0||(right.length===0&&(siegeBreached(this.siege)||this.siege?.assaultSide==='defender'))||this.elapsed>=220){const leftPower=left.reduce((s,g)=>s+g.life,0),rightPower=right.reduce((s,g)=>s+g.life,0);const win=left.length>0&&(right.length===0||leftPower>rightPower)&&(this.siege?.assaultSide!=='attacker'||siegeBreached(this.siege));this.finish(win,leftPower,rightPower);}
+ if(left.length===0||(right.length===0&&(siegeBreached(this.siege)||this.siege?.assaultSide==='defender'))||this.elapsed>=220){const leftPower=left.reduce((s,g)=>s+g.life,0),rightPower=right.reduce((s,g)=>s+g.life,0);const win=left.length>0&&(this.siege?.assaultSide==='defender'&&!siegeBreached(this.siege)||right.length===0||leftPower>rightPower)&&(this.siege?.assaultSide!=='attacker'||siegeBreached(this.siege));this.finish(win,leftPower,rightPower);}
  }
  render(){if(!this.ctx)return;const obj=[],C={grass:[.29,.36,.29],earth:[.43,.40,.31],shadow:[.25,.27,.23],trunk:[.36,.25,.18],leaf:[.28,.37,.25],stone:[.42,.43,.41],gold:[.91,.74,.42],steel:[.63,.70,.69],arrow:[.96,.66,.35]};
  if(!this.ctx.isThreeBattle){
@@ -228,7 +225,7 @@ export class BattleGame{
  // Defensive fort visual near the far side of the field.
  for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
  }
- if(this.siege&&!this.ctx.isThreeBattle)for(const q of this.siege.structures){const height=q.hp>0?1+3*q.hp/q.max:.35;instance(obj,q.x,height/2,q.z,q.id==='gate'?9:5,height,3,q.hp>0?C.stone:C.earth);}
+ if(this.siege)for(const q of this.siege.structures){const height=q.hp>0?1+3*q.hp/q.max:.35;instance(obj,q.x,height/2,q.z,q.id==='gate'?9:5,height,3,q.hp>0?C.stone:C.earth);}
  for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
   const base=g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   if(!(this.ctx.isThreeBattle&&this.ctx.modelsReady))for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
