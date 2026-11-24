@@ -1,3 +1,4 @@
+import {settleOccupations,occupiedGoal} from './campaign-war.js';
 import {civicModifiers} from './civic-systems.js';
 // Political opposition, council consent, claims and intrigue. Deterministic, JSON-safe.
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -23,7 +24,7 @@ function claimKey(realm,id){return realm+':'+id;}
 export function availableClaims(g,realm){const c=initConflict(g);return Object.values(c.claims).filter(x=>x.realm===realm&&g.provinces[x.province]&&g.provinces[x.province].owner!==realm&&x.expires>g.turn);}
 export function activeWar(g,a,b){return Object.values(initConflict(g).wars).find(w=>w.status==='active'&&pair(w.attacker,w.defender)===pair(a,b));}
 export function hasTruce(g,a,b){return (initConflict(g).truces[pair(a,b)]||0)>g.turn;}
-function endWar(g,w,result){w.status=result;w.ended=g.turn;initConflict(g).truces[pair(w.attacker,w.defender)]=g.turn+36;history(g,{kind:'war',realm:w.attacker,message:w.attacker+' vs '+w.defender+': '+result});if([w.attacker,w.defender].includes(g.player))note(g,'Peace signed: '+result+'. A three-year truce follows.');}
+function endWar(g,w,result){settleOccupations(g,w,result);w.status=result;w.ended=g.turn;initConflict(g).truces[pair(w.attacker,w.defender)]=g.turn+36;history(g,{kind:'war',realm:w.attacker,message:w.attacker+' vs '+w.defender+': '+result});if([w.attacker,w.defender].includes(g.player))note(g,'Peace signed: '+result+'. A three-year truce follows.');}
 export function recordCampaignBattle(g,attacker,defender,province,victory){const w=activeWar(g,attacker,defender);if(!w)return;const sign=attacker===w.attacker?1:-1;w.score=cap(w.score+sign*(victory?30:-18),-100,100);if(victory&&province===w.goal&&attacker===w.attacker)w.score=Math.max(65,w.score);w.battles++;if(w.score<=-100)endWar(g,w,'attacker defeated');}
 function declare(g,realm,id){
  const c=initConflict(g),claim=c.claims[claimKey(realm,id)],pr=g.provinces[id],f=g.factions[realm],other=pr?.owner;
@@ -84,7 +85,7 @@ export function conflictAction(g,world,action,id,extra){const c=initConflict(g),
  if(action==='favor'){const v=councilVotes(g,realm).find(x=>x.id===id);if(!v||v.favor||f.treasury<80)return no('Need an unfavored councillor and 80 gold.');f.treasury-=80;c.favors[councilKey(realm,id)]=g.turn+24;return ok('Councillor favor secured for two years.');}
  if(action==='scheme')return startScheme(g,realm,id,extra);
  if(action==='declare')return declare(g,realm,id);
- if(action==='peace'){const w=c.wars[id];if(!w||w.status!=='active'||![w.attacker,w.defender].includes(realm))return no('No such active war.');if(extra==='enforce'&&w.attacker===realm&&w.score>=65&&g.provinces[w.goal]?.owner===realm){endWar(g,w,'claim enforced');return ok('Claim recognized; peace signed.');}if(extra==='white'&&Math.abs(w.score)<=35&&g.turn-w.started>=6){endWar(g,w,'white peace');return ok('White peace signed.');}return no('Peace terms not yet acceptable.');}
+ if(action==='peace'){const w=c.wars[id];if(!w||w.status!=='active'||![w.attacker,w.defender].includes(realm))return no('No such active war.');if(extra==='enforce'&&w.attacker===realm&&w.score>=65&&occupiedGoal(g,w)){endWar(g,w,'claim enforced');return ok('Claim recognized; peace signed.');}if(extra==='surrender'){endWar(g,w,w.attacker===realm?'attacker defeated':occupiedGoal(g,w)?'claim enforced':'white peace');return ok('Surrender accepted; occupation resolved.');}if(extra==='reparations'&&((w.attacker===realm&&w.score>=65)||(w.defender===realm&&w.score<=-65))){const other=w.attacker===realm?w.defender:w.attacker,amount=Math.min(300,Math.max(0,g.factions[other].treasury));g.factions[other].treasury-=amount;f.treasury+=amount;endWar(g,w,'reparations');return ok('Peace signed for '+amount+' gold in reparations.');}if(extra==='white'&&Math.abs(w.score)<=35&&g.turn-w.started>=6){endWar(g,w,'white peace');return ok('White peace signed.');}return no('Peace terms not yet acceptable.');}
  if(!x||x.realm!==realm)return no('Select a faction in your realm.');
  if(action==='accept'&&['organizing','ultimatum','civil war'].includes(x.status)){settleFaction(g,x,'concessions');return ok('Faction demands accepted.');}
  if(action==='refuse'&&x.status==='ultimatum'){beginCivilWar(g,x);return ok('Civil war has begun.');}
@@ -94,7 +95,7 @@ export function conflictAction(g,world,action,id,extra){const c=initConflict(g),
 }
 export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.turn)return;c.lastTick=g.turn;
  for(const s of Object.values(c.schemes))if(s.status==='active'&&g.turn>=s.due)finishScheme(g,s);
- for(const w of Object.values(c.wars))if(w.status==='active'){if(g.provinces[w.goal]?.owner===w.attacker){w.score=cap(w.score+2,-100,100);if(w.score>=100)endWar(g,w,'claim enforced');}else if(g.turn-w.started>=48)endWar(g,w,'white peace');}
+ for(const w of Object.values(c.wars))if(w.status==='active'){if(occupiedGoal(g,w)){w.score=cap(w.score+2,-100,100);if(w.score>=100)endWar(g,w,'claim enforced');}else if(g.turn-w.started>=48)endWar(g,w,'white peace');}
  if(g.turn%3!==0)return;
  for(const [realm,s] of Object.entries(g.politics.realms)){
  const f=g.factions[realm],local=holdings(g,realm),members=local.filter(([,v])=>v.loyalty<42).map(([id])=>id);let x=Object.values(c.factions).find(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
