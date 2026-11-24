@@ -1,3 +1,4 @@
+import {strategicPlan,temperament,militaryStrength,defenseSupport} from './strategic-ai.js';
 import {settleOccupations,occupiedGoal} from './campaign-war.js';
 import {civicModifiers} from './civic-systems.js';
 // Political opposition, council consent, claims and intrigue. Deterministic, JSON-safe.
@@ -108,10 +109,10 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  if(x.status==='ultimatum'&&g.turn>=x.deadline)beginCivilWar(g,x);
  }
  // AI prepares claims on neighboring realms and may declare wars it can afford.
- if(g.turn%12===0)for(const [realm,s] of Object.entries(g.politics.realms)){if(realm===g.player)continue;const f=g.factions[realm],r=g.politics.people[s.ruler];if(!r.traits.includes('ambitious')||f.treasury<400)continue;
+ if(g.turn%12===0)for(const [realm,s] of Object.entries(g.politics.realms)){if(realm===g.player)continue;const f=g.factions[realm],r=g.politics.people[s.ruler];const plan=strategicPlan(g,realm);if((plan?.goal!=='conquer'&&!r.traits.includes('ambitious'))||f.treasury<400||plan?.goal==='recover')continue;
  const targets=[...new Set(holdings(g,realm).flatMap(([id])=>world.provinces.find(p=>p.id===id)?.neighbors||[]))].filter(id=>{const o=g.provinces[id]?.owner;return o&&o!==realm&&g.politics.realms[o]&&f.treaties[o]!=='alliance'&&!hasTruce(g,realm,o);});
- const claim=availableClaims(g,realm).find(x=>targets.includes(x.province)&&!activeWar(g,realm,g.provinces[x.province].owner));if(claim){declare(g,realm,claim.province);continue;}
- if(targets.length&&rng(c)<.4)startScheme(g,realm,'fabricate',targets[Math.floor(rng(c)*targets.length)]);
+ targets.sort((a,b)=>Number(g.provinces[b].owner===plan?.target)-Number(g.provinces[a].owner===plan?.target)||a.localeCompare(b));const claim=availableClaims(g,realm).find(x=>targets.includes(x.province)&&!activeWar(g,realm,g.provinces[x.province].owner)&&militaryStrength(g,realm)>=.65*(militaryStrength(g,g.provinces[x.province].owner)+defenseSupport(g,g.provinces[x.province].owner,realm)));if(claim){declare(g,realm,claim.province);continue;}
+ if(targets.length&&rng(c)<.4)startScheme(g,realm,'fabricate',targets[0]);
  }
  // Keep historical records bounded; active objects are never dropped.
  for(const map of [c.schemes,c.factions,c.wars])for(const [id,x] of Object.entries(map))if(x.ended!==undefined&&g.turn-x.ended>120)delete map[id];
