@@ -1,3 +1,4 @@
+import {initRoyalCourt} from './royal-court.js';
 import {initExpanded,tickExpanded} from './expanded-content.js';
 import {initLiving,tickLiving} from './living-systems.js';
 import {initDiplomacy,tickDiplomacy} from './diplomacy-systems.js';
@@ -54,13 +55,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -110,7 +111,7 @@ export function royalDiplomacy(g,world,other,action){
   log(g,'Trade treaty signed between '+f.name+' and '+o.name+'.');
   return {ok:true,msg:'Merchant treaty signed; monthly trade income increased'};
  }
- if(action==='marriage')return marryRealm(g,other);
+ if(action==='marriage'){if(f.treaties[other]==='marriage'||o.treaties[g.player]==='marriage')return {ok:false,msg:'A dynastic court tie already exists; arrange further individual marriages through the family panel.'};return marryRealm(g,other);}
  return {ok:false,msg:'Unknown diplomatic mission'};
 }
 export const EVENTS=[
