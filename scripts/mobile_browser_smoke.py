@@ -62,7 +62,10 @@ try:
     page.click('#battle-zoom-in');page.click('#battle-zoom-out');page.click('#battle-move-tap');assert page.locator('#battle-move-tap').get_attribute('aria-pressed')=='true'
     page.click('#battle-move-tap');page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
     page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
-    print(name,'PASS: practice battle deployment, running battle, touch orders and return')
+    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
+    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','native','software')
+    page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
+    print(name,'PASS: practice battle deployment, running battle, touch orders, repeat battle and return')
    if name=='desktop':
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     with page.expect_download() as info: page.click('#export-save')

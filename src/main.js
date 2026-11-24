@@ -1,3 +1,4 @@
+import {freshBattleCanvas} from './battle-lifecycle.js';
 import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistCampaign} from './portable-save.js';
 import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
 import {currentExpandedEvents} from './expanded-content.js';
@@ -127,10 +128,10 @@ function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pre
 function openBattle(desc){setDrawer(null);desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
  el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='tactical';el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
- battleDescriptor=desc;try{battle=new BattleGame(el('battle-canvas'),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';}catch(e){el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);}}
+ battleDescriptor=desc;try{battle=new BattleGame(freshBattleCanvas(el('battle-canvas')),desc,game,onBattleFinished,onBattleStatus);document.body.style.overflow='hidden';return true;}catch(e){battleDescriptor=null;el('battle-screen').hidden=true;message(`Battle couldn't start: ${e.message}`);return false;}}
 function onBattleStatus(status){
  const roster=status.roster;if(roster){const a=roster.attacker,b=roster.defender;el('battle-strength').textContent='YOUR FORCE '+fmt(a.surviving)+' / '+fmt(a.initial)+' · ENEMY '+fmt(b.surviving)+' / '+fmt(b.initial)+(status.enemyPosture?' · '+status.enemyPosture.toUpperCase():'');}
- el('battle-move-tap').setAttribute('aria-pressed',String(!!status.tapMove));el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';
+ el('battle-move-tap').setAttribute('aria-pressed',String(!!status.tapMove));el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';el('battle-pause').disabled=!!status.renderLost;el('battle-start').disabled=!!status.renderLost;el('battle-strength').dataset.renderer=status.rendererMode||'';if(status.renderLost)el('battle-strength').textContent='Graphics context lost. Retreat to return to campaign.';
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
  const cards=el('battle-units'),markup=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% HP · '+Math.round(g.morale)+'% MORALE · '+Math.round(g.fatigue||0)+'% FATIGUE · '+Math.round(g.cohesion??100)+'% COHESION · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');if(cards.dataset.markup!==markup){const left=cards.scrollLeft,focus=document.activeElement?.dataset?.unit;cards.innerHTML=markup;cards.dataset.markup=markup;cards.scrollLeft=left;if(focus!==undefined)cards.querySelector('[data-unit="'+focus+'"]')?.focus({preventScroll:true});}
  const choices=availableFormations(game.factions[game.player]);
@@ -163,10 +164,9 @@ function openIncomingBattle(){
  const defenders=armiesAt(game,threat.province,game.player).filter(a=>!game.naval?.voyages?.[a.id]),stationed=defenders[0],defense=game.provinces[threat.province];
  const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
  const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
- openBattle({defenseMode:true,attacker:stationed?.id||null,playerArmies:defenders.map(a=>a.id),enemyArmy:threat.army,enemyArmies:[threat.army],enemy:threat.by,
+ return openBattle({defenseMode:true,attacker:stationed?.id||null,playerArmies:defenders.map(a=>a.id),enemyArmy:threat.army,enemyArmies:[threat.army],enemy:threat.by,
   to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison+defenseSupport(game,game.player,threat.by),
   threat:{army:threat.army,province:threat.province}});
- return true;
 }
 function advanceWithInvasions(){
  if(!game||battle)return;
@@ -242,7 +242,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
 el('battle-showcase').addEventListener('click',()=>{
  if(!game){message('Begin your reign before opening a practice battle.');return;}
  if(battle){message('A battle is already in progress.');return;}
- const armyEntry=Object.entries(game.armies).find(([,a])=>a.owner===game.player);
+ const armyEntry=Object.entries(game.armies).find(([,a])=>a.owner===game.player&&armySize(a)>0&&!game.naval?.voyages?.[a.id]);
  if(!armyEntry){message('Recruit at least one army to enter the battle showcase.');return;}
  const target=world.provinces.find(p=>{const owner=game.provinces[p.id]?.owner;return owner&&owner!==game.player&&game.factions[owner];});
  if(!target){message('No opposing provinces are available.');return;}

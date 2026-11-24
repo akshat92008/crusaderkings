@@ -8,7 +8,7 @@ export function formationOffsets(count,id,type='infantry'){
  if(!n)return points;const center=points.reduce((a,p)=>[a[0]+p[0]/n,a[1]+p[1]/n],[0,0]);return points.map(p=>[p[0]-center[0],p[1]-center[1]]);
 }
 export function fieldFacing(g){const x=g.facingX??0,z=g.facingZ??(g.side==='attacker'?-1:1);return Math.atan2(x,z);}
-export function soldierWorldPose(g,offset){const angle=fieldFacing(g),c=Math.cos(angle),s=Math.sin(angle),rout=g.routed?Math.min(5,g.routAge||0)*2.4:0;return {x:g.x+offset[0]*c+offset[1]*s-Math.sin(angle)*rout,z:g.z-offset[0]*s+offset[1]*c-Math.cos(angle)*rout,yaw:g.routed?angle+Math.PI:angle};}
+export function soldierWorldPose(g,offset){const angle=fieldFacing(g),c=Math.cos(angle),s=Math.sin(angle),rout=g.routed?Math.min(5,g.routAge||0)*2.4:0;return {x:g.x+offset[0]*c+offset[1]*s-(g.homeDirection?0:Math.sin(angle)*rout),z:g.z-offset[0]*s+offset[1]*c+(g.homeDirection?g.homeDirection*rout:-Math.cos(angle)*rout),yaw:g.routed?(g.homeDirection?(g.homeDirection>0?0:Math.PI):angle+Math.PI):angle};}
 export function visualMode(g){return g.routed?'walk':(g.attackPulse||0)>0?'attack':g.moving?'walk':'idle';}
 export function visibleSoldierCount(g,count){if(g.routed&&(g.routAge||0)>=3)return 0;if(g.life<=0||g.troopCount===0)return 0;const available=Number.isFinite(g.troopCount)?Math.min(count,Math.max(0,Math.ceil(g.troopCount))):count;return Math.min(available,Math.max(1,Math.ceil(available*cap(g.life/100,0,1))));}
 function turnToward(a,b,t){return a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*t;}
