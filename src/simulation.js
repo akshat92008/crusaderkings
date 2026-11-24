@@ -1,3 +1,4 @@
+import {captureCommander} from './feudal-systems.js';
 import {strategicTargetScore,raidThreshold,defenseSupport} from './strategic-ai.js';
 import {controller,occupation,occupationTax,captureProvince} from './campaign-war.js';
 import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
@@ -111,7 +112,7 @@ export function concludeBattle(g,battle,result){
  const oldsize=armySize(src);onArmyMarch(g,src);applyFortDamage(g,battle.to,result);
  src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);syncRegiments(g,src);
  if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
-  const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending)delete g.armies[defending.id];
+  const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending){captureCommander(g,g.player,defending);delete g.armies[defending.id];}
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
   recordCampaignBattle(g,g.player,was,battle.to,true);
   makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
@@ -173,7 +174,7 @@ export function advanceMonth(g,world){
     const previous=controller(g,target.id),war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
     const losses=clamp(defense/Math.max(1,attack)*.29,.07,.44);
     a.infantry=Math.round(a.infantry*(1-losses));a.archers=Math.round(a.archers*(1-losses));a.cavalry=Math.round(a.cavalry*(1-losses));
-    for(const defender of armiesAt(g,target.id,previous))delete g.armies[defender.id];
+    for(const defender of armiesAt(g,target.id,previous)){captureCommander(g,a.owner,defender);delete g.armies[defender.id];}
     onArmyMarch(g,a);a.province=target.id;recordCampaignBattle(g,a.owner,previous,target.id,true);g.factions[a.owner].prestige+=3;
     makeLog(g,`${ownerName(g,a.owner)} seized ${target.id} from ${ownerName(g,previous)} after a border conflict.`);campaigns++;
    }
