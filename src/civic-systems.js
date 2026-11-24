@@ -2,6 +2,7 @@ import {courtModifiers} from './royal-court.js';
 import {healthPenalty} from './living-systems.js';
 import {institutionModifiers} from './government-institutions.js';
 import {identityModifiers} from './identity-systems.js';
+import {roleplayAction,roleplayModifiers,tickRoleplay} from './roleplay-systems.js';
 // Original, approximate 1450 gameplay profiles, not verified historical population data.
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const hash=s=>{let n=2166136261;for(const c of String(s))n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;};
@@ -46,9 +47,9 @@ export function initCivic(g,world){
 }
 function random(c){c.seed=(Math.imul(c.seed,1664525)+1013904223)>>>0;return c.seed/4294967296;}
 function provinceList(g,realm){return Object.values(g.provinces).filter(p=>p.owner===realm);}
-export function civicModifiers(g,realm){const s=g.civic?.realms[realm],gov=GOVERNMENTS[s?.government];if(!s||!gov)return {tax:1,levy:1,trade:1,build:1,scheme:0};const c=ruler(g,realm)?.civic,level=c?.perks.length||0,identity=identityModifiers(g,realm),institution=institutionModifiers(g,realm),health=healthPenalty(g,ruler(g,realm)?.id),court=courtModifiers(g,realm);
- return {tax:court.tax*(1-health*.03)*institution.tax*identity.tax*gov.tax*(.9+s.cohesion/650)*(.95+s.authority/1100)*(c?.focus==='stewardship'?1+level*.025:1),levy:court.levy*(1-health*.03)*institution.levy*identity.levy*gov.levy*(c?.focus==='martial'?1+level*.045:1),trade:court.trade*institution.trade*identity.trade*gov.trade*(s.charterUntil>g.turn?1.20:1),build:court.build*identity.build*gov.build*(c?.focus==='stewardship'?1-level*.035:1),scheme:identity.scheme+(c?.focus==='intrigue'?level*4:0),diplomacy:identity.diplomacy+(c?.focus==='diplomacy'?level*4:0)};}
-export function civicProvinceUnrest(g,realm,id){const p=g.civic?.provinces[id],s=g.civic?.realms[realm];if(!p||!s)return 0;const diversity=p.faith!==s.faith||p.culture!==s.culture;return (diversity?(s.policy==='coercion'?2:s.policy==='pluralism'?-1:0):0)+(p.acceptance<35?1:0)+identityModifiers(g,realm).unrest;}
+export function civicModifiers(g,realm){const s=g.civic?.realms[realm],gov=GOVERNMENTS[s?.government];if(!s||!gov)return {tax:1,levy:1,trade:1,build:1,scheme:0};const c=ruler(g,realm)?.civic,level=c?.perks.length||0,identity=identityModifiers(g,realm),institution=institutionModifiers(g,realm),health=healthPenalty(g,ruler(g,realm)?.id),court=courtModifiers(g,realm),role=roleplayModifiers(g,realm);
+ return {tax:role.tax*court.tax*(1-health*.03)*institution.tax*identity.tax*gov.tax*(.9+s.cohesion/650)*(.95+s.authority/1100)*(c?.focus==='stewardship'?1+level*.025:1),levy:role.levy*court.levy*(1-health*.03)*institution.levy*identity.levy*gov.levy*(c?.focus==='martial'?1+level*.045:1),trade:role.trade*court.trade*institution.trade*identity.trade*gov.trade*(s.charterUntil>g.turn?1.20:1),build:role.build*court.build*identity.build*gov.build*(c?.focus==='stewardship'?1-level*.035:1),scheme:role.scheme+identity.scheme+(c?.focus==='intrigue'?level*4:0),diplomacy:role.diplomacy+identity.diplomacy+(c?.focus==='diplomacy'?level*4:0)};}
+export function civicProvinceUnrest(g,realm,id){const p=g.civic?.provinces[id],s=g.civic?.realms[realm];if(!p||!s)return 0;const diversity=p.faith!==s.faith||p.culture!==s.culture;return (diversity?(s.policy==='coercion'?2:s.policy==='pluralism'?-1:0):0)+(p.acceptance<35?1:0)+identityModifiers(g,realm).unrest+roleplayModifiers(g,realm).unrest;}
 function history(g,realm,message){g.civic.history.unshift({realm,turn:g.turn,message});g.civic.history=g.civic.history.slice(0,200);if(realm===g.player)log(g,message);}
 function spend(g,realm,key,cost,cooldown){const s=g.civic.realms[realm],f=g.factions[realm];if(f.treasury<cost||g.turn-(s.lastDecision[key]??-1000)<cooldown)return false;f.treasury-=cost;s.lastDecision[key]=g.turn;return true;}
 function liftLords(g,realm,n){for(const [id,h] of Object.entries(g.politics.holdings))if(h.realm===realm&&g.provinces[id]?.owner===realm)h.loyalty=cap(h.loyalty+n,0,100);}
@@ -73,6 +74,7 @@ function governmentAction(g,realm){const s=g.civic.realms[realm],gov=GOVERNMENTS
  history(g,realm,gov.action+' completed.');return ok(gov.action+' completed.');
 }
 export function civicAction(g,world,action,id,extra){const c=initCivic(g,world),realm=g.player,s=c.realms[realm],f=g.factions[realm],r=ruler(g,realm),rc=character(g,r);
+ if(action.startsWith('roleplay-'))return roleplayAction(g,realm,action,id);
  if(action==='government')return governmentAction(g,realm);
  if(action==='policy'){if(!['accommodation','pluralism','coercion'].includes(id)||s.policy===id||!spend(g,realm,'faith-policy',80,24))return no('Policy change requires 80 gold and two years between changes.');s.policy=id;s.patronage=cap(s.patronage+(id==='coercion'?8:id==='pluralism'?-4:0),0,100);history(g,realm,'The realm adopted '+id+' as its faith policy.');return ok('Faith policy changed.');}
  if(action==='focus'){if(!LIFESTYLES[id]||rc.focus===id||g.turn-rc.lastFocus<24)return no('Choose a different lifestyle; changes are limited to every two years.');rc.progress??={};if(rc.focus)rc.progress[rc.focus]={xp:rc.xp,perks:rc.perks};rc.focus=id;rc.xp=rc.progress[id]?.xp||0;rc.perks=rc.progress[id]?.perks||[];rc.lastFocus=g.turn;return ok('Lifestyle focus changed.');}
@@ -111,6 +113,7 @@ export function tickCivic(g,world){const c=initCivic(g,world);if(c.lastTick===g.
  for(const [realm,s] of Object.entries(c.realms)){const f=g.factions[realm],r=ruler(g,realm),rc=character(g,r),land=provinceList(g,realm);if(!land.length)continue;
   if(!rc.focus){rc.focus=Object.keys(LIFESTYLES)[hash(r.id)%5];rc.lastFocus=g.turn;}
   rc.xp+=6+(r.skills[LIFESTYLES[rc.focus].skill]||1);const lvl=Math.min(3,Math.floor(rc.xp/60));while(rc.perks.length<lvl){rc.perks.push(LIFESTYLES[rc.focus].perks[rc.perks.length]);if(rc.perks.length===1||rc.perks.length===3){const sk=LIFESTYLES[rc.focus].skill;r.skills[sk]=cap(r.skills[sk]+1,1,5);}if(realm===g.player)log(g,r.name+' earned '+rc.perks.at(-1)+'.');}
+  tickRoleplay(g,realm,r);
   rc.stress=cap(rc.stress+(f.stability<40?5:-2)+(f.treasury<0?3:0)+(g.conflict&&Object.values(g.conflict.factions).some(x=>x.realm===realm&&x.status==='civil war')?5:0),0,100);
   if(rc.stress>=75)f.legitimacy=cap(f.legitimacy-1,0,100);
   let acceptance=0;for(const p of land){const l=c.provinces[p.id];if(!l)continue;const different=l.culture!==s.culture||l.faith!==s.faith;const d=different?(s.policy==='pluralism'?3:s.policy==='coercion'?-4:1):1;l.acceptance=cap(l.acceptance+d,0,100);l.localTrust=cap(l.localTrust+(l.acceptance>60?1:l.acceptance<35?-2:0),0,100);acceptance+=l.acceptance;}
