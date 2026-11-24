@@ -1,3 +1,4 @@
+import {marriageTerms,activeMarriageLinks,dynasticClaimOptions} from './dynastic-ties.js';
 import {campaignSearch} from './campaign-search.js';
 import {AUTHORITY,authorityLevel,politicalEstates,authorityModifiers} from './realm-authority.js';
 import {civilWarForces} from './political-conflict.js';
@@ -132,7 +133,7 @@ export function renderConflict(g,world,esc){
  const own=Object.values(g.provinces).filter(x=>x.owner===realm),foreign=Object.values(g.provinces).filter(x=>x.owner!==realm&&p.realms[x.owner]);
  for(const [type,label,targets] of [['fabricate','Fabricate claim (110g)',foreign],['undermine','Undermine foreign court (100g)',foreign],['sway','Sway vassal (60g)',own],['investigate','Investigate estate (80g)',own]]){const field='scheme-'+type;html+='<div class="rule"><b>'+esc(label)+'</b><select class="select" id="'+field+'">'+targets.map(v=>'<option value="'+esc(v.id)+'">'+esc(place(v.id))+' · '+esc(name(v.owner))+'</option>').join('')+'</select>'+btn('scheme',type,'Begin scheme','',field)+'</div>';}
  html+=renderIntrigue(g,esc);
- html+=section('TERRITORIAL CLAIMS');const claims=availableClaims(g,realm);
+ html+=section('TERRITORIAL CLAIMS');const claims=availableClaims(g,realm);const inherited=dynasticClaimOptions(g,world,realm).filter(x=>!x.existing);if(inherited.length)html+='<details class="rule"><summary>Inherited dynastic claims</summary>'+inherited.map(x=>'<div class="rule">'+characterLink(p.people[x.person],esc)+' · '+provinceLink(x.province,world,esc)+btn('dynastic-claim',x.person,'Recognize territorial claim (60g)',x.province)+'</div>').join('')+'</details>';
  if(!claims.length)html+='<p class="paragraph">No active claims. Use the chancellor to establish one.</p>';
  for(const x of claims)html+='<div class="rule"><b>'+provinceLink(x.province,world,esc)+'</b><div class="smallnote">Expires in '+Math.max(0,x.expires-g.turn)+' months · '+esc(name(g.provinces[x.province].owner))+'</div>'+btn('declare',x.province,'Declare claim war (5 prestige)')+'</div>';
  html+=section('WARS AND PEACE');const wars=Object.values(c.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm));if(!wars.length)html+='<p class="paragraph">No formal claim wars.</p>';
@@ -299,7 +300,7 @@ export function renderInstitutions(g,world,esc){
 export function renderDiplomaticAgreements(g,other,esc){
  const d=g.diplomacy,r=g.player;if(!d)return '';const name=id=>g.factions[id]?.name||id;
  const btn=(type,id,label,input='')=>'<button class="rowbtn" data-action="diplomatic-agreement" data-type="'+esc(type)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
- let html='<details class="rule"><summary>Treaties and allied support</summary>';
+ let html='<details class="rule"><summary>Treaties and allied support</summary>';const links=activeMarriageLinks(g,r,other);if(links.length)html+='<p class="smallnote">Living dynastic ties: '+links.map(x=>characterLink(g.politics.people[x.a],esc)+' × '+characterLink(g.politics.people[x.b],esc)).join(', ')+'</p>';
  html+=nonAggression(g,r,other)?'<p class="paragraph">Non-aggression agreement active.</p>'+btn('break',other,'Repudiate agreement (prestige and legitimacy penalty)'):btn('pact',other,'Non-aggression agreement (80g)');
  html+=btn('guarantee',other,'Guarantee independence (100g)');
  for(const p of Object.values(d.guarantees).filter(x=>x.protected===r||x.guarantor===r))html+='<div class="smallnote">'+esc(name(p.guarantor))+' guarantees '+esc(name(p.protected))+' · '+Math.max(0,p.until-g.turn)+' months</div>';
@@ -335,7 +336,7 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
  if(!x.own){h+=section('FOREIGN RELATIONS')+'<button class="rowbtn" data-action="show-diplomacy" data-target="'+esc(p.realm)+'">Open diplomacy with '+esc(g.factions[p.realm]?.name||p.realm)+'</button>';return h;}
  if(!x.canServe)return h;
  h+=section('AVAILABLE ACTIONS');
- if(!p.spouse){const opts=marriageCandidates(g,g.player).filter(m=>m.a===p.id),field='profile-spouse';h+='<details class="rule" open><summary>Arrange marriage</summary>'+(opts.length?'<select class="select" id="'+field+'">'+opts.map(m=>'<option value="'+esc(m.b)+'">'+esc(m.label)+(m.realm!==g.player?' · relations '+(f.relations[m.realm]||0):'')+'</option>').join('')+'</select>'+btn('politics','marry',id,'Celebrate wedding (180g)','',field):'<p class="paragraph">No eligible royal match.</p>')+'</details>';}
+ if(!p.spouse){const opts=marriageCandidates(g,g.player).filter(m=>m.a===p.id),field='profile-spouse';h+='<details class="rule" open><summary>Arrange marriage</summary>'+(opts.length?'<select class="select" id="'+field+'">'+opts.map(m=>'<option value="'+esc(m.b)+'">'+esc(m.label)+(m.realm!==g.player?' · '+(marriageTerms(g,p,g.politics.people[m.b]).accepted?'willing':'not willing'):'')+'</option>').join('')+'</select>'+btn('politics','marry',id,'Celebrate wedding (180g)','',field):'<p class="paragraph">No eligible royal match.</p>')+'</details>';}
  const armies=Object.values(g.armies).filter(a=>a.owner===g.player&&!embarked(g,a.id)&&commanderCandidates(g,a.id).some(c=>c.id===id));if(armies.length){const field='profile-army';h+='<details class="rule" open><summary>Military command</summary><select class="select" id="'+field+'">'+armies.map(a=>'<option value="'+esc(a.id)+'">'+fmt(a.infantry+a.archers+a.cavalry)+' troops · '+esc(world.provinces.find(q=>q.id===a.province)?.name||a.province)+'</option>').join('')+'</select><button class="rowbtn" data-action="profile-command" data-id="'+esc(id)+'" data-input="'+field+'">Appoint as commander</button></details>';}
  const eligibleCouncil=p.id!==s.ruler&&!Object.values(s.council).includes(id)&&!Object.values(g.royalCourt?.realms?.[g.player]?.offices||{}).some(o=>o.person===id);
  if(eligibleCouncil)h+='<details class="rule"><summary>Appoint to council</summary>'+Object.entries(s.council).map(([role,person])=>'<p class="smallnote">'+esc(role)+' · Current: '+link(person)+'</p>'+btn('politics','appoint',role,'Appoint '+p.name+' (80g)',id)).join('')+'</details>';
