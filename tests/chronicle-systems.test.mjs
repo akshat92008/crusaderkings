@@ -8,7 +8,7 @@ import {renderStories} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=(realm='england')=>{const g=createGame(world,realm);g.factions[realm].treasury=10000;g.politics.people[g.politics.realms[realm].ruler].age=35;return g;};
 const ruler=g=>g.politics.people[g.politics.realms[g.player].ruler];
-test('all existing civilizations have distinct named regional decisions',()=>{const g=start();assert.equal(Object.keys(REGIONAL_DECISIONS).length,44);assert.equal(new Set(world.factions.map(f=>regionalDecision(g,f.id)[0])).size,44);assert.equal(STORY_CHAINS.length,8);assert.equal(Object.keys(AMBITIONS).length,50);});
+test('all existing civilizations have distinct named regional decisions',()=>{const g=start();assert.equal(Object.keys(REGIONAL_DECISIONS).length,56);assert.equal(new Set(world.factions.map(f=>regionalDecision(g,f.id)[0])).size,44);assert.equal(STORY_CHAINS.length,8);assert.equal(Object.keys(AMBITIONS).length,50);});
 test('regional decisions pay gold, change actual institutions and respect cooldown',()=>{const g=start('ming'),f=g.factions.ming;f.tech=3;assert.ok(chronicleAction(g,world,'decision').ok);assert.equal(f.treasury,9820);assert.equal(f.tech,4);assert.equal(chronicleAction(g,world,'decision').ok,false);g.turn=36;assert.ok(chronicleAction(g,world,'decision').ok);});
 test('friendship and rivalry influence council votes and persist in saves',()=>{const g=start(),r=ruler(g),id=g.politics.realms.england.council.chancellor;const score=councilVotes(g,'england').find(v=>v.id===id).score,before=personalOpinion(g,r.id,id);assert.ok(chronicleAction(g,world,'befriend',id).ok);assert.ok(personalOpinion(g,r.id,id)>before);assert.ok(councilVotes(g,'england').find(v=>v.id===id).score>score);assert.equal(chronicleAction(g,world,'befriend',id).ok,false);g.turn=12;assert.ok(chronicleAction(g,world,'challenge',id).ok);assert.equal(personalOpinion(restoreGame(snapshot(g),world),r.id,id),personalOpinion(g,r.id,id));});
 test('story chains have timed stages, paid choices and lasting records',()=>{const g=start();for(const h of Object.values(g.politics.holdings))if(h.realm==='england')h.loyalty=10;g.turn=6;tickChronicles(g,world);assert.equal(currentChain(g).id,'estates');assert.ok(chronicleAction(g,world,'chain','0').ok);assert.equal(currentChain(g).stage,1);assert.equal(chronicleAction(g,world,'chain','0').ok,false);g.turn=9;tickChronicles(g,world);assert.ok(chronicleAction(g,world,'chain','0').ok);g.turn=12;tickChronicles(g,world);assert.ok(chronicleAction(g,world,'chain','0').ok);assert.equal(currentChain(g),null);assert.equal(g.chronicles.realms.england.completed[0].outcomes.length,3);});
@@ -40,4 +40,11 @@ test('a stale duplicate active ambition is discarded without another reward',()=
  assert.ok(chronicleAction(g,world,'ambition','security').ok);const duplicate=JSON.parse(JSON.stringify(s.ambition));p.buildings.fort+=2;g.turn=1;tickChronicles(g,world);
  const prestige=g.factions.england.prestige;s.ambition=duplicate;g.turn=2;tickChronicles(g,world);
  assert.equal(s.ambition,null);assert.equal(g.factions.england.prestige,prestige);
+});
+
+test('all historical atlas profiles have distinct chronicle decision names',async()=>{
+ const {HISTORICAL_CONTEXT}=await import('../src/historical-context.js');
+ const g=start();const ids=Object.keys(HISTORICAL_CONTEXT);
+ assert.equal(ids.length,56);assert.equal(new Set(ids.map(id=>regionalDecision(g,id)[0])).size,56);
+ assert.ok(ids.every(id=>Object.hasOwn(REGIONAL_DECISIONS,id)));
 });
