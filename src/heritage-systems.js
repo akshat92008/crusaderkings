@@ -28,7 +28,9 @@ export const STRUGGLES=[
 ];
 const ARTIFACTS={regalia:{name:'Ceremonial regalia',cost:260,slot:'regalia',tax:0,levy:0,trade:0,prestige:2},standard:{name:'Royal battle standard',cost:230,slot:'standard',tax:0,levy:.06,trade:0,prestige:1},ledger:{name:'Master accounting manuscript',cost:210,slot:'book',tax:.06,levy:0,trade:0,prestige:1},charter:{name:'Illuminated merchant charter',cost:240,slot:'charter',tax:0,levy:0,trade:.12,prestige:1},chronicle:{name:'Dynastic chronicle',cost:250,slot:'book',tax:0,levy:0,trade:0,prestige:3}};
 export const RELICS=ARTIFACTS;
-export const LEGACIES={statecraft:{name:'Statecraft',cost:45,tax:.04,levy:0,trade:0},warfare:{name:'Military heritage',cost:45,tax:0,levy:.05,trade:0},commerce:{name:'Commercial heritage',cost:45,tax:0,levy:0,trade:.08},scholarship:{name:'Scholarly heritage',cost:45,tax:.02,levy:0,trade:0}};
+export const LEGACIES={statecraft:{name:'Statecraft',cost:45,tax:.04,levy:0,trade:0},warfare:{name:'Military heritage',cost:45,tax:0,levy:.05,trade:0},commerce:{name:'Commercial heritage',cost:45,tax:0,levy:0,trade:.08},scholarship:{name:'Scholarly heritage',cost:45,tax:.02,levy:0,trade:0},
+ statecraft_2:{name:'Established administration',requires:'statecraft',cost:90,tax:.05,levy:0,trade:0},warfare_2:{name:'Professional military heritage',requires:'warfare',cost:90,tax:0,levy:.07,trade:0},commerce_2:{name:'Established commercial networks',requires:'commerce',cost:90,tax:0,levy:0,trade:.10},scholarship_2:{name:'Enduring scholarly institutions',requires:'scholarship',cost:90,tax:.04,levy:0,trade:.03},
+ statecraft_3:{name:'Administrative tradition',requires:'statecraft_2',cost:150,tax:.07,levy:0,trade:0},warfare_3:{name:'Renowned military tradition',requires:'warfare_2',cost:150,tax:0,levy:.09,trade:0},commerce_3:{name:'Commercial tradition',requires:'commerce_2',cost:150,tax:0,levy:0,trade:.12},scholarship_3:{name:'Scholarly tradition',requires:'scholarship_2',cost:150,tax:.05,levy:0,trade:.04}};
 function record(g,realm,message){const a=g.heritage;a.history.unshift({realm,turn:g.turn,message});a.history=a.history.slice(0,200);if(realm===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}}
 function random(a){a.seed=(Math.imul(a.seed,1664525)+1013904223)>>>0;return a.seed/4294967296;}
 function dynasty(g,realm){const house=ruler(g,realm)?.house||realm,key=realm+'|'+house;return g.heritage.dynasties[key]??={realm,house,renown:0,legacies:[],achievements:[]};}
@@ -38,7 +40,7 @@ export function initHeritage(g,world){if(g.heritage?.version===1)return g.herita
  return a;}
 export function heritageModifiers(g,realm){const a=g.heritage,s=a?.realms[realm];if(!s)return {tax:1,levy:1,trade:1};const d=a.dynasties[realm+'|'+ruler(g,realm)?.house];let tax=1,levy=1,trade=1;
  for(const id of Object.values(s.equipped)){const item=a.artifacts[id],r=ARTIFACTS[item?.kind];if(r&&item.realm===realm&&item.durability>0){tax+=r.tax;levy+=r.levy;trade+=r.trade;}}
- for(const id of d?.legacies||[]){const l=LEGACIES[id];tax+=l.tax;levy+=l.levy;trade+=l.trade;}return {tax,levy,trade};}
+ for(const id of d?.legacies||[]){const l=LEGACIES[id];if(!l)continue;tax+=l.tax;levy+=l.levy;trade+=l.trade;}return {tax,levy,trade};}
 function route(g,world,realm,to){const f=world.factions.find(f=>f.id===realm),land=world.provinces.filter(p=>g.provinces[p.id]?.owner===realm);if(!land.length||!g.provinces[to]||g.provinces[to].owner!==realm)return null;
  const origin=land.slice().sort((a,b)=>((a.centroid[0]-f.capital[0])**2+(a.centroid[1]-f.capital[1])**2)-((b.centroid[0]-f.capital[0])**2+(b.centroid[1]-f.capital[1])**2))[0].id;
  const by=Object.fromEntries(land.map(p=>[p.id,p])),q=[[origin]],seen=new Set([origin]);while(q.length){const path=q.shift(),last=path.at(-1);if(last===to)return path;for(const n of by[last]?.neighbors||[]){if(!by[n]||seen.has(n))continue;seen.add(n);q.push([...path,n]);}}return null;}
@@ -95,6 +97,7 @@ function stepStruggles(g){const a=g.heritage;for(const def of STRUGGLES){const x
  if(previous!==x.phase&&members.includes(g.player))record(g,g.player,def.name+' entered '+x.phase+'.');
  if(x.phase==='conciliation'&&x.cooperation>=90){x.phase='settlement';x.ended=g.turn;for(const id of members){g.factions[id].legitimacy=cap(g.factions[id].legitimacy+6,0,100);dynasty(g,id).renown+=8;}if(members.includes(g.player))record(g,g.player,def.name+' reached a negotiated settlement.');}
  }}
+export function unlockLegacy(g,realm,id){const d=dynasty(g,realm),l=LEGACIES[id];if(!l||d.legacies.includes(id)||d.renown<l.cost||l.requires&&!d.legacies.includes(l.requires))return no('Requires an unlearned legacy, its prerequisite and sufficient dynastic renown.');d.renown-=l.cost;d.legacies.push(id);record(g,realm,'Dynastic legacy unlocked: '+l.name+'.');return ok('Dynastic legacy unlocked.');}
 export function heritageAction(g,world,action,id,extra,guest){const a=initHeritage(g,world),realm=g.player,s=a.realms[realm],f=g.factions[realm],d=dynasty(g,realm);
  if(action==='activity')return start(g,world,realm,id,extra,guest);
  if(action==='incident')return incident(g,realm,Number(id));
@@ -102,13 +105,13 @@ export function heritageAction(g,world,action,id,extra,guest){const a=initHerita
  if(action==='artifact'){const rule=ARTIFACTS[id];if(!rule||f.treasury<rule.cost||Object.values(a.artifacts).some(x=>x.realm===realm&&x.kind===id&&x.durability>0))return no('Need sufficient gold and no intact duplicate artifact.');f.treasury-=rule.cost;const key='r'+a.next++;a.artifacts[key]={id:key,kind:id,realm,creator:ruler(g,realm).id,year:g.year,durability:100};s.equipped[rule.slot]=key;d.renown+=5;return ok(rule.name+' commissioned and equipped.');}
  if(action==='equip'){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(!x||x.realm!==realm||x.durability<=0||!rule)return no('Select an intact artifact of your realm.');s.equipped[rule.slot]=id;return ok('Artifact equipped.');}
  if(action==='repair'){const x=a.artifacts[id];if(!x||x.realm!==realm||x.durability>=100||f.treasury<80)return no('Artifact repair requires 80 gold and damage.');f.treasury-=80;x.durability=cap(x.durability+35,0,100);return ok('Artifact restored.');}
- if(action==='legacy'){const l=LEGACIES[id];if(!l||d.legacies.includes(id)||d.renown<l.cost)return no('Need 45 dynastic renown and an unlearned legacy.');d.renown-=l.cost;d.legacies.push(id);return ok('Dynastic legacy unlocked.');}
+ if(action==='legacy')return unlockLegacy(g,realm,id);
  return no('Unknown activity or heritage decision.');}
 export function tickHeritage(g,world){const a=initHeritage(g,world);if(a.lastTick===g.turn)return;a.lastTick=g.turn;
  for(const [realm,s] of Object.entries(a.realms)){const r=ruler(g,realm),d=dynasty(g,realm),f=g.factions[realm];if(!r)continue;if(s.seenRuler!==r.id){s.seenRuler=r.id;d.renown+=5;}
  if(a.activities[realm])stepActivity(g,realm,a.activities[realm]);
  else if(realm!==g.player&&g.turn%12===0&&f.treasury>600&&own(g,realm).length&&random(a)<.22){const destinations=activityDestinations(g,world,realm);if(destinations.length){const kind=s.lastCoronation!==r.id?'coronation':['feast','hunt','tour','pilgrimage','tournament'][hash(realm+g.turn)%5];start(g,world,realm,kind,destinations[hash(realm+g.turn)%destinations.length].id);}}
- if(g.turn%12===0){for(const id of Object.values(s.equipped)){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(x&&rule&&x.durability>0){x.durability=cap(x.durability-4,0,100);f.prestige+=rule.prestige;}}if(own(g,realm).length>=10&&!d.achievements.includes('Realm builder')){d.achievements.push('Realm builder');d.renown+=15;}}
+ if(g.turn%12===0){if(realm!==g.player){const preference={martial:'warfare',stewardship:'statecraft',learning:'scholarship',diplomacy:'commerce',intrigue:'statecraft'}[r.civic?.focus]||'statecraft',options=Object.keys(LEGACIES).filter(id=>!d.legacies.includes(id)&&d.renown>=LEGACIES[id].cost&&(!LEGACIES[id].requires||d.legacies.includes(LEGACIES[id].requires)));const next=options.find(id=>id===preference||id.startsWith(preference+'_'))||options[0];if(next)unlockLegacy(g,realm,next);}for(const id of Object.values(s.equipped)){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(x&&rule&&x.durability>0){x.durability=cap(x.durability-4,0,100);f.prestige+=rule.prestige;}}if(own(g,realm).length>=10&&!d.achievements.includes('Realm builder')){d.achievements.push('Realm builder');d.renown+=15;}}
  }
  if(g.turn%3===0)stepStruggles(g);
 }
