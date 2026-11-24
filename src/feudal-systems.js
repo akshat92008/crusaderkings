@@ -1,3 +1,4 @@
+import {partitionRepresentatives} from './succession-systems.js';
 // Crown, regional title and provincial title hierarchy, based on prototype geography.
 // Provincial holders remain authoritative in g.politics.holdings.
 import {controller} from './campaign-war.js';
@@ -15,7 +16,7 @@ export function syncTitles(g){const f=g.feudal;if(!f)return;const next={};for(co
  f.titles=next;}
 export function titleList(g,realm){return Object.values(g.feudal?.titles||{}).filter(t=>t.realm===realm);}
 export function regionalLoyalty(g,province){const c=g.feudal?.titles['c:'+province],d=g.feudal?.titles[c?.parent];if(!d||d.holder===g.politics.realms[d.realm]?.ruler||isImprisoned(g,d.holder))return 0;const v=d.members.map(id=>[id,g.politics.holdings[id]]).filter(([,h])=>h?.lord===d.holder);if(!v.length)return 0;return cap((v.reduce((n,[,h])=>n+h.loyalty,0)/v.length-55)*.18,-8,8);}
-export function partitionInheritance(g,realm,deceased,primary){if(!g.feudal)return;const f=g.feudal,p=g.politics,s=p.realms[realm],heirs=deceased.children.map(id=>live(g,id)).filter(c=>c?.realm===realm&&c.house===deceased.house&&c.id!==primary.id).sort((a,b)=>b.age-a.age||a.id.localeCompare(b.id));if(s.law!=='elective')for(const c of heirs){f.claimants[realm+':'+c.id]={realm,person:c.id,from:deceased.id,created:g.turn};}
+export function partitionInheritance(g,realm,deceased,primary){if(!g.feudal)return;const f=g.feudal,p=g.politics,s=p.realms[realm],heirs=partitionRepresentatives(g,deceased).filter(c=>c.id!==primary.id);if(s.law!=='elective')for(const c of heirs){f.claimants[realm+':'+c.id]={realm,person:c.id,from:deceased.id,created:g.turn};}
  const crown=holdings(g,realm).filter(([,h])=>h.lord===deceased.id).sort(([a],[b])=>a.localeCompare(b));const available=heirs.filter(c=>!isImprisoned(g,c.id));if(s.law==='partition'&&available.length){let i=0;for(const [id,h] of crown){h.lord=i===0?primary.id:available[(i-1)%available.length].id;h.loyalty=65;i++;}if(crown.length>1)note(g,realm,'Partition distributed '+crown.length+' crown holdings among the heirs.');}
  else for(const [,h] of crown){h.lord=primary.id;h.loyalty=65;}syncTitles(g);}
 export function claimantCandidates(g,realm){const r=ruler(g,realm);return Object.values(g.feudal?.claimants||{}).filter(x=>x.realm===realm&&x.person!==r?.id&&live(g,x.person)?.realm===realm&&!isImprisoned(g,x.person)&&g.turn-x.created<180);}
