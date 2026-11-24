@@ -1,5 +1,5 @@
 /** Safe, copy-free royal court, trade and legacy interface views. */
-import {marriageCandidates,politicalRevenue,politicalLevy} from './dynastic-politics.js';
+import {marriageCandidates,politicalRevenue,politicalLevy,politicalDispatch} from './dynastic-politics.js';
 import {currentRoyalEvent,currentCourt,tradeIncome,tradePactCount,objectives,campaignStanding} from './kingdom-depth.js';
 const fmt=x=>Math.round(x).toLocaleString('en-US');
 function stat(name,value){return '<label>'+name+'</label><strong>'+value+'</strong>';}
@@ -75,6 +75,7 @@ function renderPolitics(g,esc){
  const button=(action,id,label,extra='',input='')=>'<button class="rowbtn" data-action="politics" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
  const person=id=>p.people[id];const show=c=>c?esc(c.name)+' · '+c.age+'y · '+esc(c.traits.join(', '))+(c.alive?'':' · deceased'):'None';
  let html=(s.regent?'<div class="rule"><b>Regency</b><p class="paragraph">'+show(person(s.regent))+' governs during the sovereign’s minority.</p></div>':'')+section('DYNASTY AND LIVING FAMILY')+'<div class="rule"><h3>'+esc(r.house)+'</h3><p class="paragraph">'+show(r)+'</p><div class="smallnote">Consort: '+show(person(r.spouse))+'</div><div class="smallnote">Parents: '+r.parents.map(id=>show(person(id))).join(' / ')+'</div>'+r.children.map(id=>'<div class="smallnote">Child: '+show(person(id))+' · spouse: '+show(person(person(id)?.spouse))+'</div>').join('')+'</div>';
+ const dispatch=politicalDispatch(g);if(dispatch)html+=section('POLITICAL DISPATCH')+'<div class="rule"><h3>'+esc(dispatch.title)+'</h3><p class="paragraph">'+esc(dispatch.description)+'</p>'+dispatch.choices.map((x,i)=>button('dispatch',i,x.label+(x.cost?' ('+x.cost+'g)':''))).join('')+'</div>';
  html+=section('SUCCESSION LAW')+'<div class="rule"><b>'+esc(s.law)+'</b><p class="paragraph">Reform costs 250 gold, requires 65 legitimacy, and is limited to once per decade.</p>'+['eldest','youngest','elective'].filter(l=>l!==s.law).map(l=>button('law',l,'Adopt '+l)).join('')+'</div>';
  html+=section('DYNASTIC MARRIAGES')+'<p class="paragraph">Eligible adults only. Weddings cost 180 gold; foreign matches also require +20 relations.</p>';
  const matches=marriageCandidates(g,g.player);if(matches.length){const groups=Object.groupBy?Object.groupBy(matches,x=>x.a):matches.reduce((a,x)=>((a[x.a]??=[]).push(x),a),{});for(const [id,opts] of Object.entries(groups)){const field='spouse-'+id;html+='<div class="rule"><b>'+show(person(id))+'</b><select class="select" id="'+esc(field)+'">'+opts.map(x=>'<option value="'+esc(x.b)+'">'+esc(x.label)+'</option>').join('')+'</select>'+button('marry',id,'Celebrate marriage (180g)','',field)+'</div>';}}else html+='<p class="paragraph">No eligible foreign matches at present.</p>';
