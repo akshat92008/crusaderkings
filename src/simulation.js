@@ -157,7 +157,7 @@ export function advanceMonth(g,world){
    const origin=world.provinces.find(p=>p.id===a.province);if(!origin||g.provinces[origin.id].owner!==a.owner)continue;
    const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&p.owner!==a.owner&&p.owner!==g.player&&!hasTruce(g,a.owner,p.owner)&&g.factions[a.owner].treaties[p.owner]!=='alliance');
    if(!potential.length||rand(g)>.48)continue;
-   const target=potential[Math.floor(rand(g)*potential.length)];
+   const target=potential.find(p=>activeWar(g,a.owner,p.owner)?.goal===p.id)||potential[Math.floor(rand(g)*potential.length)];
    const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,target.owner).reduce((sum,v)=>sum+armySize(v),0);
    const attack=armySize(a)*(0.75+rand(g)*.7);
    if(attack>defense*.88){
