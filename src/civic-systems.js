@@ -1,3 +1,4 @@
+import {healthPenalty} from './living-systems.js';
 import {institutionModifiers} from './government-institutions.js';
 import {identityModifiers} from './identity-systems.js';
 // Original, approximate 1450 gameplay profiles, not verified historical population data.
@@ -44,8 +45,8 @@ export function initCivic(g,world){
 }
 function random(c){c.seed=(Math.imul(c.seed,1664525)+1013904223)>>>0;return c.seed/4294967296;}
 function provinceList(g,realm){return Object.values(g.provinces).filter(p=>p.owner===realm);}
-export function civicModifiers(g,realm){const s=g.civic?.realms[realm],gov=GOVERNMENTS[s?.government];if(!s||!gov)return {tax:1,levy:1,trade:1,build:1,scheme:0};const c=ruler(g,realm)?.civic,level=c?.perks.length||0,identity=identityModifiers(g,realm),institution=institutionModifiers(g,realm);
- return {tax:institution.tax*identity.tax*gov.tax*(.9+s.cohesion/650)*(.95+s.authority/1100)*(c?.focus==='stewardship'?1+level*.025:1),levy:institution.levy*identity.levy*gov.levy*(c?.focus==='martial'?1+level*.045:1),trade:institution.trade*identity.trade*gov.trade*(s.charterUntil>g.turn?1.20:1),build:identity.build*gov.build*(c?.focus==='stewardship'?1-level*.035:1),scheme:identity.scheme+(c?.focus==='intrigue'?level*4:0),diplomacy:identity.diplomacy+(c?.focus==='diplomacy'?level*4:0)};}
+export function civicModifiers(g,realm){const s=g.civic?.realms[realm],gov=GOVERNMENTS[s?.government];if(!s||!gov)return {tax:1,levy:1,trade:1,build:1,scheme:0};const c=ruler(g,realm)?.civic,level=c?.perks.length||0,identity=identityModifiers(g,realm),institution=institutionModifiers(g,realm),health=healthPenalty(g,ruler(g,realm)?.id);
+ return {tax:(1-health*.03)*institution.tax*identity.tax*gov.tax*(.9+s.cohesion/650)*(.95+s.authority/1100)*(c?.focus==='stewardship'?1+level*.025:1),levy:(1-health*.03)*institution.levy*identity.levy*gov.levy*(c?.focus==='martial'?1+level*.045:1),trade:institution.trade*identity.trade*gov.trade*(s.charterUntil>g.turn?1.20:1),build:identity.build*gov.build*(c?.focus==='stewardship'?1-level*.035:1),scheme:identity.scheme+(c?.focus==='intrigue'?level*4:0),diplomacy:identity.diplomacy+(c?.focus==='diplomacy'?level*4:0)};}
 export function civicProvinceUnrest(g,realm,id){const p=g.civic?.provinces[id],s=g.civic?.realms[realm];if(!p||!s)return 0;const diversity=p.faith!==s.faith||p.culture!==s.culture;return (diversity?(s.policy==='coercion'?2:s.policy==='pluralism'?-1:0):0)+(p.acceptance<35?1:0)+identityModifiers(g,realm).unrest;}
 function history(g,realm,message){g.civic.history.unshift({realm,turn:g.turn,message});g.civic.history=g.civic.history.slice(0,200);if(realm===g.player)log(g,message);}
 function spend(g,realm,key,cost,cooldown){const s=g.civic.realms[realm],f=g.factions[realm];if(f.treasury<cost||g.turn-(s.lastDecision[key]??-1000)<cooldown)return false;f.treasury-=cost;s.lastDecision[key]=g.turn;return true;}
