@@ -1,7 +1,33 @@
 // Dynastic ties and inherited territorial claims, with no instant annexation.
 import {capitalDistrict} from './historical-world.js';
 const num=n=>Number.isFinite(n)?n:0,pair=(a,b)=>[a,b].sort().join('|'),alive=(g,id)=>{const p=g.politics?.people?.[id];return p?.alive?p:null;},war=(g,a,b)=>Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&pair(w.attacker,w.defender)===pair(a,b)),land=(g,r)=>Object.values(g.provinces||{}).some(p=>p.owner===r);
-export function marriageTerms(g,a,b){if(!a||!b)return {accepted:false,score:0,reasons:['Missing character']};if(a.realm===b.realm)return {accepted:true,score:100,reasons:['Domestic marriage']};const f=g.factions[a.realm],o=g.factions[b.realm];if(!f||!o||!land(g,a.realm)||!land(g,b.realm))return {accepted:false,score:0,reasons:['Both realms must have land']};const forward=num(f.relations?.[b.realm]),reverse=num(o.relations?.[a.realm]),faith=a.civic?.faith&&a.civic.faith===b.civic?.faith,score=Math.round(35+forward*.55+reverse*.30+(faith?8:0)+(a.traits?.includes('generous')?3:0));const reasons=['Relations '+forward+' / '+reverse];if(war(g,a.realm,b.realm))reasons.push('Active war');if(forward<20)reasons.push('Requires at least +20 relations');if(reverse<-30)reasons.push('Foreign court hostile');return {accepted:!war(g,a.realm,b.realm)&&forward>=20&&reverse>=-30&&score>=35,score,reasons};}
+// Optional alternate-history marriage policies; no existing faith is assigned a universal rule.
+export const MARRIAGE_POLICIES={open:'Open marriage',same_faith:'Same-faith marriage',indissoluble:'Marriage cannot be dissolved'};
+export const WEDDING_CONTRACTS={
+ paternal:{name:'Paternal-house wedding',lineage:'paternal',settlement:0},
+ maternal:{name:'Maternal-house wedding',lineage:'maternal',settlement:0},
+ paternal_settlement:{name:'Paternal-house wedding with settlement',lineage:'paternal',settlement:100},
+ maternal_settlement:{name:'Maternal-house wedding with settlement',lineage:'maternal',settlement:100}
+};
+export function marriagePolicy(g,realm){const key=g.politics?.realms?.[realm]?.marriagePolicy;return Object.hasOwn(MARRIAGE_POLICIES,key)?key:'open';}
+export function faithPermitsMarriage(g,a,b){
+ if(!a||!b)return false;
+ if(![a.realm,b.realm].some(r=>marriagePolicy(g,r)==='same_faith'))return true;
+ const faith=p=>p.civic?.faith??g.civic?.realms?.[p.realm]?.faith;
+ return Boolean(faith(a)&&faith(a)===faith(b));
+}
+export function marriageContract(g,id){
+ const p=g.politics?.people?.[id],q=g.politics?.people?.[p?.spouse];
+ if(!p?.alive||!q?.alive||q.spouse!==id)return null;
+ return (g.politics.marriages||[]).slice().reverse().find(m=>!m.ended&&((m.a===id&&m.b===q.id)||(m.b===id&&m.a===q.id)))??{a:id,b:q.id,lineage:p.marriageLineage||'paternal',settlement:0};
+}
+export function divorceTerms(g,id){
+ const p=g.politics?.people?.[id],q=g.politics?.people?.[p?.spouse],contract=marriageContract(g,id);
+ if(!contract)return null;
+ const forbidden=[p.realm,q.realm].some(r=>marriagePolicy(g,r)==='indissoluble');
+ return {contract,spouse:q.id,cost:120,prestige:15,legitimacy:5,reason:forbidden?'A marriage charter forbids dissolution.':''};
+}
+export function marriageTerms(g,a,b){if(!a||!b)return {accepted:false,score:0,reasons:['Missing character']};if(!faithPermitsMarriage(g,a,b))return {accepted:false,score:0,reasons:['A court marriage charter requires the same faith']};if(a.realm===b.realm)return {accepted:true,score:100,reasons:['Domestic marriage']};const f=g.factions[a.realm],o=g.factions[b.realm];if(!f||!o||!land(g,a.realm)||!land(g,b.realm))return {accepted:false,score:0,reasons:['Both realms must have land']};const forward=num(f.relations?.[b.realm]),reverse=num(o.relations?.[a.realm]),faith=a.civic?.faith&&a.civic.faith===b.civic?.faith,score=Math.round(35+forward*.55+reverse*.30+(faith?8:0)+(a.traits?.includes('generous')?3:0));const reasons=['Relations '+forward+' / '+reverse];if(war(g,a.realm,b.realm))reasons.push('Active war');if(forward<20)reasons.push('Requires at least +20 relations');if(reverse<-30)reasons.push('Foreign court hostile');return {accepted:!war(g,a.realm,b.realm)&&forward>=20&&reverse>=-30&&score>=35,score,reasons};}
 export function activeMarriageLinks(g,a,b){return Object.values(g.politics?.people||{}).filter(p=>p.alive&&p.realm===a&&p.spouse&&alive(g,p.spouse)?.realm===b&&alive(g,p.spouse)?.spouse===p.id).map(p=>({a:p.id,b:p.spouse}));}
 // A treaty is sustained by a reciprocal living spouse link between the
 // current courts. Moving a spouse across realms must not preserve the old

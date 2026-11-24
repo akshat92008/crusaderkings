@@ -7,7 +7,7 @@ import {successionCandidates,nominateSuccessor,hereditaryLine,crownExcluded,crow
 import {feudalHierarchy,obligationProfile,creditEstateIncome,estateExemptionAction} from './feudal-obligations.js';
 import {estateDisputeAction} from './estate-conflicts.js';
 import {resolveVassalPetition} from './vassal-courts.js';
-import {marriageTerms,reconcileMarriageTreaties,inheritedClaims} from './dynastic-ties.js';
+import {marriageTerms,reconcileMarriageTreaties,inheritedClaims,WEDDING_CONTRACTS,MARRIAGE_POLICIES,marriagePolicy,marriageContract,divorceTerms,faithPermitsMarriage} from './dynastic-ties.js';
 import {authorityAction,authorityModifiers,politicalEstates} from './realm-authority.js';
 import {courtAction,initRoyalCourt,tickRoyalCourt} from './royal-court.js';
 import {partitionInheritance,isImprisoned,regionalLoyalty,syncTitles} from './feudal-systems.js';
@@ -28,7 +28,7 @@ function person(g,realm,age,opts={}){
  const c={id,realm,house:opts.house||'House of '+f.name,name:opts.name||pick(pools[f.continent]||pools.Europe,n)+' '+id,age,alive:true,sex:opts.sex||((n&1)?'female':'male'),parents:opts.parents||[],children:[],spouse:null,traits:[pick(traits,n),pick(traits,n>>>8)].filter((x,i,a)=>a.indexOf(x)===i),skills:{diplomacy:1+n%5,martial:1+(n>>>5)%5,stewardship:1+(n>>>10)%5,intrigue:1+(n>>>15)%5,learning:1+(n>>>20)%5},wealth:100,claims:[],memories:[],...opts};
  p.people[id]=c;for(const parent of c.parents)if(p.people[parent])p.people[parent].children.push(id);return c;
 }
-function link(a,b){a.spouse=b.id;b.spouse=a.id;}
+function link(a,b){a.spouse=b.id;b.spouse=a.id;delete a.marriageLineage;delete b.marriageLineage;}
 function ancestors(p,c,depth=3){if(!c||depth<=0)return [];return c.parents.flatMap(id=>[id,...ancestors(p,p.people[id],depth-1)]);}
 function eligible(p,a,b){return a&&b&&a.alive&&b.alive&&a.id!==b.id&&!a.spouse&&!b.spouse&&a.sex!==b.sex&&!a.parents.includes(b.id)&&!b.parents.includes(a.id)&&!ancestors(p,a).includes(b.id)&&!ancestors(p,b).includes(a.id)&&!ancestors(p,a).some(x=>ancestors(p,b).includes(x));}
 function children(p,r){return r.children.map(id=>live(p,id)).filter(Boolean);}
@@ -69,7 +69,7 @@ export function initPolitics(g,world){
 export function politicalRevenue(g,realm){return obligationProfile(g,realm).tax;}
 export function politicalLevy(g,realm){return obligationProfile(g,realm).levy;}
 const adults=(a,b)=>a?.age>=18&&b?.age>=18;
-const royalFamily=(p,r)=>[...new Set([r,...children(p,r),...r.parents.flatMap(id=>p.people[id]?.children||[]).map(id=>live(p,id)).filter(Boolean)])];
+const royalFamily=(p,r)=>{if(!r)return [];const siblings=r.parents.flatMap(id=>p.people[id]?.children||[]).map(id=>live(p,id)).filter(Boolean);return [...new Set([r,...children(p,r),...siblings,...children(p,r).flatMap(c=>children(p,c)),...siblings.flatMap(c=>children(p,c))])].filter(c=>c.realm===r.realm);};
 function compatible(g,a,b){
  return eligible(g.politics,a,b)&&!isImprisoned(g,a.id)&&!isImprisoned(g,b.id);
 }
@@ -133,15 +133,15 @@ function betrothalAction(g,action,id,other){
  }
  const candidate=betrothalCandidates(g,realm,id).find(b=>b.id===other);
  if(!candidate?.accepted)return {ok:false,msg:candidate?.reasons.join(' · ')||'Select an eligible royal match.'};
- return arrangeBetrothal(g,realm,a,candidate);
+ return arrangeBetrothal(g,realm,a,candidate,action==='betroth-maternal'?'maternal':action==='betroth-settlement'?'paternal_settlement':action==='betroth-maternal-settlement'?'maternal_settlement':'paternal');
 }
-function arrangeBetrothal(g,realm,a,candidate){
+function arrangeBetrothal(g,realm,a,candidate,contract='paternal'){
  const p=g.politics,f=g.factions[realm];
  if(f.treasury<60)return {ok:false,msg:'Requires 60 gold to arrange the betrothal.'};
  f.treasury-=60;
- (p.betrothals??={})[a.id]={a:a.id,b:candidate.id,sponsor:realm,partner:candidate.realm,expires:g.turn+108};
+ (p.betrothals??={})[a.id]={a:a.id,b:candidate.id,sponsor:realm,partner:candidate.realm,expires:g.turn+108,contract};
  if(realm===g.player||candidate.realm===g.player)log(g,a.name+' was betrothed to '+p.people[candidate.id].name+'.');
- return {ok:true,msg:'Betrothal recorded. The wedding costs 180 gold when both reach adulthood.'};
+ return {ok:true,msg:'Betrothal recorded. The wedding costs '+(180+WEDDING_CONTRACTS[contract].settlement)+' gold when both reach adulthood.'};
 }
 function arrangeAiBetrothals(g){
  const p=g.politics;
@@ -166,7 +166,7 @@ function settleBetrothals(g){
    continue;
   }
   const a=p.people[promise.a],b=p.people[promise.b];
-  if(adults(a,b)&&marry(g,a,b).ok)delete p.betrothals[promise.a];
+  if(adults(a,b)&&marry(g,a,b,Object.hasOwn(WEDDING_CONTRACTS,promise.contract)?promise.contract:'paternal').ok)delete p.betrothals[promise.a];
  }
 }
 function changeCrownExclusion(g,id,exclude){
@@ -186,8 +186,8 @@ function changeCrownExclusion(g,id,exclude){
  log(g,message);
  return {ok:true,msg:message};
 }
-export function personalMarriage(g,aId,bId){const p=g.politics,a=live(p,aId),b=live(p,bId);if(!adults(a,b)||!a||!b||a.realm!==b.realm||!compatible(g,a,b)||activeBetrothal(g,aId)||activeBetrothal(g,bId)||humanControlsCharacter(g,aId)||humanControlsCharacter(g,bId)||p.realms[a.realm]?.ruler===aId||p.realms[b.realm]?.ruler===bId||a.wealth<90)return {ok:false,msg:'Personal marriage unavailable.'};a.wealth-=90;link(a,b);p.marriages.push({a:a.id,b:b.id,year:g.year,personal:true});recordLifeEvent(g,a,'marriage',b,a.name+' married '+b.name+'.');recordLifeEvent(g,b,'marriage',a,b.name+' married '+a.name+'.');return {ok:true,msg:'Personal marriage celebrated.'};}
-function marry(g,a,b,lineage='paternal'){const p=g.politics;if(!adults(a,b)||!compatible(g,a,b))return {ok:false,msg:'Marriage candidates are no longer eligible.'};const f=g.factions[a.realm],o=g.factions[b.realm];if(f.treasury<180)return {ok:false,msg:'Need 180 gold for a wedding.'};const terms=marriageTerms(g,a,b);if(!terms.accepted)return {ok:false,msg:terms.reasons.join(' · ')};f.treaties??={};o.treaties??={};f.treasury-=180;link(a,b);a.marriageLineage=b.marriageLineage=lineage;p.marriages.push({a:a.id,b:b.id,year:g.year,lineage});recordLifeEvent(g,a,'marriage',b,a.name+' married '+b.name+'.');recordLifeEvent(g,b,'marriage',a,b.name+' married '+a.name+'.');if(a.realm!==b.realm){f.relations[b.realm]=clamp((f.relations[b.realm]||0)+20,-100,100);o.relations[a.realm]=clamp((o.relations[a.realm]||0)+20,-100,100);if(!f.treaties[b.realm]&&!o.treaties[a.realm]){f.treaties[b.realm]='marriage';o.treaties[a.realm]='marriage';}}f.legitimacy=clamp(f.legitimacy+6,0,100);f.prestige+=4;log(g,a.name+' married '+b.name+'.');return {ok:true,msg:'Dynastic marriage celebrated.'};}
+export function personalMarriage(g,aId,bId){const p=g.politics,a=live(p,aId),b=live(p,bId);if(!adults(a,b)||!a||!b||a.realm!==b.realm||!compatible(g,a,b)||!faithPermitsMarriage(g,a,b)||activeBetrothal(g,aId)||activeBetrothal(g,bId)||humanControlsCharacter(g,aId)||humanControlsCharacter(g,bId)||p.realms[a.realm]?.ruler===aId||p.realms[b.realm]?.ruler===bId||a.wealth<90)return {ok:false,msg:'Personal marriage unavailable.'};a.wealth-=90;link(a,b);p.marriages.push({a:a.id,b:b.id,year:g.year,personal:true});recordLifeEvent(g,a,'marriage',b,a.name+' married '+b.name+'.');recordLifeEvent(g,b,'marriage',a,b.name+' married '+a.name+'.');return {ok:true,msg:'Personal marriage celebrated.'};}
+function marry(g,a,b,contract='paternal'){const p=g.politics,agreement=WEDDING_CONTRACTS[contract];if(!agreement)return {ok:false,msg:'Unknown marriage contract.'};const {lineage,settlement}=agreement;if(!adults(a,b)||!compatible(g,a,b))return {ok:false,msg:'Marriage candidates are no longer eligible.'};const f=g.factions[a.realm],o=g.factions[b.realm];if(f.treasury<180+settlement)return {ok:false,msg:'Need '+(180+settlement)+' gold for this wedding.'};const terms=marriageTerms(g,a,b);if(!terms.accepted)return {ok:false,msg:terms.reasons.join(' · ')};f.treaties??={};o.treaties??={};f.treasury-=180+settlement;if(settlement)b.wealth=(Number(b.wealth)||0)+settlement;link(a,b);a.marriageLineage=b.marriageLineage=lineage;p.marriages.push({a:a.id,b:b.id,year:g.year,turn:g.turn,lineage,settlement,contract});recordLifeEvent(g,a,'marriage',b,a.name+' married '+b.name+'.');recordLifeEvent(g,b,'marriage',a,b.name+' married '+a.name+'.');if(a.realm!==b.realm){f.relations[b.realm]=clamp((f.relations[b.realm]||0)+20,-100,100);o.relations[a.realm]=clamp((o.relations[a.realm]||0)+20,-100,100);if(!f.treaties[b.realm]&&!o.treaties[a.realm]){f.treaties[b.realm]='marriage';o.treaties[a.realm]='marriage';}}f.legitimacy=clamp(f.legitimacy+6,0,100);f.prestige+=4;log(g,a.name+' married '+b.name+'.');return {ok:true,msg:'Dynastic marriage celebrated.'};}
 // Shared wedding entry point for campaign negotiations; no duplicate spouse or treaty logic.
 export function negotiatedMarriage(g,realm,a,b){if(!marriageCandidates(g,realm).some(x=>x.a===a&&x.b===b))return {ok:false,msg:'The proposed pair is no longer eligible.'};return marry(g,g.politics.people[a],g.politics.people[b]);}
 export function marryRealm(g,other){const option=marriageCandidates(g,g.player).find(x=>x.realm===other);if(!option)return {ok:false,msg:'No eligible adult royal relatives in these houses.'};return marry(g,g.politics.people[option.a],g.politics.people[option.b]);}
@@ -195,7 +195,7 @@ export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,w
  if(action.startsWith('union-'))return personalUnionAction(g,action,id);
  if(['personal-gift','personal-patronage','personal-rebuke'].includes(action))return characterInteraction(g,g.player,id,action);
  if(action.startsWith('regency-'))return regencyAction(g,g.player,action,extra||id);
- if(action==='betroth'||action==='break-betrothal')return betrothalAction(g,action,id,extra);
+ if(['betroth','betroth-maternal','betroth-settlement','betroth-maternal-settlement','break-betrothal'].includes(action))return betrothalAction(g,action,id,extra);
  if(action==='disinherit'||action==='restore-inheritance')return changeCrownExclusion(g,id,action==='disinherit');
  if(action==='nominate-successor'){const result=nominateSuccessor(g,g.player,id);if(result.ok)sync(g,g.player);return result;}
  if(action==='estate-dispute')return estateDisputeAction(g,g.player,id,extra);
@@ -209,8 +209,26 @@ export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,w
  if(action==='authority')return authorityAction(g,g.player,id,councilPermission(g,g.player,'law'));
  if(['court-appoint','court-dismiss','court-standard','court-audience','court-audience-answer','court-project'].includes(action))return courtAction(g,g.player,action,id,extra);
  if(action==='dispatch')return resolvePoliticalDispatch(g,g.player,Number(id));
- if(action==='marry'||action==='marry-maternal'){const a=p.people[id],b=p.people[extra];if(a?.realm!==g.player||!marriageCandidates(g,g.player).some(x=>x.a===id&&x.b===extra))return {ok:false,msg:'Select an eligible royal pair.'};return marry(g,a,b,action==='marry-maternal'?'maternal':'paternal');}
+ if(['marry','marry-maternal','marry-settlement','marry-maternal-settlement'].includes(action)){const a=p.people[id],b=p.people[extra];if(a?.realm!==g.player||!marriageCandidates(g,g.player).some(x=>x.a===id&&x.b===extra))return {ok:false,msg:'Select an eligible royal pair.'};return marry(g,a,b,action==='marry-maternal'?'maternal':action==='marry-settlement'?'paternal_settlement':action==='marry-maternal-settlement'?'maternal_settlement':'paternal');}
  if(action==='appoint'){const candidate=live(p,extra);if(!Object.hasOwn(s.council,id)||!candidate||candidate.realm!==g.player||candidate.age<18||isImprisoned(g,candidate.id)||candidate.id===r.id||Object.values(s.council).includes(candidate.id)||Object.values(g.royalCourt?.realms[g.player]?.offices||{}).some(o=>o.person===candidate.id)||f.treasury<80)return {ok:false,msg:'Select an adult unassigned courtier and have 80 gold.'};f.treasury-=80;s.council[id]=candidate.id;sync(g,g.player);log(g,candidate.name+' appointed '+id+'.');return {ok:true,msg:'Council appointment confirmed.'};}
+ if(action==='marriage-policy'){
+  if(!Object.hasOwn(MARRIAGE_POLICIES,id)||id===marriagePolicy(g,g.player))return {ok:false,msg:'Choose a different marriage charter.'};
+  if(!humanControlsRealm(g,g.player)||!r.alive||r.age<18||isImprisoned(g,r.id)||!councilPermission(g,g.player,'law')||f.legitimacy<65||f.treasury<150||g.turn-(s.lastMarriagePolicy??-120)<120)return {ok:false,msg:'Requires a free adult sovereign, council approval, 150 gold, 65 legitimacy and ten years between marriage reforms.'};
+  f.treasury-=150;s.marriagePolicy=id;s.lastMarriagePolicy=g.turn;log(g,'Marriage charter reformed: '+MARRIAGE_POLICIES[id]);return {ok:true,msg:MARRIAGE_POLICIES[id]+' enacted.'};
+ }
+ if(action==='divorce'){
+  const a=p.people[id],terms=divorceTerms(g,id),b=p.people[terms?.spouse];
+  if(!humanControlsRealm(g,g.player)||a?.realm!==g.player||!royalFamily(p,r).includes(a)||!adults(a,b)||!terms||!r.alive||r.age<18||isImprisoned(g,r.id)||isImprisoned(g,a.id)||isImprisoned(g,b.id))return {ok:false,msg:'Select a married adult royal relative under a free adult sovereign.'};
+  if(terms.reason)return {ok:false,msg:terms.reason};
+  if(!councilPermission(g,g.player,'law')||f.treasury<terms.cost||f.prestige<terms.prestige||f.legitimacy<55)return {ok:false,msg:'Requires council approval, 120 gold, 15 prestige and 55 legitimacy.'};
+  f.treasury-=terms.cost;f.prestige-=terms.prestige;f.legitimacy-=terms.legitimacy;
+  const contract=marriageContract(g,a.id);contract.ended='divorce';contract.endedTurn=g.turn;
+  if(!p.marriages.includes(contract))p.marriages.push({...contract,year:null});
+  a.spouse=b.spouse=null;delete a.marriageLineage;delete b.marriageLineage;
+  changeOpinion(g,a.id,b.id,-35);changeOpinion(g,b.id,a.id,-35);
+  if(a.realm!==b.realm){const o=g.factions[b.realm];f.relations[b.realm]=clamp((f.relations[b.realm]||0)-25,-100,100);o.relations[a.realm]=clamp((o.relations[a.realm]||0)-25,-100,100);}
+  reconcileMarriageTreaties(g);recordLifeEvent(g,a,'divorce',b,a.name+' divorced '+b.name+'.');recordLifeEvent(g,b,'divorce',a,b.name+' divorced '+a.name+'.');log(g,a.name+' divorced '+b.name+'.');return {ok:true,msg:'Marriage dissolved. Children and existing inheritance claims remain.'};
+ }
  if(action==='gender-law'||action==='faith-law'){
   const gender=action==='gender-law',choices=gender?GENDER_LAWS:FAITH_LAWS,field=gender?'genderLaw':'faithLaw',current=crownPolicy(g,g.player)[gender?'gender':'faith'];
   if(!Object.hasOwn(choices,id)||id===current)return {ok:false,msg:'Choose a different crown eligibility rule.'};
@@ -229,7 +247,7 @@ export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,w
  else return {ok:false,msg:'Unknown political action.'};
  syncTitles(g);log(g,'The crown negotiated '+action+' with '+p.people[v.lord].name+'.');return {ok:true,msg:'Vassal agreement updated.'};
 }
-function death(g,world,c){const p=g.politics;rememberBereavement(g,c);c.alive=false;c.deathYear=g.year;if(c.spouse){const s=p.people[c.spouse];if(s){s.spouse=null;delete s.marriageLineage;}c.spouse=null;delete c.marriageLineage;}const realm=c.realm,s=p.realms[realm];let estateHeir=hereditaryLine(g,c)[0]||null;if(s?.ruler===c.id){let h=successor(p,realm,g);if(!h)h=Object.values(p.people).filter(x=>x.alive&&x.realm===realm&&x.house===c.house&&x.id!==c.id&&!isImprisoned(g,x.id)&&!crownExcluded(x,realm)&&crownPolicyEligible(g,realm,x)).sort((a,b)=>b.age-a.age)[0]||person(g,realm,30,{house:'Successor house of '+g.factions[realm].name,...(crownPolicy(g,realm).gender==='female_only'?{sex:'female'}:crownPolicy(g,realm).gender==='male_only'?{sex:'male'}:{})});estateHeir=estateHeir||h;s.ruler=h.id;delete s.nominee;partitionInheritance(g,realm,c,h);for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;g.kingdom.courts[realm].successions++;g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy-12,0,100);for(const v of Object.values(p.holdings))if(v.realm===realm)v.loyalty=clamp(v.loyalty-12,0,100);if(realm===g.player)log(g,c.name+' died. '+h.name+' inherited the crown.');}
+function death(g,world,c){const p=g.politics;rememberBereavement(g,c);c.alive=false;c.deathYear=g.year;if(c.spouse){const history=(p.marriages||[]).slice().reverse().find(m=>!m.ended&&((m.a===c.id&&m.b===c.spouse)||(m.b===c.id&&m.a===c.spouse)));if(history){history.ended='death';history.endedTurn=g.turn;}const s=p.people[c.spouse];if(s){s.spouse=null;delete s.marriageLineage;}c.spouse=null;delete c.marriageLineage;}const realm=c.realm,s=p.realms[realm];let estateHeir=hereditaryLine(g,c)[0]||null;if(s?.ruler===c.id){let h=successor(p,realm,g);if(!h)h=Object.values(p.people).filter(x=>x.alive&&x.realm===realm&&x.house===c.house&&x.id!==c.id&&!isImprisoned(g,x.id)&&!crownExcluded(x,realm)&&crownPolicyEligible(g,realm,x)).sort((a,b)=>b.age-a.age)[0]||person(g,realm,30,{house:'Successor house of '+g.factions[realm].name,...(crownPolicy(g,realm).gender==='female_only'?{sex:'female'}:crownPolicy(g,realm).gender==='male_only'?{sex:'male'}:{})});estateHeir=estateHeir||h;s.ruler=h.id;delete s.nominee;partitionInheritance(g,realm,c,h);for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;g.kingdom.courts[realm].successions++;g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy-12,0,100);for(const v of Object.values(p.holdings))if(v.realm===realm)v.loyalty=clamp(v.loyalty-12,0,100);if(realm===g.player)log(g,c.name+' died. '+h.name+' inherited the crown.');}
  const inherited=Object.entries(p.holdings).filter(([,h])=>h.lord===c.id&&!unionJuniorDomain(g,h.realm,c.id)).map(([id,h])=>{
   const law=estateLaw(g,id);
   return {id,h,law,heir:law==='customary'?null:estateSuccession(g,id,law).heir};
@@ -247,7 +265,7 @@ function death(g,world,c){const p=g.politics;rememberBereavement(g,c);c.alive=fa
  for(const [role,id] of Object.entries(s?.council||{}))if(id===c.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;
  const inheritance=Math.max(0,Number(c.wealth)||0);if(estateHeir){estateHeir.wealth=(Number(estateHeir.wealth)||0)+inheritance;}else if(g.factions[realm])g.factions[realm].treasury+=inheritance;c.wealth=0;
  if(s)reconcileRegency(g,realm);
- reconcilePersonalUnions(g);
+ reconcilePersonalUnions(g);reconcileMarriageTreaties(g);
 }
 
 export function removePoliticalCharacter(g,world,id){const c=g.politics.people[id];if(!c?.alive)return false;death(g,world,c);sync(g,c.realm);syncTitles(g);reconcileCareer(g);return true;}
