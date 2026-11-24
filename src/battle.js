@@ -102,7 +102,7 @@ export class BattleGame{
  constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=Boolean(descriptor.interactive);this.deployment=Boolean(descriptor.interactive);this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();const hasWebGL2=Boolean(canvas.getContext('webgl2'));
  if(hasWebGL2){
   try{
-   const province=game.provinces?.[descriptor.to],fortLevel=province?.buildings?.fort||0;
+   const province=game.provinces?.[descriptor.to],fortLevel=descriptor.fieldBattle?0:province?.buildings?.fort||0;
    const desertFactions=new Set(['mamluks','delhi','bahmani','gujarat','malwa','morocco','tunis','mali','songhai','arabia','timurids','persia','oman','yemen','safavids']);
    const biome=desertFactions.has(game.player)||desertFactions.has(descriptor.enemy)?'desert':'temperate';
    this.ctx=new ThreeBattleScene(canvas,{fortLevel,biome,seed:1450+Math.round(fortLevel*23)});
@@ -137,7 +137,7 @@ export class BattleGame{
  const a=fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
  const enemyArmy=descriptor.enemyArmy&&game.armies[descriptor.enemyArmy];
  const enemies=enemyArmy?{...enemyArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(enemyArmy[t]||0)+(descriptor.defenseMode?0:startingTroops(enemy,descriptor.defenseGarrison||0)[t])]))}:startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseMode?0:descriptor.defenseGarrison||0)));
- this.siege=createSiegeState(game.provinces?.[descriptor.to]?.buildings?.fort||0,!!descriptor.defenseMode);this.groups=[];
+ this.siege=descriptor.fieldBattle?null:createSiegeState(game.provinces?.[descriptor.to]?.buildings?.fort||0,!!descriptor.defenseMode);this.groups=[];
  const mySlots=armyFormationSlots(playerFaction,a,6),enemySlots=armyFormationSlots(enemy,enemies,6);
  for(let i=0;i<6;i++){
   const type=mySlots[i],slotCount=mySlots.filter(t=>t===type).length;
