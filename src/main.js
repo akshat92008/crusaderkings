@@ -260,7 +260,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  const btn=e.target.closest('[data-action]');if(!btn||!game||battle)return;const action=btn.dataset.action,type=btn.dataset.type;
  if(action==='player-life'){clickResult(playerLifeAction(game,btn.dataset.id,type,btn.dataset.extra));return;}
  if(action==='personal-life'){clickResult(resolvePersonalDilemma(game,btn.dataset.id,type));return;}
- if(action==='career'){const id=btn.dataset.input?el(btn.dataset.input)?.value:btn.dataset.id;const result=careerAction(game,type,id,btn.dataset.extra);if(result.ok&&type==='start'){cancelMarch();pageHistory.reset();tab='realm';characterId=null;}clickResult(result);return;}
+ if(action==='career'){const id=btn.dataset.input?el(btn.dataset.input)?.value:btn.dataset.id;const result=careerAction(game,type,id,btn.dataset.extra,campaignWorld(game,world));if(result.ok&&type==='start'){cancelMarch();pageHistory.reset();tab='realm';characterId=null;}clickResult(result);return;}
  if(action==='pin'){clickResult(toggleCampaignPin(game,type,btn.dataset.id));return;}
  if(vassalCareer(game))return;
  if(action==='landless'){clickResult(landlessAction(game,campaignWorld(game,world),type,btn.dataset.id));return;}
