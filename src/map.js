@@ -1,3 +1,4 @@
+import {pickArmyMarker} from './campaign-hud.js';
 import {geographicIndex,seatSignature,frameCoalescer} from './render-performance.js';
 import {capitalDistrict} from './historical-world.js';
 import {occupation} from './campaign-war.js';
@@ -30,7 +31,7 @@ export class CampaignMap{
   canvas.addEventListener('pointermove',e=>{if(this.pointers.has(e.pointerId))this.pointers.set(e.pointerId,local(e));if(this.pointers.size>=2){const next=this.pinchState();if(this.pinch&&next.distance>0){this.panX+=next.x-this.pinch.x;this.panY+=next.y-this.pinch.y;this.zoomAt(next.x,next.y,next.distance/Math.max(1,this.pinch.distance));}this.pinch=next;return;}if(this.pinching)return;
    if(this.drag){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.distance=Math.max(this.drag.distance,Math.hypot(dx,dy));if(this.drag.distance>3){this.panX=this.drag.px+dx;this.panY=this.drag.py+dy;this.render();}return;}if(e.pointerType==='touch')return;
    const p=this.toGeo(...local(e)),found=this.pick(...p),historical=this.mode==='historical'?this.pickHistorical(...p):null;if(found?.id!==this.hover?.id||historical?.properties?.name!==this.hoverHistorical?.properties?.name){this.hover=found;this.hoverHistorical=historical;canvas.style.cursor=found?'crosshair':'grab';this.render();}});
-  const end=(e,cancel=false)=>{if(!cancel&&!this.pinching&&this.drag?.distance<5){const province=this.pick(...this.toGeo(...local(e)));if(province)this.onProvince(province.id);}this.pointers.delete(e.pointerId);this.drag=null;this.pinch=null;if(!this.pointers.size)this.pinching=false;};
+  const end=(e,cancel=false)=>{if(!cancel&&!this.pinching&&this.drag?.distance<5){const [x,y]=local(e),marker=!this.marchOrigin&&pickArmyMarker(this.armyMarkers||[],x,y);if(marker&&this.onArmy)this.onArmy(marker);else{const province=this.pick(...this.toGeo(x,y));if(province)this.onProvince(province.id);}}this.pointers.delete(e.pointerId);this.drag=null;this.pinch=null;if(!this.pointers.size)this.pinching=false;};
   canvas.addEventListener('pointerup',e=>end(e));canvas.addEventListener('pointercancel',e=>end(e,true));
   canvas.addEventListener('wheel',e=>{e.preventDefault();this.zoomAt(e.offsetX,e.offsetY,Math.exp(-e.deltaY*.00122));},{passive:false});
  }
@@ -71,9 +72,10 @@ export class CampaignMap{
  _markArmy(c,a,offset=0){const province=this.provinceIndex.get(a.province);if(!province)return;
   const [x,y]=this.toScreen(...province.centroid);if(x<20||y<32||x>this.w-25||y>this.h-30)return;
   const mine=a.owner===this.game?.player;
+  this.armyMarkers??=[];const marker={province:a.province,owner:a.owner,troops:a.troops,x:x+offset,y:y-15,halfWidth:11,bottom:12};this.armyMarkers.push(marker);
   c.save();c.translate(x+offset,y-15);c.shadowColor='rgba(26,29,20,.58)';c.shadowBlur=5;c.fillStyle=mine?'#c9a04d':'#6c5c55';c.strokeStyle='#2e3430';c.lineWidth=1.3;
   c.beginPath();c.moveTo(-6,-12);c.lineTo(6,-12);c.lineTo(6,5);c.lineTo(0,11);c.lineTo(-6,5);c.closePath();c.fill();c.stroke();c.shadowBlur=0;
-  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText('⚔',0,-2);if(this.zoom>=2.1||mine){const text=a.troops>=1000?(a.troops/1000).toFixed(1).replace(/\.0$/,'')+'k':String(a.troops);c.font='bold 10px system-ui';const w=c.measureText(text).width+10;c.fillStyle=mine?'#423820':'#3b3834';c.fillRect(-w/2,13,w,15);c.fillStyle='#fff0c8';c.fillText(text,0,20);}c.restore();
+  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText('⚔',0,-2);if(this.zoom>=2.1||mine){const text=a.troops>=1000?(a.troops/1000).toFixed(1).replace(/\.0$/,'')+'k':String(a.troops);c.font='bold 10px system-ui';const w=c.measureText(text).width+10;marker.halfWidth=Math.max(11,w/2);marker.bottom=29;c.fillStyle=mine?'#423820':'#3b3834';c.fillRect(-w/2,13,w,15);c.fillStyle='#fff0c8';c.fillText(text,0,20);}c.restore();
  }
  _realmSeats(){const key=seatSignature(this.world,this.game);if(this.seatCache?.key===key)return this.seatCache.value;const factions=this.game?Object.values(this.game.factions).filter(f=>f.id!=='independent'&&f.capital):this.world.factions;const states=this.game?.provinces,world={...this.world,factions},by=new Map(world.provinces.map(p=>[p.id,p]));const value=factions.map(f=>{const seat=capitalDistrict(world,f.id,states);return seat?{f,point:by.get(seat.id).centroid,count:world.provinces.filter(p=>(states?states[p.id]?.owner:p.owner)===f.id).length}:null;}).filter(Boolean).sort((a,b)=>b.count-a.count||a.f.id.localeCompare(b.f.id));this.seatCache={key,value};return value;}
  _labels(c,s,seats){
@@ -131,7 +133,7 @@ export class CampaignMap{
   drawOceanLettering(c,view,w,h);
   const seats=this._realmSeats();if(this.mode!=='terrain')this._labels(c,s,seats);
   this._cityMarkers(c,seats);
-  if(this.game){const groups=atlasArmyGroups(this.game.armies,this.game.naval?.voyages),counts=new Map();for(const a of groups){const n=counts.get(a.province)||0;counts.set(a.province,n+1);this._markArmy(c,a,n*17);}}
+  this.armyMarkers=[];if(this.game){const groups=atlasArmyGroups(this.game.armies,this.game.naval?.voyages),counts=new Map();for(const a of groups){const n=counts.get(a.province)||0;counts.set(a.province,n+1);this._markArmy(c,a,n*17);}}
   if(w>700&&h>350)drawRosette(c,55,h-75,20);
   // Atlas masthead is ink on translucent parchment; not part of geography.
   c.save();c.fillStyle='rgba(234,217,176,.87)';c.strokeStyle='rgba(102,84,53,.63)';c.lineWidth=1.1;

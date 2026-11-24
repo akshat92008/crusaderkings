@@ -192,12 +192,12 @@ export class BattleGame{
  setFormation(index,id){
   const g=this.groups[index];
   if(!g||g.side!=='attacker'||g.routed||!availableFormations(this.game.factions[this.game.player]).some(f=>f.id===id))return false;
-  attachTactics(g,this.game.factions[this.game.player],id);this.report();return true;
+  attachTactics(g,this.game.factions[this.game.player],id);if(this.deployment)g.deploymentRevision=(g.deploymentRevision||0)+1;this.report();return true;
  }
  setLane(index,lane){
   if(!this.deployment||![0,1,2].includes(lane))return false;
   const g=this.groups[index];if(!g||g.side!=='attacker'||g.routed)return false;
-  g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;this.report();return true;
+  g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;g.deploymentRevision=(g.deploymentRevision||0)+1;this.report();return true;
  }
  command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed){this.audio?.play('order');this.report();}return changed;}
  startAssault(){if(!this.deployment||this.renderLost)return false;this.deployment=false;this.paused=false;this.frameRemainder=0;this.audio?.unlock();this.audio?.play('horn');this.last=performance.now();this.report();return true;}
