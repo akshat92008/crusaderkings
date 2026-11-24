@@ -43,6 +43,7 @@ export function marriageCandidates(g,realm){const p=g.politics;if(!p)return [];c
 function marry(g,a,b){const p=g.politics;if(!eligible(p,a,b))return {ok:false,msg:'Marriage candidates are no longer eligible.'};const f=g.factions[a.realm],o=g.factions[b.realm];f.treaties??={};o.treaties??={};if(f.treasury<180)return {ok:false,msg:'Need 180 gold for a wedding.'};if(a.realm!==b.realm&&(f.relations[b.realm]||0)<20)return {ok:false,msg:'Relations must reach +20.'};f.treasury-=180;link(a,b);p.marriages.push({a:a.id,b:b.id,year:g.year});if(a.realm!==b.realm){f.relations[b.realm]=clamp((f.relations[b.realm]||0)+20,-100,100);o.relations[a.realm]=clamp((o.relations[a.realm]||0)+20,-100,100);if(!f.treaties[b.realm]&&!o.treaties[a.realm]){f.treaties[b.realm]='marriage';o.treaties[a.realm]='marriage';}}f.legitimacy=clamp(f.legitimacy+6,0,100);f.prestige+=4;log(g,a.name+' married '+b.name+'.');return {ok:true,msg:'Dynastic marriage celebrated.'};}
 export function marryRealm(g,other){const option=marriageCandidates(g,g.player).find(x=>x.realm===other);if(!option)return {ok:false,msg:'No eligible adult royal relatives in these houses.'};return marry(g,g.politics.people[option.a],g.politics.people[option.b]);}
 export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,world),s=p.realms[g.player],f=g.factions[g.player],v=p.holdings[id],r=p.people[s.ruler];
+ if(action==='dispatch')return resolvePoliticalDispatch(g,g.player,Number(id));
  if(action==='marry'){const a=p.people[id],b=p.people[extra];if(a?.realm!==g.player||!marriageCandidates(g,g.player).some(x=>x.a===id&&x.b===extra))return {ok:false,msg:'Select an eligible royal pair.'};return marry(g,a,b);}
  if(action==='appoint'){const candidate=live(p,extra);if(!Object.hasOwn(s.council,id)||!candidate||candidate.realm!==g.player||candidate.age<18||candidate.id===r.id||Object.values(s.council).includes(candidate.id)||f.treasury<80)return {ok:false,msg:'Select an adult unassigned courtier and have 80 gold.'};f.treasury-=80;s.council[id]=candidate.id;sync(g,g.player);log(g,candidate.name+' appointed '+id+'.');return {ok:true,msg:'Council appointment confirmed.'};}
  if(action==='law'){if(!['eldest','youngest','elective'].includes(id)||id===s.law||g.turn-s.lastLaw<120||f.legitimacy<65||f.treasury<250)return {ok:false,msg:'Reform needs 250 gold, 65 legitimacy and ten years between changes.'};f.treasury-=250;s.law=id;s.lastLaw=g.turn;for(const h of Object.values(p.holdings))if(h.realm===g.player)h.loyalty=clamp(h.loyalty-8,0,100);sync(g,g.player);log(g,'The crown reformed succession: '+id);return {ok:true,msg:'Succession law changed.'};}
@@ -58,6 +59,52 @@ function death(g,world,c){const p=g.politics;c.alive=false;c.deathYear=g.year;if
  for(const [id,v] of Object.entries(p.holdings))if(v.lord===c.id){const h=heirs(p,c)[0]||person(g,world,v.realm,32,{house:'Successor house of '+id});v.lord=h.id;v.loyalty=clamp(v.loyalty-8,0,100);}
  for(const [role,id] of Object.entries(s?.council||{}))if(id===c.id)s.council[role]=person(g,world,realm,35,{house:'Court of '+g.factions[realm].name}).id;
 }
+
+// Original, contextual event templates. Effects operate on the actual target character/holding.
+const DISPATCHES=[
+ {id:'levy_petition',title:'The levy petition',target:'vassal',test:(g,v)=>v.levy===2,desc:n=>n+' petitions for relief from compulsory military service.',choices:[['Reduce levy obligations',0,18,'levy',0],['Pay for local supplies',100,10],['Reject the petition',0,-13]]},
+ {id:'tax_protest',title:'The unpaid tithe',target:'vassal',test:(g,v)=>v.tax===2,desc:n=>n+' argues that royal taxation is exhausting the estate.',choices:[['Lower the contract tax',0,16,'tax',0],['Fund emergency relief',120,14],['Demand payment',0,-15]]},
+ {id:'autonomy_dispute',title:'The rights of the estate',target:'vassal',test:(g,v)=>v.autonomy===0,desc:n=>n+' asks the crown to restore local legal privileges.',choices:[['Restore autonomy',0,16,'autonomy',2],['Offer a negotiated gift',100,8],['Maintain royal authority',0,-12]]},
+ {id:'border_feud',title:'A dispute between estates',target:'vassal',test:(g,v)=>v.loyalty<65,desc:n=>n+' asks the monarch to resolve a bitter dispute over provincial authority.',choices:[['Hear the case personally',80,14],['Appoint an independent mediator',50,8],['Dismiss the petition',0,-10]]},
+ {id:'loyal_service',title:'A faithful servant',target:'vassal',test:(g,v)=>v.loyalty>=70,desc:n=>n+' has offered exceptional service to the realm and expects recognition.',choices:[['Grant an honorary award',100,12],['Praise their service publicly',0,5],['Keep the royal gold',0,-7]]},
+ {id:'wealthy_house',title:'An increasingly wealthy house',target:'vassal',test:(g,v)=>v.wealth>=60,desc:n=>n+' has accumulated substantial resources and proposes greater local privileges.',choices:[['Recognize local privileges',0,12,'autonomy',2],['Finance joint improvements',150,16],['Reject the proposal',0,-12]]},
+ {id:'court_training',title:'A promising courtier',target:'court',test:(g,v,c)=>c.skills.learning<=3,desc:n=>n+' requests funding to study with renowned scholars.',choices:[['Sponsor instruction',100,0,'learning',1],['Recommend independent study',0,0],['Refuse',0,0]]},
+ {id:'military_instruction',title:'An officer seeks instruction',target:'court',test:(g,v,c)=>c.skills.martial<5,desc:n=>n+' wants to undertake further military instruction.',choices:[['Fund instruction',120,0,'martial',1],['Decline the expense',0,0]]},
+ {id:'diplomatic_apprentice',title:'Lessons in diplomacy',target:'court',test:(g,v,c)=>c.skills.diplomacy<5,desc:n=>n+' seeks experience in formal negotiations.',choices:[['Sponsor diplomatic training',100,0,'diplomacy',1],['Keep the courtier at home',0,0]]},
+ {id:'estate_reform',title:'The books of account',target:'court',test:(g,v,c)=>c.skills.stewardship<5,desc:n=>n+' proposes training in provincial accounting and estate management.',choices:[['Pay for practical instruction',100,0,'stewardship',1],['Reject the proposal',0,0]]},
+ {id:'heir_education',title:'The next generation',target:'child',test:(g,v,c)=>c.age>=6&&c.age<=17,desc:n=>n+' has reached an important stage of their education.',choices:[['Study statecraft',80,0,'diplomacy',1],['Study military command',80,0,'martial',1],['Study philosophy',80,0,'learning',1]]},
+ {id:'heir_finances',title:'Lessons in responsibility',target:'child',test:(g,v,c)=>c.age>=8&&c.age<=17,desc:n=>n+' is old enough to learn how the royal household operates.',choices:[['Learn estate management',80,0,'stewardship',1],['Learn the court’s secrets',80,0,'intrigue',1],['Continue ordinary lessons',0,0]]}
+];
+function dispatchTarget(g,realm,e){
+ const p=g.politics,s=p.realms[realm],r=p.people[s.ruler];
+ if(e.target==='vassal')return Object.entries(p.holdings).filter(([id,v])=>v.realm===realm&&g.provinces[id]?.owner===realm&&e.test(g,v,p.people[v.lord])).map(([id,v])=>({id:v.lord,province:id}));
+ const people=e.target==='child'?children(p,r):Object.values(s.council).map(id=>live(p,id)).filter(Boolean);
+ return people.filter(c=>e.test(g,null,c)).map(c=>({id:c.id,province:null}));
+}
+function scheduleDispatch(g,realm){
+ const p=g.politics;p.dispatches??={};p.dispatchHistory??={};
+ if(p.dispatches[realm])return;
+ const candidates=DISPATCHES.flatMap(e=>g.turn-(p.dispatchHistory[realm+':'+e.id]??-120)>=60?dispatchTarget(g,realm,e).map(target=>({event:e.id,...target,turn:g.turn})):[]);
+ if(candidates.length)p.dispatches[realm]=candidates[Math.floor(roll(p)*candidates.length)];
+}
+export function politicalDispatch(g,realm=g.player){
+ const p=g.politics,d=p?.dispatches?.[realm],e=DISPATCHES.find(x=>x.id===d?.event),c=p?.people[d?.id];
+ if(!e||!c?.alive||(d.province&&(p.holdings[d.province]?.lord!==c.id||g.provinces[d.province]?.owner!==realm)))return null;
+ return {...d,title:e.title,description:e.desc(c.name),choices:e.choices.map(([label,cost,loyalty,field,value])=>({label,cost,loyalty,field,value}))};
+}
+export function resolvePoliticalDispatch(g,realm,index){
+ const p=g.politics,d=politicalDispatch(g,realm),choice=d?.choices[index],f=g.factions[realm];
+ if(!d||!Number.isInteger(index)||!choice)return {ok:false,msg:'No current political dispatch.'};
+ if(f.treasury<choice.cost)return {ok:false,msg:'Insufficient funds.'};
+ f.treasury-=choice.cost;const c=p.people[d.id],v=d.province?p.holdings[d.province]:null;
+ if(v){v.loyalty=clamp(v.loyalty+choice.loyalty,0,100);if(choice.field)v[choice.field]=choice.value;}
+ else if(choice.field)c.skills[choice.field]=clamp(c.skills[choice.field]+choice.value,1,5);
+ c.memories.push(g.year+': '+d.title+' — '+choice.label);c.memories=c.memories.slice(-30);
+ p.dispatchHistory[realm+':'+d.event]=g.turn;delete p.dispatches[realm];
+ if(realm===g.player)log(g,d.title+': '+choice.label+'.');sync(g,realm);
+ return {ok:true,msg:'Political decision recorded.'};
+}
+
 export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTick===g.turn)return;p.lastTick=g.turn;
  for(const [id,pr] of Object.entries(g.provinces))if(p.realms[pr.owner]?p.holdings[id]?.realm!==pr.owner:!!p.holdings[id])newHolding(g,world,id);
  if(g.turn%12===0){
@@ -71,6 +118,10 @@ export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTic
   const key='grievance:'+id,old=p.situations[key];if(v.loyalty<35){p.situations[key]={id:key,realm:v.realm,province:id,lord:v.lord,phase:v.loyalty<20?'ultimatum':'grievance',started:old?.started??g.turn};if(!old&&v.realm===g.player)log(g,lord.name+' is organizing opposition to the crown.');if(v.loyalty<15&&g.turn-p.situations[key].started>=12&&roll(p)<.25){g.provinces[id].unrest=clamp(g.provinces[id].unrest+25,0,100);f.stability=clamp(f.stability-8,0,100);v.loyalty=25;log(g,lord.name+' resisted royal authority; provincial unrest increased.');}}else if(old)delete p.situations[key];
  }}
  for(const realm of Object.keys(p.realms)){
+  p.dispatches??={};p.dispatchHistory??={};
+  if(p.dispatches[realm]&&(!politicalDispatch(g,realm)||g.turn-p.dispatches[realm].turn>12))delete p.dispatches[realm];
+  if(g.turn%6===0)scheduleDispatch(g,realm);
+  if(realm!==g.player&&g.turn%6===0){const d=politicalDispatch(g,realm);if(d){const options=d.choices.map((x,i)=>({x,i})).filter(({x})=>x.cost<=g.factions[realm].treasury-150||x.cost===0);const chosen=options.sort((a,b)=>(b.x.loyalty-b.x.cost*.03)-(a.x.loyalty-a.x.cost*.03))[0];if(chosen)resolvePoliticalDispatch(g,realm,chosen.i);}}
   const s=p.realms[realm],r=p.people[s.ruler],old=s.regent;
   s.regent=r.age<18?(live(p,s.council.chancellor)?.id||null):null;
   if(s.regent&&g.turn%12===0)g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy-1,0,100);
