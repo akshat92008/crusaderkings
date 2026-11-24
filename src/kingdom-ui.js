@@ -257,7 +257,7 @@ function renderEstateSuccession(g,id,esc,panel){
  if(h.lord===current)return '';
  const preview=estateSuccession(g,id);
  const terms=estateCharterTerms(g,g.player,id),field='estate-law-'+panel+'-'+id;
- let html='<details class="rule"><summary>Estate succession</summary><p class="smallnote"><b>'+esc(rules.name)+'</b> · '+esc(rules.description)+'</p>';
+ let html='<details class="rule" data-section="estate-succession"><summary>Estate succession</summary><p class="smallnote"><b>'+esc(rules.name)+'</b> · '+esc(rules.description)+'</p>';
  html+='<p class="smallnote">Expected holder: '+(preview.heir?characterLink(preview.heir,esc):'An appointed local successor if no family heir survives.')+'</p>';
  if(preview.ballots.length)html+=preview.ballots.map(v=>'<p class="smallnote">'+esc(g.politics.people[v.voter].name)+' would vote for '+esc(g.politics.people[v.candidate].name)+' · '+v.weight+' votes</p>').join('');
  if(terms){
@@ -442,7 +442,7 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
  return h;}
 function renderEstateCharter(g,holding,button){
  const remaining=Math.max(0,(holding.lastCharter??-EXEMPTION_COOLDOWN)+EXEMPTION_COOLDOWN-g.turn);
- let html='<details class="rule"><summary>Estate exemptions</summary><p class="smallnote">An exemption removes the estate’s tax or levy contribution and adds 22 loyalty. Revocation costs 10 legitimacy and 25 estate loyalty.</p>';
+ let html='<details class="rule" data-section="estate-exemptions"><summary>Estate exemptions</summary><p class="smallnote">An exemption removes the estate’s tax or levy contribution and adds 22 loyalty. Revocation costs 10 legitimacy and 25 estate loyalty.</p>';
  if(remaining)html+='<p class="smallnote">Charter amendments reopen in '+remaining+' months.</p>';
  for(const [key,label] of [['tax','Tax'],['levy','Levy']]){
   const active=Boolean(holding.exemptions?.[key]);
