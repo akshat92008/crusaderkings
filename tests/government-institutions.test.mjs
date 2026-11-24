@@ -147,3 +147,18 @@ test('kinship relief consumes real stores and refunds reserved food on lost targ
  assert.equal(institutionState(g,'a').reserves,10);g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.food,130);assert.equal(g.civic.provinces.p.localTrust,62);
  g.turn=12;assert.ok(governmentAction(g,{},undefined).ok);assert.ok(governmentAction(g,{},'kinship:relief','q').ok);g.provinces.q.owner='b';g.turn=13;tickInstitutions(g);assert.equal(institutionState(g,'a').reserves,50);assert.equal(localProgramView(g,'a').active,null);
 });
+
+import {estateReviewView,tributeAccounts} from '../src/government-institutions.js';
+test('feudal compacts bind the actual lord and require near-expiry consent for renewal',()=>{
+ const g=fixture('feudal');assert.ok(governmentAction(g,{},'p').ok);assert.equal(governmentAction(g,{},'estate:renew','p').ok,false);
+ g.turn=24;assert.ok(governmentAction(g,{},'estate:renew','p').ok);assert.equal(g.factions.a.treasury,770);assert.equal(estateReviewView(g,'a')[0].until,60);
+ g.politics.holdings.p.lord='m';assert.equal(estateReviewView(g,'a').length,0);assert.equal(institutionModifiers(g,'a').levy,1);
+ g.turn=25;tickInstitutions(g);assert.equal(institutionState(g,'a').compacts.p,undefined);
+});
+test('tribute default and recovery conserve treasury and forgiveness clears debt without payment',()=>{
+ const g=fixture('tributary');assert.ok(governmentAction(g,{},'b').ok);g.factions.b.treasury=0;g.turn=1;tickInstitutions(g);
+ assert.equal(tributeAccounts(g,'a')[0].arrears,5);g.factions.b.treasury=100;const total=g.factions.a.treasury+g.factions.b.treasury;g.turn=2;tickInstitutions(g);
+ assert.equal(tributeAccounts(g,'a')[0].arrears,0);assert.equal(g.factions.b.treasury,90);assert.equal(g.factions.a.treasury+g.factions.b.treasury,total);
+ g.factions.b.treasury=0;g.turn=3;tickInstitutions(g);assert.equal(tributeAccounts(g,'a')[0].arrears,5);const money=g.factions.a.treasury;
+ assert.ok(governmentAction(g,{},'tribute:waive','b').ok);assert.equal(g.factions.a.treasury,money);assert.equal(tributeAccounts(g,'a')[0].arrears,0);
+});

@@ -17,7 +17,7 @@ import {COURT_OFFICES,courtCandidates,courtModifiers} from './royal-court.js';
 import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
 import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions} from './diplomacy-systems.js';
-import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
+import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers,tributeAccounts,estateReviewView} from './government-institutions.js';
 import {governmentMotionView} from './government-deliberations.js';
 import {civilServiceView} from './imperial-civil-service.js';
 import {merchantElectionView,steppePastureView} from './regional-institutions.js';
@@ -325,6 +325,14 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const estates=estateReviewView(g,realm);
+ if(estates){html+='<div class="rule"><b>Estate consent and renewal</b><p class="paragraph">Compacts bind the current local lord. Renew consent near expiry rather than allowing a lapse. A change of lord invalidates the old agreement.</p>';
+ for(const x of estates)html+='<div class="smallnote">'+esc(place(x.id))+' · '+Math.max(0,x.until-g.turn)+' months · loyalty '+Math.round(x.loyalty)+'</div><button class="rowbtn" data-action="institution" data-id="estate:renew" data-second="estate-renew-'+esc(x.id)+'"'+(x.canRenew?'':' disabled')+'>Renew estate consent (90g)</button><input type="hidden" id="estate-renew-'+esc(x.id)+'" value="'+esc(x.id)+'">';
+ if(!estates.length)html+='<div class="smallnote">Negotiate an estate compact first.</div>';html+='</div>';}
+ if(s.mode==='tribute'){html+='<div class="rule"><b>Tribute accounts</b><p class="paragraph">Missed payments accumulate as arrears. The compact recovers at most one extra month of debt per month; forgive arrears to clear the burden.</p>';
+ const accounts=tributeAccounts(g,realm);
+ for(const x of accounts)html+='<div class="smallnote">'+esc(g.factions[x.id]?.name||x.id)+' · '+x.amount+'g/month · arrears '+x.arrears+'g · '+x.missed+' missed months</div><button class="rowbtn" data-action="institution" data-id="tribute:waive" data-second="tribute-waive-'+esc(x.id)+'"'+(x.arrears?'':' disabled')+'>Forgive arrears</button><input type="hidden" id="tribute-waive-'+esc(x.id)+'" value="'+esc(x.id)+'">';
+ if(!accounts.length)html+='<div class="smallnote">No active tribute agreements.</div>';html+='</div>';}
  const program=localProgramView(g,realm);
  if(program){const info={military:['Household service commissions','Commission a funded landed household for political service. After three months the serving lord receives a reward and increased loyalty.','military:commission','Commission household (100g)'],city:['Urban public works','Fund a six-month civic works project to improve community trust and reduce unrest.','city:works','Fund public works (160g)'],kinship:['Community relief allocations','Set aside 30 food from community stores for a three-month local relief program.','kinship:relief','Allocate relief (30 food)']}[program.kind];
  html+='<div class="rule"><b>'+esc(info[0])+'</b><p class="paragraph">'+esc(info[1])+'</p>';
