@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createGame,snapshot,restoreGame,advanceMonth} from '../src/simulation.js';
+import {createGame,snapshot,restoreGame,advanceMonth,build,recruit,startMarch,setPolicy,negotiate} from '../src/simulation.js';
 import {careerCandidates,careerAction,careerView,humanControlsRealm,vassalCareer,renderCareer,renderCareerEntry} from '../src/player-career.js';
 import {tickVassalCourts} from '../src/vassal-courts.js';
 import {removePoliticalCharacter} from '../src/dynastic-politics.js';
@@ -55,4 +55,10 @@ test('vassal campaign advances while the liege uses autonomous crown management'
  assert.equal(g.turn,6);assert.ok(vassalCareer(g));
  assert.ok(Number.isFinite(g.factions.england.treasury));
  assert.ok(Object.values(g.armies).every(a=>a.infantry>=0&&a.archers>=0&&a.cavalry>=0));
+});
+
+test('sovereign campaign commands cannot be issued from a vassal perspective',()=>{
+ const {g,id}=fixture();const before=snapshot(g);
+ for(const result of [build(g,id,'farm'),recruit(g,id,'infantry'),startMarch(g,world,id,'p1'),setPolicy(g,'tax',0),negotiate(g,'france','gift',world)])assert.equal(result.ok,false);
+ assert.equal(snapshot(g),before);
 });

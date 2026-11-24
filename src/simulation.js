@@ -54,6 +54,7 @@ export function empireStats(g,owner){
  return {provinces:p.length,income,trade,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops:Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a),0),population:p.reduce((s,a)=>s+a.population,0)};
 }
 export function setPolicy(g,key,value){
+ if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  const f=g.factions[g.player];if(!f||!Object.hasOwn(POLICY,key)||!Number.isInteger(value)||value<0||value>2)return {ok:false,msg:'Invalid policy'};
  if(f.policies[key]===value)return {ok:false,msg:'Policy already enacted'};
  if(f.treasury<80)return {ok:false,msg:'Need 80 gold to issue this decree'};
@@ -63,6 +64,7 @@ export function setPolicy(g,key,value){
  return {ok:true,msg:'Royal decree enacted'};
 }
 export function build(g,provinceId,kind){
+ if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  const p=g.provinces[provinceId],f=g.factions[g.player],b=BUILDINGS[kind];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  if(!b)return {ok:false,msg:'Unknown building'};
@@ -82,6 +84,7 @@ export function recruitmentQuote(g,provinceId,type='infantry'){
  return {cost:Math.round(prices[type]*(type===primary?.82:1)*(1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy)),doctrine};
 }
 export function recruit(g,provinceId,type='infantry'){
+ if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  const p=g.provinces[provinceId],f=g.factions[g.player];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  const quote=recruitmentQuote(g,provinceId,type);if(!quote)return {ok:false,msg:'Unknown troop type'};const {cost,doctrine,count:recruited}=quote;
@@ -96,6 +99,7 @@ export function recruit(g,provinceId,type='infantry'){
 }
 export function isAdjacent(world,src,dst){return !!world.provinces.find(p=>p.id===src)?.neighbors?.includes(dst);}
 export function startMarch(g,world,fromId,toId){
+ if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  const src=g.provinces[fromId],target=g.provinces[toId];
  if(!src||!target)return {ok:false,msg:'Select two valid provinces.'};
  if(fromId===toId)return {ok:false,msg:'Choose another province'};
@@ -168,6 +172,7 @@ export function concludeBattle(g,battle,result,world=null){
  return {ok:true,msg:'Battle result applied.'};
 }
 export function negotiate(g,other,action,world={factions:[]}){
+ if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  if(other===g.player||other==='independent'||!g.factions[other])return {ok:false,msg:'Invalid diplomatic target'};
  if(action==='trade'||action==='marriage')return royalDiplomacy(g,world,other,action);
  const f=g.factions[g.player],o=g.factions[other];const relation=f.relations[other]||0;
