@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {createGame,snapshot,restoreGame,advanceMonth,startMarch} from '../src/simulation.js';
-import {temperament,strategicPlan,threatAssessment,strategicTargetScore,raidThreshold,defenseSupport,defensivePartners,strategyAction,tickStrategy,militaryStrength,borderRealms} from '../src/strategic-ai.js';
+import {temperament,strategicPlan,threatAssessment,strategicTargetScore,raidThreshold,defenseSupport,defensivePartners,strategyAction,tickStrategy,militaryStrength,borderRealms,strategicFronts} from '../src/strategic-ai.js';
 import {renderStrategy} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=(realm='england')=>{const g=createGame(world,realm);g.factions[realm].treasury=10000;return g;};
@@ -30,4 +30,22 @@ test('new and ended wars invalidate plans before the scheduled quarterly review,
  copy.factions.england.food=-50;copy.turn=9;tickStrategy(copy,world);
  assert.equal(strategicPlan(copy,'england').goal,'recover');
  assert.equal(strategicPlan(copy,'england').target,null);
+});
+
+test('new defensive front interrupts the previous offensive plan before its scheduled review',()=>{const g=start(),mine=Object.values(g.provinces).find(p=>p.owner==='england'),theirs=Object.values(g.provinces).find(p=>p.owner==='france');g.conflict.wars.old={id:'old',attacker:'england',defender:'france',status:'active',goal:theirs.id,started:0,score:10};g.turn=3;tickStrategy(g,world);assert.equal(strategicPlan(g,'england').target,'france');g.conflict.wars.new={id:'new',attacker:'burgundy',defender:'england',status:'active',goal:mine.id,started:4,score:70};g.campaignWar.occupations[mine.id]={by:'burgundy',owner:'england',war:'new'};g.turn=6;tickStrategy(g,world);const fronts=strategicFronts(g,world,'england');assert.equal(fronts[0].target,'burgundy');assert.equal(fronts[0].occupied,true);assert.equal(strategicPlan(g,'england').goal,'defend');assert.equal(strategicPlan(g,'england').fronts.length,2);assert.match(renderStrategy(g,world,String),/ACTIVE FRONTS/);g.conflict.wars.new.status='white peace';delete g.campaignWar.occupations[mine.id];g.turn=9;tickStrategy(g,world);assert.equal(strategicPlan(g,'england').target,'france');});
+
+test('an autonomous court sends separate armies toward two reachable war fronts',()=>{
+ const g=start('england'),realm='ming',local=Object.values(g.provinces).filter(p=>p.owner===realm).slice(0,3);
+ assert.equal(local.length,3);const [origin,west,east]=local;
+ const hostileWest=Object.values(g.provinces).find(p=>p.owner==='joseon'),hostileEast=Object.values(g.provinces).find(p=>p.owner==='japan');
+ assert.ok(hostileWest&&hostileEast);
+ const atlas={...world,provinces:[{id:origin.id,neighbors:[west.id,east.id]},{id:west.id,neighbors:[origin.id,hostileWest.id]},{id:east.id,neighbors:[origin.id,hostileEast.id]},{id:hostileWest.id,neighbors:[west.id]},{id:hostileEast.id,neighbors:[east.id]}]};
+ for(const [id,a] of Object.entries(g.armies))if(a.owner===realm)delete g.armies[id];
+ const make=(id,n)=>({id,owner:realm,province:origin.id,infantry:n,archers:0,cavalry:0,morale:75,experience:0});
+ g.armies.frontA=make('frontA',400);g.armies.frontB=make('frontB',300);
+ g.conflict.wars.west={id:'west',attacker:'joseon',defender:realm,status:'active',goal:west.id,started:0,score:0};
+ g.conflict.wars.east={id:'east',attacker:'japan',defender:realm,status:'active',goal:east.id,started:1,score:0};
+ g.turn=3;tickStrategy(g,atlas);
+ assert.deepEqual(new Set([g.armies.frontA.province,g.armies.frontB.province]),new Set([west.id,east.id]));
+ assert.equal(strategicPlan(g,realm).fronts.length,2);
 });

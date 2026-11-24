@@ -27,8 +27,15 @@ export function initFeudal(g,world){
 export function syncTitles(g){const f=g.feudal;if(!f)return;const next={};for(const [realm,s] of Object.entries(g.politics.realms))next['k:'+realm]={id:'k:'+realm,tier:'crown',realm,deJureRealm:realm,holder:s.ruler,parent:null,name:g.factions[realm].name};
  for(const d of Object.values(f.districts)){const realms=new Set(d.members.map(id=>g.politics.holdings[id]?.realm).filter(Boolean));for(const realm of realms){const members=d.members.filter(id=>g.politics.holdings[id]?.realm===realm&&g.provinces[id]?.owner===realm);if(!members.length)continue;const id=d.id+':'+realm,old=f.titles[id],lords=[...new Set(members.map(p=>g.politics.holdings[p].lord))].filter(c=>live(g,c)),holder=lords.includes(old?.holder)?old.holder:lords.sort((a,b)=>members.filter(p=>g.politics.holdings[p].lord===b).length-members.filter(p=>g.politics.holdings[p].lord===a).length||a.localeCompare(b))[0]||g.politics.realms[realm].ruler;
  next[id]={id,tier:'regional',realm,deJureRealm:d.deJureRealm,holder,parent:'k:'+realm,name:d.name,members};for(const p of members)next['c:'+p]={id:'c:'+p,tier:'province',realm,deJureRealm:d.deJureRealm,holder:g.politics.holdings[p].lord,parent:id,name:p,province:p};}}
+ // Evidence is personal, not a privilege inherited by an unrelated successor.
+ for(const [id,t] of Object.entries(next)){const previous=f.titles[id];if(t.tier==='province'&&previous&&(previous.holder!==t.holder||previous.realm!==t.realm)){delete g.politics.holdings[t.province].leverageUntil;if(g.estateConflicts?.retinues)delete g.estateConflicts.retinues[t.province];}}
  f.titles=next;}
 export function titleList(g,realm){return Object.values(g.feudal?.titles||{}).filter(t=>t.realm===realm);}
+export function regionalTitleCandidates(g,realm,id){
+ const t=g.feudal?.titles?.[id],r=g.politics.realms[realm]?.ruler;if(t?.tier!=='regional'||t.realm!==realm)return [];
+ const eligible=new Set(t.members.filter(p=>g.provinces[p]?.owner===realm&&controller(g,p)===realm).map(p=>g.politics.holdings[p]?.lord));
+ return [...eligible].map(id=>live(g,id)).filter(p=>p&&p.realm===realm&&p.age>=18&&p.id!==t.holder&&p.id!==r&&!isImprisoned(g,p.id)).sort((a,b)=>a.id.localeCompare(b.id));
+}
 export function characterTitles(g,id){
  return Object.values(g.feudal?.titles||{}).filter(t=>t.holder===id);
 }
@@ -39,7 +46,7 @@ export function partitionInheritance(g,realm,deceased,primary){if(!g.feudal)retu
 export function claimantCandidates(g,realm){const r=ruler(g,realm);return Object.values(g.feudal?.claimants||{}).filter(x=>x.realm===realm&&x.person!==r?.id&&live(g,x.person)?.realm===realm&&!isImprisoned(g,x.person)&&g.turn-x.created<180);}
 export function installClaimant(g,realm,id){const c=claimantCandidates(g,realm).find(c=>c.person===id),next=live(g,id),s=g.politics.realms[realm];if(!c||!next||!s)return false;const old=ruler(g,realm);s.ruler=id;delete g.feudal.claimants[realm+':'+id];g.feudal.claimants[realm+':'+old.id]={realm,person:old.id,from:id,created:g.turn};for(const [role,person] of Object.entries(s.council))if(person===id)s.council[role]=old.id;s.regent=next.age<18?(s.council.chancellor||null):null;g.kingdom.courts[realm].successions++;g.kingdom.courts[realm].dynasty=next.house;g.kingdom.courts[realm].ruler={name:next.name,age:next.age,...next.skills};for(const [,h] of holdings(g,realm))if(h.lord===old.id){h.lord=id;h.loyalty=65;}syncTitles(g);note(g,realm,next.name+' took the crown after the claimant settlement.');return true;}
 export function capturePrisoner(g,captor,id,reason='battle'){const p=live(g,id);if(!g.feudal||!p||!g.politics.realms[captor]||p.age<18||ruler(g,p.realm)?.id===id||isImprisoned(g,id))return false;g.feudal.prisoners[id]={person:id,captor,realm:p.realm,reason,started:g.turn,status:'held'};for(const a of Object.values(g.military?.armies||{}))if(a.commander===id)a.commander=null;note(g,captor,p.name+' was imprisoned ('+reason+').');return true;}
-export function captureCommander(g,captor,army){const id=g.military?.armies[army?.id]?.commander;return id?capturePrisoner(g,captor,id,'war captive'):false;}
+export function captureCommander(g,captor,army){const id=g.military?.armies[army?.id]?.commander;return id&&captor!==army.owner&&live(g,id)?.realm===army.owner?capturePrisoner(g,captor,id,'war captive'):false;}
 function release(g,x){x.status='released';x.ended=g.turn;}
 function prisonerValue(g,p){
  const offices=g.politics.realms[p.realm]?.council||{};
@@ -79,8 +86,8 @@ export function feudalAction(g,world,action,id,extra){const f=initFeudal(g,world
  if(action==='grant'){if(v.lord!==r.id||!p||p.realm!==realm||p.age<18||p.id===r.id||isImprisoned(g,p.id))return no('Grant a personally held province to a free adult subject.');v.lord=p.id;v.loyalty=80;v.tax=1;v.levy=1;v.autonomy=1;nation.prestige+=3;}
  else{if(v.lord===r.id||nation.legitimacy<55||!(v.leverageUntil>g.turn||isImprisoned(g,v.lord)))return no('Reclaim requires 55 legitimacy and proven leverage or an imprisoned lord.');nation.legitimacy-=8;v.lord=r.id;v.loyalty=100;v.tax=1;v.levy=1;v.autonomy=1;}
  syncTitles(g);return ok('Provincial title transferred.');}
- if(action==='regional'){if(t?.tier!=='regional'||t.realm!==realm||!p||p.realm!==realm||p.age<18||isImprisoned(g,p.id)||!t.members.some(id=>g.politics.holdings[id]?.lord===p.id)||t.holder===p.id||nation.treasury<120)return no('Choose an eligible provincial lord within the district and pay 120 gold.');nation.treasury-=120;t.holder=p.id;return ok('Regional title granted.');}
- if(action==='arrest'){const target=live(g,id),v=holdings(g,realm).filter(([,h])=>h.lord===id);if(!target||target.realm!==realm||!v.some(([,h])=>h.leverageUntil>g.turn)||nation.legitimacy<55||!capturePrisoner(g,realm,id,'proven misconduct'))return no('Arrest requires a free adult vassal, established evidence and 55 legitimacy.');nation.legitimacy-=3;return ok('Vassal imprisoned.');}
+ if(action==='regional'){if(!regionalTitleCandidates(g,realm,id).some(candidate=>candidate.id===p?.id)||nation.treasury<120)return no('Choose a different free adult lord with a controlled province in this district and pay 120 gold.');nation.treasury-=120;t.holder=p.id;return ok('Regional title granted.');}
+ if(action==='arrest'){const target=live(g,id),v=holdings(g,realm).filter(([,h])=>h.lord===id);if(!target||target.realm!==realm||!v.some(([province,h])=>controller(g,province)===realm&&h.leverageUntil>g.turn)||nation.legitimacy<55||!capturePrisoner(g,realm,id,'proven misconduct'))return no('Arrest requires a free adult vassal, established evidence and 55 legitimacy.');nation.legitimacy-=3;return ok('Vassal imprisoned.');}
  if(action==='estate-law'){
   const result=amendEstateCharter(g,realm,t?.province,extra);
   if(result.ok)note(g,realm,result.msg);

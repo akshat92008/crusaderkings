@@ -5,7 +5,7 @@ import {createGame,snapshot,restoreGame,concludeBattle} from '../src/simulation.
 import {politicsAction,tickPolitics} from '../src/dynastic-politics.js';
 import {councilVotes,conflictAction,tickConflict} from '../src/political-conflict.js';
 import {militaryAction} from '../src/military-systems.js';
-import {titleList,syncTitles,feudalAction,regionalLoyalty,partitionInheritance,claimantCandidates,isImprisoned,captureCommander,capturePrisoner,prisonerExchangeOptions,tickFeudal} from '../src/feudal-systems.js';
+import {titleList,syncTitles,feudalAction,regionalLoyalty,partitionInheritance,claimantCandidates,isImprisoned,captureCommander,capturePrisoner,prisonerExchangeOptions,tickFeudal,regionalTitleCandidates} from '../src/feudal-systems.js';
 import {renderFeudal} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=(realm='ming')=>{const g=createGame(world,realm);g.factions[realm].treasury=10000;g.factions[realm].legitimacy=85;return g;};
@@ -43,4 +43,36 @@ test('foreign prisoner exchanges release both captives and settle unequal ranks 
  assert.ok(!isImprisoned(copy,marshal)&&!isImprisoned(copy,foreigner.id));
  assert.equal(feudalAction(copy,world,'exchange',foreigner.id,marshal).ok,false);
  assert.equal(other.treasury,before+35);
+});
+
+test('transferring a provincial title does not transfer evidence of its former holder\'s misconduct',()=>{
+ const g=start(),r=sovereign(g),[id,h]=holdings(g)[0],old=h.lord;
+ h.leverageUntil=48;assert.ok(feudalAction(g,world,'reclaim','c:'+id).ok);
+ assert.equal(h.leverageUntil,undefined);
+ assert.ok(feudalAction(g,world,'grant','c:'+id,old).ok);
+ assert.equal(feudalAction(g,world,'reclaim','c:'+id).ok,false);
+ assert.equal(feudalAction(g,world,'arrest',old).ok,false);
+ const copy=restoreGame(snapshot(g),world);
+ assert.equal(copy.politics.holdings[id].leverageUntil,undefined);
+});
+test('regional appointments only offer different free adults with controlled district estates',()=>{
+ const g=start(),t=titleList(g,g.player).find(t=>t.tier==='regional'&&regionalTitleCandidates(g,g.player,t.id).length);
+ assert.ok(t);
+ const chosen=regionalTitleCandidates(g,g.player,t.id)[0],cash=g.factions[g.player].treasury;
+ assert.ok(!regionalTitleCandidates(g,g.player,t.id).some(p=>p.id===t.holder));
+ assert.ok(feudalAction(g,world,'regional',t.id,chosen.id).ok);
+ assert.equal(g.factions[g.player].treasury,cash-120);
+ assert.equal(feudalAction(g,world,'regional',t.id,chosen.id).ok,false);
+ assert.equal(g.factions[g.player].treasury,cash-120);
+});
+
+test('enemy occupation prevents regional appointment and arrest using the occupied estate',()=>{
+ const g=start(),realm=g.player,t=titleList(g,realm).find(t=>t.tier==='regional'&&regionalTitleCandidates(g,realm,t.id).length);
+ assert.ok(t);const chosen=regionalTitleCandidates(g,realm,t.id)[0],cash=g.factions[realm].treasury;
+ const owned=t.members.filter(id=>g.politics.holdings[id].lord===chosen.id);assert.ok(owned.length);
+ for(const id of owned){g.politics.holdings[id].leverageUntil=48;g.campaignWar.occupations[id]={owner:realm,by:'joseon',war:'fixture'};}
+ assert.ok(!regionalTitleCandidates(g,realm,t.id).some(p=>p.id===chosen.id));
+ assert.equal(feudalAction(g,world,'regional',t.id,chosen.id).ok,false);
+ assert.equal(feudalAction(g,world,'arrest',chosen.id).ok,false);
+ assert.equal(g.factions[realm].treasury,cash);
 });

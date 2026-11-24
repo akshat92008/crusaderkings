@@ -40,6 +40,23 @@ export function initIdentity(g,world){if(g.identity?.version===1)return g.identi
  return s;}
 export function identityModifiers(g,r){const s=g.identity?.realms[r],out={tax:1,levy:1,trade:1,build:1,scheme:0,diplomacy:0,research:0,acceptance:0,unrest:0};if(!s)return out;for(const d of [...s.traditions.map(id=>TRADITIONS[id]),...s.innovations.map(id=>INNOVATIONS[id])])if(d)for(const k of Object.keys(out))if(typeof d[k]==='number')out[k]=['tax','levy','trade','build'].includes(k)?out[k]*d[k]:out[k]+d[k];const faith=faithCharterModifiers(g,r),culture=cultureModifiers(g,r);for(const k of Object.keys(faith))out[k]+=faith[k];for(const k of Object.keys(culture))out[k]+=culture[k];return out;}
 export function researchOptions(g,r){const s=g.identity?.realms[r];return s?Object.keys(INNOVATIONS).filter(id=>!s.innovations.includes(id)&&INNOVATIONS[id].requires.every(k=>s.innovations.includes(k))):[];}
+// Innovation diffusion follows actual peaceful contacts. Snapshot known innovations
+// before each quarter so iteration order cannot grant same-quarter chain discoveries.
+function innovationNetwork(g,world){
+ const network=new Map(),wars=new Set(Object.values(g.conflict?.wars||{}).filter(w=>w.status==='active').map(w=>[w.attacker,w.defender].sort().join('|')));
+ const link=(a,b,kind)=>{if(!a||!b||a===b||!g.identity.realms[a]||!g.identity.realms[b]||wars.has([a,b].sort().join('|')))return;for(const [r,o] of [[a,b],[b,a]]){if(!network.has(r))network.set(r,new Map());const channels=network.get(r);if(!channels.has(o))channels.set(o,new Set());channels.get(o).add(kind);}};
+ const owner=id=>{const p=g.provinces[id];return p&&controller(g,id)===p.owner?p.owner:null;};
+ for(const p of world.provinces)for(const n of p.neighbors||[])link(owner(p.id),owner(n),'border');
+ for(const route of Object.values(g.economy?.routes||{}))if(route.status==='active'&&!route.suspended&&route.lastVolume>0&&owner(route.from)===route.realm)link(route.realm,owner(route.to),'trade');
+ for(const [r,s] of Object.entries(g.identity.realms)){const x=s.faithExchange;if(x&&x.ends>=g.turn&&g.civic.realms[r]?.faith===x.faith&&g.civic.realms[x.realm]?.faith===x.otherFaith&&g.politics.people[x.advisor]?.alive&&g.politics.people[x.otherAdvisor]?.alive)link(r,x.realm,'scholarship');}
+ return network;
+}
+const discoveredSnapshot=g=>new Map(Object.entries(g.identity.realms).map(([r,s])=>[r,new Set(s.innovations)]));
+export function innovationDiffusion(g,world,r,id,network=innovationNetwork(g,world),known=discoveredSnapshot(g)){
+ if(!INNOVATIONS[id]||!INNOVATIONS[id].requires.every(k=>known.get(r)?.has(k)))return {bonus:0,channels:[]};
+ const channels=new Set();for(const [other,kinds] of network.get(r)||[])if(known.get(other)?.has(id))for(const k of kinds)channels.add(k);
+ const weights={border:2,trade:3,scholarship:2};return {bonus:Math.min(6,[...channels].reduce((n,k)=>n+weights[k],0)),channels:[...channels].sort()};
+}
 export function localIdentities(g,r){const faith=new Set(),culture=new Set();for(const p of own(g,r)){const l=g.civic.provinces[p.id];faith.add(l.faith);culture.add(l.culture);}return {faith:[...faith],culture:[...culture]};}
 function research(g,r,id){const s=g.identity.realms[r],f=g.factions[r];if(!own(g,r).length||s.research||!researchOptions(g,r).includes(id)||f.treasury<150)return no('Research requires an available innovation, no active project and 150 gold.');f.treasury-=150;s.research={id,progress:0,started:g.turn};return ok('Research commissioned.');}
 function institution(g,r,id){const s=g.identity.institutions[id],p=g.provinces[id],f=g.factions[r];if(!s||!p||p.owner!==r||controller(g,id)!==r||s.level>=3||f.treasury<180*(s.level+1))return no('Requires controlled land, available institution level and sufficient gold.');f.treasury-=180*(s.level+1);s.level++;s.faith=g.civic.provinces[id].faith;return ok('Local institution expanded.');}
@@ -57,11 +74,12 @@ export function identityAction(g,world,action,id,extra){const s=initIdentity(g,w
  if(action==='adopt-faith'){if(!localIdentities(g,r).faith.includes(id)||id===c.faith||g.turn-state.lastFaith<120||f.treasury<250)return no('Select a faith present in controlled land; requires 250 gold and ten years between changes.');f.treasury-=250;c.faith=id;ruler(g,r).civic.faith=id;state.lastFaith=g.turn;state.faithAuthority=40;f.legitimacy=cap(f.legitimacy-8,0,100);note(g,r,'The ruler adopted a different local faith. Provincial identities remain unchanged.');return ok('Ruler faith changed.');}
  return no('Unknown identity action.');}
 export function tickIdentity(g,world){const s=initIdentity(g,world);if(s.lastTick===g.turn)return;s.lastTick=g.turn;if(g.turn%3!==0)return;
+ const network=innovationNetwork(g,world),known=discoveredSnapshot(g);
  for(const [r,state] of Object.entries(s.realms)){const f=g.factions[r],c=g.civic.realms[r],land=own(g,r);if(!land.length){if(state.faithCharter?.council||state.faithExchange)tickFaithCharter(g,r,land);if(state.culturalCourt?.study)tickCulture(g,r,land);continue;}const mod=identityModifiers(g,r);
  let backing=0;for(const p of land){const i=s.institutions[p.id],l=g.civic.provinces[p.id];if(i.level&&i.faith===l.faith){l.localTrust=cap(l.localTrust+i.level,0,100);l.devotion=cap(l.devotion+1,0,100);if(i.faith===c.faith)backing+=i.level;}l.acceptance=cap(l.acceptance+mod.acceptance,0,100);}
  state.faithAuthority=cap(state.faithAuthority+cap((45+Math.min(40,backing*5)-state.faithAuthority)*.15,-3,3),0,100);if(state.faithAuthority>=70&&g.turn%12===0)f.legitimacy=cap(f.legitimacy+1,0,100);
  tickFaithCharter(g,r,land);tickCulture(g,r,land);
- if(state.research){const rr=state.research,d=INNOVATIONS[rr.id];rr.progress+=5+(ruler(g,r).skills.learning||1)+mod.research+researchPatronBonus(g,r);if(rr.progress>=d.cost){state.innovations.push(rr.id);state.research=null;note(g,r,d.name+' discovered.');}}
+ if(state.research){const rr=state.research,d=INNOVATIONS[rr.id];rr.progress+=5+(ruler(g,r).skills.learning||1)+mod.research+researchPatronBonus(g,r)+innovationDiffusion(g,world,r,rr.id,network,known).bonus;if(rr.progress>=d.cost){state.innovations.push(rr.id);state.research=null;note(g,r,d.name+' discovered.');}}
  if(!humanControlsRealm(g,r)&&g.turn%12===0&&f.treasury>700){if(!state.research){const opts=researchOptions(g,r);if(opts.length)research(g,r,opts[0]);}const p=land.find(p=>s.institutions[p.id].level===0&&g.civic.provinces[p.id].localTrust<80);if(p&&f.treasury>700)institution(g,r,p.id);if(f.treasury>1000&&f.prestige>=20&&state.traditions.length<4&&g.turn-state.lastTradition>=60){const options=Object.keys(TRADITIONS).filter(id=>!state.traditions.includes(id));const id=options.find(id=>id==='scholarly_patronage')||options[0];if(id){f.treasury-=350;f.prestige-=20;state.traditions.push(id);state.lastTradition=g.turn;}}}
  }
  for(const [id,x] of Object.entries(s.projects)){const p=g.provinces[id],l=g.civic.provinces[id],c=g.civic.realms[x.realm];if(!p||p.owner!==x.realm||controller(g,id)!==x.realm||c[x.kind]!==x.target||l[x.kind]!==x.original||c.policy==='coercion'){delete s.projects[id];continue;}if(l.acceptance<65||l.localTrust<60){x.progress=Math.max(0,x.progress-5);continue;}x.progress+=6+Math.floor(l.localTrust/20);if(x.progress>=100){l[x.kind]=x.target;delete s.projects[id];note(g,x.realm,'Community dialogue completed at '+id+'. Local '+x.kind+' identity changed in the simulation.');}}

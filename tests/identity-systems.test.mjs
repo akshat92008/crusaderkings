@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {createGame,snapshot,restoreGame,empireStats} from '../src/simulation.js';
-import {identityAction,identityModifiers,researchOptions,tickIdentity,TRADITIONS,INNOVATIONS,localIdentities} from '../src/identity-systems.js';
+import {identityAction,identityModifiers,researchOptions,tickIdentity,TRADITIONS,INNOVATIONS,localIdentities,innovationDiffusion} from '../src/identity-systems.js';
 import {renderIdentity} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=(realm='ming')=>{const g=createGame(world,realm);g.factions[realm].treasury=10000;g.factions[realm].prestige=100;return g;};
@@ -32,4 +32,24 @@ test('tradition replacement preserves the existing tradition slots and enforces 
  assert.equal(cultureLeadership(g,g.civic.realms.ming.culture).realm,'ming');
  assert.ok(identityAction(g,world,'culture-replace-tradition',next,old).ok);assert.equal(s.traditions.length,count);assert.ok(s.traditions.includes(next));assert.ok(!s.traditions.includes(old));
  assert.equal(identityAction(g,world,'culture-replace-tradition',old,next).ok,false);
+});
+
+test('research diffusion follows peaceful controlled borders, trade and prerequisites',()=>{
+ const g=start('ming'),a=province(g),b=Object.values(g.provinces).find(p=>p.owner==='joseon');
+ assert.ok(a&&b);
+ const atlas={...world,provinces:[{id:a.id,neighbors:[b.id]},{id:b.id,neighbors:[a.id]}]};
+ const s=g.identity.realms.ming;g.identity.realms.joseon.innovations=['records','courts'];
+ assert.equal(innovationDiffusion(g,atlas,'ming','records').bonus,2);
+ assert.equal(innovationDiffusion(g,atlas,'ming','courts').bonus,0);
+ g.economy.routes.diffusion={id:'diffusion',realm:'ming',from:a.id,to:b.id,status:'active',lastVolume:4};
+ assert.equal(innovationDiffusion(g,atlas,'ming','records').bonus,5);
+ g.economy.routes.diffusion.suspended='blockade';
+ assert.equal(innovationDiffusion(g,atlas,'ming','records').bonus,2);
+ g.conflict.wars.diffusion={id:'diffusion',attacker:'ming',defender:'joseon',status:'active'};
+ assert.equal(innovationDiffusion(g,atlas,'ming','records').bonus,0);
+ delete g.conflict.wars.diffusion;delete g.economy.routes.diffusion;
+ assert.ok(identityAction(g,world,'research','records').ok);
+ assert.match(renderIdentity(g,atlas,String),/Knowledge diffusion: \+2 per quarter/);
+ const copy=restoreGame(snapshot(g),world);assert.equal(innovationDiffusion(copy,atlas,'ming','records').bonus,2);
+ assert.ok(s.research);
 });
