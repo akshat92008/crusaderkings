@@ -17,6 +17,8 @@ function targetPosition(g,e,all){const order=g.fieldOrder||'advance',d=dist(g,e)
  if(g.type==='archers'&&order!=='charge'){const preferred=g.range*.83;if(d<g.range*.46)return [g.x-dx*6,g.z-dz*6];if(d<=preferred)return [g.x,g.z];return [e.x-dx*preferred,e.z-dz*preferred];}
  if(g.type==='cavalry'&&order!=='charge'&&e.type==='infantry'&&d>10){const flank=g.order%2?1:-1;return [e.x+flank*7,e.z-dz*2];}
  return [e.x-dx*Math.min(g.range*.55,1.5),e.z-dz*Math.min(g.range*.55,1.5)];}
+export function activeTroops(g){return g.routed?0:Math.max(0,(g.troopCount||0)*cap(g.life/100,0,1));}
+export function numericalPower(g,e){return activeTroops(g)/Math.max(1,activeTroops(e));}
 export function fieldStrength(groups,side){return groups.filter(g=>g.side===side&&!g.routed).reduce((n,g)=>n+(g.troopCount||0)*cap(g.life/100,0,1)*(0.5+cap(g.morale/100,0,1)*.5),0);}
 function random(state){state.fieldSeed=((state.fieldSeed??145019)*1664525+1013904223)>>>0;return state.fieldSeed/4294967296;}
 function addEffect(state,kind,x,z,duration){state.effects??=[];state.effects.push({kind,x,z,age:0,duration,seed:state.fieldSeed??0});if(state.effects.length>64)state.effects.splice(0,state.effects.length-64);}
@@ -27,11 +29,11 @@ export function stepField(state,dt){state.effects??=[];for(const e of state.effe
  // Friendly groups repel one another gently, but holding units stay anchored.
  if(!['hold','move','fallback'].includes(order))for(const other of live){if(other===g||other.side!==g.side)continue;const p=positions.get(other.id),sx=g.x-p.x,sz=g.z-p.z,sep=Math.hypot(sx,sz);if(sep>.001&&sep<3){const push=Math.min(.45,dt*(3-sep));g.x=cap(g.x+sx/sep*push,-64,64);g.z=cap(g.z+sz/sep*push,-46,46);}}
  g.cooldown=(g.cooldown||0)-dt;const range=dist(g,e);if(range>g.range||g.cooldown>0||order==='fallback')continue;g.cooldown=g.type==='archers'?1.2:.8;
- g.attackPulse=g.type==='archers'?.45:.30;g.attackSerial=(g.attackSerial||0)+1;const power=cap((g.troopCount||1)/Math.max(1,e.troopCount||1),.35,2.5),charge=aggressive&&g.type==='cavalry'&&moving?1.22:1,brace=e.fieldOrder==='hold'&&['pike_square','shield_wall'].includes(e.formationId)&&g.type==='cavalry'?1.25:1;
- const aspect=attackAspect(g,e),flank=aspect==='rear'?1.32:aspect==='flank'?1.16:1,cover=g.type==='archers'?fieldTerrain(e).cover:1;const damage=g.damage*flank/cover*(.75+.25*(g.cohesion??100)/100)*(.55+.45*g.life/100)*(1-g.fatigue*.004)*power*charge*(g.type==='cavalry'&&e.type==='archers'?1.35:1)/(Math.max(.6,e.armor||1)*brace*(g.type==='cavalry'?Math.max(.6,e.cavalryCounter||1):1))*(.88+random(state)*.24);
+ g.attackPulse=g.type==='archers'?.45:.30;g.attackSerial=(g.attackSerial||0)+1;const power=numericalPower(g,e),charge=aggressive&&g.type==='cavalry'&&moving?1.22:1,brace=e.fieldOrder==='hold'&&['pike_square','shield_wall'].includes(e.formationId)&&g.type==='cavalry'?1.25:1;
+ const aspect=attackAspect(g,e),flank=aspect==='rear'?1.32:aspect==='flank'?1.16:1,cover=g.type==='archers'?fieldTerrain(e).cover:1;const damage=g.damage*flank/cover*(.75+.25*(g.cohesion??100)/100)*(.75+.25*cap(g.morale/100,0,1))*(1-g.fatigue*.004)*power*charge*(g.type==='cavalry'&&e.type==='archers'?1.35:1)/(Math.max(.6,e.armor||1)*brace*(g.type==='cavalry'?Math.max(.6,e.cavalryCounter||1):1))*(.88+random(state)*.24);
  hits.push({g,e,damage,aspect});if(g.type==='archers')state.projectiles.push({sx:g.x,sz:g.z,tx:e.x,tz:e.z,t:0});}
- for(const {g,e,damage,aspect} of hits){if(g.type!=='archers')addEffect(state,'impact',e.x,e.z,.32);e.life=cap(e.life-damage*.19,0,100);e.cohesion=cap((e.cohesion??100)-damage*.15*(aspect==='rear'?1.8:aspect==='flank'?1.4:1),35,100);e.morale=cap(e.morale-damage*.31*(aspect==='rear'?1.4:aspect==='flank'?1.2:1),0,100);}
+ for(const {g,e,damage,aspect} of hits){if(g.type!=='archers')addEffect(state,'impact',e.x,e.z,.32);e.life=cap(e.life-damage*.19*Math.max(1,activeTroops(e))/Math.max(1,e.troopCount||0),0,100);e.cohesion=cap((e.cohesion??100)-damage*.15*(aspect==='rear'?1.8:aspect==='flank'?1.4:1),35,100);e.morale=cap(e.morale-Math.min(45,damage*.31)*(aspect==='rear'?1.4:aspect==='flank'?1.2:1),0,100);}
  const routed=[];for(const g of live)if(g.life<8||g.morale<13){g.routed=true;g.routAge=0;g.attackPulse=0;addEffect(state,'rout',g.x,g.z,.6);routed.push(g);}
- for(const g of routed)for(const ally of live)if(!ally.routed&&ally.side===g.side&&dist(ally,g)<14)ally.morale=cap(ally.morale-7,0,100);
+ for(const g of routed)for(const ally of live)if(!ally.routed&&ally.side===g.side&&dist(ally,g)<14)ally.morale=cap(ally.morale-7*Math.min(1,(g.troopCount||0)/Math.max(1,ally.troopCount||0)),0,100);
  for(const p of state.projectiles)p.t+=dt*2.3;state.projectiles=state.projectiles.filter(p=>p.t<=1);
 }

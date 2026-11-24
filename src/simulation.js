@@ -98,31 +98,31 @@ export function startMarch(g,world,fromId,toId){
  if(!src||!target||controller(g,fromId)!==g.player)return {ok:false,msg:'Select an owned province to march from'};
  if(fromId===toId)return {ok:false,msg:'Choose another province'};
  if(!isAdjacent(world,fromId,toId))return {ok:false,msg:'Armies can currently move only to connected provinces'};
- const army=armiesAt(g,fromId,g.player).sort((a,b)=>armySize(b)-armySize(a)||a.id.localeCompare(b.id))[0];
- if(!army||embarked(g,army.id)||armySize(army)<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
- if(controller(g,toId)===g.player){onArmyMarch(g,army);army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
+ const forces=armiesAt(g,fromId,g.player).filter(a=>armySize(a)>0).sort((a,b)=>armySize(b)-armySize(a)||a.id.localeCompare(b.id)),army=forces[0],total=forces.reduce((n,a)=>n+armySize(a),0);
+ if(!army||total<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
+ if(controller(g,toId)===g.player){for(const a of forces){onArmyMarch(g,a);a.province=toId;}makeLog(g,`${total} troops marched to ${toId}.`);return {ok:true,type:'move',msg:total+' troops moved'};}
  const opponent=controller(g,toId);if(occupation(g,toId)&&opponent!==target.owner&&target.owner!==g.player)return {ok:false,msg:'Cannot attack a third-party occupation without formal war.'};
  if(nonAggression(g,g.player,opponent)||hasTruce(g,g.player,opponent))return {ok:false,msg:'A peace treaty bars this attack.'};
  if(['alliance','marriage'].includes(g.factions[g.player].treaties[opponent]))return {ok:false,msg:'Cannot attack an allied realm'};
  const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
  const garrison=45+target.development*12+target.buildings.fort*45+defenseSupport(g,opponent,g.player);
- return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
+ return {ok:true,type:'battle',attacker:army.id,playerArmies:forces.map(a=>a.id),attackTroops:total,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
 export function concludeBattle(g,battle,result,world=null){
  const src=g.armies[battle.attacker];if(!src)return;
  const dst=g.provinces[battle.to];const was=controller(g,battle.to),war=activeWar(g,g.player,was);
 
- const ratio=clamp(result.attackerRemaining??0,0,1);
- const oldsize=armySize(src);onArmyMarch(g,src);applyFortDamage(g,battle.to,result);
- applyFieldLosses(src,result,'attacker',ratio);syncRegiments(g,src);
+ const ratio=clamp(result.attackerRemaining??0,0,1),forces=result.fieldBattle?participatingArmies(g,battle.playerArmies||[src.id],g.player,battle.from||src.province):[src];
+ const oldsize=forces.reduce((n,a)=>n+armySize(a),0);applyFortDamage(g,battle.to,result);
+ for(const a of forces){onArmyMarch(g,a);applyFieldLosses(a,result,'attacker',ratio);syncRegiments(g,a);}
  const field=result.fieldBattle&&Array.isArray(battle.enemyArmies),defenders=field?participatingArmies(g,battle.enemyArmies,was,battle.to):[];for(const a of defenders){applyFieldLosses(a,result,'defender',clamp(result.enemyRemaining??.5,0,1));syncRegiments(g,a);}
- if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
+ if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);for(const a of forces){a.province=battle.to;a.experience=clamp(a.experience+.06,0,1);}
   if(field){const retreat=world?.provinces.find(p=>p.id===battle.to)?.neighbors.find(id=>controller(g,id)===was&&g.provinces[id]?.owner===was);for(const a of defenders){if(retreat&&armySize(a)>0){a.province=retreat;a.morale=clamp((a.morale||75)-20,10,100);}else{captureCommander(g,g.player,a);delete g.armies[a.id];}}}else{const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending){captureCommander(g,g.player,defending);delete g.armies[defending.id];}}
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
   recordCampaignBattle(g,g.player,was,battle.to,true);
-  makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
- } else {recordCampaignBattle(g,g.player,was,battle.to,false);src.morale=clamp(src.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${armySize(src)} survivors.`);}
+  makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-forces.reduce((n,a)=>n+armySize(a),0)} casualties.`);
+ } else {recordCampaignBattle(g,g.player,was,battle.to,false);for(const a of forces)a.morale=clamp(a.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${forces.reduce((n,a)=>n+armySize(a),0)} survivors.`);}
 }
 export function negotiate(g,other,action,world={factions:[]}){
  if(other===g.player||other==='independent'||!g.factions[other])return {ok:false,msg:'Invalid diplomatic target'};
