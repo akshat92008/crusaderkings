@@ -444,7 +444,20 @@ const rows=[
   90,
   "Support local provisioning",
   "This campaign abstraction models local food security, not a centralized historical state."
- ]
+ ],
+ ["scottish_border_order","Scottish border lordship cooperation",["scotland"],"loyalty",44,70,150,"Hear border lordship petitions","The crown depends on cooperation from landed households. A deterioration in estate loyalty can provoke negotiations over local obligations."],
+ ["breton_administration","Breton ducal administration",["brittany"],"trust",42,68,130,"Commission district hearings","Provincial confidence supports ducal administration when neighboring crowns compete for influence."],
+ ["kalmar_estate_consent","Consent within the Nordic union",["kalmar"],"loyalty",45,70,160,"Convene representatives of the estates","A composite union depends on negotiated support from its estates; this pressure models local political consent, not uniform administration."],
+ ["genoese_credit","Genoese merchant obligations",["genoa"],"credit",45,75,140,"Convene merchant notaries","Commercial credit can weaken when the republic's obligations outstrip confidence in its trading institutions."],
+ ["venetian_provisioning","Venetian provisioning agreements",["venice"],"grain",14,34,150,"Support provisioning contracts","Urban and maritime communities depend on reliable stores and supply agreements."],
+ ["cypriot_local_cooperation","Cypriot community cooperation",["cyprus"],"acceptance",44,68,120,"Hear representatives of island communities","Political cooperation can be strained when local communities lose confidence in shared administration."],
+ ["oirat_seasonal_security","Oirat seasonal provisioning",["oirats"],"grain",12,30,110,"Allocate provisions to clan households","Seasonal scarcity can strain cooperation among confederate households."],
+ ["chagatai_caravan_confidence","Chagatai caravan confidence",["chagatai"],"credit",45,70,115,"Sponsor caravan arbitration","The security of exchange networks depends on credible arrangements among local authorities."],
+ ["tibetan_institutional_support","Tibetan institutional cooperation",["tibet"],"faith",42,68,135,"Convene institutional delegates","Competing regional and religious institutions depend on continued confidence; the campaign does not assume unified authority."],
+ ["lanxang_river_provisions","Lan Xang river settlement provisions",["lanxang"],"grain",14,34,120,"Support local rice reserves","Inadequate food stores can strain local cooperation along river settlements."],
+ ["sunda_market_confidence","Sunda market cooperation",["sunda"],"credit",46,72,130,"Hear market representatives","Reliable local exchange depends on cooperation between merchants and regional authorities."],
+ ["tlemcen_trade_confidence","Tlemcen commercial confidence",["zayyanid"],"credit",45,70,135,"Mediate caravan and market petitions","Merchant confidence connects the court with wider exchange networks."],
+ ["tupi_local_provisioning","Tupi-speaking community provisioning",["tupi"],"grain",12,28,95,"Support community food stores","A composite gameplay profile represents diverse communities facing local provisioning pressures, not a single historical state."]
 ];
 export const CONDITIONAL_SITUATIONS=rows.map(([id,name,members,metric,bad,good,cost,action,desc])=>({id,name,members,domestic:members.length===1,conditional:true,desc,model:{title:action,action,cost,metric,bad,good,phases:['competition','rivalry','hostility','conciliation'],desc:'Respond to the measured local pressure. Two consecutive healthy quarterly reviews resolve the situation.'}}));
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),mean=(a,fn)=>a.length?a.reduce((n,x)=>n+fn(x),0)/a.length:null;

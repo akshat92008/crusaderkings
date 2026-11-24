@@ -9,7 +9,7 @@ const start=(realm='england')=>{const g=createGame(world,realm);g.factions[realm
 const dyn=g=>g.heritage.dynasties[g.player+'|'+g.politics.people[g.politics.realms[g.player].ruler].house];
 const dest=g=>activityDestinations(g,world).find(x=>x.route.length===1).id;
 function finish(g){for(let i=0;i<40&&g.heritage.activities[g.player];i++){g.turn++;tickHeritage(g,world);if(activityIncident(g))assert.ok(heritageAction(g,world,'incident','0').ok);}assert.equal(g.heritage.activities[g.player],undefined);}
-test('all activities and regional scenarios initialize with eligible members',()=>{const g=start();assert.equal(Object.keys(ACTIVITIES).length,12);assert.equal(STRUGGLES.length,50);assert.equal(Object.keys(g.heritage.struggles).length,50);assert.ok(struggleView(g).length>0);});
+test('all activities and regional scenarios initialize with eligible members',()=>{const g=start();assert.equal(Object.keys(ACTIVITIES).length,12);assert.equal(STRUGGLES.length,63);assert.equal(Object.keys(g.heritage.struggles).length,63);assert.ok(struggleView(g).length>0);});
 test('activities cost money, reject duplicates and apply completion rewards',()=>{const g=start(),f=g.factions.england,old=f.prestige;assert.ok(heritageAction(g,world,'activity','coronation',dest(g)).ok);assert.equal(f.treasury,10000-180);assert.equal(heritageAction(g,world,'activity','feast',dest(g)).ok,false);finish(g);assert.ok(f.prestige>old);assert.ok(dyn(g).renown>0);assert.equal(heritageAction(g,world,'activity','coronation',dest(g)).ok,false);});
 test('journeys follow connected owned provinces and cancel if the route is lost',()=>{const g=start('ming'),d=activityDestinations(g,world).find(x=>x.route.length>1);assert.ok(d);assert.ok(heritageAction(g,world,'activity','tour',d.id).ok);const x=g.heritage.activities.ming;assert.equal(x.phase,'travel');for(let i=1;i<x.path.length;i++)assert.ok(world.provinces.find(p=>p.id===x.path[i-1]).neighbors.includes(x.path[i]));g.provinces[d.id].owner='independent';g.turn++;tickHeritage(g,world);assert.equal(g.heritage.activities.ming,undefined);});
 test('summit improves reciprocal relations and weddings need a marriage',()=>{const g=start(),f=g.factions.england;assert.equal(heritageAction(g,world,'activity','wedding',dest(g)).ok,false);assert.ok(heritageAction(g,world,'activity','summit',dest(g),'france').ok);finish(g);assert.ok(f.relations.france>=15);assert.ok(g.factions.france.relations.england>=15);});
@@ -36,3 +36,24 @@ test('religious assembly and scholarly gathering affect existing institution and
 test('royal artifacts record their cultural origin, creator and restoration history',()=>{const g=start();assert.ok(heritageAction(g,world,'artifact','chronicle').ok);const x=Object.values(g.heritage.artifacts)[0];assert.equal(x.origin,'england');assert.equal(x.owner,g.politics.realms.england.ruler);assert.equal(x.culture,g.civic.realms.england.culture);x.durability=50;assert.ok(heritageAction(g,world,'repair',x.id).ok);assert.ok(x.history[0].message.includes('Restored'));const copy=restoreGame(snapshot(g),world);assert.equal(copy.heritage.artifacts[x.id].history.length,2);});
 
 test('conditional regional situations activate on real local pressure and resolve only after sustained recovery',()=>{const g=start('france'),x=g.heritage.struggles.french_recovery,land=Object.values(g.provinces).filter(p=>p.owner==='france');assert.equal(x.phase,'dormant');assert.equal(heritageAction(g,world,'initiative','french_recovery','special').ok,false);for(const p of land)p.unrest=70;g.turn=3;tickHeritage(g,world);assert.equal(x.phase,'hostility');assert.ok(heritageAction(g,world,'initiative','french_recovery','special').ok);assert.ok(land.some(p=>p.unrest===60));assert.equal(heritageAction(g,world,'initiative','french_recovery','special').ok,false);for(const p of land)p.unrest=15;g.turn=6;tickHeritage(g,world);assert.equal(x.ended,null);g.turn=9;tickHeritage(g,world);assert.equal(x.outcome.kind,'negotiated');});
+
+test('all 56 historical starting profiles participate in at least one regional situation',async()=>{
+ const {HISTORICAL_CONTEXT}=await import('../src/historical-context.js');
+ assert.equal(Object.keys(HISTORICAL_CONTEXT).length,56);
+ for(const id of Object.keys(HISTORICAL_CONTEXT))assert.ok(STRUGGLES.some(s=>s.members.includes(id)),id);
+ assert.equal(new Set(STRUGGLES.map(s=>s.id)).size,STRUGGLES.length);
+});
+test('expanded atlas regional situations migrate legacy saves without resetting old progress',()=>{
+ const g=start();g.heritage.struggles.western_succession.tension=81;
+ for(const id of ["scottish_border_order","breton_administration","kalmar_estate_consent","genoese_credit","venetian_provisioning","cypriot_local_cooperation","oirat_seasonal_security","chagatai_caravan_confidence","tibetan_institutional_support","lanxang_river_provisions","sunda_market_confidence","tlemcen_trade_confidence","tupi_local_provisioning"])delete g.heritage.struggles[id];
+ const copy=restoreGame(snapshot(g),world);assert.equal(copy.heritage.struggles.western_succession.tension,81);
+ for(const id of ["scottish_border_order","breton_administration","kalmar_estate_consent","genoese_credit","venetian_provisioning","cypriot_local_cooperation","oirat_seasonal_security","chagatai_caravan_confidence","tibetan_institutional_support","lanxang_river_provisions","sunda_market_confidence","tlemcen_trade_confidence","tupi_local_provisioning"]){assert.equal(copy.heritage.struggles[id].phase,'dormant');assert.equal(copy.heritage.struggles[id].ended,null);}
+});
+test('new regional pressures use controlled local records, charge once per response and do not affect unrelated realms',async()=>{
+ const {CONDITIONAL_SITUATIONS,situationMeasure,respondToSituation}=await import('../src/regional-situations.js');
+ const def=CONDITIONAL_SITUATIONS.find(x=>x.id==='genoese_credit');
+ const g={factions:{genoa:{treasury:500},venice:{treasury:500}},provinces:{p:{id:'p',owner:'genoa'},q:{id:'q',owner:'venice'}},economy:{realms:{genoa:{credit:30},venice:{credit:20}}}};
+ assert.equal(situationMeasure(g,def,['genoa']).bad,true);
+ assert.equal(respondToSituation(g,'genoa',def),true);assert.equal(g.factions.genoa.treasury,360);assert.equal(g.economy.realms.genoa.credit,39);assert.equal(g.economy.realms.venice.credit,20);
+ g.economy.realms.genoa.credit=80;assert.equal(respondToSituation(g,'genoa',def),false);assert.equal(g.factions.genoa.treasury,360);
+});
