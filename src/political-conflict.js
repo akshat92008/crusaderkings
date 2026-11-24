@@ -1,3 +1,4 @@
+import {regencyPermission} from './regency-systems.js';
 import {claimDynasticSeat,validDynasticClaim} from './dynastic-ties.js';
 import {estatePower} from './realm-authority.js';
 import {campaignArmyPower,borderBattleOutcome,proportionalLoss} from './border-battle.js';
@@ -30,7 +31,7 @@ export function councilVotes(g,realm,proposal='law'){
  const score=18+(f.legitimacy-50)*.7+(f.stability-50)*.3+(person.traits.includes('ambitious')?-20:0)+(person.traits.includes('content')?15:0)+(person.traits.includes('just')&&proposal==='revoke'?-28:0)+(person.traits.includes('cautious')&&proposal==='war'?-25:0)+(role==='marshal'&&proposal==='war'?22:0)+(favor?55:0)+personalOpinion(g,s.ruler,id)*.35+hookStrength(g,realm,id)*18;
  return {role,id,yes:score>=25,score:Math.round(score),favor};});
 }
-export function councilPermission(g,realm,proposal){const c=initConflict(g);if(c.council[realm]!=='binding')return true;const v=councilVotes(g,realm,proposal);return v.filter(x=>x.yes).length>v.length/2;}
+export function councilPermission(g,realm,proposal){const c=initConflict(g);if(!regencyPermission(g,realm,proposal))return false;if(c.council[realm]!=='binding')return true;const v=councilVotes(g,realm,proposal);return v.filter(x=>x.yes).length>v.length/2;}
 function power(g,ids){return ids.reduce((n,id)=>n+estatePower(g,id),0);}
 function claimKey(realm,id){return realm+':'+id;}
 export function availableClaims(g,realm){const c=initConflict(g);return Object.values(c.claims).filter(x=>x.realm===realm&&g.provinces[x.province]&&g.provinces[x.province].owner!==realm&&x.expires>g.turn&&validDynasticClaim(g,x));}

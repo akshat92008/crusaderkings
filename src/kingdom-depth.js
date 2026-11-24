@@ -1,3 +1,4 @@
+import {initRegencies} from './regency-systems.js';
 import {initEstateConflicts,tickEstateConflicts} from './estate-conflicts.js';
 import {initVassalCourts,tickVassalCourts} from './vassal-courts.js';
 import {initAuthority,tickAuthority} from './realm-authority.js';
@@ -60,13 +61,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
