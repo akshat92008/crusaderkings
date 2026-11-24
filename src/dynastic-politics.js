@@ -1,3 +1,4 @@
+import {courtAction,initRoyalCourt,tickRoyalCourt} from './royal-court.js';
 import {partitionInheritance,isImprisoned,regionalLoyalty,syncTitles} from './feudal-systems.js';
 import {personalOpinion} from './chronicle-systems.js';
 import {councilPermission} from './political-conflict.js';
@@ -48,9 +49,10 @@ function marry(g,a,b){const p=g.politics;if(!eligible(p,a,b)||isImprisoned(g,a.i
 export function negotiatedMarriage(g,realm,a,b){if(!marriageCandidates(g,realm).some(x=>x.a===a&&x.b===b))return {ok:false,msg:'The proposed pair is no longer eligible.'};return marry(g,g.politics.people[a],g.politics.people[b]);}
 export function marryRealm(g,other){const option=marriageCandidates(g,g.player).find(x=>x.realm===other);if(!option)return {ok:false,msg:'No eligible adult royal relatives in these houses.'};return marry(g,g.politics.people[option.a],g.politics.people[option.b]);}
 export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,world),s=p.realms[g.player],f=g.factions[g.player],v=p.holdings[id],r=p.people[s.ruler];
+ if(['court-appoint','court-dismiss'].includes(action))return courtAction(g,g.player,action,id,extra);
  if(action==='dispatch')return resolvePoliticalDispatch(g,g.player,Number(id));
  if(action==='marry'){const a=p.people[id],b=p.people[extra];if(a?.realm!==g.player||!marriageCandidates(g,g.player).some(x=>x.a===id&&x.b===extra))return {ok:false,msg:'Select an eligible royal pair.'};return marry(g,a,b);}
- if(action==='appoint'){const candidate=live(p,extra);if(!Object.hasOwn(s.council,id)||!candidate||candidate.realm!==g.player||candidate.age<18||isImprisoned(g,candidate.id)||candidate.id===r.id||Object.values(s.council).includes(candidate.id)||f.treasury<80)return {ok:false,msg:'Select an adult unassigned courtier and have 80 gold.'};f.treasury-=80;s.council[id]=candidate.id;sync(g,g.player);log(g,candidate.name+' appointed '+id+'.');return {ok:true,msg:'Council appointment confirmed.'};}
+ if(action==='appoint'){const candidate=live(p,extra);if(!Object.hasOwn(s.council,id)||!candidate||candidate.realm!==g.player||candidate.age<18||isImprisoned(g,candidate.id)||candidate.id===r.id||Object.values(s.council).includes(candidate.id)||Object.values(g.royalCourt?.realms[g.player]?.offices||{}).some(o=>o.person===candidate.id)||f.treasury<80)return {ok:false,msg:'Select an adult unassigned courtier and have 80 gold.'};f.treasury-=80;s.council[id]=candidate.id;sync(g,g.player);log(g,candidate.name+' appointed '+id+'.');return {ok:true,msg:'Council appointment confirmed.'};}
  if(action==='law'){if(g.civic?.realms[g.player]?.government==='republic'&&id!=='elective')return {ok:false,msg:'The republic requires elective succession.'};if(!councilPermission(g,g.player,'law'))return {ok:false,msg:'Binding council rejected the succession reform.'};if(!['eldest','youngest','elective','partition'].includes(id)||id===s.law||g.turn-s.lastLaw<120||f.legitimacy<65||f.treasury<250)return {ok:false,msg:'Reform needs 250 gold, 65 legitimacy and ten years between changes.'};f.treasury-=250;s.law=id;s.lastLaw=g.turn;for(const h of Object.values(p.holdings))if(h.realm===g.player)h.loyalty=clamp(h.loyalty-8,0,100);sync(g,g.player);log(g,'The crown reformed succession: '+id);return {ok:true,msg:'Succession law changed.'};}
  if(!v||v.realm!==g.player||g.provinces[id]?.owner!==g.player||v.lord===r.id)return {ok:false,msg:'Select a loyal holding in your realm.'};
  if(action==='gift'){if(f.treasury<100)return {ok:false,msg:'Need 100 gold.'};f.treasury-=100;v.wealth+=100;v.loyalty=clamp(v.loyalty+15,0,100);}
@@ -112,7 +114,7 @@ export function resolvePoliticalDispatch(g,realm,index){
  return {ok:true,msg:'Political decision recorded.'};
 }
 
-export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTick===g.turn)return;p.lastTick=g.turn;
+export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTick===g.turn)return;p.lastTick=g.turn;initRoyalCourt(g);
  for(const [id,pr] of Object.entries(g.provinces))if(p.realms[pr.owner]?p.holdings[id]?.realm!==pr.owner:!!p.holdings[id])newHolding(g,world,id);
  if(g.turn%12===0){
   const living=Object.values(p.people).filter(c=>c.alive);for(const c of living)c.age++;
@@ -136,4 +138,5 @@ export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTic
   if(realm===g.player&&old!==s.regent)log(g,s.regent?'A regency begins for '+r.name+'.':'The regency ends.');
   sync(g,realm);
  }
+ tickRoyalCourt(g);
 }
