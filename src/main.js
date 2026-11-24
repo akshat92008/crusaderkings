@@ -1,3 +1,4 @@
+import {governmentAction} from './government-institutions.js';
 import {intrigueAction} from './intrigue-systems.js';
 import {campaignWorld} from './independence-systems.js';
 import {identityAction} from './identity-systems.js';
@@ -189,6 +190,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='military'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(militaryAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='economy'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(economyAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
  if(action==='heritage'){const input=btn.dataset.input?el(btn.dataset.input):null,guest=btn.dataset.guest?el(btn.dataset.guest):null;clickResult(heritageAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,guest?.value));}
+ if(action==='institution'){const first=btn.dataset.input?el(btn.dataset.input):null,second=btn.dataset.second?el(btn.dataset.second):null;clickResult(governmentAction(game,campaignWorld(game,world),first?.value??btn.dataset.id,second?.value));}
  if(action==='civic'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(civicAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='intrigue'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(intrigueAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
