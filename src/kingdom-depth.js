@@ -1,3 +1,5 @@
+import {controller,initCampaignWar,tickCampaignWar} from './campaign-war.js';
+import {embarked,initNaval,tickNaval,portBlocked} from './naval-systems.js';
 import {initMilitary,tickMilitary} from './military-systems.js';
 import {initEconomy,tickEconomy,economyModifiers} from './economy-systems.js';
 import {initHeritage,tickHeritage,heritageModifiers} from './heritage-systems.js';
@@ -42,13 +44,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -59,7 +61,8 @@ export function tradeIncome(g,id){
  for(const pact of Object.values(g.kingdom?.tradePacts||{})){
   if(!pact.partners.includes(id))continue;
   const other=pact.partners.find(x=>x!==id);
-  value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2);
+  const blockadeFactor=who=>Object.values(g.naval?.ports||{}).some(p=>g.provinces[p.province]?.owner===who&&portBlocked(g,p.province))?.65:1;
+  value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2)*Math.min(blockadeFactor(id),blockadeFactor(other));
  }
  return Math.round(value*civicModifiers(g,id).trade*heritageModifiers(g,id).trade);
 }
@@ -256,7 +259,7 @@ function aiMonthly(g,world){
   const nation=g.factions[f.id],land=provinces(g,f.id);
   if(!nation||!land.length)continue;
   if(g.turn%3===0&&nation.treasury>450){
-   const p=choose(land,hash(f.id+g.turn));
+   const p=choose(land.filter(p=>controller(g,p.id)===f.id),hash(f.id+g.turn));if(!p)continue;
    const neighbor=world.provinces.find(x=>x.id===p.id)?.neighbors||[];
    const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
    const kind=nation.food<130?'farm':frontier&&(p.buildings.fort||0)<2?'fort':(p.buildings.market||0)<2?'market':'farm';
@@ -264,7 +267,7 @@ function aiMonthly(g,world){
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
   if(g.turn%6===0&&nation.treasury>450){
-   const a=armies(g,f.id).sort((x,y)=>size(x)-size(y))[0];
+   const a=armies(g,f.id).filter(a=>!embarked(g,a.id)).sort((x,y)=>size(x)-size(y))[0];
    if(a&&size(a)<650){nation.treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];a.morale=clamp(a.morale+1,0,100);}
   }
   if(g.turn%12===0&&nation.treasury>450){
@@ -287,7 +290,7 @@ export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  // Trade is already included in the campaign balance.
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);
+ tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');

@@ -8,7 +8,10 @@ import {civicAction,civicModifiers} from './civic-systems.js';
 import {heritageAction} from './heritage-systems.js';
 import {economyAction,economyModifiers} from './economy-systems.js';
 import {militaryAction} from './military-systems.js';
-import {renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {navalAction,portBlocked} from './naval-systems.js';
+import {controller,occupation} from './campaign-war.js';
+import {activeWar} from './political-conflict.js';
+import {renderNaval,renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -65,6 +68,7 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
  }else if(tab==='heritage'){html=renderHeritage(game,world,esc);
  }else if(tab==='economy'){html=renderEconomy(game,world,esc);
  }else if(tab==='military'){html=renderMilitary(game,world,esc);
+ }else if(tab==='naval'){html=renderNaval(game,world,esc);
  }else if(tab==='trade'){
   html=renderTrade(game,world,esc);
  }else if(tab==='legacy'){
@@ -75,8 +79,9 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
  el('tab-content').innerHTML=html;
 }
 function renderInspector(){if(!game)return;let p=staticById[selected],state=game.provinces[selected];if(!p||!state){el('province-panel').innerHTML='<div class="emptyselection"><div class="emptycrest">♜</div><h2>THE KING\'S ATLAS</h2><p>Select any province to inspect its holdings.</p></div>';return;}
- const own=state.owner===game.player,owner=game.factions[state.owner],a=armiesAt(game,selected,state.owner),yourArmy=armiesAt(game,selected,game.player)[0];const total=a.reduce((s,q)=>s+armySize(q),0);
+ const own=state.owner===game.player&&controller(game,selected)===game.player,owner=game.factions[state.owner],a=armiesAt(game,selected,state.owner),yourArmy=armiesAt(game,selected,game.player)[0];const total=a.reduce((s,q)=>s+armySize(q),0);
  let text=`<div class="inspector"><span class="eyebrow">PROVINCE CHANCERY · ${esc(p.continent.toUpperCase())}</span><h2>${esc(displayProvince(p))}</h2><div class="owner"><span class="swatch" style="background:${esc(owner?.color||'#667670')}"></span>${esc(owner?.name||'Independent Polities')} ${own?'<span style="color:#e4ca83"> · YOUR REALM</span>':''}</div><div class="province-hero">${p.terrain==='forest'?'♣':p.terrain==='highlands'?'▲':'♜'}<span>${esc(p.terrain.toUpperCase())} · ${p.centroid[0].toFixed(1)}°, ${p.centroid[1].toFixed(1)}°</span></div><div class="province-facts"><div class="fact"><label>POPULATION</label><b>${fmt(state.population)}k</b></div><div class="fact"><label>DEVELOPMENT</label><b>LV. ${fmt(state.development)}</b></div><div class="fact"><label>UNREST</label><b style="color:${state.unrest>55?'#e1a194':'#aed2af'}">${fmt(state.unrest)}%</b></div><div class="fact"><label>GARRISON & ARMY</label><b>${fmt(total||45+state.development*12)}</b></div></div>`;
+ const occupied=occupation(game,selected);if(occupied)text+='<div class="rule"><b>OCCUPIED BY '+esc(ownerName(game,occupied.by))+'</b><p class="paragraph">Legal ownership remains with '+esc(ownerName(game,state.owner))+'.</p>'+(occupied.by===game.player&&yourArmy?'<button class="rowbtn" data-action="march">March from occupied territory</button>':'')+'</div>';if(game.naval?.ports[selected])text+='<div class="rule"><b>PORT '+(portBlocked(game,selected)?'· BLOCKADED':'')+'</b></div>';
  const local=game.civic?.provinces[selected];if(local)text+=`<div class="rule"><b>${esc(local.culture)}</b><p class="paragraph">${esc(local.faith)} · ${fmt(local.acceptance)}% acceptance</p></div>`;
  if(own){text+=`<div class="sectiontitle">MARCHING ORDERS</div><p class="paragraph">${yourArmy?`Your ${fmt(armySize(yourArmy))}-strong field army is stationed here.`:'No field army is stationed here.'} March to a connected province to reinforce or initiate a manual battle.</p><button class="btnblock" data-action="march">⚔ ISSUE MARCH / ATTACK ORDER</button><div class="sectiontitle">RAISE NEW REGIMENTS</div><div class="building-grid"><button data-action="recruit" data-type="infantry">⚔ Infantry <small>50 men · from 90g</small></button><button data-action="recruit" data-type="archers">➶ Archers <small>50 men · from 123g</small></button><button data-action="recruit" data-type="cavalry">♞ Cavalry <small>25 men · from 197g</small></button></div><div class="sectiontitle">PROVINCIAL CONSTRUCTION</div><div class="building-grid">${Object.entries(BUILDINGS).map(([kind,b])=>`<button data-action="build" data-type="${kind}">${b.icon} ${b.name}<small>Lvl ${state.buildings[kind]} / 3 · ${fmt(b.cost*(state.buildings[kind]+1)*civicModifiers(game,game.player).build*economyModifiers(game,game.player).cost)}g</small></button>`).join('')}</div>`;
  }else{text+=`<div class="sectiontitle">FOREIGN TERRITORY</div><p class="paragraph">To invade, select a neighboring owned province with a field army and choose <strong>Issue March / Attack Order</strong>. Then select this province on the world map.</p><button class="btnblock secondary" data-action="show-diplomacy" data-target="${state.owner}">✦ DIPLOMATIC OPTIONS</button>`;}
@@ -103,7 +108,7 @@ function onBattleFinished(result){
  const title=defense?(win?'THE INVADERS WERE REPELLED':'THE FORTRESS HAS FALLEN'):(win?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS');
  const explanation=practice?'Practice battle; your campaign will not be changed.':
    defense?(win?'Your garrison has held the fortress.':'Your defensive position has been overrun.'):
-   win?'The enemy province will be taken.':'Your army has retreated.';
+   win?(activeWar(game,game.player,battleDescriptor.enemy)?'The province will be occupied pending peace.':'The enemy province will be taken.'):'Your army has retreated.';
  el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p><button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
  el('battle-return').onclick=()=>{
   if(!practice){
@@ -166,6 +171,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='naval'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(navalAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
  if(action==='military'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(militaryAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='economy'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(economyAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
  if(action==='heritage'){const input=btn.dataset.input?el(btn.dataset.input):null,guest=btn.dataset.guest?el(btn.dataset.guest):null;clickResult(heritageAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,guest?.value));}

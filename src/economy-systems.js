@@ -1,3 +1,5 @@
+import {controller} from './campaign-war.js';
+import {portBlocked} from './naval-systems.js';
 // Regional goods, settlement industries, treasury credit and local crises.
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const hash=s=>{let n=2166136261;for(const c of String(s))n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;};
@@ -32,7 +34,7 @@ function capacity(p,good){return 60+p.tier*25+p.industries.warehouse*40+(['grain
 function add(p,good,n){p.stock[good]=cap(p.stock[good]+n,0,capacity(p,good));}
 function costOf(g,good){return g.economy.prices[good];}
 function war(g,a,b){return Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&((w.attacker===a&&w.defender===b)||(w.attacker===b&&w.defender===a)));}
-function routeAllowed(g,world,realm,from,to){const a=g.provinces[from],b=g.provinces[to];if(!a||!b||a.owner!==realm||from===to||b.owner==='independent'||!g.economy.realms[b.owner]||war(g,realm,b.owner))return false;
+function routeAllowed(g,world,realm,from,to){const a=g.provinces[from],b=g.provinces[to];if(!a||!b||controller(g,from)!==realm||controller(g,to)!==b.owner||portBlocked(g,from)||portBlocked(g,to)||a.owner!==realm||from===to||b.owner==='independent'||!g.economy.realms[b.owner]||war(g,realm,b.owner))return false;
  if(b.owner===realm)return !!world.provinces.find(p=>p.id===from)?.neighbors.includes(to);
  const treaty=g.kingdom.tradePacts[[realm,b.owner].sort().join('|')];return !!treaty&&(g.factions[realm].relations[b.owner]||0)>=-30;}
 export function tradeDestinations(g,world,realm,from){return Object.values(g.provinces).filter(p=>routeAllowed(g,world,realm,from,p.id));}
@@ -41,7 +43,7 @@ function createRoute(g,world,realm,from,to,good){const e=g.economy,f=g.factions[
  if(Object.values(e.routes).filter(r=>r.realm===realm&&r.status==='active').length>=Math.max(2,own(g,realm).length*2)+(e.realms[realm].merchantGuild?2:0))return no('Trade route limit reached.');
  if(f.treasury<90)return no('Need 90 gold to establish a route.');f.treasury-=90;const id='t'+e.next++;e.routes[id]={id,realm,from,to,good,status:'active',lastVolume:0,lastValue:0,total:0,started:g.turn};return ok('Merchant route established.');}
 function flow(g,world,r){const e=g.economy,a=local(g,r.from),b=local(g,r.to),owner=g.provinces[r.to]?.owner;
- r.lastVolume=0;r.lastValue=0;if(!routeAllowed(g,world,r.realm,r.from,r.to)){r.status='closed';r.closed=g.turn;return;}
+ r.lastVolume=0;r.lastValue=0;if(portBlocked(g,r.from)||portBlocked(g,r.to)){r.suspended='blockade';return;}delete r.suspended;if(!routeAllowed(g,world,r.realm,r.from,r.to)){r.status='closed';r.closed=g.turn;return;}
  const available=Math.max(0,a.stock[r.good]-8),room=Math.max(0,capacity(b,r.good)-b.stock[r.good]);let qty=Math.floor(Math.min(available,room,5+3*(a.industries.caravan+b.industries.caravan)+a.tier+b.tier));
  const price=costOf(g,r.good),seller=g.factions[r.realm],buyer=g.factions[owner],tax=owner===r.realm?0:[0,.05,.12][e.realms[owner].tariff];
  if(owner!==r.realm)qty=Math.min(qty,Math.floor(Math.max(0,buyer.treasury)/price));
@@ -85,7 +87,7 @@ export function economyAction(g,world,action,id,extra,third){const e=initEconomy
  if(action==='stabilize'){if(f.treasury<180||s.inflation<=0)return no('Need inflation and 180 gold.');f.treasury-=180;s.inflation=cap(s.inflation-6,0,40);return ok('Currency stabilized.');}
  if(action==='guild'){if(s.merchantGuild||f.treasury<250)return no('Guild already chartered or need 250 gold.');f.treasury-=250;s.merchantGuild=true;s.credit=cap(s.credit+10,0,100);return ok('Merchant guild chartered; credit improved.');}
  if(action==='tariff'){const n=Number(id);if(![0,1,2].includes(n)||s.tariff===n||g.turn-s.lastPolicy<12)return no('Tariff policy may be changed once per year.');s.tariff=n;s.lastPolicy=g.turn;return ok('Tariff policy changed.');}
- if(!p||p.owner!==realm||!l)return no('Select an owned settlement.');
+ if(!p||p.owner!==realm||controller(g,id)!==realm||!l)return no('Select an owned settlement.');
  if(action==='industry'){const r=INDUSTRIES[extra],level=l.industries[extra];if(!r||level>=3||r.requires&&!l.resources.includes(r.requires))return no('Industry unavailable or at maximum level.');const cost=industryCost(g,realm,id,extra);if(f.treasury<cost)return no('Need '+cost+' gold.');f.treasury-=cost;l.industries[extra]++;return ok(r.name+' upgraded.');}
  if(action==='settlement'){const cost=350*(l.tier+1);if(l.tier>=2||p.development<5+l.tier*4||f.treasury<cost)return no('Settlement upgrade needs sufficient development and '+cost+' gold.');f.treasury-=cost;l.tier++;p.development=cap(p.development+1,1,20);return ok('Settlement upgraded to '+SETTLEMENTS[l.tier]+'.');}
  if(action==='relief'){const x=e.crises[id];if(!x||g.turn-x.reliefTurn<3||f.treasury<120)return no('Relief requires an active crisis, 120 gold, and a three-month interval.');f.treasury-=120;x.reliefTurn=g.turn;x.severity=cap(x.severity-18,0,90);p.unrest=cap(p.unrest-6,0,100);add(l,'grain',12);return ok('Emergency relief delivered.');}

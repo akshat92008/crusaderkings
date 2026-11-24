@@ -1,3 +1,4 @@
+import {occupation} from './campaign-war.js';
 import {ReliefMap} from './relief-map.js';
 import {
  atlasPaper,atlasColor,buildDecorativeCounties,drawGeoPath,drawSea,drawLand,
@@ -56,6 +57,7 @@ export class CampaignMap{
    c.beginPath();drawGeoPath(c,p.geometry);c.fillStyle=atlasColor(this.game?.factions?.[owner]?.color||this.ownerColors[owner]||'#b4b09a',.29);
    c.globalAlpha=owner===this.game?.player?0.87:0.77;c.fill('evenodd');c.globalAlpha=1;
    c.lineWidth=clamp(1.35/s,.05,.52);c.strokeStyle='rgba(54,43,31,.50)';c.stroke();
+   const o=occupation(this.game||{},p.id);if(o){c.save();c.strokeStyle=this.game.factions[o.by]?.color||'#c18e48';c.lineWidth=clamp(3/s,.13,1.2);c.setLineDash([4/s,2/s]);c.stroke();c.restore();}
   }c.restore();
  }
  _drawHistorical(c,s){
