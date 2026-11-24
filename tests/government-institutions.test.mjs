@@ -11,3 +11,33 @@ test('herds generate food and lose stock during shortages',()=>{const g=fixture(
 test('community reserves respond to shortages without endless food generation',()=>{const g=fixture('kinship');assert.ok(governmentAction(g,{}).ok);g.factions.a.food=50;g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.food,80);assert.equal(institutionState(g,'a').reserves,10);g.factions.a.food=0;g.turn=6;tickInstitutions(g);assert.equal(institutionState(g,'a').reserves,0);assert.equal(g.factions.a.food,10);});
 test('tribute transfers gold without creation and stops at war',()=>{const g=fixture('tributary');assert.ok(governmentAction(g,{},'b').ok);const total=g.factions.a.treasury+g.factions.b.treasury;g.turn=1;tickInstitutions(g);assert.equal(g.factions.a.treasury,905);assert.equal(g.factions.b.treasury,995);assert.equal(g.factions.a.treasury+g.factions.b.treasury,total);g.conflict.wars.w={status:'active',attacker:'a',defender:'b'};g.turn=2;tickInstitutions(g);assert.equal(institutionState(g,'a').tributes.b,undefined);assert.equal(g.factions.b.treasury,995);});
 test('newly formed realms initialize institutions and saved records persist',()=>{const g=fixture('steppe');assert.ok(governmentAction(g,{}).ok);const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);assert.equal(institutionState(copy,'a').herds,25);copy.civic.realms.c={government:'city'};initInstitutions(copy);assert.equal(institutionState(copy,'c').mode,'merchants');});
+
+import {GOVERNMENT_MOTIONS,governmentMotionView} from '../src/government-deliberations.js';
+test('government-specific motions cover all profiles and preserve the existing institutions',()=>{assert.deepEqual(Object.keys(GOVERNMENT_MOTIONS).sort(),Object.keys(INSTITUTION_TYPES).sort());assert.equal(new Set(Object.values(GOVERNMENT_MOTIONS).map(x=>x.name)).size,13);});
+test('assembly votes are delayed, weighted, save-safe and can enact or repeal a policy',()=>{
+ const g=fixture('feudal');g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;
+ const v=governmentMotionView(g,'a');assert.equal(v.weight,4);assert.equal(v.yes,4);
+ assert.ok(governmentAction(g,{},'motion:propose').ok);assert.equal(g.factions.a.treasury,870);
+ assert.equal(governmentAction(g,{},'motion:propose').ok,false);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=2;tickInstitutions(copy);assert.equal(governmentMotionView(copy,'a').active,false);
+ copy.turn=3;tickInstitutions(copy);assert.equal(governmentMotionView(copy,'a').active,true);assert.equal(institutionModifiers(copy,'a').levy,1.10);assert.equal(institutionModifiers(copy,'a').tax,.94);
+ assert.equal(governmentAction(copy,{},'motion:propose').ok,false);copy.turn=15;assert.ok(governmentAction(copy,{},'motion:propose').ok);
+ copy.turn=18;tickInstitutions(copy);assert.equal(governmentMotionView(copy,'a').active,false);assert.equal(institutionModifiers(copy,'a').tax,1);
+});
+test('failed votes, duplicate lobbying and prisoner exclusion cannot mint money or bypass debate',()=>{
+ const g=fixture('imperial');g.politics.holdings.p.loyalty=10;g.politics.holdings.q.loyalty=10;
+ assert.ok(governmentAction(g,{},'motion:propose').ok);const total=g.factions.a.treasury+g.politics.people.n.wealth;
+ assert.ok(governmentAction(g,{},'motion:lobby','n').ok);assert.equal(g.factions.a.treasury+g.politics.people.n.wealth,total);
+ assert.equal(governmentAction(g,{},'motion:lobby','n').ok,false);g.feudal.prisoners.n={status:'held'};
+ assert.equal(governmentMotionView(g,'a').electors.some(e=>e.id==='n'),false);
+ g.turn=3;tickInstitutions(g);assert.equal(governmentMotionView(g,'a').last.passed,false);assert.equal(institutionModifiers(g,'a').tax,1);
+});
+test('AI assemblies make and resolve motions through the same rules',()=>{
+ const g=fixture('feudal');g.player='b';g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;g.turn=12;tickInstitutions(g);
+ assert.ok(governmentMotionView(g,'a').motion);g.turn=15;tickInstitutions(g);assert.equal(governmentMotionView(g,'a').active,true);
+});
+test('occupation and government changes invalidate old policy benefits',()=>{
+ const g=fixture('feudal');g.politics.holdings.p.loyalty=80;g.politics.holdings.q.loyalty=80;governmentAction(g,{},'motion:propose');g.turn=3;tickInstitutions(g);
+ assert.equal(governmentMotionView(g,'a').active,true);g.civic.realms.a.government='regional';initInstitutions(g);
+ assert.equal(governmentMotionView(g,'a').active,false);assert.equal(institutionModifiers(g,'a').tax,1);
+});

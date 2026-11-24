@@ -2,6 +2,7 @@
 // State is realm-specific; no historical claims are implied.
 import {controller} from './campaign-war.js';
 import {isImprisoned} from './feudal-systems.js';
+import {governmentPolicyModifiers,governmentMotionAction,tickGovernmentMotions} from './government-deliberations.js';
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const own=(g,r)=>Object.values(g.provinces).filter(p=>p.owner===r&&controller(g,p.id)===r);
 const ruler=(g,r)=>g.politics.people[g.politics.realms[r]?.ruler];
@@ -33,6 +34,7 @@ export function institutionModifiers(g,r){const s=institutionState(g,r),out={tax
  if(s.mode==='merchants')out.trade+=Math.min(.18,Object.values(s.houses).filter(h=>eligibleHouse(g,r,h.person)).reduce((n,h)=>n+h.level*.03,0));
  if(s.mode==='retainers')out.levy+=Math.min(.18,Object.values(s.retainers).filter(h=>eligibleHouse(g,r,h.person)).reduce((n,h)=>n+h.level*.03,0));
  if(s.mode==='herds')out.levy+=Math.min(.15,s.herds*.0015);
+ const policy=governmentPolicyModifiers(g,r);for(const k of Object.keys(out))out[k]*=policy[k];
  return out;}
 function action(g,r,id,extra){const s=state(g,r),d=INSTITUTION_TYPES[g.civic.realms[r].government],f=g.factions[r];if(!d||!own(g,r).length||f.treasury<d.cost||g.turn-s.last<6)return no('Requires controlled land, sufficient funds and six months between institutional actions.');
  const h=g.politics.holdings[id],valid=institutionTargets(g,r).includes(id);switch(s.mode){
@@ -44,8 +46,8 @@ function action(g,r,id,extra){const s=state(g,r),d=INSTITUTION_TYPES[g.civic.rea
  case 'tribute':{const other=g.factions[id],rev=g.institutions.realms[id]?.tributes[r];if(!valid||s.tributes[id]?.until>g.turn||rev?.until>g.turn||(other.relations[r]||0)<25||Object.values(g.conflict.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)&&[w.attacker,w.defender].includes(id)))return no('Requires a willing foreign realm (+25 relations), no reciprocal compact or war.');const amount=Math.min(25,Math.max(5,own(g,id).length*3));s.tributes[id]={until:g.turn+36,amount};break;}
  default:return no('Unknown institutional model.');}
  f.treasury-=d.cost;s.last=g.turn;note(g,r,d.action+' completed.');return ok(d.action+' completed.');}
-export function governmentAction(g,world,id,extra){return action(g,g.player,id,extra);}
-export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastTick===g.turn)return;root.lastTick=g.turn;for(const [r,s] of Object.entries(root.realms)){const f=g.factions[r],land=own(g,r);if(!land.length)continue;
+export function governmentAction(g,world,id,extra){if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);return action(g,g.player,id,extra);}
+export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastTick===g.turn)return;root.lastTick=g.turn;for(const [r,s] of Object.entries(root.realms)){const f=g.factions[r],land=own(g,r);tickGovernmentMotions(g,r);if(!land.length)continue;
  for(const [id,x] of Object.entries(s.compacts))if(x.until<=g.turn||!land.some(p=>p.id===id))delete s.compacts[id];
  for(const [id,x] of Object.entries(s.offices))if(!land.some(p=>p.id===id)||!adult(g,x.person,r))delete s.offices[id];
  for(const list of [s.houses,s.retainers])for(const [id,x] of Object.entries(list))if(!eligibleHouse(g,r,x.person))delete list[id];

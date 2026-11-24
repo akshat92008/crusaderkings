@@ -18,6 +18,7 @@ import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
 import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
+import {governmentMotionView} from './government-deliberations.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -319,6 +320,17 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const v=governmentMotionView(g,realm);
+ if(v){const d=v.definition;html+='<div class="rule"><b>'+esc(d.name)+'</b><p class="paragraph">'+esc(d.desc)+'</p><div class="smallnote">'+(v.active?'Enacted':'Not enacted')+' · Tax '+Math.round(d.tax*100)+'% · Levies '+Math.round(d.levy*100)+'% · Trade '+Math.round(d.trade*100)+'% while enacted</div>';
+ if(v.motion){html+='<div class="smallnote">Debate: '+(v.motion.enact?'Enact':'Repeal')+' · '+Math.max(0,v.motion.ends-g.turn)+' months remaining</div>';}
+ html+='<div class="smallnote">Projected support '+v.yes+' / '+v.weight+' voting weight · strict majority required</div>';
+ if(v.last)html+='<div class="smallnote">Last vote: '+(v.last.passed?'Passed':'Rejected')+' ('+v.last.yes+'/'+v.last.total+')</div>';
+ if(!v.motion)html+='<button class="rowbtn" data-action="institution" data-id="motion:propose"'+(v.blocked?' disabled':'')+'>'+ (v.active?'Propose repeal':'Propose enactment')+' ('+d.cost+'g)</button>'+(v.blocked?'<div class="smallnote">'+esc(v.blocked)+'</div>':'');
+ for(const e of v.electors)html+='<div class="smallnote">'+esc(e.name)+' · '+e.weight+' votes · '+e.support+'% support score · '+(e.support>=55?'Supports':'Opposes')+(e.lobbied?' · Lobbied':'')+'</div>';
+ const available=v.electors.filter(e=>!e.lobbied);
+ if(v.motion&&available.length)html+='<select class="select" id="institution-lobby-person">'+available.map(e=>'<option value="'+esc(e.id)+'">'+esc(e.name)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="motion:lobby" data-second="institution-lobby-person"'+(g.factions[realm].treasury<35?' disabled':'')+'>Seek support (35g)</button>';
+ html+='</div>';}
+
  return html+'</details>';
 }
 
