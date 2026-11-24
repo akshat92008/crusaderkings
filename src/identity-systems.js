@@ -53,7 +53,7 @@ export function identityAction(g,world,action,id,extra){const s=initIdentity(g,w
  if(action==='adopt-faith'){if(!localIdentities(g,r).faith.includes(id)||id===c.faith||g.turn-state.lastFaith<120||f.treasury<250)return no('Select a faith present in controlled land; requires 250 gold and ten years between changes.');f.treasury-=250;c.faith=id;ruler(g,r).civic.faith=id;state.lastFaith=g.turn;state.faithAuthority=40;f.legitimacy=cap(f.legitimacy-8,0,100);note(g,r,'The ruler adopted a different local faith. Provincial identities remain unchanged.');return ok('Ruler faith changed.');}
  return no('Unknown identity action.');}
 export function tickIdentity(g,world){const s=initIdentity(g,world);if(s.lastTick===g.turn)return;s.lastTick=g.turn;if(g.turn%3!==0)return;
- for(const [r,state] of Object.entries(s.realms)){const f=g.factions[r],c=g.civic.realms[r],land=own(g,r);if(!land.length)continue;const mod=identityModifiers(g,r);
+ for(const [r,state] of Object.entries(s.realms)){const f=g.factions[r],c=g.civic.realms[r],land=own(g,r);if(!land.length){if(state.faithCharter?.council||state.faithExchange)tickFaithCharter(g,r,land);continue;}const mod=identityModifiers(g,r);
  let backing=0;for(const p of land){const i=s.institutions[p.id],l=g.civic.provinces[p.id];if(i.level&&i.faith===l.faith){l.localTrust=cap(l.localTrust+i.level,0,100);l.devotion=cap(l.devotion+1,0,100);if(i.faith===c.faith)backing+=i.level;}l.acceptance=cap(l.acceptance+mod.acceptance,0,100);}
  state.faithAuthority=cap(state.faithAuthority+cap((45+Math.min(40,backing*5)-state.faithAuthority)*.15,-3,3),0,100);if(state.faithAuthority>=70&&g.turn%12===0)f.legitimacy=cap(f.legitimacy+1,0,100);
  tickFaithCharter(g,r,land);

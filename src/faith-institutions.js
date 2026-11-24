@@ -134,7 +134,7 @@ export function tickFaithCharter(g,r,land){
  const s=state(g,r),a=advisor(g,r);
  tickFaithExchange(g,r);
  if(s?.council&&g.turn>=s.council.ends){
-  const x=s.council,v=voteView(g,r,land,s.policies,x),passed=!!a&&v.total>0&&v.yes*2>v.total&&x.faith===c.faith;
+  const x=s.council,v=voteView(g,r,land,s.policies,x),passed=!!a&&land.length>0&&localFaithCenters(g,r,land).length>0&&v.total>0&&v.yes*2>v.total&&x.faith===c.faith;
   if(passed){s.policies[x.axis]=x.value;i.faithAuthority=clamp(i.faithAuthority+3,0,100);}
   note(g,r,s,'Institutional council '+(passed?'adopted ':'rejected ')+FAITH_CHARTER[x.axis].options[x.value].name+' ('+v.yes+'/'+v.total+' votes).');s.council=null;
  }
@@ -147,7 +147,7 @@ export function tickFaithCharter(g,r,land){
   const sanctuaryCount=local.filter(x=>x.l.faith===c.faith&&x.i.sanctuary?.faith===c.faith).length;
   if(sanctuaryCount&&g.turn%12===0)i.faithAuthority=clamp(i.faithAuthority+Math.min(3,sanctuaryCount),0,100);
  }
- if(r===g.player||!a||g.turn<24||g.turn%24!==0||f.treasury<1100)return;
+ if(r===g.player||!a||!land.length||g.turn<24||g.turn%24!==0||f.treasury<1100)return;
  // AI uses the same council and recognition rules; no forced conversions or automatic schisms.
  const v=faithCharterView(g,r,land);
  if(v.canSite){faithCharterAction(g,r,'faith-site',v.candidates[0].id);return;}
@@ -159,7 +159,7 @@ export function tickFaithCharter(g,r,land){
 
 // Shared institutional confidence is calculated from existing realms, not stored as another faith population.
 export function faithConfidence(g,label){
- const values=Object.entries(g.identity?.realms||{}).filter(([r,x])=>court(g,r)?.faith===label&&Number.isFinite(x.faithAuthority)).map(([,x])=>x.faithAuthority);
+ const values=Object.entries(g.identity?.realms||{}).filter(([r,x])=>court(g,r)?.faith===label&&Number.isFinite(x.faithAuthority)&&hasLand(g,r)).map(([,x])=>x.faithAuthority);
  return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):null;
 }
 const atWar=(g,a,b)=>Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(a)&&[w.attacker,w.defender].includes(b));

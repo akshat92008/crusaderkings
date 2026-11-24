@@ -44,3 +44,7 @@ test('recognized pilgrimage adds backing and a ruler memory only when the site r
  const g=fixture();assert.ok(faithCharterAction(g,'a','faith-site','p').ok);const site=pilgrimageSanctuary(g,'a','p');assert.ok(site);const x={host:'r',quality:80,sanctuary:site};const before=g.identity.realms.a.faithAuthority;
  assert.equal(completeSacredJourney(g,'a',x),true);assert.equal(g.identity.realms.a.faithAuthority,before+4);assert.equal(g.politics.people.r.memories.length,1);g.provinces.p.owner='b';assert.equal(completeSacredJourney(g,'a',x),false);
 });
+
+test('losing all controlled institutional centers prevents a council from enacting its reform',()=>{
+ const g=fixture();faithCharterAction(g,'a','faith-council','governance:stewardship');g.provinces.p.owner='b';g.provinces.q.owner='b';tick(g,6);assert.equal(faithCharterView(g,'a').policies.governance,'consultation');
+});
