@@ -1,3 +1,4 @@
+import {armyOutliner,battleComparison,portraitMark} from './campaign-hud.js';
 import {characterLink,contextualButton,realmWarContext,sectionLink} from './campaign-context.js';
 import {marriageCandidates} from './dynastic-politics.js';
 import {freshBattleCanvas} from './battle-lifecycle.js';
@@ -28,7 +29,7 @@ import {militaryAction} from './military-systems.js';
 import {navalAction,portBlocked} from './naval-systems.js';
 import {controller,occupation} from './campaign-war.js';
 import {activeWar} from './political-conflict.js';
-import {renderDiplomaticAgreements,renderIdentity,renderFeudal,renderStories,renderStrategy,renderNaval,renderMilitary,renderArmyCommand,renderCharacter,renderProvinceLord,renderCampaignHub,renderProvinceConnections,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {renderDiplomaticAgreements,renderIdentity,renderFeudal,renderStories,renderStrategy,renderNaval,renderMilitary,renderArmyCommand,renderCharacter,renderCharacterDirectory,renderDynasty,renderCouncilDirectory,renderVassalDirectory,renderProvinceLord,renderCampaignHub,renderProvinceConnections,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,recruitmentQuote,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -60,7 +61,7 @@ function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,worl
  selected=id;map.select(id);renderInspector();setDrawer('province');}
 function render(){if(!game)return;const f=player(),s=empireStats(game,game.player);
  el('resource-gold').textContent=fmt(f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
- el('faction-name').textContent=f.name;el('faction-government').textContent=f.government;
+ const ruler=game.politics?.people?.[game.politics?.realms?.[game.player]?.ruler],mark=portraitMark(ruler);el('hud-ruler').hidden=!ruler;el('hud-ruler-name').textContent=ruler?.name||'—';el('hud-portrait').textContent=mark.initials;el('hud-portrait').style.background=mark.color;el('quick-nav').hidden=false;const armyRows=armyOutliner(game);el('outliner-count').textContent=armyRows.length;el('outliner-list').innerHTML=armyRows.map(a=>'<button class="outliner-row" data-province-link="'+esc(a.province)+'"><b>'+fmt(a.troops)+' troops</b><small>'+esc(staticById[a.province]?.name||a.province)+(a.embarked?' · at sea':a.unassigned?' · commander needed':'')+'</small></button>').join('')||'<p class="smallnote">No armies raised.</p>';el('faction-name').textContent=f.name;el('faction-government').textContent=f.government;
  el('faction-flag').style.background=f.color;el('faction-flag').textContent='♛';
  el('world-counter').title=world.meta.caveat;el('world-counter').textContent=`${world.provinces.length} DISTRICTS · ${Object.values(game.factions).filter(q=>q.id!=='independent'&&Object.values(game.provinces).some(p=>p.owner===q.id)).length} REALMS`;
  el('latest-event').textContent=game.log[0]?.text||'Your court awaits.';
@@ -76,7 +77,7 @@ function render(){if(!game)return;const f=player(),s=empireStats(game,game.playe
   el('invasion-auto').hidden=threat.status!=='ready';
  }
  renderTab();renderInspector();map.render();}
-const rememberedTabs={};
+const rememberedTabs={},directoryState={scope:'court',query:'',sort:'martial'};let vassalSort='loyalty';
 function navigateTab(next,section=''){if(!game||!document.querySelector('[data-tab="'+next+'"]'))return;characterId=null;setDrawer('management');tab=next;renderTab();const panel=el('tab-content');panel.scrollTop=0;if(section){const h=[...panel.querySelectorAll('.sectiontitle')].find(n=>n.textContent===section);h?.scrollIntoView({block:'start'});}}
 function openCharacter(id){if(!game?.politics?.people?.[id])return;if(!characterId){characterBackTab=tab;characterBackProvince=!el('province-drawer').hidden?selected:null;}characterId=id;setDrawer('management');renderTab();el('tab-content').scrollTop=0;}
 function renderTab(){if(!game)return;if(characterId){el('tab-content').innerHTML=renderCharacter(game,world,characterId,esc);return;}const liveWorld=campaignWorld(game,world),workspace=workspaceFor(tab);rememberedTabs[workspace.id]=tab;
@@ -95,6 +96,10 @@ function renderTab(){if(!game)return;if(characterId){el('tab-content').innerHTML
   const other=game.factions[diplomaticTarget]||game.factions.france,rel=f.relations[other.id]||0;
   html=`<div class="label">FOREIGN AFFAIRS</div><div class="sectiontitle">SEND ENVOYS</div><select class="select" id="diplomatic-select">${nations.map(n=>`<option value="${n.id}" ${n.id===diplomaticTarget?'selected':''}>${esc(n.name)}</option>`).join('')}</select><div class="rule"><div class="label">FOREIGN POWER</div><h3 style="font-size:14px;margin:9px 0">${esc(other.name)}</h3><div class="statlist"><label>Relationship</label><strong class="${rel>0?'up':rel<0?'down':''}">${rel>0?'+':''}${rel}</strong><label>Political union</label><strong>${f.treaties[other.id]==='alliance'?'ALLIED':'NONE'}</strong><label>State form</label><strong>${esc(other.government)}</strong></div></div><div class="sectiontitle">ROYAL DIPLOMATIC ACTIONS</div><button class="rowbtn" data-action="gift">✦ Send gift (250 gold)</button><button class="rowbtn" data-action="alliance">⚜ Propose alliance (relation +35)</button><button class="rowbtn" data-action="trade">◈ Establish merchant treaty (140 gold, relation +10)</button><p class="smallnote">Choose a specific royal marriage below.</p><button class="rowbtn negative" data-action="insult">⚑ Issue formal insult</button><p class="paragraph" style="margin-top:13px">Relations now support merchant treaties and dynastic marriages. Royal marriages now link actual adults and their descendants. Formal peace settlements remain simplified.</p>`;
  const sovereign=game.politics?.people?.[game.politics?.realms?.[other.id]?.ruler],matches=marriageCandidates(game,game.player).filter(m=>m.realm===other.id);html+='<div class="rule"><b>Foreign sovereign</b><p>'+characterLink(sovereign,esc)+'</p>'+(matches.length?'<details><summary>Choose a dynastic marriage</summary>'+matches.slice(0,30).map(m=>contextualButton('politics','marry',m.a,m.label+' (180g)',esc,m.b)).join('')+'</details>':'<p class="smallnote">No eligible dynastic match.</p>')+'</div>'+renderDiplomaticAgreements(game,other.id,esc);const wars=realmWarContext(game,other.id);if(wars.length)html+='<div class="rule"><b>Active wars with this realm</b>'+wars.map(w=>'<p class="smallnote">War score '+w.ourScore+'</p>').join('')+sectionLink('political','Negotiate peace',esc,'WARS AND PEACE')+'</div>';else html+=sectionLink('political','Territorial claims and formal war',esc,'TERRITORIAL CLAIMS');
+ }else if(tab==='characters'){html=renderCharacterDirectory(game,esc,directoryState);
+ }else if(tab==='dynasty'){html=renderDynasty(game,esc);
+ }else if(tab==='council'){html=renderCouncilDirectory(game,esc);
+ }else if(tab==='vassals'){html=renderVassalDirectory(game,liveWorld,esc,vassalSort);
  }else if(tab==='court'){
   html=renderCourt(game,esc);
  }else if(tab==='political'){html=renderConflict(game,liveWorld,esc);
@@ -142,7 +147,7 @@ function onBattleStatus(status){
  const formations=el('battle-formation');const choiceKey=choices.map(o=>o.id).join(',');if(formations.dataset.choices!==choiceKey){formations.dataset.choices=choiceKey;formations.innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' · '+Math.round(o.damage*100)+'% attack / '+Math.round(o.defense*100)+'% defense</option>').join('');}
  if(unit&&document.activeElement!==formations)formations.value=unit.formationId;el('battle-order').title=unit?(unit.terrainName||'Open field')+' · Enemy posture: '+(status.enemyPosture||'Deploying'):'Regiment order';const order=el('battle-order');if(unit&&document.activeElement!==order&&unit.fieldOrder!=='move'&&[...order.options].some(o=>o.value===unit.fieldOrder))order.value=unit.fieldOrder;
  const fort=el('battle-fort-status');if(fort){fort.hidden=!status.siege;fort.textContent=status.siege?status.siege.structures.map(q=>q.name+' '+Math.round(q.hp/q.max*100)+'%').join(' · '):'';}
- el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;
+ el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;el('battle-cancel').hidden=!status.deployment||!!battleDescriptor?.defenseMode;const comparison=el('battle-comparison');comparison.hidden=!status.deployment;if(status.deployment){const c=battleComparison(status.groups),line=(s,name)=>'<div><b>'+name+' · '+fmt(s.troops)+'</b><small>Inf '+fmt(s.mix.infantry)+' / Arch '+fmt(s.mix.archers)+' / Cav '+fmt(s.mix.cavalry)+' · Morale '+fmt(s.morale)+'% · Readiness '+fmt(s.power*100)+'%</small></div>';comparison.innerHTML=line(c.attacker,'Your force')+line(c.defender,'Enemy force')+'<small>Numerical ratio '+(c.ratio===null?'No opposing soldiers':c.ratio.toFixed(1)+':1')+' · Terrain, tactics and readiness affect outcomes.</small>';}
 }
 function onBattleFinished(result){
  const defense=!!battleDescriptor?.defenseMode,practice=!!battleDescriptor?.showcase,win=result.victory;
@@ -214,7 +219,9 @@ el('zoom-in').addEventListener('click',()=>map.zoomAt(map.w/2,map.h/2,1.35));el(
 el('tabs').addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t)navigateTab(t.dataset.tab);});
 el('workspace-nav').addEventListener('click',e=>{const t=e.target.closest('[data-workspace]');if(t){const next=workspaceTab(t.dataset.workspace,rememberedTabs);if(next)navigateTab(next);}});
 document.addEventListener('click',e=>{const t=e.target.closest('[data-priority-tab]');if(t)navigateTab(t.dataset.priorityTab,t.dataset.sectionLink||'');const c=e.target.closest('[data-character]');if(c)openCharacter(c.dataset.character);if(e.target.closest('[data-character-back]')){if(characterBackProvince&&staticById[characterBackProvince]){selected=characterBackProvince;characterId=null;characterBackProvince=null;map.select(selected);renderInspector();setDrawer('province');}else navigateTab(characterBackTab);}const p=e.target.closest('[data-province-link]');if(p&&game&&staticById[p.dataset.provinceLink]){characterId=null;selected=p.dataset.provinceLink;map.select(selected);map.focus(...staticById[selected].centroid,3.2);renderInspector();setDrawer('province');}});
-el('tab-content').addEventListener('change',e=>{
+el('hud-ruler').addEventListener('click',()=>openCharacter(game?.politics?.realms?.[game.player]?.ruler));
+el('tab-content').addEventListener('input',e=>{if(e.target.id==='people-query'){directoryState.query=e.target.value;const at=e.target.selectionStart;renderTab();const input=el('people-query');input?.focus();input?.setSelectionRange(at,at);}});
+el('tab-content').addEventListener('change',e=>{if(e.target.id==='people-scope'||e.target.id==='people-sort'){directoryState[e.target.id==='people-scope'?'scope':'sort']=e.target.value;renderTab();}if(e.target.id==='vassal-sort'){vassalSort=e.target.value;renderTab();}
  if(e.target.matches('.policy-select'))clickResult(setPolicy(game,e.target.dataset.policy,Number(e.target.value)));
  if(e.target.id==='diplomatic-select'){diplomaticTarget=e.target.value;renderTab();}
 });
@@ -263,6 +270,7 @@ el('battle-sound').addEventListener('click',()=>{battleSound=!battleSound;update
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
 el('battle-start').addEventListener('click',()=>battle?.startAssault());
+el('battle-cancel').addEventListener('click',()=>{if(!battle?.deployment||battleDescriptor?.defenseMode)return;battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();message('Deployment cancelled. No casualties or territory changes.');});
 el('battle-formation').addEventListener('change',e=>{
  if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
 });

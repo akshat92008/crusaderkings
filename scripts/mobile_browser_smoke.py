@@ -25,6 +25,14 @@ try:
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+1')
    box=page.locator('#world-map').bounding_box();assert box['height']>=height*.45,box
    page.screenshot(path=str(OUT/(name+'-map.png')))
+   assert page.locator('#hud-ruler').is_visible()
+   page.locator('#quick-nav [data-priority-tab="characters"]').click()
+   page.fill('#people-query','no-matching-person-xyz');assert page.locator('.directory-list .person-row').count()==0
+   page.fill('#people-query','');assert page.locator('.directory-list .person-row').count()>0
+   page.locator('#tabs [data-tab="dynasty"]').click();assert page.locator('.family-generation').count()==4
+   page.locator('#tabs [data-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
+   page.locator('#tabs [data-tab="vassals"]').click();assert page.locator('#vassal-sort').is_visible()
+   page.locator('[data-workspace="realm"]').click();page.click('#close-management')
    page.click('#open-management')
    page.locator('.campaign-hub [data-character]').first.click()
    assert page.locator('.character-hero').is_visible()
@@ -33,7 +41,7 @@ try:
    assert page.locator('.campaign-hub').is_visible()
    for work in ['realm','court','foreign','war','people']:
     page.locator('[data-workspace="'+work+'"]').click()
-    assert 1<=page.locator('#tabs .tab:visible').count()<=5
+    assert 1<=page.locator('#tabs .tab:visible').count()<=8
    page.click('#close-management');page.click('#open-province')
    assert page.locator('#province-drawer').is_visible()
    assert page.locator('[data-section="recruit"]').is_visible()
@@ -63,6 +71,7 @@ try:
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert page.locator('#battle-start').is_visible()
+    assert page.locator('#battle-comparison').is_visible()
     page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='false'
     page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='true'
     page.wait_for_timeout(500);page.screenshot(path=str(OUT/(name+'-battle-deployment.png')),timeout=45000)
