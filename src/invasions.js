@@ -71,6 +71,21 @@ export function planEnemyInvasion(g,world){
  g.factions[chosen.by].treasury-=90; // genuine military mobilization cost
  return chosen;
 }
+// Revalidate a pending battle against authoritative campaign state. A saved or
+// previously displayed alert is not permission to attack from another province.
+export function validReadyInvasion(g,world,threat){
+ if(!threat||threat.status!=='ready')return false;
+ const enemy=g.armies[threat.army],target=g.provinces[threat.province];
+ if(!g.factions[threat.by]||threat.by===g.player||!enemy||enemy.owner!==threat.by||enemy.contingent||troops(enemy)<1||embarked(g,enemy.id))return false;
+ if(!target||target.owner!==g.player||controller(g,threat.province)!==g.player)return false;
+ const staging=threat.staging??enemy.province;
+ if(enemy.province!==staging||g.provinces[staging]?.owner!==threat.by||controller(g,staging)!==threat.by)return false;
+ if(!world.provinces.find(p=>p.id===staging)?.neighbors?.includes(threat.province))return false;
+ return !nonAggression(g,threat.by,g.player)&&!hasTruce(g,threat.by,g.player)&&!['alliance','marriage'].includes(g.factions[threat.by]?.treaties?.[g.player]);
+}
+function pendingInvasion(g,threat){
+ return g.kingdom?.threats?.find(t=>t.army===threat?.army&&t.province===threat?.province);
+}
 export function progressEnemyInvasions(g,world){
  const remaining=[];
  for(const threat of g.kingdom.threats||[]){
@@ -79,7 +94,8 @@ export function progressEnemyInvasions(g,world){
   if(threat.status==='ready'){
    // If the user advances time again instead of defending, allow an
    // automated resolution. Never leave an invisible permanent siege.
-   if(g.turn>(threat.readyTurn||g.turn)){autoResolveInvasion(g,world,threat);continue;}
+   if(!validReadyInvasion(g,world,threat))continue;
+   if(g.turn>(threat.readyTurn??g.turn)){autoResolveInvasion(g,world,threat);continue;}
    remaining.push(threat);continue;
   }
   if(threat.path?.length&&enemy.province!==threat.staging){
@@ -91,6 +107,7 @@ export function progressEnemyInvasions(g,world){
   if(threat.eta===0){
    if(enemy.province!==threat.staging)continue;
    threat.status='ready';threat.readyTurn=g.turn;
+   if(!validReadyInvasion(g,world,threat))continue;
   }
   remaining.push(threat);
  }
@@ -102,10 +119,10 @@ function trimArmy(a,fraction){
  for(const unit of ['infantry','archers','cavalry'])a[unit]=Math.max(0,Math.round(a[unit]*clamp(fraction,0,1)));
 }
 export function resolveInvasion(g,world,threat,result){
- const found=g.kingdom?.threats?.find(t=>t.army===threat?.army&&t.province===threat?.province);
+ const found=pendingInvasion(g,threat);
  if(!found||found.status!=='ready')return {ok:false,msg:'No active invasion at that province'};
  const province=g.provinces[found.province],attacker=g.armies[found.army];
- if(!attacker||!province||province.owner!==g.player||controller(g,found.province)!==g.player||embarked(g,attacker.id)||nonAggression(g,found.by,g.player)||hasTruce(g,found.by,g.player)||['alliance','marriage'].includes(g.factions[found.by]?.treaties?.[g.player]))return {ok:false,msg:'The invasion is no longer valid'};
+ if(!validReadyInvasion(g,world,found))return {ok:false,msg:'The invasion is no longer valid'};
  const human=[...armiesOf(g,g.player).filter(a=>a.province===found.province),...fieldContingentsAt(g,g.player,found.province,found.by)];
  const invaders=[attacker,...fieldContingentsAt(g,found.by,attacker.province,g.player)];
  const playerRatio=clamp(result.attackerRemaining??.5,0,1);
@@ -142,6 +159,8 @@ export function resolveInvasion(g,world,threat,result){
  return {ok:true,defended,msg};
 }
 export function autoResolveInvasion(g,world,threat){
+ threat=pendingInvasion(g,threat);
+ if(!validReadyInvasion(g,world,threat))return {ok:false,msg:'Invasion no longer active'};
  const target=g.provinces[threat.province],army=g.armies[threat.army];
  if(!target||!army)return {ok:false,msg:'Invasion no longer active'};
  const defense=campaignGarrison(target)+defenseSupport(g,g.player,threat.by)+
