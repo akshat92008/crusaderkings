@@ -16,7 +16,9 @@ try:
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    page.goto('http://127.0.0.1:'+str(server.server_port),wait_until='domcontentloaded',timeout=45000)
    page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
-   page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
+   page.fill('#realm-search','no-such-kingdom');assert page.locator('#start-new').is_disabled()
+   page.fill('#realm-search','england');assert page.locator('#start-faction option').count()==1
+   page.fill('#realm-search','');page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
    assert page.locator('#management-panel').is_hidden()
    assert page.locator('#province-drawer').is_hidden()
    assert page.locator('#map-modes').is_hidden()

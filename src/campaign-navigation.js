@@ -16,3 +16,6 @@ export function realmPriorities(g,stats,royalEvent=false,expandedEvents=0){const
  if(royalEvent||expandedEvents)add('court','Court decisions waiting',(Number(Boolean(royalEvent))+expandedEvents)+' pending decision(s).');
  const factions=Object.values(g.conflict?.factions||{}).filter(x=>x.realm===g.player&&['organizing','ultimatum','civil war'].includes(x.status)&&x.pressure>=65);if(factions.length)add('political','Faction pressure','Review powerful internal opposition.','urgent');
  return out.sort((a,b)=>Number(b.level==='urgent')-Number(a.level==='urgent'));}
+
+// Search by realm, geography, or government without exposing hidden game data.
+export function searchRealms(factions,query=''){const normalized=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();const words=normalized(query).trim().split(/\s+/).filter(Boolean);return factions.filter(f=>words.every(w=>normalized([f.name,f.id,f.continent,f.government].join(' ')).includes(w))).sort((a,b)=>a.name.localeCompare(b.name));}

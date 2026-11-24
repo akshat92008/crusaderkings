@@ -1,4 +1,4 @@
-import {workspaceFor,workspaceTab,realmPriorities} from './campaign-navigation.js';
+import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
 import {currentExpandedEvents} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
 import {expandedAction} from './expanded-content.js';
@@ -172,11 +172,11 @@ function advanceWithInvasions(){
  }
 }
 // Bind controls once. Rebuilt content uses delegated events.
-el('start-faction').innerHTML=world.factions.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<option value="${f.id}" ${f.id==='ottomans'?'selected':''}>${esc(f.name)} — ${esc(f.continent)}</option>`).join('');
 el('start-world-count').textContent=atlasWorld.factions.length+' REALMS · '+atlasWorld.provinces.length+' DISTRICTS';
-function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value),d=militaryDoctrine(f);el('start-faction-info').textContent=`${f.government} · ${f.continent} · ${d.name} · Signature: ${d.unique} · ${d.mix.map(x=>Math.round(x*100)+'%').join(' / ')} infantry / archers / cavalry`; }
-el('start-faction').addEventListener('change',renderStartFaction);renderStartFaction();
-el('start-new').addEventListener('click',()=>start(el('start-faction').value));
+function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value);el('start-new').disabled=!f;if(!f){el('start-faction-info').textContent='No matching kingdoms. Try another name or region.';return;}const d=militaryDoctrine(f),count=atlasWorld.provinces.filter(p=>p.owner===f.id).length;el('start-faction-info').textContent=f.continent+' · '+count+' districts · '+d.name;}
+function filterStartRealms(preferred=el('start-faction').value){const list=searchRealms(atlasWorld.factions,el('realm-search').value);el('start-faction').innerHTML=list.map(f=>`<option value="${esc(f.id)}">${esc(f.name)} — ${esc(f.continent)}</option>`).join('');if(list.some(f=>f.id===preferred))el('start-faction').value=preferred;renderStartFaction();}
+el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-faction').addEventListener('change',renderStartFaction);filterStartRealms('ottomans');
+el('start-new').addEventListener('click',()=>{if(atlasWorld.factions.some(f=>f.id===el('start-faction').value))start(el('start-faction').value);});
 try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
 el('load-existing').addEventListener('click',load);
 el('save-game').addEventListener('click',save);
