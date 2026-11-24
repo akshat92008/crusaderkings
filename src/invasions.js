@@ -9,7 +9,7 @@ import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
  */
 const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
 const troops=a=>Math.max(0,(a?.infantry||0)+(a?.archers||0)+(a?.cavalry||0));
-const armiesOf=(g,id)=>Object.values(g.armies).filter(a=>a.owner===id);
+const armiesOf=(g,id)=>Object.values(g.armies).filter(a=>a.owner===id&&!embarked(g,a.id));
 const trace=(world,start,goal,owner,g)=>{
   if(start===goal)return [start];
   const byId=new Map(world.provinces.map(p=>[p.id,p])),queue=[[start]],seen=new Set([start]);
@@ -105,12 +105,12 @@ export function resolveInvasion(g,world,threat,result){
  for(const a of human){trimArmy(a,playerRatio);syncRegiments(g,a);}
  onArmyMarch(g,attacker);trimArmy(attacker,enemyRatio);syncRegiments(g,attacker);applyFortDamage(g,found.province,result);
  const defended=Boolean(result.victory);
- recordCampaignBattle(g,found.by,g.player,found.province,!defended);
+ const war=activeWar(g,found.by,g.player);
  if(defended){
   g.factions[g.player].prestige+=8;
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
  }else{
-  captureProvince(g,activeWar(g,found.by,g.player),found.by,found.province,attacker.province);province.unrest=clamp(province.unrest+27,0,100);
+  captureProvince(g,war,found.by,found.province,attacker.province);province.unrest=clamp(province.unrest+27,0,100);
   if(!result.fortBreached&&province.buildings.fort>0)province.buildings.fort--;
   attacker.province=found.province;
   // Surviving defenders retreat to an owned neighboring province if possible.
@@ -118,10 +118,11 @@ export function resolveInvasion(g,world,threat,result){
   const retreat=(local?.neighbors||[]).find(id=>g.provinces[id]?.owner===g.player);
   for(const a of human){
    if(retreat)a.province=retreat;
-   else if((a.infantry+a.archers+a.cavalry)<20)delete g.armies[a.id];
+   else {const fallback=Object.values(g.provinces).find(p=>p.id!==found.province&&p.owner===g.player&&controller(g,p.id)===g.player);if(fallback)a.province=fallback.id;else delete g.armies[a.id];}
   }
   g.factions[found.by].prestige+=8;
  }
+ recordCampaignBattle(g,found.by,g.player,found.province,!defended);
  g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);
  const msg=defended?'Your defenders repelled '+g.factions[found.by].name+' at '+found.province:
   g.factions[found.by].name+' captured '+found.province+' after a successful assault';
