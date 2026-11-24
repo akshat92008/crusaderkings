@@ -22,6 +22,7 @@ import {governmentMotionView} from './government-deliberations.js';
 import {civilServiceView} from './imperial-civil-service.js';
 import {merchantElectionView,steppePastureView} from './regional-institutions.js';
 import {regionalPoliticalView} from './regional-politics.js';
+import {crownInspectionView,memberAssemblyView} from './institution-procedures.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -323,6 +324,18 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const inspection=crownInspectionView(g,realm);
+ if(inspection){html+='<div class="rule"><b>Royal inspection reports</b><p class="paragraph">Commission an appointed inspector to review local order. After three months, implement or decline the recommendations. Funding reduces unrest; refusal may anger the local estate.</p>';
+ if(inspection.report){const x=inspection.report;html+='<div class="smallnote">'+esc(place(x.province))+' · '+esc(name(x.person))+' · '+(x.status==='ready'?'Report ready: reduce unrest by '+x.relief:'Investigating · '+Math.max(0,x.ends-g.turn)+' months')+'</div>';
+ if(x.status==='ready')html+='<button class="rowbtn" data-action="institution" data-id="crown:fund"'+(inspection.canFund?'':' disabled')+'>Implement report (100g)</button><button class="rowbtn" data-action="institution" data-id="crown:dismiss">Decline recommendations</button>';
+ }else if(inspection.targets.length)html+='<select class="select" id="crown-inspection-target">'+inspection.targets.map(x=>'<option value="'+esc(x.id)+'">'+esc(place(x.id))+' · unrest '+Math.round(x.unrest)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="crown:inspect" data-second="crown-inspection-target"'+(inspection.canStart?'':' disabled')+'>Commission inspection (70g)</button>';
+ else html+='<div class="smallnote">Appoint an inspector above to unlock reports.</div>';
+ if(inspection.last)html+='<p class="smallnote">'+esc(inspection.last.message)+'</p>';html+='</div>';}
+ const members=memberAssemblyView(g,realm);
+ if(members){html+='<div class="rule"><b>Confederate member assembly</b><p class="paragraph">Member chiefs vote equally on a common relief fund. A strict majority is required; only consenting members benefit from the agreement.</p><div class="smallnote">'+members.support+'/'+members.total+' chiefs support the fund'+(members.assembly?' · Vote in '+Math.max(0,members.assembly.ends-g.turn)+' months':'')+'</div>';
+ for(const x of members.members)html+='<div class="smallnote">'+esc(x.name)+' · '+x.land+' holdings · loyalty '+x.loyalty+' · '+(x.loyalty>=55?'Supports':'Opposes')+'</div>';
+ html+='<button class="rowbtn" data-action="institution" data-id="confed:assembly"'+(members.canStart?'':' disabled')+'>Convene member assembly (100g)</button>';
+ if(members.last)html+='<p class="smallnote">'+esc(members.last.message)+'</p>';html+='</div>';}
  const regional=regionalPoliticalView(g,realm);
  if(regional){const disabled=regional.canAct?'':' disabled';html+='<div class="rule">';
  if(regional.kind==='regional'){

@@ -112,3 +112,21 @@ test('regional agreements exclude occupied estates and changed faith invalidates
  const g=regionalFixture('regional');g.campaignWar={occupations:{p:{by:'b'}}};assert.equal(governmentAction(g,{},'regional:grant','p').ok,false);assert.ok(governmentAction(g,{},'regional:grant','q').ok);
  const s=regionalFixture('sultanate');s.politics.people.n.skills.learning=4;s.politics.people.n.civic={faith:'Court faith'};governmentAction(s,{},'sultanate:scholar','n');s.civic.realms.a.faith='New faith';assert.equal(regionalPoliticalView(s,'a').scholar,null);
 });
+
+import {crownInspectionView,memberAssemblyView} from '../src/institution-procedures.js';
+test('centralized crowns commission delayed inspector reports and choose whether to fund them',()=>{
+ const g=regionalFixture('centralized');assert.ok(governmentAction(g,{},'p','n').ok);assert.ok(governmentAction(g,{},'crown:inspect','p').ok);assert.equal(g.factions.a.treasury,820);
+ assert.equal(governmentAction(g,{},'crown:fund').ok,false);g.turn=3;tickInstitutions(g);assert.equal(crownInspectionView(g,'a').report.relief,15);
+ assert.ok(governmentAction(g,{},'crown:fund').ok);assert.equal(g.provinces.p.unrest,5);assert.equal(g.factions.a.treasury,720);assert.equal(crownInspectionView(g,'a').report,null);
+});
+test('central inspection cancels on territorial loss and refusal is a distinct consequence',()=>{
+ const g=regionalFixture('centralized');governmentAction(g,{},'p','n');governmentAction(g,{},'crown:inspect','p');g.turn=3;tickInstitutions(g);
+ const loyalty=g.politics.holdings.p.loyalty;assert.ok(governmentAction(g,{},'crown:dismiss').ok);assert.equal(g.politics.holdings.p.loyalty,loyalty-4);
+ g.turn=6;assert.ok(governmentAction(g,{},'crown:inspect','p').ok);g.provinces.p.owner='b';g.turn=7;tickInstitutions(g);assert.equal(crownInspectionView(g,'a').report,null);
+});
+test('confederate members vote equally and a strict majority is required for collective relief',()=>{
+ const g=regionalFixture('confederation');g.politics.holdings.p.loyalty=80;assert.equal(memberAssemblyView(g,'a').support,1);
+ assert.ok(governmentAction(g,{},'confed:assembly').ok);g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.stability,60);assert.equal(g.provinces.p.unrest,20);
+ g.turn=15;g.politics.holdings.q.loyalty=80;assert.ok(governmentAction(g,{},'confed:assembly').ok);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);copy.turn=18;tickInstitutions(copy);assert.equal(copy.factions.a.stability,63);assert.equal(copy.provinces.p.unrest,15);assert.equal(copy.politics.holdings.q.loyalty,86);
+});
