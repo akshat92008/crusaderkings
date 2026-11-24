@@ -41,7 +41,7 @@ import {GOVERNMENTS,LIFESTYLES,civicModifiers,civicEvent} from './civic-systems.
 import {initConflict,councilVotes,availableClaims,peaceTerms} from './political-conflict.js';
 /** Safe, copy-free royal court, trade and legacy interface views. */
 import {marriageCandidates,politicalRevenue,politicalLevy,politicalDispatch} from './dynastic-politics.js';
-import {currentRoyalEvent,currentCourt,tradeIncome,tradePactCount,objectives,campaignStanding} from './kingdom-depth.js';
+import {currentRoyalEvent,currentCourt,tradeIncome,tradePactCount,merchantTreatyStatus,objectives,campaignStanding} from './kingdom-depth.js';
 const fmt=x=>Math.round(x).toLocaleString('en-US');
 function stat(name,value){return '<label>'+name+'</label><strong>'+value+'</strong>';}
 function section(name){return '<div class="sectiontitle">'+name+'</div>';}
@@ -86,7 +86,7 @@ export function renderTrade(g,world,esc){
  if(!pacts.length)html+='<p class="paragraph">No merchant treaties yet. Establish one with a court that has at least +10 relations.</p>';
  for(const treaty of pacts){
   const other=treaty.partners.find(id=>id!==g.player),name=g.factions[other]?.name||other;
-  html+='<div class="rule"><div class="label">ACTIVE TREATY</div><h3>'+esc(name)+'</h3><div class="smallnote">Established on campaign turn '+fmt(treaty.founded)+'. Markets and relations support commerce.</div></div>';
+  html+='<div class="rule"><div class="label">'+esc(merchantTreatyStatus(g,treaty).toUpperCase())+'</div><h3>'+esc(name)+'</h3><div class="smallnote">Established on campaign turn '+fmt(treaty.founded)+'. Markets and relations support commerce.</div></div>';
  }
  html+=section('MERCHANT NETWORK')+'<p class="paragraph">The 1450 political map uses synthetic provinces, so these treaties are economy simulations—not verified medieval trade routes.</p>';
  return html;

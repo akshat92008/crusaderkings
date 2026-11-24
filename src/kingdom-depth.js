@@ -74,11 +74,18 @@ export function initializeKingdomSystems(g,world){
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
 export const tradePactCount=(g,id=g.player)=>Object.values(g.kingdom?.tradePacts||{}).filter(p=>p.partners.includes(id)).length;
+// A treaty can survive exile in the diplomatic record, but cannot produce
+// merchant income without controlled settlements on both sides.
+export function merchantTreatyStatus(g,pact){
+ const partners=pact?.partners;
+ if(!Array.isArray(partners)||partners.length!==2||partners[0]===partners[1]||partners.some(id=>!g.factions[id]||id==='independent'))return 'Invalid treaty';
+ return partners.every(id=>provinces(g,id).some(p=>controller(g,p.id)===id))?'Active treaty':'Suspended — no controlled settlement';
+}
 export function tradeIncome(g,id){
- const marketSum=who=>provinces(g,who).reduce((n,p)=>n+(p.buildings.market||0),0);
+ const marketSum=who=>provinces(g,who).filter(p=>controller(g,p.id)===who).reduce((n,p)=>n+(p.buildings.market||0),0);
  let value=0;
  for(const pact of Object.values(g.kingdom?.tradePacts||{})){
-  if(!pact.partners.includes(id))continue;
+  if(!pact.partners.includes(id)||merchantTreatyStatus(g,pact)!=='Active treaty')continue;
   const other=pact.partners.find(x=>x!==id);
   const blockadeFactor=who=>Object.values(g.naval?.ports||{}).some(p=>g.provinces[p.province]?.owner===who&&portBlocked(g,p.province))?.65:1;
   value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2)*Math.min(blockadeFactor(id),blockadeFactor(other));
@@ -111,7 +118,8 @@ export function royalDiplomacy(g,world,other,action){
  if(!f||!o||other==='independent'||other===g.player)return {ok:false,msg:'Invalid diplomatic court'};
  const rel=getRelation(g,g.player,other),id=pair(g.player,other);
  if(action==='trade'){
-  if(g.kingdom.tradePacts[id])return {ok:false,msg:'Trade agreement is already active'};
+  if(g.kingdom.tradePacts[id])return {ok:false,msg:'A trade agreement already exists'};
+  if(merchantTreatyStatus(g,{partners:[g.player,other]})!=='Active treaty')return {ok:false,msg:'Both courts must control a settlement to sign a merchant treaty.'};
   if(rel<10)return {ok:false,msg:'Relations must be at least +10 for trade'};
   if(f.treasury<140)return {ok:false,msg:'Need 140 gold to charter a trade route'};
   f.treasury-=140;g.kingdom.tradePacts[id]={partners:[g.player,other],founded:g.turn};
@@ -293,19 +301,12 @@ function aiMonthly(g,world){
    }
   }
   if(g.turn%12===0&&nation.treasury>450){
-   const peers=world.factions.filter(p=>p.continent===f.continent&&p.id!==f.id);
+   const peers=world.factions.filter(p=>p.continent===f.continent&&p.id!==f.id&&merchantTreatyStatus(g,{partners:[f.id,p.id]})==='Active treaty');
    const other=peers.length?choose(peers,hash(f.id+g.year)):null;
    if(other&&!g.kingdom.tradePacts[pair(f.id,other.id)]&&getRelation(g,f.id,other.id)>-10){
     nation.treasury-=85;g.kingdom.tradePacts[pair(f.id,other.id)]={partners:[f.id,other.id],founded:g.turn,ai:true};
    }
   }
- }
-}
-function tickTrade(g){
- for(const p of Object.values(g.kingdom.tradePacts))for(const id of p.partners){
-  const f=g.factions[id];if(!f)continue;
-  const other=p.partners.find(x=>x!==id),sum=who=>provinces(g,who).reduce((n,x)=>n+(x.buildings.market||0),0);
-  f.treasury+=Math.round(Math.min(85,6+sum(id)*3+sum(other)*2));
  }
 }
 export function advanceKingdomSystems(g,world){
