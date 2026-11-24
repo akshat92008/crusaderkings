@@ -18,3 +18,11 @@ test('equipped artifacts alter income, condition, repair and survive saves',()=>
 test('renown unlocks permanent house legacies once, with functional modifiers',()=>{const g=start();dyn(g).renown=50;assert.ok(heritageAction(g,world,'legacy','warfare').ok);assert.equal(dyn(g).renown,5);assert.ok(heritageModifiers(g,g.player).levy>1);assert.equal(heritageAction(g,world,'legacy','warfare').ok,false);});
 test('old saves migrate heritage, and UI offers actual actions',()=>{const g=start();delete g.heritage;const copy=restoreGame(snapshot(g),world),html=renderHeritage(copy,world,String);assert.ok(html.includes('ROYAL ACTIVITIES AND JOURNEYS'));assert.ok(html.includes('REGIONAL STRUGGLES'));assert.ok(html.includes('data-action="heritage"'));});
 test('journey completes after moving through multiple connected provinces',()=>{const g=start('ming'),d=activityDestinations(g,world).find(x=>x.route.length>1);assert.ok(d);assert.ok(heritageAction(g,world,'activity','tour',d.id).ok);const before=g.heritage.realms.ming.completed;finish(g);assert.equal(g.heritage.realms.ming.completed,before+1);});
+
+test('a pilgrimage to a recognized sanctuary uses actual travel and records a spiritual result',()=>{
+ const g=start(),id=dest(g),local=g.civic.provinces[id],faith=g.civic.realms.england.faith;
+ local.faith=faith;g.identity.institutions[id]={level:2,faith,lastConsultation:-12,sanctuary:{faith,established:0}};
+ const before=g.identity.realms.england.faithAuthority;assert.ok(heritageAction(g,world,'activity','pilgrimage',id).ok);
+ assert.equal(g.heritage.activities.england.sanctuary.province,id);finish(g);
+ assert.ok(g.identity.realms.england.faithAuthority>before);assert.ok(g.politics.people[g.politics.realms.england.ruler].memories.some(m=>m.includes('Completed a sacred journey')));
+});

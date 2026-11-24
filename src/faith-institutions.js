@@ -48,7 +48,7 @@ function note(g,r,s,message){
  g.identity.history.unshift({realm:r,turn:g.turn,message});g.identity.history=g.identity.history.slice(0,200);
  if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}
 }
-function advisor(g,r){const p=adult(g,r,g.living?.realms[r]?.faithAdvisor);return p&&p.id!==ruler(g,r)?.id&&p.civic?.faith===court(g,r)?.faith&&(p.skills?.learning??0)>=2?p:null;}
+function advisor(g,r){const p=adult(g,r,g.living?.realms[r]?.faithAdvisor);return p&&p.id!==ruler(g,r)?.id&&p.civic?.faith===court(g,r)?.faith&&(p.skills?.learning??0)>=2&&(g.living?.health?.[p.id]?.severity??0)<70?p:null;}
 function centers(g,r,land){
  return land.filter(p=>own(g,r,p.id)).map(p=>({id:p.id,p,l:g.civic.provinces[p.id],i:g.identity.institutions[p.id]})).filter(x=>x.l&&x.i?.level>0&&x.i.faith===x.l.faith);
 }
@@ -97,10 +97,11 @@ export function faithCharterModifiers(g,r){
 }
 function validName(g,name){return /^[\p{L}\p{N}][\p{L}\p{N} .'-]{2,47}$/u.test(name)&&!Object.hasOwn(g.identity.faithDefinitions||{},name)&&!Object.values(g.civic.realms).some(c=>c.faith===name)&&!Object.values(g.civic.provinces).some(c=>c.faith===name)&&!['__proto__','constructor','prototype'].includes(name);}
 export function faithCharterAction(g,r,action,id,extra){
- const v=faithCharterView(g,r),c=court(g,r),i=g.identity.realms[r],f=g.factions[r];if(!v)return no('Religious institutions unavailable.');
+ if(action==='faith-exchange')return startFaithExchange(g,r,id);
+ const v=faithCharterView(g,r),c=court(g,r),i=g.identity?.realms[r],f=g.factions[r];if(!v)return no('Religious institutions unavailable.');
  const s=state(g,r,true);
  if(action==='faith-council'){
-  const [axis,value]=String(id).split(':'),d=FAITH_CHARTER[axis]?.options[value];
+  const [axis,value]=String(id).split(':'),options=Object.hasOwn(FAITH_CHARTER,axis)?FAITH_CHARTER[axis].options:null,d=options&&Object.hasOwn(options,value)?options[value]:null;
   if(!d||v.policies[axis]===value||!v.canCouncil||f.treasury<d.cost+60)return no('Requires a qualified same-faith advisor, institutional backing, a new policy, treasury and two years between councils.');
   f.treasury-=d.cost+60;s.council={axis,value,ends:g.turn+6,faith:c.faith};s.lastCouncil=g.turn;note(g,r,s,'An institutional council convened to debate '+d.name+'.');return ok('Council convened.');
  }
@@ -131,6 +132,7 @@ export function tickFaithCharter(g,r,land){
  const c=court(g,r),i=g.identity.realms[r],f=g.factions[r];if(!c||!i||!f)return;
  if(i.faithCharter&&i.faithCharter.faith!==c.faith)delete i.faithCharter;
  const s=state(g,r),a=advisor(g,r);
+ tickFaithExchange(g,r);
  if(s?.council&&g.turn>=s.council.ends){
   const x=s.council,v=voteView(g,r,land,s.policies,x),passed=!!a&&v.total>0&&v.yes*2>v.total&&x.faith===c.faith;
   if(passed){s.policies[x.axis]=x.value;i.faithAuthority=clamp(i.faithAuthority+3,0,100);}
@@ -150,6 +152,55 @@ export function tickFaithCharter(g,r,land){
  const v=faithCharterView(g,r,land);
  if(v.canSite){faithCharterAction(g,r,'faith-site',v.candidates[0].id);return;}
  if(v.canCouncil){const axis=v.policies.governance==='consultation'?'governance':v.policies.coexistence==='customary'?'coexistence':null;
-  if(axis)faithCharterAction(g,r,'faith-council',axis+':'+(axis==='governance'?'stewardship':'localCompacts'));
+  if(axis){faithCharterAction(g,r,'faith-council',axis+':'+(axis==='governance'?'stewardship':'localCompacts'));return;}
  }
+ const exchange=faithExchangeView(g,r);if(exchange.canStart&&exchange.options.length&&i.faithAuthority<70)startFaithExchange(g,r,exchange.options[0].id);
+}
+
+// Shared institutional confidence is calculated from existing realms, not stored as another faith population.
+export function faithConfidence(g,label){
+ const values=Object.entries(g.identity?.realms||{}).filter(([r,x])=>court(g,r)?.faith===label&&Number.isFinite(x.faithAuthority)).map(([,x])=>x.faithAuthority);
+ return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):null;
+}
+const atWar=(g,a,b)=>Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(a)&&[w.attacker,w.defender].includes(b));
+const hasLand=(g,r)=>Object.values(g.provinces).some(p=>own(g,r,p.id));
+function exchangeEligible(g,r,other){
+ if(other===r||!g.factions[other]||!court(g,other)||!g.identity?.realms[other]||!advisor(g,r)||!advisor(g,other)||atWar(g,r,other)||!hasLand(g,r)||!hasLand(g,other))return false;
+ const a=g.factions[r].relations?.[other]??0,b=g.factions[other].relations?.[r]??0,similar=faithFamily(g,court(g,r).faith)===faithFamily(g,court(g,other).faith);
+ return Math.min(a,b)>=(similar?0:20);
+}
+export function faithExchangeView(g,r){
+ const i=g.identity?.realms[r],f=g.factions[r],a=advisor(g,r);
+ if(!i||!f)return {options:[],active:null,canStart:false,wait:0};
+ const active=i.faithExchange||null,wait=Math.max(0,36-g.turn+(i.lastFaithExchange??-120));
+ const options=a?Object.keys(g.civic.realms).filter(id=>exchangeEligible(g,r,id)).map(id=>({id,name:g.factions[id].name||id,faith:court(g,id).faith,sharedFamily:faithFamily(g,court(g,r).faith)===faithFamily(g,court(g,id).faith),relations:g.factions[r].relations?.[id]??0})).sort((a,b)=>Number(b.sharedFamily)-Number(a.sharedFamily)||b.relations-a.relations||a.id.localeCompare(b.id)):[];
+ return {options,active,wait,canStart:!active&&!wait&&f.treasury>=120&&options.length>0};
+}
+function startFaithExchange(g,r,id){
+ const v=faithExchangeView(g,r);if(!v.canStart||!v.options.some(x=>x.id===id))return no('Requires a willing foreign court, qualified advisors, peace, 120 gold and a three-year interval.');
+ const i=g.identity.realms[r],s=state(g,r,true);g.factions[r].treasury-=120;i.lastFaithExchange=g.turn;
+ i.faithExchange={realm:id,faith:court(g,r).faith,otherFaith:court(g,id).faith,ends:g.turn+6,advisor:advisor(g,r).id,otherAdvisor:advisor(g,id).id};
+ note(g,r,s,'A six-month scholarly exchange began with '+(g.factions[id].name||id)+'.');return ok('Religious exchange agreed.');
+}
+function tickFaithExchange(g,r){
+ const i=g.identity.realms[r],x=i.faithExchange;if(!x)return;
+ const valid=exchangeEligible(g,r,x.realm)&&court(g,r).faith===x.faith&&court(g,x.realm).faith===x.otherFaith&&advisor(g,r)?.id===x.advisor&&advisor(g,x.realm)?.id===x.otherAdvisor;
+ if(!valid){delete i.faithExchange;note(g,r,state(g,r,true),'The religious exchange was cancelled after its conditions changed.');return;}
+ if(g.turn<x.ends)return;
+ const f=g.factions[r],other=g.factions[x.realm],o=g.identity.realms[x.realm];
+ f.relations??={};other.relations??={};f.relations[x.realm]=clamp((f.relations[x.realm]||0)+8,-100,100);other.relations[r]=clamp((other.relations[r]||0)+8,-100,100);
+ i.faithAuthority=clamp(i.faithAuthority+3,0,100);o.faithAuthority=clamp(o.faithAuthority+2,0,100);
+ delete i.faithExchange;note(g,r,state(g,r,true),'The religious exchange concluded; institutional backing and mutual relations improved.');
+}
+// The existing activity system owns travel and completion. A recognized destination adds a faith-specific result.
+export function pilgrimageSanctuary(g,r,id){
+ const local=g.civic?.provinces[id],i=g.identity?.institutions[id],faith=court(g,r)?.faith;
+ return own(g,r,id)&&local?.faith===faith&&i?.faith===faith&&i.level>=2&&i.sanctuary?.faith===faith?{province:id,faith}:null;
+}
+export function completeSacredJourney(g,r,activity){
+ const x=activity.sanctuary,actual=x&&pilgrimageSanctuary(g,r,x.province),head=ruler(g,r);
+ if(!actual||actual.faith!==x.faith||head?.id!==activity.host)return false;
+ const i=g.identity.realms[r],local=g.civic.provinces[x.province],bonus=Math.max(1,Math.round((activity.quality??50)/20));
+ i.faithAuthority=clamp(i.faithAuthority+bonus,0,100);local.devotion=clamp((local.devotion??50)+bonus*2,0,100);local.localTrust=clamp(local.localTrust+bonus,0,100);
+ head.memories??=[];head.memories.push('Completed a sacred journey to '+x.province+' in '+g.year+'.');note(g,r,state(g,r,true),'The ruler completed a sacred journey to a recognized sanctuary.');return true;
 }

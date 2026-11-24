@@ -1,4 +1,5 @@
 // Alternate-history regional politics and character activities. Serializable and deterministic.
+import {pilgrimageSanctuary,completeSacredJourney} from './faith-institutions.js';
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const ruler=(g,id)=>g.politics.people[g.politics.realms[id]?.ruler];
 const own=(g,id)=>Object.values(g.provinces).filter(p=>p.owner===id);
@@ -54,6 +55,7 @@ function start(g,world,realm,kind,to,guest){const a=g.heritage,s=a.realms[realm]
  if(kind==='summit'&&(!g.factions[guest]||guest===realm||!g.politics.realms[guest]||!own(g,guest).length||(f.relations[guest]||0)<-30))return no('Select an eligible foreign guest.');
  const cost=rule.cost+Math.max(0,path.length-1)*15;if(f.treasury<cost)return no('Need '+cost+' gold.');
  f.treasury-=cost;s.last[kind]=g.turn;a.activities[realm]={id:'a'+a.next++,realm,kind,host:r.id,destination:to,path,index:0,phase:path.length>1?'travel':'gathering',remaining:rule.duration,started:g.turn,cost,guest:kind==='summit'?guest:null,event:null,eventUsed:false,quality:50,marriage:kind==='wedding'?recentMarriage(g,realm).a+'|'+recentMarriage(g,realm).b:null};
+ if(kind==='pilgrimage'){const sanctuary=pilgrimageSanctuary(g,realm,to);if(sanctuary)a.activities[realm].sanctuary=sanctuary;}
  record(g,realm,r.name+' began '+rule.name+'.');return ok('Activity started. Advance time to travel and attend.');
 }
 const INCIDENTS=[
@@ -76,7 +78,7 @@ function finish(g,realm,x){const a=g.heritage,s=a.realms[realm],f=g.factions[rea
  if(x.kind==='coronation')s.lastCoronation=r.id;if(x.kind==='wedding'&&x.marriage)s.celebrated.push(x.marriage);
  if(x.kind==='feast'||x.kind==='tour')for(const [id,h] of Object.entries(g.politics.holdings))if(h.realm===realm&&g.provinces[id]?.owner===realm)h.loyalty=cap(h.loyalty+(x.kind==='tour'?7:5),0,100);
  if(x.kind==='tournament')for(const a of Object.values(g.armies))if(a.owner===realm)a.experience=cap(a.experience+.05,0,1);
- if(x.kind==='pilgrimage')g.civic.realms[realm].patronage=cap(g.civic.realms[realm].patronage+10,0,100);
+ if(x.kind==='pilgrimage'){g.civic.realms[realm].patronage=cap(g.civic.realms[realm].patronage+10,0,100);completeSacredJourney(g,realm,x);}
  if(x.kind==='summit'&&g.factions[x.guest]){const other=g.factions[x.guest];f.relations[x.guest]=cap((f.relations[x.guest]||0)+15,-100,100);other.relations[realm]=cap((other.relations[realm]||0)+15,-100,100);}
  d.gatherings=(d.gatherings||0)+1;if(d.gatherings>=5&&!d.achievements.includes('Patron of gatherings')){d.achievements.push('Patron of gatherings');d.renown+=10;}
  delete a.activities[realm];record(g,realm,rule.name+' concluded with '+x.quality+'% quality.');}
