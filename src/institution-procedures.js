@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Special institutional procedures for centralized crowns and confederations.
 // These act on existing offices, local trust and holding loyalty, not ownership.
 import {controller} from './campaign-war.js';
@@ -77,7 +78,7 @@ export function tickInstitutionProcedures(g,r,land){
    x.status='ready';x.relief=5+(p.skills?.stewardship??1)*2;x.expires=g.turn+6;
    note(g,r,s,'A royal inspection report is ready for a funding decision.');
   }else if(x.status==='ready'&&g.turn>=x.expires){procedureAction(g,r,'crown:dismiss');}
-  if(r!==g.player&&s.report?.status==='ready')procedureAction(g,r,f.treasury>=500?'crown:fund':'crown:dismiss');
+  if(!humanControlsRealm(g,r)&&s.report?.status==='ready')procedureAction(g,r,f.treasury>=500?'crown:fund':'crown:dismiss');
  }
  if(k==='confederation'&&s?.assembly&&g.turn>=s.assembly.ends){
   const v=memberAssemblyView(g,r,land),passed=v.total>=2&&v.support*2>v.total;
@@ -89,7 +90,7 @@ export function tickInstitutionProcedures(g,r,land){
   }
   note(g,r,s,'Member relief fund '+(passed?'approved':'rejected')+' by '+v.support+' of '+v.total+' member chiefs.');s.assembly=null;
  }
- if(r===g.player||g.turn<12||g.turn%12!==0||f.treasury<800)return;
+ if(humanControlsRealm(g,r)||g.turn<12||g.turn%12!==0||f.treasury<800)return;
  if(k==='centralized'){
   const v=crownInspectionView(g,r),target=v.targets.filter(x=>x.unrest>=20).sort((a,b)=>b.unrest-a.unrest||a.id.localeCompare(b.id))[0];
   if(v.canStart&&target)procedureAction(g,r,'crown:inspect',target.id);

@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Government-specific deliberation, using existing characters and holdings.
 // A motion changes institutional policy, never title ownership or succession.
 import {controller} from './campaign-war.js';
@@ -77,7 +78,7 @@ export function governmentMotionAction(g,r,command,id){
 }
 export function tickGovernmentMotions(g,r){
  const d=GOVERNMENT_MOTIONS[type(g,r)],f=g.factions[r];if(!d||!f)return;
- let s=state(g,r);if(!s?.motion&&(r===g.player||g.turn<12||g.turn%12!==0||s?.active||f.treasury<=700||g.turn-(s?.last??-120)<12))return;
+ let s=state(g,r);if(!s?.motion&&(humanControlsRealm(g,r)||g.turn<12||g.turn%12!==0||s?.active||f.treasury<=700||g.turn-(s?.last??-120)<12))return;
  const v=governmentMotionView(g,r);
  if(s?.motion&&g.turn>=s.motion.ends){
   const passed=v.weight>0&&v.yes*2>v.weight&&land(g,r).length>0;
@@ -93,7 +94,7 @@ export function tickGovernmentMotions(g,r){
   record(g,r,d.name+(passed?(s.active?' enacted.':' repealed.'):' rejected.')+' Vote '+result.yes+'/'+result.total+'.');
   return;
  }
- if(r===g.player||g.turn<12)return;
+ if(humanControlsRealm(g,r)||g.turn<12)return;
  if(s?.motion&&g.turn<s.motion.ends&&f.treasury>500){
   const swing=v.electors.filter(e=>!e.lobbied&&e.support>=35&&e.support<55).sort((a,b)=>b.weight-a.weight||b.support-a.support)[0];
   if(swing&&v.yes*2<=v.weight)governmentMotionAction(g,r,'lobby',swing.id);

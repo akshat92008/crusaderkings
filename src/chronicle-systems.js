@@ -52,7 +52,19 @@ export const REGIONAL_DECISIONS={
  mapuche:['Convene community leaders','Negotiate cooperation among local communities.','loyalty'],
  maori:['Support community food stores','Invest in collective food security.','food'],
  fiji:['Renew community compacts','Support cooperation and local institutions.','loyalty'],
- aboriginal:['Support local community gatherings','Support the autonomy and cooperation of diverse local communities.','loyalty']
+ aboriginal:['Support local community gatherings','Support the autonomy and cooperation of diverse local communities.','loyalty'],
+ scotland:['Mediate border lordship obligations','Hear the landed households and preserve cooperation along the border.','loyalty'],
+ brittany:['Review ducal district accounts','Support accountable administration of the duchy.','authority'],
+ kalmar:['Convene the union delegations','Hear competing territorial representatives and negotiate political cooperation.','loyalty'],
+ genoa:['Confirm merchant notarial privileges','Support predictable agreements for maritime merchants.','trade'],
+ venice:['Provision the lagoon markets','Invest in reserves and reliable provisioning arrangements.','food'],
+ cyprus:['Hear island community petitions','Support local cooperation across diverse communities.','loyalty'],
+ oirats:['Convene seasonal clan delegates','Negotiate cooperation among confederate households.','loyalty'],
+ chagatai:['Support caravan shelters','Invest in exchange networks and commercial confidence.','trade'],
+ tibet:['Patronize regional manuscript collections','Support learning in regional institutions without assuming unified rule.','learning'],
+ lanxang:['Improve river settlement stores','Support rice provisioning and local reserves.','food'],
+ sunda:['Renew regional market agreements','Support trade and customary market institutions.','trade'],
+ zayyanid:['Support the Tlemcen caravan markets','Strengthen exchange between the court and inland merchants.','trade']
 };
 export const AMBITIONS={
  ...ADDITIONAL_AMBITIONS,
@@ -112,8 +124,32 @@ function effect(g,realm,kind,value,target){const f=g.factions[realm],r=ruler(g,r
 function decision(g,realm){const c=g.chronicles.realms[realm],f=g.factions[realm],d=regionalDecision(g,realm);if(!land(g,realm).length||f.treasury<180||g.turn-c.decisionAt<36)return no('Requires controlled land, 180 gold and a three-year interval.');f.treasury-=180;c.decisionAt=g.turn;effect(g,realm,d[2],12);note(g,realm,d[0]+' completed.');return ok(d[0]+' completed.');}
 export function currentChain(g,realm=g.player){const x=g.chronicles?.realms[realm]?.chain,def=CHAINS.find(c=>c.id===x?.id);if(!def||!x||!def.stages[x.stage])return null;return {...x,name:def.name,stageCount:def.stages.length,interval:def.delay||3,...def.stages[x.stage]};}
 function resolve(g,realm,index){const s=g.chronicles.realms[realm],x=currentChain(g,realm),ch=x?.choices[index],f=g.factions[realm];if(!Number.isInteger(index)||!ch||g.turn<x.due||f.treasury<ch[1])return no('No available or affordable choice.');f.treasury-=ch[1];effect(g,realm,ch[2],ch[3],x.target);s.chain.outcomes.push(ch[0]);s.chain.score+=ch[3];note(g,realm,x.title+': '+ch[0]+'.');if(x.stage===x.stageCount-1){f.prestige+=Math.max(0,Math.round(s.chain.score/3));if(x.interval>=12){const outcome=s.chain.score>=25?'settled':s.chain.score>=0?'fragile compromise':'unresolved';f.stability=cap(f.stability+(outcome==='settled'?6:outcome==='unresolved'?-6:0),0,100);s.chain.result=outcome;note(g,realm,x.name+': '+outcome+'.');}s.lastChain[x.id]=g.turn;s.completed.push({id:x.id,turn:g.turn,outcomes:s.chain.outcomes,score:s.chain.score,...(s.chain.result?{result:s.chain.result}: {})});s.completed=s.completed.slice(-20);s.chain=null;}else{s.chain.stage++;s.chain.due=g.turn+x.interval;}return ok('Decision recorded.');}
-export function ambitionProgress(g,realm){const a=g.chronicles?.realms[realm]?.ambition;return a?additionalAmbitionProgress(g,realm,a.id,a.base):null;}
-function ambitionComplete(g,realm,a){if(Object.hasOwn(ADDITIONAL_AMBITIONS,a.id))return !!additionalAmbitionProgress(g,realm,a.id,a.base)?.done;const f=g.factions[realm],r=ruler(g,realm),now=baseline(g,realm),v=nobles(g,realm);switch(a.id){case 'linguist':return now.languages>=(a.base.languages??now.languages)+2;case 'specialist':return now.branchRanks>=(a.base.branchRanks??now.branchRanks)+3;case 'patron':return now.activities>=(a.base.activities??now.activities)+3;case 'sanctuaries':return now.sanctuaries>=(a.base.sanctuaries??now.sanctuaries)+2;case 'confidants':return now.contacts>=(a.base.contacts??now.contacts)+3;case 'prosperity':return f.treasury>=1500&&now.development>=a.base.development+3;case 'unity':return f.stability>=75&&v.length>0&&v.reduce((n,[,h])=>n+h.loyalty,0)/v.length>=70;case 'mastery':return r.civic?.perks.length>=3;case 'legacy':return now.activities>=a.base.activities+2;case 'security':return now.forts>=a.base.forts+2;case 'friendship':return now.friends.filter(id=>!(a.base.friends||[]).includes(id)).length>=2;case 'innovation':return now.innovations>=(a.base.innovations??now.innovations)+2;case 'reconciliation':return now.acceptance>=Math.min(100,(a.base.acceptance??now.acceptance)+10)&&now.trust>=75;case 'institutions':return now.institutions>=(a.base.institutions??now.institutions)+3;case 'resilience':return now.stress<=Math.max(0,(a.base.stress??now.stress)-25)&&f.stability>=70;}return false;}
+export function ambitionProgress(g,realm){
+ const a=g.chronicles?.realms[realm]?.ambition;if(!a||!Object.hasOwn(AMBITIONS,a.id))return null;
+ if(Object.hasOwn(ADDITIONAL_AMBITIONS,a.id))return additionalAmbitionProgress(g,realm,a.id,a.base);
+ const f=g.factions[realm],r=ruler(g,realm),now=baseline(g,realm),v=nobles(g,realm),b=a.base||{};
+ const result=(value,target,detail='',extra=true,lower=false)=>({value:Math.round(value*10)/10,target:Math.round(target*10)/10,detail,done:extra&&(lower?value<=target:value>=target)});
+ const growth=(key,n)=>result(now[key],(b[key]??now[key])+n);
+ switch(a.id){
+ case 'linguist':return growth('languages',2);
+ case 'specialist':return growth('branchRanks',3);
+ case 'patron':return growth('activities',3);
+ case 'sanctuaries':return growth('sanctuaries',2);
+ case 'confidants':return growth('contacts',3);
+ case 'prosperity':return result(now.development,(b.development??now.development)+3,'Treasury: '+Math.floor(f.treasury)+'/1500',f.treasury>=1500);
+ case 'unity':{const loyalty=v.length?v.reduce((n,[,h])=>n+h.loyalty,0)/v.length:0;return result(loyalty,70,'Stability: '+Math.round(f.stability)+'/75'+(v.length?'':' · No eligible estates'),v.length>0&&f.stability>=75);}
+ case 'mastery':return result(r.civic?.perks?.length||0,3,'Current lifestyle: '+(r.civic?.focus||'Unselected'));
+ case 'legacy':return growth('activities',2);
+ case 'security':return growth('forts',2);
+ case 'friendship':return result(now.friends.filter(id=>!(b.friends||[]).includes(id)).length,2);
+ case 'innovation':return growth('innovations',2);
+ case 'reconciliation':return result(now.acceptance,Math.min(100,(b.acceptance??now.acceptance)+10),'Local trust: '+Math.round(now.trust)+'/75',now.trust>=75);
+ case 'institutions':return growth('institutions',3);
+ case 'resilience':return result(now.stress,Math.max(0,(b.stress??now.stress)-25),'Stress must fall to target · Stability: '+Math.round(f.stability)+'/70',f.stability>=70,true);
+ }
+ return null;
+}
+function ambitionComplete(g,realm,a){return !!ambitionProgress(g,realm)?.done;}
 export function chronicleAction(g,world,action,id){initChronicles(g,world);const realm=g.player,s=g.chronicles.realms[realm],f=g.factions[realm],r=ruler(g,realm);
  if(action==='decision')return decision(g,realm);
  if(action==='chain')return resolve(g,realm,Number(id));

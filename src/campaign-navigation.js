@@ -13,7 +13,7 @@ export const WORKSPACES=[
 export function workspaceFor(tab){return WORKSPACES.find(g=>g.tabs.includes(tab))||WORKSPACES[0];}
 export function workspaceTab(id,remembered={}){const g=WORKSPACES.find(w=>w.id===id);return g?(g.tabs.includes(remembered[id])?remembered[id]:g.tabs[0]):null;}
 export function realmPriorities(g,stats,royalEvent=false,expandedEvents=0){const f=g.factions[g.player],out=[];const add=(tab,label,detail,level='attention')=>out.push({tab,label,detail,level});if(!f)return out;
- if(!Object.values(g.provinces||{}).some(p=>p.owner===g.player))add('realm','Court in exile','Seek sanctuary, patron commissions or restoration.','urgent');
+ if(g.provinces&&!Object.values(g.provinces).some(p=>p.owner===g.player))add('realm','Court in exile','Seek sanctuary, patron commissions or restoration.','urgent');
  const uncommanded=Object.values(g.armies||{}).filter(a=>a.owner===g.player&&(a.infantry+a.archers+a.cavalry)>0&&!g.naval?.voyages?.[a.id]&&!g.military?.armies?.[a.id]?.commander).length;if(g.kingdom?.threats?.length)add('military','Border threat','Check the invasion warning on the map.','urgent');
  if(f.treasury<0||stats.balance<0)add('economy','Treasury under pressure',f.treasury<0?'Treasury is in debt.':'Monthly expenses exceed income.',f.treasury<0?'urgent':'attention');
  if(f.food<30||stats.foodDelta<0)add('economy','Food supply',f.food<30?'Food reserves are low.':'Food reserves are falling.');

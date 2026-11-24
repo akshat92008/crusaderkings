@@ -113,7 +113,7 @@ export function tickCivic(g,world){const c=initCivic(g,world);if(c.lastTick===g.
  if(g.turn%3!==0)return;
  for(const [realm,s] of Object.entries(c.realms)){const f=g.factions[realm],r=ruler(g,realm),rc=character(g,r),land=provinceList(g,realm);if(!land.length)continue;
   if(r.realm===realm){if(!rc.focus){rc.focus=Object.keys(LIFESTYLES)[hash(r.id)%5];rc.lastFocus=g.turn;}
-  rc.xp+=6+(r.skills[LIFESTYLES[rc.focus].skill]||1);const lvl=Math.min(3,Math.floor(rc.xp/60));while(rc.perks.length<lvl){rc.perks.push(LIFESTYLES[rc.focus].perks[rc.perks.length]);if(rc.perks.length===1||rc.perks.length===3){const sk=LIFESTYLES[rc.focus].skill;r.skills[sk]=cap(r.skills[sk]+1,1,5);}if(realm===g.player)log(g,r.name+' earned '+rc.perks.at(-1)+'.');}
+  rc.xp+=6+(r.skills[LIFESTYLES[rc.focus].skill]||1);const lvl=Math.min(3,Math.floor(rc.xp/60));while(rc.perks.length<lvl){rc.perks.push(LIFESTYLES[rc.focus].perks[rc.perks.length]);if(rc.perks.length===1||rc.perks.length===3){const sk=LIFESTYLES[rc.focus].skill;r.skills[sk]=cap(r.skills[sk]+1,1,5);}if(humanControlsRealm(g,realm))log(g,r.name+' earned '+rc.perks.at(-1)+'.');}
   tickRoleplay(g,realm,r);
   rc.stress=cap(rc.stress+(f.stability<40?5:-2)+(f.treasury<0?3:0)+(g.conflict&&Object.values(g.conflict.factions).some(x=>x.realm===realm&&x.status==='civil war')?5:0),0,100);
   }

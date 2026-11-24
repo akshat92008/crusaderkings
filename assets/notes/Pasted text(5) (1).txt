@@ -1,0 +1,679 @@
+# **Crown Monarch — Parallel development master plan**
+
+This is the complete plan for **my development responsibilities**, while Codex continues working on the core engineering systems.
+
+You can copy this entire plan into a separate chat and instruct me to execute it. It is designed to minimize conflicts with Codex while maintaining our full Crusader Kings 3 quality target.
+
+## **1. Project context**
+
+| Parameter              | Specification                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Game                   | Crown Monarch                                                                            |
+| Repository             | [GitHub repository](https://github.com/akshat92008/crusaderkings?utm_source=chatgpt.com) |
+| Target                 | Full CK3-level grand-strategy depth                                                      |
+| Combat                 | Bannerlord-inspired strategic field battles                                              |
+| Engine                 | Existing custom browser game engine                                                      |
+| Setting                | Worldwide 1450 campaign                                                                  |
+| Last verified baseline | 382 passing automated tests                                                              |
+| Development approach   | Parallel feature branches, followed by integration                                       |
+| Budget                 | Zero-cost development wherever possible                                                  |
+
+## **2. Division of responsibilities**
+
+| System                              | Responsible agent |
+| ----------------------------------- | ----------------- |
+| Core simulation architecture        | Codex             |
+| Titles and succession               | Codex             |
+| Feudal hierarchy                    | Codex             |
+| Marriage and inheritance            | Codex             |
+| Strategic military AI               | Codex             |
+| Diplomacy and warfare               | Codex             |
+| Tactical battlefield combat         | Codex             |
+| Economy and logistics               | Codex             |
+| Landless gameplay                   | Codex             |
+| Government diversity                | ChatGPT           |
+| Religion and religious institutions | ChatGPT           |
+| Culture and regional identity       | ChatGPT           |
+| Intrigue and personal schemes       | ChatGPT           |
+| Events and decisions                | ChatGPT           |
+| Activities and travel               | ChatGPT           |
+| Regional political situations       | ChatGPT           |
+| Historical content                  | ChatGPT           |
+| UI and UX overhaul                  | ChatGPT           |
+| Independent quality assurance       | ChatGPT           |
+
+Shared mechanics must be coordinated before integration. Neither agent should independently rewrite the other's systems.
+
+# **Phase 1 — Government systems overhaul**
+
+[Обитель богов-императоров. Обзор Crusader Kings III: All Under Heaven X|S | Stratege](https://images.openai.com/static-rsc-4/lDGxOZcmmkuS2Om1DyCGpPXyhNGePSfGx66YO0q-aKbs1rT7tG70NbgFC_njZhELbLM1DszJRY7CE7TJCcIu9s7qnGfLCOJDT34MSgjKbQqiTictOOjcduoUQnnYhmsOqGb_YIN9n4eIzo7NVlUdfllWAjNRtJk05AFqaX7Mv54?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/GlqXXIrgmadMBUiJC8H12Pa7KdCN_Dp2LeRnx8iD_ywF4GNW06-tr--c7xPBrsJC9h8MszdFT-0dl2bnJdO4a0hSL1qYA5dbtPHH7MK2vIWBPXz3DnKz248dt7AuFeYr5SCmJdQL2StmEAC8sNgNofGcj8yYbrtnfSgFyt0p_a8?purpose=inline)
+
+15
+
+**Objective:** Make every major government type feel like a fundamentally different game.
+
+Currently, Crown Monarch has multiple government profiles, but many share similar underlying mechanics. That must change.
+
+### **1.1 European feudal governments**
+
+Develop hereditary privileges, noble assemblies, royal charters, estate rights, aristocratic influence, obligations and negotiations over government reforms.
+
+### **1.2 Indian kingdoms**
+
+Develop a distinct political framework featuring regional chiefs, land grants, subordinate courts, temple patronage, royal assemblies, tributary relationships, competing dynasties and regional power struggles.
+
+Indian kingdoms must not simply be European feudal kingdoms with different names.
+
+### **1.3 Chinese imperial government**
+
+Implement:
+
+- Imperial bureaucracy.
+- Civil service examinations.
+- Official ranks and promotions.
+- Provincial governors.
+- Merit and political influence.
+- Court factions.
+- Imperial legitimacy.
+- Administrative corruption.
+- Dynastic decline and restoration.
+
+### **1.4 Japanese shogunate**
+
+Develop competing military houses, imperial recognition, shogunal authority, regional lords, political loyalty, house rivalries and struggles for national dominance.
+
+### **1.5 Islamic sultanates**
+
+Develop military patronage, religious legitimacy, court factions, appointed governors, scholarly institutions, succession disputes and competing military elites.
+
+### **1.6 Steppe and nomadic governments**
+
+Introduce clan influence, herds, migration incentives, tribal assemblies, confederations, leadership challenges and seasonal political pressures.
+
+### **1.7 Merchant republics**
+
+Develop merchant families, commercial influence, political elections, family prestige, commercial rivalries, political appointments and oligarchic competition.
+
+Codex will handle the underlying economy; my work will focus on the political and institutional gameplay built upon it.
+
+### **1.8 Additional political structures**
+
+Extend tributary states, African kingdoms, confederations, centralized monarchies, city-states and Indigenous political systems using historically appropriate distinctions.
+
+### **Completion criteria**
+
+Every government must have unique mechanics, resources, decisions, events, political threats, AI priorities and dedicated UI information.
+
+Changing government should fundamentally alter the player's strategy.
+
+# **Phase 2 — Complete religious system**
+
+[Crusader Kings 3 Faith and Fervor, A Guide to Religion | GameWatcher](https://images.openai.com/static-rsc-4/w_ahnQZx5NnhbJu46zpK2EXE7fQwK7Jvk1QxbOXwVELfKom2OQlp6vSGHLvVoFTL3nJ-SYVOml_atBOBtbIH57wqv5j8r74bzH7E2Jsvc9b5DbdozIKKYWFiFN1-QpDr_2D_K9cMOYqwSrVfZ636cmzn_Oz3YtQ3BgzVUS2-y_s?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/6hBZ_r4B48HPftkmf5UOv9FfnatfONJmqKZl3-mYpWmhlWearNIllbNMBjfHUc6Q1U7Tzepyz2JNbhhLn7U2cg-_9K4KB-Ptqgt0NGtoxSiv8SQDapYNY3fFj5rsmS6Zvx4wHOowVs5t2aM6kMca2HuElw5fhEtjmJgL6IBhpDM?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/P7A3nS2VXDWRm0bRpzrV3BZoN_FRL4Gwf-mT17WCa3VZgitWYzFZnO8kPq1D83oO5imFp3TvlfDSM7mlsQDx3F8pNojCPpRoCCKRKNDRaUgA6xTVxMPEvSyRJLgOSQeQE5hZ3Rl1qlqbgJsKsiHQVAavWx2chxUWdfBGiT5txa4?purpose=inline)
+
+9
+
+**Objective:** Make religion a major political and social force rather than a passive statistical modifier.
+
+| Subsystem              | Implementation                                          |
+| ---------------------- | ------------------------------------------------------- |
+| Faith hierarchy        | Religions, faiths and denominations                     |
+| Religious doctrines    | Marriage, succession, clergy and political authority    |
+| Religious institutions | Temples, monasteries and scholarly centers              |
+| Religious leadership   | Spiritual authorities and appointments                  |
+| Religious legitimacy   | Recognition and opposition from clergy                  |
+| Holy sites             | Regional spiritual importance                           |
+| Religious reform       | Reform existing institutions or establish new movements |
+| Conversion             | Character and provincial conversion                     |
+| Religious tolerance    | Minority rights and local coexistence                   |
+| Religious conflicts    | Schisms, persecution and political opposition           |
+| Religious diplomacy    | Shared faith and institutional relationships            |
+| Pilgrimages            | Religious journeys and personal consequences            |
+
+Religion must interact directly with dynasties, government legitimacy, marriage acceptance, diplomacy, factions, character personalities and provincial stability.
+
+Historical religions must receive nuanced treatment rather than being represented through stereotypes or simplistic bonuses.
+
+# **Phase 3 — Culture, language and regional identity**
+
+[Client Challenge](https://images.openai.com/static-rsc-4/lscL5gJjHEwBuLqMCn7rsJXGOmftgd2HFfAMFkZBVh_xUGrTs1xEBlvu39I4qZIQPV_kKYG2-XmuYNUw9sPq42ySUjDTDkx9dmvyDfNBFpqELxtMfJc21YDPFic00kbvJVpDxKPrzM0s0B1D1J3HGpHy_XNIHouDApke8ph_LD8?purpose=inline)
+
+[Crusader Kings III: Royal Court — Price  PS5 | Price history | PSprices](https://images.openai.com/static-rsc-4/yRmFo-pAmMWfEOcu0r6XoZB7dm2il6oRTp8z0B4FCKwvnpeLK2JoZ_UTojER0lmn_JUTqcug2p_TTfiC2ofv9B-9noyLG2diJ7c2DJ5TkITkbnoQeXPhM4_r-ruCUKf_PfblztsU7dwLZy_5MU7vt4dljjdfAtXemhNSswwcS1k?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/i_noVLdmCA6Jhidy04-lQbWu1Hv6fNPr8lYsZHJnFJ347Yk5TcMOn3OsZ6zqGu8iv-nuNSp3ZDwR8lDBlQOhudqmy_aCn4_uy29P-jXFmjAHrrSDVqbUijANZZNkG1B7KBbRvITusy_I1EGIx3yTN43ChSCi4yvn_NXRYiqCO1k?purpose=inline)
+
+11
+
+Develop a complete cultural identity system.
+
+### **Cultural mechanics**
+
+- Cultural groups and regional identities.
+- Languages and linguistic relationships.
+- Cultural traditions.
+- Cultural acceptance.
+- Assimilation and integration.
+- Cultural divergence.
+- Hybrid cultures.
+- Cultural leadership.
+- Regional innovations.
+- Cultural reform.
+- Court language.
+- Cultural tensions.
+- Cultural military traditions connected to Codex's combat systems.
+
+### **Regional distinctions**
+
+Develop meaningful differences between European, Indian, Persian, Central Asian, Chinese, Japanese, African, Southeast Asian and American societies.
+
+Culture should influence how characters interact, which institutions develop, which marriages are accepted and how conquered territories respond to foreign rulers.
+
+# **Phase 4 — Advanced intrigue and character interactions**
+
+[Client Challenge](https://images.openai.com/static-rsc-4/eENDFsJG0EpXH6UKYDHEIjM_HlfKvC6Su_L8TtSCqVHSh0jkv2QbVfwxR3FCbcut2KmhRG47xrblFOltx5SI-jyAhCf8RULjOnUPzblH84gOJwGwFg-gBn0AJ_7duSSgeJbFDLP_Ma70V6NAHNb9qxSBj1HD7gvvxtaqjXOzy_Y?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/odAGAvtztxoaslsf5DzrVGPRZAVOA0OBBP2CEWFc6CP84_mhSpgGZsv-WfKsK7SA7f7ZQl6Ggcwfqj4F8DRO_o8Zjax4CDlADrdJStHtMx8VoLcCqVtgHcdvcU5il9fvxNXDAg-SA1hk3ZIyqN8Nb2WS4FayukqX79CJrdjet5Q?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/rKf90Wq5LR6gcbXRvi75vAKXvZGLdCa_Qx4bO_gMSlwEuqH2FOZf8M8rbapLBzY4iOw3q8pDFpaMuWh3HKunMMqffmePq9_xdazYdO2NS0VsuAOV44aaowv9MPLNtK5d57x5Y4398VvJKtY12-_HQfGyOE8wX2Pj_YP8bit66xc?purpose=inline)
+
+11
+
+Our current intrigue system has a functional foundation. It requires significantly more depth.
+
+### **4.1 Scheme categories**
+
+| Personal schemes | Political schemes       | Hostile schemes    |
+| ---------------- | ----------------------- | ------------------ |
+| Befriend         | Influence councillor    | Assassination      |
+| Sway             | Fabricate evidence      | Abduction          |
+| Courtship        | Undermine authority     | Discredit          |
+| Patronage        | Influence succession    | Expose secrets     |
+| Reconciliation   | Recruit faction members | Political sabotage |
+
+### **4.2 Scheme mechanics**
+
+Every scheme must have preparation time, participants, agent recruitment, discovery risk, success probability, opposing counterintelligence, resource requirements and multiple possible outcomes.
+
+### **4.3 Intelligence networks**
+
+Create persistent intelligence relationships involving informants, spies, courtiers and political agents.
+
+Agents should participate because of loyalty, wealth, fear, personal relationships, ambition or political interests.
+
+### **4.4 Secrets and hooks**
+
+Expand secrets, evidence, blackmail, political leverage and exposure consequences.
+
+A discovered secret should produce actionable political opportunities rather than just appear in a list.
+
+### **4.5 Autonomous intrigue**
+
+AI characters must independently develop rivalries, recruit agents, plot against opponents, protect themselves and react to discovered conspiracies.
+
+The player should not be the only person initiating schemes.
+
+# **Phase 5 — Massive events and decisions expansion**
+
+[Crusader Kings 3: Royal Court - Screenshots aus dem Addon](https://images.openai.com/static-rsc-4/s_Cx6lUHBSzHZLtZrJxTZQJEDXilGo_rrK3glI0C6T5v-ldkrEJPq45indjAwdFT_fvvGeCgwdQV1FRXBxzMf7v96b3skL1uHjSj7xHfZecDDoJ3JNM3Kfof6Vup09FWYOqoiWmLxZYN13gN6HAEb_M91Iqd818wFyQxHyL7ItM?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/A15SebxJWeTk3ZimbX5ZNFYMiNUmiMGtbvPRs5zsft4QqWYQujH2408vX7KLqonE2KuAeMb9Jo6uRtaW5sAq7BQxuvfcsbKSofDq_aucSbNYOR0mr91-t0O2e3VM5UtEcyoopAK9VyH2DjV20MaLzwdusl08OqbhiB4kQIOSdpY?purpose=inline)
+
+15
+
+The existing expanded-content module contains 287 event definitions and 99 decision definitions.
+
+The proposed content-production targets are:
+
+Events
+
+287 / 2,000
+
+Decisions
+
+99 / 400
+
+Major branching storylines
+
+100
+
+Regional political situations
+
+50
+
+Long-term character ambitions
+
+50
+
+Proposed internal content targets. These are not official CK3 content counts or mandatory proof of equivalent depth.
+
+### **Event categories**
+
+| Category                   | Proposed target |
+| -------------------------- | --------------- |
+| Dynasty and family         | 250             |
+| Court and politics         | 300             |
+| Regional and historical    | 400             |
+| Religion and culture       | 250             |
+| Intrigue and relationships | 250             |
+| Warfare and diplomacy      | 200             |
+| Economy and society        | 150             |
+| Activities and travel      | 150             |
+| Health and personal life   | 50              |
+| **Total**                  | **2,000**       |
+
+### **Content quality requirements**
+
+Events must have contextual triggers, personality-dependent choices, actual character participants, meaningful consequences, follow-up events, persistent memories and appropriate AI responses.
+
+I will not simply generate thousands of interchangeable events that modify gold, prestige and stability.
+
+### **Example of interconnected gameplay**
+
+This is the kind of emergent storytelling we need to achieve.
+
+# **Phase 6 — Regional situations and political struggles**
+
+[Crusader Kings III: Fate of Iberia on Steam](https://images.openai.com/static-rsc-4/2FttdqhwKejZHI81RWAuMhzykHAcJdVnFmp20-LIfFgmPIYA7Gqpa_DJiWZRgdUp0xdUqkQcf8DlWkB08jjoG8ih_DRsII42ftZZZlA6VSE8xK__Yg-2rwe379XsoO3Oelt_Bp1zLn02n4Hc_kyR1XAfbhncpFfQ7LVsXdR7eUc?purpose=inline)
+
+[Crusader Kings 3: Legacy of Persia Gets November Release | GameWatcher](https://images.openai.com/static-rsc-4/YFwAvIZNNE3-8CbYbEr6V1yXwHokMKBNGpWxd_s8y5c6hfSS0MpU7Z93XzFkKqxqZWtVABZXdp4kv3waFakFdbDoiylT3huUnlUh1vp5q6WXK_GHdxHKqpC2gnu9h6uFtXhN2WaKSPyXO_NddGW_q_y3LQAxlPb-QV_R__F3c6A?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/kzzBOA6JAJ9JiqvEzHOBFlgbP75PHl9VQTF6rHJxetZPmOcxRIN5WpUDd69RoJb2RGhcgsYi5ggHvepMb_gWc3wuxuXO_sr_E4Eg3W0UW0Lz4tVofFYm7J35GNzyVs3Z9j-YNmzycF226LhaC0KkU-AdEPy_Ccb4LAci48qg1Yk?purpose=inline)
+
+9
+
+Build persistent regional struggles that evolve over decades.
+
+### **Proposed 1450 regional situations**
+
+| Region                 | Political situation                          |
+| ---------------------- | -------------------------------------------- |
+| England and France     | Postwar dynastic rivalry                     |
+| England                | Competing royal houses                       |
+| Byzantium and Anatolia | Imperial survival and Ottoman expansion      |
+| Holy Roman Empire      | Imperial authority versus princely autonomy  |
+| Iberia                 | Competing crowns and religious politics      |
+| Northern India         | Competition between regional powers          |
+| Southern India         | Vijayanagara and Deccan rivalries            |
+| China                  | Imperial bureaucracy and frontier security   |
+| Japan                  | Rival military houses                        |
+| Central Asia           | Competition between successor states         |
+| Southeast Asia         | Tributary and maritime competition           |
+| West Africa            | Trade routes and imperial authority          |
+| Mesoamerica            | Regional dominance and tributary competition |
+
+Each situation should have participants, phases, progress conditions, catalysts, special decisions, events, alternative resolutions and long-term consequences.
+
+Historical situations should be researched and adapted to the actual campaign starting conditions.
+
+AI rulers must actively participate.
+
+# **Phase 7 — Activities, travel and personal experiences**
+
+[Crusader Kings III: Tours & Tournaments — Download](https://images.openai.com/static-rsc-4/sAdQ8I3Ds72jBWGSlY04TEWp-kH7qvWElc6h-km0XTHekPD1S5aonGUFCBUHR66_deFEbnYvd8JyHyQyHW0aTBVg7dNdLC4v5_WeY6-1c2o5teK71YQjE-precvmjT7uCIuFojiiwOf-_Rl3SEhvK1NePoAOzzLASu0nd4tFVjk?purpose=inline)
+
+[Crusader Kings III Chapter II - Paradox Interactive](https://images.openai.com/static-rsc-4/bLlLps9yB3fNDR3_IBigC4fdWqlMh02ne-ZHvCedSNwSXM1jq_s44aLdhDSZO2rBirtmwLfNCk-p3wSRsLU6lT0irADB2CpJyGzZKY0kpBeHm5qaVUj99SKXH4qecycbxvFkYJPIQJrATQYgZiTHUPePC3W11BGOFEVvlc66YFY?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/6QjfzmQ0bzamILBb_oJ8VzYmx3XMAoedj_aJmZrsxTGX7UwBHDqlWd5_1hNYn-Vc4CPNbIrgkiCQOalJmW3pu-mYMDPuNSNx6ZaKLJj2p6Xq1yjgUBo3gPDQnBNM6eeqp3FzmRfljImK9c6Sl0Bg_9AKNU15uPSe2BVw8i--UUI?purpose=inline)
+
+16
+
+Expand the existing activities into complete gameplay experiences.
+
+### **Required activities**
+
+- Coronations.
+- Grand weddings.
+- Royal hunts.
+- Feasts.
+- Grand tournaments.
+- Pilgrimages.
+- Royal tours.
+- Diplomatic summits.
+- Religious assemblies.
+- Scholarly gatherings.
+- Memorial ceremonies.
+- Coming-of-age ceremonies.
+
+### **Activity architecture**
+
+Every major activity must support planning, location selection, invitations, budget, preparation, participants, travel risks, character interactions and persistent consequences.
+
+During an activity, characters should form friendships, rivalries, political agreements and personal memories.
+
+### **Travel**
+
+Implement route planning, estimated duration, escorts, dangerous regions, travel events, delays and return journeys.
+
+The campaign continues while characters are travelling, creating opportunities for political intrigue and government instability.
+
+# **Phase 8 — Character roleplay, lifestyles and ambitions**
+
+[The best traits in Crusader Kings III - Digital Trends](https://images.openai.com/static-rsc-4/aoqWvgodbuhjg2vxoRsYk71DAGDp9y8UooDVYP99-5FO0g-OZc1PqnoDgpazUdAfszx5Z6OsNjSLOgLblvUzeIVNcjWXvltJCC9OFX4Dv-_Owc0xtE6XIipcOWN0eDw1hoCYwCJej2n84AAgv57cQjUIJSKIGBFxnP7cb14SuWc?purpose=inline)
+
+[Crusader Kings III: Fate of Iberia | Deku Deals](https://images.openai.com/static-rsc-4/3BxlycWgzSc4Lweiq5rB5w_SF4UU8h5oMp91hOdoK-EAls-7BgbwMWBSj5tODahtg9oxgNNJplajexjzoqM5bv7rJOYzwxBU54RGsncgSwJgwlNqBruwrO-PF7WwJWVU_eXixmSa-IdwD4cyBfz48ZWEz8xz1rDsem--NU0OWJo?purpose=inline)
+
+9
+
+Extend the existing character-agency and civic systems without replacing Codex's authoritative character architecture.
+
+### **Lifestyle progression**
+
+Develop five major lifestyle categories.
+
+| Lifestyle   | Progression branches                          |
+| ----------- | --------------------------------------------- |
+| Diplomacy   | Negotiation, family, leadership               |
+| Martial     | Strategy, command, chivalry                   |
+| Stewardship | Wealth, administration, architecture          |
+| Intrigue    | Intelligence, manipulation, political control |
+| Learning    | Scholarship, medicine, theology               |
+
+Each branch needs distinctive unlocks and meaningful interactions with game systems.
+
+### **Character depth**
+
+Expand stress, coping mechanisms, life goals, childhood experiences, education, health, injuries, reputation, friendships, rivalries, accomplishments and personal memories.
+
+Characters should have individual stories that emerge naturally from gameplay.
+
+# **Phase 9 — Royal courts and institutional life**
+
+[Client Challenge](https://images.openai.com/static-rsc-4/ROgLceje_n-tYmcLMxKxmb-AdpAqTidfRUVXRYcY2JBO8iuN4cW852TA7jfQLPJo4DhpORJrfJucEGz3zRxcv3XqvLjhCue4Lyl_JVEKZqxFN-yEMhxuqi53qu66eO1v-iYRi3w6WNrCV17-DEIkZD7BsSpjsiW-Vpp4BdqKp-s?purpose=inline)
+
+[Crusader Kings III: Royal Court Screenshots · SteamDB](https://images.openai.com/static-rsc-4/r3CmJaxAu9BvMY3t9kIhIGcrmF-Zs9t1cLs-mnCHxXw0P_1po4yUOv2bPV_--BzhWvTPZ4RxTjrDNbQa5JtQPOZaLlWXRk-VYlZXOjYM3bNBEwqNwbgM6AVBDZmeNqzL9U4a2OKIBF6ktxPFPGk2dZHPZbTHTbd-EzZckUgMwQg?purpose=inline)
+
+12
+
+My responsibilities here will focus on court experiences, presentation and content. Codex retains ownership of core council authority and title rules.
+
+Develop court grandeur, court reputation, cultural patronage, royal audiences, court ceremonies, scholars, artists, diplomats, physicians, artifacts, royal collections, court competitions and household events.
+
+Different cultures and governments should have distinct court traditions.
+
+### **Royal artifacts**
+
+Artifacts should possess an origin, history, owner, condition, cultural identity, prestige value and gameplay significance.
+
+They can become inherited family treasures or objects of political competition.
+
+# **Phase 10 — Complete UI and UX redesign**
+
+This will be one of my largest responsibilities.
+
+The target is CK3-level information accessibility, but with a simpler learning curve and original visual identity.
+
+## **10.1 Main campaign interface**
+
+[Crusader Kings 3’s New Legends Beautifully Canonise the Weird Stuff | by Pascal Wagner | Medium](https://images.openai.com/static-rsc-4/6lDZdlr3eVAChSMv1gYGNP1SJqbDxQcK_GgKLNbZDnVZFtlwloGT_DW3dch0gHcRbGVhUF0HfIkGqT16u6uqj4nJFxhKHTcpfJ0h_tDV_9l6_YiAiNjIKdE4Eq9Egso64ob4yrwxRKUZtvRCtWQNbNPxqNupNY0-6zTKCH0JnBE?purpose=inline)
+
+[Client Challenge](https://images.openai.com/static-rsc-4/D6IcuVgpoEs19eiTuaiG0pTT4ysyS7jUrCEQuI-m3CUNhfcrY2OpxVY_uWXrvPWLqVTaL4CMmjAhfMxedcWdWZBRRET2G8w3l1G3ngmJMowBs13MvOaDyJzdcPexATxT6jwAj3k3c6SRz1G04WYPV7dlbEOS1s_lZeItIHHwq58?purpose=inline)
+
+[Crusader Kings 3: Interface Guide - gamepressure.com](https://images.openai.com/static-rsc-4/DwhCjvBg5NnVQaTXB4FiBp1SXJ9hJSpqCgTczPrgHMsee1ZhcupnLMRVXIoNJeZNnT0Xlsm1Za24E1miwPlGijMsY8YlpXoxjEcR7jPfOyZQEN70pCEjSdbAfetgoJAKy4v3ENgAH36FiF5XcBMWlmIcxmu15TYYkvhjioGRPiM?purpose=inline)
+
+12
+
+The main screen should feature:
+
+- Persistent ruler portrait and information.
+- Prominent treasury, prestige, legitimacy and military indicators.
+- Date, pause and simulation speed controls.
+- Compact management navigation.
+- Actionable notification center.
+- Search.
+- Campaign outliner.
+- Context-sensitive interactions.
+- Map mode controls.
+- Clear navigation history.
+
+## **10.2 Proposed interface layout**
+
+Proposed Crown Monarch campaign layout, not an existing screenshot.
+
+## **10.3 Individual management screens**
+
+[Client Challenge](https://images.openai.com/static-rsc-4/i-YEAnTOTDURVfBNSaB4GcDP-ePkLqMt1KuWuryJoAIi7P82WMBpxytdAngwqs9hGTKVr0yvaVXunNeH8Uzsswvqz6MDYHYGVqznV5Fsi72hU7y7xlIy6UjE-VNAPETJYSJTRzSYkMQQvOA405bmjxegwNXD2cPPDHdZaYeTUsE?purpose=inline)
+
+**Character interface**
+
+Portrait, family, titles, personality, health, skills, personal wealth, ambitions, relationships, history and interactions.
+
+[CK3: What To Do With More Powerful Vassals Than Council Seats – FandomSpot](https://images.openai.com/static-rsc-4/3GngoXg7YIqdJ8rVHyoGdtA3y8EVFuW0Fv5S1Fg8USKRm411jleZnEOZLEzXSapeTYDikPVxscwcqMqYYsCwMoGiNtqEmjS7FtHKAs0gJsou7Cyk_iNWa00yIYVvluipPqqNbOLR1qUAUgJN2v4s3ZJXgJ83EKzHkZY0rOD1A3k?purpose=inline)
+
+**Realm and vassal interface**
+
+Hierarchy, political power, taxes, obligations, grievances, direct domain and faction threats.
+
+[Client Challenge](https://images.openai.com/static-rsc-4/eENDFsJG0EpXH6UKYDHEIjM_HlfKvC6Su_L8TtSCqVHSh0jkv2QbVfwxR3FCbcut2KmhRG47xrblFOltx5SI-jyAhCf8RULjOnUPzblH84gOJwGwFg-gBn0AJ_7duSSgeJbFDLP_Ma70V6NAHNb9qxSBj1HD7gvvxtaqjXOzy_Y?purpose=inline)
+
+**Intrigue interface**
+
+Active schemes, agents, secrets, hooks, intelligence networks and counterintelligence.
+
+**Military interface**
+
+Clearly visible armies, troop counts, commanders, regiments, readiness, supplies and movement orders. The underlying logic remains Codex's responsibility.
+
+[crusader kings 3 - Why can't I declare war to press my own claims? - Arqade](https://images.openai.com/static-rsc-4/_Lqlq1KrPijx1VHZCV70RJCtYQWEORzqBKk2Qr4hUUIwoCgZeSVObjnxj6Uy60tZ1W5viuhvHSWxPnEQUe1ecwvj0sTZzeU1rM1Jch5OSgyJ_cqTHbeEjZ8ZUpioWuG40iicBet0YH7RIO0c8s2bdpeASDLCWaJEQiOqt8Rzd_4?purpose=inline)
+
+**Decisions and situations interface**
+
+Categorized decisions, requirements, costs, consequences, progress and regional developments.
+
+## **10.4 Tooltip system**
+
+Every important statistic must explain its calculation.
+
+Example of a proposed in-game tooltip
+
+## **Vassal opinion**
+
+# **−24**
+
+Base relationship
+
++10
+
+Excessive taxation
+
+-15
+
+High crown authority
+
+-10
+
+Wants council position
+
+-12
+
+Shared culture
+
++8
+
+Recent political dispute
+
+-5
+
+Suggested action: Review the vassal's obligations or offer an appropriate council position.
+
+These values are illustrative. Production tooltips must use actual simulation calculations.
+
+## **10.5 Interactive tutorial**
+
+Introduce guided tutorials covering characters, succession, vassals, council appointments, marriage, warfare, diplomacy, economy, religion, intrigue and government mechanics.
+
+The player should never need to read the source code or ask ChatGPT how to appoint a commander.
+
+# **Phase 11 — Visual identity and presentation**
+
+[Crusader Kings III - Paradox Interactive](https://images.openai.com/static-rsc-4/TW7iXfbeSEWidexydLhU85kptamWKhSpRsxkxdV2rc_g3EhjSCGc_alSiEAyDMtzq46UyIe09oTiflgwWizpE-7wmIrDpULRKBCWyOjrkB7tk4W5KlPoGvBwyTWl4fxaTZvZYOCIUqnPyK3GvoAqmyZRnxuGqFxXLMW2XkUAcg8?purpose=inline)
+
+[Feudums - Kalamona Studios - GDWC - The Game Development World Championship](https://images.openai.com/static-rsc-4/3pyTt4eCoHlat6gzUjQ3hYIsQLfirAPYK1IArAhWOyKUrm-aFUAGzIxB3VPuTvaVlRs2GswOUp95GiAN-NYMmS4A5NfuMng2pDPopouJNW4oLFOlxZ25VLIvSCXzoeMcphVNjLBjty6Ve_Qw-QEYwMbY2CxmCyIRiThnNsFr4tg?purpose=inline)
+
+[The King at the Burn: Robert the Bruce and the Battle of Bannockburn | Front Line Stories](https://images.openai.com/static-rsc-4/SntRaLvcniubxF2fFBzxKN-6T2FPmt_-Lcn96KQ2pYJk9wdGKhb2J4aas9-FBwJ6q1f3W1GiOU95aO8ocitoCJBN31tG5YPDtPe_OEXc23jk4gnCwwDFJgtpa3J8fS4G2MHBHRlUeMENSaic6qmQZqcB07rBaNclOrNeIQSyP1c?purpose=inline)
+
+16
+
+I propose an original visual direction using antique gold, dark charcoal, aged parchment, regional heraldry, medieval illustrations and subtle ornamental borders.
+
+The graphical upgrade should cover character cards, event illustrations, icons, buttons, tooltips, menus, typography, government insignia, dynasty symbols, loading screens and notifications.
+
+### **Cultural presentation**
+
+European, Indian, Islamic, East Asian, African and other regional courts should receive distinctive visual identities.
+
+We will use original or appropriately licensed assets, not directly extract proprietary CK3 graphics.
+
+# **Phase 12 — Historical research and content accuracy**
+
+[1450 CE Political Map](https://images.openai.com/static-rsc-4/KL9mEPUMhh17nwvfKoqo9X4p2voTcFsivB6VruEG18jzD3DJQULGa3Y1OmJj2rQtH2DAYdH6JI2kousoFL0kWNF6pxmSebHYRgp61bsRUvAEGngUOSaJXfGMY8Q3FoT0qi5M1hDPzUL4eG5WnKldIoNhM19vlB9lzzjj09Y-zew?purpose=inline)
+
+[Other Indias: 1320–1525 - India: A History](https://images.openai.com/static-rsc-4/4aCY6OXFDYOPOTCSriOT3RZNrlR6h2ibavlOhWcK-d_ayw3_A1e2PiXyAe0YSrGF3DoGLmcNZOxP616TEhBVDMnwokT48CCl9l7fVvbxqaoJsyYoaCAWwYBluke5vfmymy9o7VoOoGj9xH5FINP7eey7euWvhTL1ZtK8o048D8g?purpose=inline)
+
+[China Under Ming and Qing Rule](https://images.openai.com/static-rsc-4/TMJ6XTReKRWe6tChYDM0A14IP5ftaBurfdqYAHMybgsf7_cngY8kvwMGtEQDdYnUulmyAWKlTXkHD-DrFmOHYAD7Akqfg8VLAsYBB4Bk24FF1K2jXOISSspSVCjtuqS8bLr0q9u0zty5jazDoZw4_h1HQuheP-gYjEJWRdiJlHs?purpose=inline)
+
+9
+
+Improve the historical foundation of our existing atlas.
+
+Research and develop historical rulers, dynasties, capitals, regional titles, government types, cultural identities, religious distributions, political rivalries and significant historical circumstances.
+
+Where historical records are uncertain, distinguish documented information from fictional gameplay approximations.
+
+I will focus on research, data and historical content. Structural changes to the map format or simulation geometry must be coordinated with Codex.
+
+# **Phase 13 — Independent QA and balancing**
+
+My final responsibility is to independently verify both my work and its interaction with Codex's systems.
+
+| Testing area   | Required verification                                  |
+| -------------- | ------------------------------------------------------ |
+| Government     | Every government provides differentiated gameplay      |
+| Religion       | Conversion, reform and political consequences function |
+| Culture        | Cultural changes persist and affect other systems      |
+| Intrigue       | AI and player schemes produce valid outcomes           |
+| Events         | Valid participants, choices and consequences           |
+| Activities     | Correct travel, duration and resolution                |
+| UI             | All actionable controls function                       |
+| Saves          | New and legacy campaign compatibility                  |
+| Performance    | Large campaigns remain responsive                      |
+| Browser        | Chromium, Firefox and WebKit                           |
+| Mobile         | Responsive UI and touch usability                      |
+| Long campaigns | Extended simulation without systemic corruption        |
+
+I will use regression tests, actual browser checks where available, screenshots, saved-game comparisons, automated campaign simulations and adversarial gameplay scenarios.
+
+Test counts alone will not be treated as proof of CK3-level quality.
+
+# **3. Development execution order**
+
+1. **Wave 1 — Institutional depth**
+
+   Governments, religion and culture.
+2. **Wave 2 — Character-driven depth**
+
+   Intrigue, lifestyles, ambitions and court experiences.
+3. **Wave 3 — Content expansion**
+
+   Events, decisions and regional situations.
+4. **Wave 4 — Living world**
+
+   Activities, travel and historical content.
+5. **Wave 5 — Presentation**
+
+   Complete UI, visual identity and tutorials. Interface work should also accompany earlier waves.
+6. **Wave 6 — Integration**
+
+   Reconcile completed systems with Codex's latest implementation.
+7. **Wave 7 — Release verification**
+
+   Bug fixing, balancing, campaign testing and final acceptance.
+
+# **4. GitHub development protocol**
+
+To avoid conflicts with Codex, I will use dedicated branches.
+
+| Proposed branch              | Responsibility                   |
+| ---------------------------- | -------------------------------- |
+| `chatgpt/government-depth`   | Government mechanics             |
+| `chatgpt/faith-culture`      | Religion and culture             |
+| `chatgpt/character-intrigue` | Personal schemes and roleplay    |
+| `chatgpt/world-content`      | Events, decisions and situations |
+| `chatgpt/activities`         | Activities and travel            |
+| `chatgpt/historical-content` | Historical research and data     |
+| `chatgpt/ui-overhaul`        | Interface and presentation       |
+| `chatgpt/integration-qa`     | Integration and verification     |
+
+Before each implementation, inspect the latest `main`, active branches, recent commits and relevant Codex work.
+
+Use existing authoritative state and APIs. Do not create duplicate character records, competing economic models or alternative ownership systems.
+
+Completed work must ultimately be integrated into `main`. Separate branches are a development safeguard, not the final product.
+
+# **5. Expected final product**
+
+[Review - Crusader Kings III - WayTooManyGames](https://images.openai.com/static-rsc-4/ZJmnO63GVgDFAlgm0_6xiEd2eV3ia4OiZe1T7tNsOT79TTVMabpfvDJTGwHV5WX_nZLszIO5Q6JgOe6QfYfc5DbWJY98N2aLNBI0YA0SPRj09KdU1jyhk6Beu4Qjv3EdrZ84RgSZ2kyJPBBdXi9XY3BJPCkvRHTrQmVr9VJQJnI?purpose=inline)
+
+**Deep worldwide strategy**
+
+[Crusader Kings III: Royal Court](https://images.openai.com/static-rsc-4/8pshajDtoSBvLMi0CBmSMeVF-fkms5acjL4hgmyqXDmPeoN5aUODxja0-n0EVJmSoQS2U4169IEfBZOu7AI4mcx08Dr4polBM_6LZEaUUkOPuqAN1kFVjemx7lOvWQoOmBV226gAOZ_enHVUwazWlSIz8JrTu7ul9u0wNFTbpyw?purpose=inline)
+
+**Living characters and dynasties**
+
+[Mount & Blade II: Bannerlord](https://images.openai.com/static-rsc-4/lsNAPnMPreNlHKbt5vZYqdHySw8JHzka1jqhE5-RcHm75PKcwERTNf2Cp3oWM5c09zCiPqAhf7CBy7crWdB6qPALaEEpST8kbo29nDEvqT-Xf1RYifEucXhZfnFS0jtwY1gBvjjq6gBuSV0Wlnur9bSR5nmWzGxa43qWkCPMouI?purpose=inline)
+
+**Strategic playable battles**
+
+[Crusader Kings 3's next expansion is the one we've all been waiting for, and it's only a few months away | PC Gamer](https://images.openai.com/static-rsc-4/_Ml5zt_a8ndycV9fDpFdCAapTnK_rDq5PSQyQO90T9YHPthorLOHR3LN4mVgfcBfQthrhXJsLVMjJSXzks-wJHsVcoyj21GHBWMtaalucJQpmaMIjrP4nnsLdx9wIriC3Lkh-bKcZvqUzlLluzs1tpUIbkxpBw8tIIRlHKDDX5g?purpose=inline)
+
+**Immersive political storytelling**
+
+Our final game should combine CK3-level political simulation and character storytelling with Bannerlord-inspired army command, while maintaining its own historical setting, engine and artistic identity.
+
+These are reference images for the target experience, not screenshots of Crown Monarch.
+
+# **6. Master instruction for the new chat**
+
+Paste this instruction along with the plan above.
+
+You are responsible for parallel development of Crown Monarch.
+
+Repository: [https://github.com/akshat92008/crusaderkings.git](https://github.com/akshat92008/crusaderkings.git)
+
+Execute the attached 13-phase ChatGPT development master plan completely.
+
+Codex is simultaneously working on core simulation architecture, succession, titles, feudal hierarchy, diplomacy, military AI, combat, economy, logistics and landless gameplay.
+
+Your responsibilities are government depth, religion, culture, intrigue, character roleplay, events, decisions, regional situations, activities, travel, royal court experiences, historical content, complete UI/UX redesign, visual presentation and independent QA.
+
+MANDATORY DEVELOPMENT RULES:
+
+1. Inspect the latest repository and Codex's visible changes before beginning.
+2. Work on dedicated feature branches to avoid conflicts.
+3. Preserve all existing working functionality.
+4. Use existing authoritative simulation records instead of creating duplicate systems.
+5. Build actual working mechanics, not placeholders, mockups or documentation alone.
+6. Connect every mechanic to the relevant AI, campaign progression, UI and save system.
+7. Research Crusader Kings 1, 2 and 3, including relevant expansions, as mechanical references.
+8. Match CK3's depth and usability while maintaining Crown Monarch's original identity.
+9. Test every major implementation and fix identified regressions.
+10. Perform browser verification and capture actual screenshots whenever the environment supports it.
+11. Integrate completed and verified changes into main after checking for conflicts with Codex.
+12. Do not falsely claim that a feature is complete, tested or production-ready.
+13. Continue implementing substantial development work instead of repeatedly returning roadmaps.
+14. Report actual commits, changed systems, test results and unresolved blockers.
+15. Do not lower the quality target to satisfy an arbitrary completion deadline.
+
+The ultimate target is a complete, polished, character-driven grand-strategy game with CK3-level depth and Bannerlord-inspired strategic army battles.
+
+No siege gameplay or base-building combat.
+
+Begin by auditing the latest main branch and executing the first available development wave. Maximize progress during each execution session.
+
+**This is my complete parallel development assignment.** Codex can concentrate on the core engineering while I develop the institutions, gameplay depth, content, presentation and player experience.
+
+The 13 phases are proposed development scope, not completed work. No repository changes have been made in this response. The precise integration boundaries will need to be rechecked against Codex's latest commits when execution begins.
