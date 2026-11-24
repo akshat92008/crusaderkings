@@ -7,6 +7,19 @@ const rows=[
   [
    "france"
   ],
+ ["scottish_border_order","Scottish border lordship cooperation",["scotland"],"loyalty",44,70,150,"Hear border lordship petitions","The crown depends on cooperation from landed households. A deterioration in estate loyalty can provoke negotiations over local obligations."],
+ ["breton_administration","Breton ducal administration",["brittany"],"trust",42,68,130,"Commission district hearings","Provincial confidence supports ducal administration when neighboring crowns compete for influence."],
+ ["kalmar_estate_consent","Consent within the Nordic union",["kalmar"],"loyalty",45,70,160,"Convene representatives of the estates","A composite union depends on negotiated support from its estates; this pressure models local political consent, not uniform administration."],
+ ["genoese_credit","Genoese merchant obligations",["genoa"],"credit",45,75,140,"Convene merchant notaries","Commercial credit can weaken when the republic's obligations outstrip confidence in its trading institutions."],
+ ["venetian_provisioning","Venetian provisioning agreements",["venice"],"grain",14,34,150,"Support provisioning contracts","Urban and maritime communities depend on reliable stores and supply agreements."],
+ ["cypriot_local_cooperation","Cypriot community cooperation",["cyprus"],"acceptance",44,68,120,"Hear representatives of island communities","Political cooperation can be strained when local communities lose confidence in shared administration."],
+ ["oirat_seasonal_security","Oirat seasonal provisioning",["oirats"],"grain",12,30,110,"Allocate provisions to clan households","Seasonal scarcity can strain cooperation among confederate households."],
+ ["chagatai_caravan_confidence","Chagatai caravan confidence",["chagatai"],"credit",45,70,115,"Sponsor caravan arbitration","The security of exchange networks depends on credible arrangements among local authorities."],
+ ["tibetan_institutional_support","Tibetan institutional cooperation",["tibet"],"faith",42,68,135,"Convene institutional delegates","Competing regional and religious institutions depend on continued confidence; the campaign does not assume unified authority."],
+ ["lanxang_river_provisions","Lan Xang river settlement provisions",["lanxang"],"grain",14,34,120,"Support local rice reserves","Inadequate food stores can strain local cooperation along river settlements."],
+ ["sunda_market_confidence","Sunda market cooperation",["sunda"],"credit",46,72,130,"Hear market representatives","Reliable local exchange depends on cooperation between merchants and regional authorities."],
+ ["tlemcen_trade_confidence","Tlemcen commercial confidence",["zayyanid"],"credit",45,70,135,"Mediate caravan and market petitions","Merchant confidence connects the court with wider exchange networks."],
+ ["tupi_local_provisioning","Tupi-speaking community provisioning",["tupi"],"grain",12,28,95,"Support community food stores","A composite gameplay profile represents diverse communities facing local provisioning pressures, not a single historical state."],
   "unrest",
   42,
   22,
@@ -459,6 +472,13 @@ function targets(g,r,m,land){
  if(m==='unrest')return land;
  return [];
 }
+export function situationResponseView(g,r,def){
+ const m=def.model.metric,land=owned(g,r),v=def.members.includes(r)&&land.length?value(g,r,m,land):null,f=g.factions[r],high=highBad.has(m),state=g.heritage?.struggles?.[def.id];
+ const cooldown=state?Math.max(0,12-g.turn+(state.last[r]??-1000)):0;
+ const healthy=v!==null&&(high?v<=def.model.good:v>=def.model.good);
+ const reason=!def.members.includes(r)||!land.length?'No controlled land in this situation.':!Number.isFinite(v)?'No eligible local records.':state?.ended!=null?'Situation already resolved.':state?.phase==='dormant'?'Dormant until the pressure threshold is reached.':healthy?'Local conditions already meet the recovery target.':cooldown?'Response available in '+cooldown+' months.':(f?.treasury??0)<def.model.cost?'Requires '+def.model.cost+' gold.':m==='pressure'&&!targets(g,r,m,land).some(x=>x.status!=='civil war')?'No faction eligible for peaceful mediation.':'';
+ return {value:v,label:name[m],healthy,threshold:def.model.bad,goal:def.model.good,high,cooldown,reason,canRespond:!reason};
+}
 function value(g,r,m,land){
  const t=targets(g,r,m,land);
  if(m==='credit')return g.economy?.realms[r]?.credit??null;
@@ -474,8 +494,8 @@ export function situationMeasure(g,def,members,cache){
  return {values,bad,healthy,severity,label:name[m],available:worst!==null};
 }
 export function respondToSituation(g,r,def){
- const m=def.model.metric,land=owned(g,r),v=value(g,r,m,land),f=g.factions[r];if(v===null||!land.length||f.treasury<def.model.cost)return false;
- const high=highBad.has(m);if(high?v<=def.model.good:v>=def.model.good)return false;
+ const view=situationResponseView(g,r,def);if(!view.canRespond)return false;
+ const m=def.model.metric,land=owned(g,r),v=view.value,f=g.factions[r],high=view.high;
  const t=targets(g,r,m,land),field={loyalty:'loyalty',acceptance:'acceptance',trust:'localTrust',grain:'grain',unrest:'unrest'}[m];
  if(m==='credit')g.economy.realms[r].credit=cap(v+9,0,100);
  else if(m==='faith')g.identity.realms[r].faithAuthority=cap(v+8,0,100);
