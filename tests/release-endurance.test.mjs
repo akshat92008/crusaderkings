@@ -11,6 +11,26 @@ const months = Number(process.env.CROWN_ENDURANCE_MONTHS ?? 60);
 assert.ok(Number.isInteger(months) && months >= 12 && months <= 3600,
  'CROWN_ENDURANCE_MONTHS must be a whole number between 12 and 3600.');
 
+// Annual checks cover canonical crown, occupation, diplomacy and character records.
+function assertCampaignLinks(game){
+ for(const [realm,state] of Object.entries(game.politics.realms)){
+  assert.equal(game.politics.people[state.ruler]?.alive,true,'Living ruler: '+realm);
+  assert.equal(game.feudal.titles['k:'+realm]?.holder,state.ruler,'Crown holder: '+realm);
+ }
+ for(const [id,o] of Object.entries(game.campaignWar?.occupations||{})){
+  assert.ok(game.provinces[id],'Occupation province: '+id);
+  assert.equal(game.provinces[id].owner,o.owner,'Occupation legal owner: '+id);
+  assert.ok(game.factions[o.by],'Occupying realm: '+id);
+  assert.equal(game.conflict.wars[o.war]?.status,'active','Occupation war: '+id);
+ }
+ for(const p of Object.values(game.politics.people)){
+  if(p.alive)assert.ok(Number.isFinite(p.wealth)&&p.wealth>=0,'Personal wealth: '+p.id);
+ }
+ for(const u of Object.values(game.personalUnions?.unions||{})){
+  assert.equal(game.politics.realms[u.senior]?.ruler,u.monarch,'Union senior');
+  assert.equal(game.politics.realms[u.junior]?.ruler,u.monarch,'Union junior');
+ }
+}
 function assertTitles(game){
  for(const province of Object.values(game.provinces)){
   const holding = game.politics.holdings[province.id];
@@ -28,7 +48,7 @@ function assertTitles(game){
 }
 
 for(const [realm,difficulty] of [['england','normal'],['vijayanagara','hard']]){
- test('Release endurance on dense atlas: ' + realm,{timeout:Math.max(240_000,months*550)},()=>{
+ test('Release endurance on dense atlas: ' + realm,{timeout:Math.max(240_000,months*900)},()=>{
   let game = createGame(world,realm);
   game.kingdom.difficulty = difficulty;
   for(let i=0;i<months;i++){
@@ -43,11 +63,13 @@ for(const [realm,difficulty] of [['england','normal'],['vijayanagara','hard']]){
    }
    if(i%12===11){
     assertTitles(game);
+    assertCampaignLinks(game);
     const raw = snapshot(game);
     validatePortableSave(raw);
     game = restoreGame(raw,world);
     assert.equal(game.turn,i+1);
     assertTitles(game);
+    assertCampaignLinks(game);
    }
   }
   assert.ok(Number.isFinite(empireStats(game,realm).balance));
