@@ -435,13 +435,55 @@ function stepStruggles(g){const a=g.heritage,cache=new Map();for(const p of Obje
  if(!def.domestic&&x.phase==='hostility'&&x.tension>=90&&x.cooperation<=15){const ranked=members.slice().sort((a,b)=>x.influence[b]-x.influence[a]||a.localeCompare(b));const leader=ranked[0],total=members.reduce((n,id)=>n+regionalLand(g,id).length,0);if(x.influence[leader]>=150&&x.influence[leader]>=2*Math.max(1,x.influence[ranked[1]])&&regionalLand(g,leader).length>=total*.55)settleRegional(g,a,def,x,members,'dominance',leader);}
  }}
 export function unlockLegacy(g,realm,id){const d=dynasty(g,realm),l=LEGACIES[id];if(!l||d.legacies.includes(id)||d.renown<l.cost||l.requires&&!d.legacies.includes(l.requires))return no('Requires an unlearned legacy, its prerequisite and sufficient dynastic renown.');d.renown-=l.cost;d.legacies.push(id);record(g,realm,'Dynastic legacy unlocked: '+l.name+'.');return ok('Dynastic legacy unlocked.');}
+// Crown artifacts remain unique records; transfers preserve provenance and conserve gold.
+const artifactLand=(g,r)=>own(g,r).some(p=>!g.campaignWar?.occupations?.[p.id]||g.campaignWar.occupations[p.id].by===r);
+function artifactPeace(g,a,b){return !Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(a)&&[w.attacker,w.defender].includes(b));}
+function artifactReady(g,a,b,x){return !!(x&&ARTIFACTS[x.kind]&&x.realm===a&&x.durability>0&&a!==b&&g.factions[a]&&g.factions[b]&&ruler(g,a)?.alive&&ruler(g,b)?.alive&&artifactLand(g,a)&&artifactLand(g,b)&&artifactPeace(g,a,b)&&g.turn-(x.lastTransfer??-1000)>=12&&!Object.values(g.heritage.artifacts).some(v=>v.realm===b&&v.kind===x.kind&&v.durability>0));}
+export function artifactValue(x){const def=ARTIFACTS[x?.kind];return def?Math.max(20,Math.round(def.cost*(.35+.85*cap(x.durability,0,100)/100))):0;}
+export function artifactExchangeQuote(g,item,to,mode='gift',from=g.player){
+ const x=g.heritage?.artifacts[item],price=artifactValue(x);
+ if(!artifactReady(g,from,to,x))return {ok:false,price,reason:'Requires a unique intact artifact, two landed courts at peace, and a twelve-month transfer interval.'};
+ const a=g.factions[from],b=g.factions[to],relation=b.relations[from]||0,offer=mode==='buy'||mode==='sell';
+ if(!['gift','sell','buy'].includes(mode))return {ok:false,price,reason:'Unknown exchange.'};
+ if(mode==='buy'&&Object.values(g.heritage.realms[from].equipped).includes(item))return {ok:false,price,reason:'The foreign court will not sell its equipped regalia.'};
+ if((mode==='gift'&&relation<0)||(offer&&relation<20))return {ok:false,price,reason:offer?'Trade needs relations of at least 20.':'The other court will not accept a gift while relations are hostile.'};
+ if(offer&&b.treasury<price+(mode==='sell'?300:0))return {ok:false,price,reason:'The purchaser cannot afford this exchange.'};
+ if(mode==='buy'&&(a.relations[to]||0)<20)return {ok:false,price,reason:'The selling court requires friendly relations.'};
+ return {ok:true,price};
+}
+export function artifactMarkets(g,r=g.player){
+ const items=Object.values(g.heritage?.artifacts||{}),foreign=Object.keys(g.factions).filter(id=>id!==r&&g.heritage?.realms[id]);
+ return {owned:items.filter(x=>x.realm===r).map(x=>({item:x,price:artifactValue(x),gifts:foreign.filter(id=>artifactExchangeQuote(g,x.id,id,'gift',r).ok),sales:foreign.filter(id=>artifactExchangeQuote(g,x.id,id,'sell',r).ok)})),offers:items.filter(x=>x.realm!==r&&artifactExchangeQuote(g,x.id,r,'buy',x.realm).ok).map(x=>({item:x,price:artifactValue(x)}))};
+}
+function commissionArtifact(g,realm,kind,equip=true){
+ const a=g.heritage,s=a.realms[realm],f=g.factions[realm],d=dynasty(g,realm),rule=ARTIFACTS[kind],head=ruler(g,realm);
+ if(!rule||!head?.alive||!artifactLand(g,realm)||f.treasury<rule.cost||Object.values(a.artifacts).some(x=>x.realm===realm&&x.kind===kind&&x.durability>0))return no('Need controlled land, sufficient gold and no intact duplicate artifact.');
+ f.treasury-=rule.cost;const key='r'+a.next++;a.artifacts[key]={id:key,kind,realm,creator:head.id,owner:head.id,origin:realm,culture:g.civic.realms[realm].culture,year:g.year,durability:100,history:[{turn:g.turn,message:'Commissioned by '+head.name}]};if(equip||!s.equipped[rule.slot])s.equipped[rule.slot]=key;d.renown+=5;return ok(rule.name+' commissioned.');
+}
+function exchangeArtifact(g,item,to,mode){
+ const x=g.heritage.artifacts[item],from=mode==='buy'?x?.realm:g.player,dest=mode==='buy'?g.player:to;
+ if(mode==='buy'&&from===g.player)return no('Choose a foreign artifact.');
+ const q=artifactExchangeQuote(g,item,dest,mode,from);if(!q.ok)return no(q.reason);
+ const a=g.heritage,rule=ARTIFACTS[x.kind],seller=g.factions[from],buyer=g.factions[dest],head=ruler(g,dest);
+ if(mode!=='gift'){buyer.treasury-=q.price;seller.treasury+=q.price;}
+ else {buyer.relations[from]=cap((buyer.relations[from]||0)+12,-100,100);seller.relations[dest]=cap((seller.relations[dest]||0)+5,-100,100);}
+ for(const [slot,id] of Object.entries(a.realms[from].equipped))if(id===item)delete a.realms[from].equipped[slot];
+ x.realm=dest;x.owner=head.id;x.lastTransfer=g.turn;x.history??=[];x.history.unshift({turn:g.turn,message:(mode==='gift'?'Gifted':'Purchased for '+q.price+'g')+' by '+head.name+' from '+seller.name});x.history=x.history.slice(0,20);
+ if(!a.realms[dest].equipped[rule.slot])a.realms[dest].equipped[rule.slot]=item;
+ record(g,from,rule.name+' transferred to '+buyer.name+'.');record(g,dest,rule.name+' received from '+seller.name+'.');
+ return ok(rule.name+' transferred to '+buyer.name+'.');
+}
+
 export function heritageAction(g,world,action,id,extra,guest){const a=initHeritage(g,world),realm=g.player,s=a.realms[realm],f=g.factions[realm],d=dynasty(g,realm);
  if(action==='activity-plan')return planActivity(g,world,realm,id,extra,guest);
  if(action.startsWith('activity-'))return planAction(g,world,realm,action,id||extra);
  if(action==='activity')return start(g,world,realm,id,extra,guest);
  if(action==='incident')return incident(g,realm,Number(id));
  if(action==='initiative')return struggleAction(g,realm,id,extra);
- if(action==='artifact'){const rule=ARTIFACTS[id];if(!rule||f.treasury<rule.cost||Object.values(a.artifacts).some(x=>x.realm===realm&&x.kind===id&&x.durability>0))return no('Need sufficient gold and no intact duplicate artifact.');f.treasury-=rule.cost;const key='r'+a.next++;a.artifacts[key]={id:key,kind:id,realm,creator:ruler(g,realm).id,owner:ruler(g,realm).id,origin:realm,culture:g.civic.realms[realm].culture,year:g.year,durability:100,history:[{turn:g.turn,message:'Commissioned by '+ruler(g,realm).name}]};s.equipped[rule.slot]=key;d.renown+=5;return ok(rule.name+' commissioned and equipped.');}
+ if(action==='artifact')return commissionArtifact(g,realm,id);
+ if(action==='artifact-gift')return exchangeArtifact(g,id,extra,'gift');
+ if(action==='artifact-sell')return exchangeArtifact(g,id,extra,'sell');
+ if(action==='artifact-buy')return exchangeArtifact(g,id,realm,'buy');
  if(action==='equip'){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(!x||x.realm!==realm||x.durability<=0||!rule)return no('Select an intact artifact of your realm.');s.equipped[rule.slot]=id;x.history??=[];x.history.unshift({turn:g.turn,message:'Equipped by '+ruler(g,realm).name});x.history=x.history.slice(0,20);return ok('Artifact equipped.');}
  if(action==='repair'){const x=a.artifacts[id];if(!x||x.realm!==realm||x.durability>=100||f.treasury<80)return no('Artifact repair requires 80 gold and damage.');f.treasury-=80;x.durability=cap(x.durability+35,0,100);x.history??=[];x.history.unshift({turn:g.turn,message:'Restored by '+ruler(g,realm).name});x.history=x.history.slice(0,20);return ok('Artifact restored.');}
  if(action==='legacy')return unlockLegacy(g,realm,id);
@@ -450,7 +492,7 @@ export function tickHeritage(g,world){const a=initHeritage(g,world);if(a.lastTic
  for(const [realm,s] of Object.entries(a.realms)){const r=ruler(g,realm),d=dynasty(g,realm),f=g.factions[realm];if(!r)continue;if(s.seenRuler!==r.id){s.seenRuler=r.id;d.renown+=5;for(const x of Object.values(a.artifacts).filter(x=>x.realm===realm)){x.owner=r.id;x.history??=[];x.history.unshift({turn:g.turn,message:'Entrusted to the new sovereign '+r.name});x.history=x.history.slice(0,20);}}
  if(a.activities[realm])stepActivity(g,realm,a.activities[realm]);
  else if(realm!==g.player&&g.turn%12===0&&f.treasury>600&&own(g,realm).length&&random(a)<.22){const destinations=activityDestinations(g,world,realm);if(destinations.length){const kind=s.lastCoronation!==r.id?'coronation':['feast','hunt','tour','pilgrimage','tournament','assembly','symposium','memorial','coming_age'][hash(realm+g.turn)%9];start(g,world,realm,kind,destinations[hash(realm+g.turn)%destinations.length].id);}}
- if(g.turn%12===0){if(realm!==g.player){const preference={martial:'warfare',stewardship:'statecraft',learning:'scholarship',diplomacy:'commerce',intrigue:'statecraft'}[r.civic?.focus]||'statecraft',options=Object.keys(LEGACIES).filter(id=>!d.legacies.includes(id)&&d.renown>=LEGACIES[id].cost&&(!LEGACIES[id].requires||d.legacies.includes(LEGACIES[id].requires)));const next=options.find(id=>id===preference||id.startsWith(preference+'_'))||options[0];if(next)unlockLegacy(g,realm,next);}for(const id of Object.values(s.equipped)){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(x&&rule&&x.durability>0){x.durability=cap(x.durability-4,0,100);f.prestige+=rule.prestige;}}if(own(g,realm).length>=10&&!d.achievements.includes('Realm builder')){d.achievements.push('Realm builder');d.renown+=15;}}
+ if(g.turn%12===0){if(realm!==g.player){if(g.turn%24===0&&f.treasury>=1800&&artifactLand(g,realm)&&hash(realm+g.turn)%4===0){const choices=Object.keys(ARTIFACTS).filter(k=>!Object.values(a.artifacts).some(x=>x.realm===realm&&x.kind===k&&x.durability>0));if(choices.length)commissionArtifact(g,realm,choices[hash(realm+':artifact:'+g.turn)%choices.length],false);}const preference={martial:'warfare',stewardship:'statecraft',learning:'scholarship',diplomacy:'commerce',intrigue:'statecraft'}[r.civic?.focus]||'statecraft',options=Object.keys(LEGACIES).filter(id=>!d.legacies.includes(id)&&d.renown>=LEGACIES[id].cost&&(!LEGACIES[id].requires||d.legacies.includes(LEGACIES[id].requires)));const next=options.find(id=>id===preference||id.startsWith(preference+'_'))||options[0];if(next)unlockLegacy(g,realm,next);}for(const id of Object.values(s.equipped)){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(x&&x.realm===realm&&rule&&x.durability>0){x.durability=cap(x.durability-4,0,100);f.prestige+=rule.prestige;}}if(own(g,realm).length>=10&&!d.achievements.includes('Realm builder')){d.achievements.push('Realm builder');d.renown+=15;}}
  }
  if(g.turn%3===0)stepStruggles(g);
 }
