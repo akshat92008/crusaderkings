@@ -1,5 +1,5 @@
 import {personalUnionAction,reconcilePersonalUnions,unionJuniorDomain} from './personal-unions.js';
-import {humanControlsRealm,reconcileCareer} from './player-career.js';
+import {humanControlsRealm,humanControlsCharacter,reconcileCareer} from './player-career.js';
 import {estateLaw,estateSuccession} from './estate-succession.js';
 import {characterInteraction} from './character-agency.js';
 import {reconcileRegency,tickRegency,regencyAction} from './regency-systems.js';
@@ -147,7 +147,7 @@ function arrangeAiBetrothals(g){
  const p=g.politics;
  for(const [realm,state] of Object.entries(p.realms)){
   const faction=g.factions[realm],plan=g.strategy?.plans?.[realm];
-  if(humanControlsRealm(g,realm)||faction.treasury<550||plan?.goal!=='diplomacy')continue;
+  if(humanControlsRealm(g,realm)||humanControlsCharacter(g,p.realms[realm]?.ruler)||faction.treasury<550||plan?.goal!=='diplomacy')continue;
   if(Object.values(p.betrothals||{}).some(x=>x.sponsor===realm&&validBetrothal(g,x)))continue;
   const heir=children(p,p.people[state.ruler]).filter(betrothalAge).sort((a,b)=>b.age-a.age||a.id.localeCompare(b.id))[0];
   if(!heir)continue;
@@ -300,7 +300,7 @@ export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTic
  if(g.turn%12===0){
   arrangeAiBetrothals(g);
   // Royal AI chooses partners with existing relations; domestic matches keep family lines alive.
-  for(const [realm,s] of Object.entries(p.realms)){const r=p.people[s.ruler];if(humanControlsRealm(g,realm))continue;for(const a of [r,...children(p,r)]){if(a.realm!==realm||a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];if(match&&marry(g,a,p.people[match.b]).ok){}else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:'House of '+realm+' consorts'});link(a,b);}}}
+  for(const [realm,s] of Object.entries(p.realms)){const r=p.people[s.ruler];if(humanControlsRealm(g,realm)||humanControlsCharacter(g,r.id))continue;for(const a of [r,...children(p,r)]){if(a.realm!==realm||a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];if(match&&marry(g,a,p.people[match.b]).ok){}else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:'House of '+realm+' consorts'});link(a,b);}}}
  }
  reconcileMarriageTreaties(g);
  if(g.turn%3===0){const estates=Object.fromEntries(Object.keys(p.realms).map(r=>[r,politicalEstates(g,r)])),hierarchies=Object.fromEntries(Object.keys(p.realms).map(r=>[r,feudalHierarchy(g,r)]));for(const [id,v] of Object.entries(p.holdings)){const f=g.factions[v.realm],lord=p.people[v.lord];if(!f||!lord)continue;if(v.lord===p.realms[v.realm].ruler){v.loyalty=100;continue;}const target=clamp(55+(f.legitimacy-50)*.4+(f.stability-50)*.25-(v.tax-1)*15-(v.levy-1)*10+(v.autonomy-1)*10+(v.exemptions?.tax?6:0)+(v.exemptions?.levy?6:0)-(lord.traits.includes('ambitious')?12:0)+personalOpinion(g,p.realms[v.realm].ruler,lord.id)*.20+regionalLoyalty(g,id)+authorityModifiers(g,v.realm,estates[v.realm]).loyalty-(estates[v.realm]?.byLord[v.lord]?.grievance||0),0,100);v.loyalty=clamp(v.loyalty+clamp(target-v.loyalty,-4,4),0,100);creditEstateIncome(g,id,Math.max(0,Math.round(g.provinces[id].development*(3-v.tax))),hierarchies[v.realm]);if(!humanControlsRealm(g,v.realm)&&v.loyalty<20&&v.autonomy===2&&f.treasury<150&&!v.exemptions?.levy)estateExemptionAction(g,v.realm,id,'levy',true,true);if(!humanControlsRealm(g,v.realm)&&v.loyalty<35&&f.treasury>=150){f.treasury-=150;v.loyalty+=20;v.autonomy=2;}

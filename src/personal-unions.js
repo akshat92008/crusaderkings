@@ -81,7 +81,7 @@ export function personalUnionAction(g,action,id){
  const r=g.player,u=personalUnion(g,r);
  if(g.playerCareer?.mode==='vassal')return no('A sovereign must negotiate a crown union.');
  if(action==='union-form')return found(g,r,id);
- if(action==='union-release'){if(!u)return no('No active personal union.');return split(g,u,'voluntary separation')?ok('The crowns are separate again.'):no('No local successor is available.');}
+ if(action==='union-release'){if(!u)return no('No active personal union.');if(g.kingdom?.threats?.length)return no('Resolve pending invasion alerts before separating crowns.');if(!split(g,u,'voluntary separation'))return no('No local successor is available.');g.player=u.senior;return ok('The crowns are separate again. You continue as the senior sovereign.');}
  if(action==='union-switch'){if(!u||!unionPartners(g,r,id))return no('Select the other crown in your union.');if(g.kingdom?.threats?.length)return no('Resolve pending invasion alerts before switching crowns.');g.player=id;return ok('Now administering '+g.factions[id].name+'. The other crown continues autonomously.');}
  return no('Unknown personal union action.');
 }

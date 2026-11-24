@@ -49,7 +49,7 @@ export function nominateSuccessor(g,realm,id){const s=g.politics?.realms?.[realm
 // their branch, and private estates keep their ordinary rules of inheritance.
 export function crownExclusionTerms(g,realm,id){
  const s=g.politics?.realms?.[realm],r=g.politics?.people?.[s?.ruler],p=g.politics?.people?.[id];
- if(!r||!p?.alive||p.realm!==realm||p.house!==r.house||r.id===id)return null;
+ if(!r||!p?.alive||p.realm!==(personalUnion(g,realm)?.junior===realm?r.realm:realm)||p.house!==r.house||r.id===id)return null;
  const excluded=crownExcluded(p,realm);
  if(!excluded&&!successionCandidates(g,realm).some(c=>c.id===id))return null;
  return {excluded,prestige:excluded?15:25,legitimacy:excluded?5:10};
