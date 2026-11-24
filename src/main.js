@@ -1,3 +1,4 @@
+import {feudalAction} from './feudal-systems.js';
 import {chronicleAction} from './chronicle-systems.js';
 import {strategyAction,defenseSupport} from './strategic-ai.js';
 import {CampaignMap} from './map.js';
@@ -13,7 +14,7 @@ import {militaryAction} from './military-systems.js';
 import {navalAction,portBlocked} from './naval-systems.js';
 import {controller,occupation} from './campaign-war.js';
 import {activeWar} from './political-conflict.js';
-import {renderStories,renderStrategy,renderNaval,renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {renderFeudal,renderStories,renderStrategy,renderNaval,renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -73,6 +74,7 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
  }else if(tab==='naval'){html=renderNaval(game,world,esc);
  }else if(tab==='strategy'){html=renderStrategy(game,world,esc);
  }else if(tab==='stories'){html=renderStories(game,world,esc);
+ }else if(tab==='titles'){html=renderFeudal(game,world,esc);
  }else if(tab==='trade'){
   html=renderTrade(game,world,esc);
  }else if(tab==='legacy'){
@@ -175,6 +177,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='feudal'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(feudalAction(game,world,type,btn.dataset.id,input?.value));}
  if(action==='story'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(chronicleAction(game,world,type,input?.value??btn.dataset.id));}
  if(action==='strategy'){const first=btn.dataset.input?el(btn.dataset.input):null,second=btn.dataset.second?el(btn.dataset.second):null;clickResult(strategyAction(game,world,type,first?.value??btn.dataset.id,second?.value??btn.dataset.extra));}
  if(action==='naval'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(navalAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
