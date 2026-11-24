@@ -34,7 +34,7 @@ export function initCivic(g,world){
  if(g.civic?.version===1)return g.civic;
  const c=g.civic={version:1,realms:{},provinces:{},events:{},situations:{},history:[],lastTick:-1,seed:671901};
  for(const f of world.factions){const [government,culture,faith]=profile(f);c.realms[f.id]={government,culture,faith,authority:55,cohesion:65,patronage:45,policy:'accommodation',lastDecision:{},charterUntil:0,lastElection:g.turn,lastRuler:g.politics.realms[f.id].ruler};
-  if(g.turn===0&&g.politics.realms[f.id].law==='eldest')g.politics.realms[f.id].law=GOVERNMENTS[government].law;
+  if(government==='republic'||g.turn===0&&g.politics.realms[f.id].law==='eldest')g.politics.realms[f.id].law=GOVERNMENTS[government].law;
  }
  for(const p of world.provinces){const s=c.realms[g.provinces[p.id]?.owner];c.provinces[p.id]={culture:s?.culture||'Local traditions',faith:s?.faith||'Local traditions',acceptance:65,devotion:50,localTrust:65};}
  for(const p of Object.values(g.politics.people))character(g,p);
@@ -71,7 +71,7 @@ function governmentAction(g,realm){const s=g.civic.realms[realm],gov=GOVERNMENTS
 export function civicAction(g,world,action,id,extra){const c=initCivic(g,world),realm=g.player,s=c.realms[realm],f=g.factions[realm],r=ruler(g,realm),rc=character(g,r);
  if(action==='government')return governmentAction(g,realm);
  if(action==='policy'){if(!['accommodation','pluralism','coercion'].includes(id)||s.policy===id||!spend(g,realm,'faith-policy',80,24))return no('Policy change requires 80 gold and two years between changes.');s.policy=id;s.patronage=cap(s.patronage+(id==='coercion'?8:id==='pluralism'?-4:0),0,100);history(g,realm,'The realm adopted '+id+' as its faith policy.');return ok('Faith policy changed.');}
- if(action==='focus'){if(!LIFESTYLES[id]||rc.focus===id||g.turn-rc.lastFocus<24)return no('Choose a different lifestyle; changes are limited to every two years.');rc.focus=id;rc.xp=0;rc.perks=[];rc.lastFocus=g.turn;return ok('Lifestyle focus changed.');}
+ if(action==='focus'){if(!LIFESTYLES[id]||rc.focus===id||g.turn-rc.lastFocus<24)return no('Choose a different lifestyle; changes are limited to every two years.');rc.progress??={};if(rc.focus)rc.progress[rc.focus]={xp:rc.xp,perks:rc.perks};rc.focus=id;rc.xp=rc.progress[id]?.xp||0;rc.perks=rc.progress[id]?.perks||[];rc.lastFocus=g.turn;return ok('Lifestyle focus changed.');}
  if(action==='guardian'){const child=person(g,id),guardian=person(g,extra);if(!child?.alive||!r.children.includes(id)||child.age<6||child.age>=18||!guardian?.alive||guardian.realm!==realm||guardian.age<18||guardian.id===id)return no('Choose a royal child aged 6–17 and an adult local guardian.');character(g,child).guardian=guardian.id;return ok('Guardian assigned.');}
  if(action==='rest'){if(!spend(g,realm,'rest',70,12))return no('Rest needs 70 gold and a yearly interval.');rc.stress=cap(rc.stress-25,0,100);return ok('Ruler stress reduced.');}
  if(action==='patronage'){if(!spend(g,realm,'patronage',110,12))return no('Patronage needs 110 gold and a yearly interval.');s.patronage=cap(s.patronage+15,0,100);f.legitimacy=cap(f.legitimacy+4,0,100);return ok('Religious and community institutions supported.');}
