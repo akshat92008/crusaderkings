@@ -39,7 +39,7 @@ export function tickMilitary(g,world){const m=initMilitary(g);if(m.lastTick===g.
  }}
 // Tactical gate and tower objectives are separate from render assets.
 export function createSiegeState(fortLevel,defenseMode=false){const level=cap(Number(fortLevel)||0,0,3);if(!level)return null;const hp=80+level*65;return {level,assaultSide:defenseMode?'defender':'attacker',structures:[{id:'gate',name:'Gate',x:0,z:-18,hp,max:hp},{id:'left',name:'West tower',x:-24,z:-18,hp:hp*.65,max:hp*.65},{id:'right',name:'East tower',x:24,z:-18,hp:hp*.65,max:hp*.65}]};}
-export function siegeTarget(siege,g){if(!siege||g.side!==siege.assaultSide)return null;const gate=siege.structures[0];if(gate.hp<=0)return null;return gate;}
+export function siegeTarget(siege,g){if(!siege||g.side!==siege.assaultSide)return null;const gate=siege.structures[0];if(gate.hp<=0)return null;const flank=g.x<-15?siege.structures[1]:g.x>15?siege.structures[2]:null;return flank&&flank.hp>0?flank:gate;}
 export function siegeDamage(siege,id,damage){const x=siege?.structures.find(x=>x.id===id);if(!x||x.hp<=0)return false;x.hp=Math.max(0,x.hp-Math.max(0,damage));return x.hp===0;}
 export function siegeBreached(siege){return !siege||siege.structures[0].hp<=0;}
 export function applyFortDamage(g,province,result){const p=g.provinces[province];if(p&&result?.fortBreached&&p.buildings.fort>0)p.buildings.fort--;}
