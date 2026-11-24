@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createGame,snapshot,restoreGame,advanceMonth} from '../src/simulation.js';
 import {personalUnionAction,personalUnion,unionPartners,unionTerms,reconcilePersonalUnions,renderPersonalUnions} from '../src/personal-unions.js';
-import {removePoliticalCharacter,successionPreview} from '../src/dynastic-politics.js';
+import {removePoliticalCharacter,successionPreview,politicsAction} from '../src/dynastic-politics.js';
 import {nonAggression,militaryAccess} from '../src/diplomacy-systems.js';
 import {conflictAction} from '../src/political-conflict.js';
+import {humanControlsCharacter,humanControlsRealm} from '../src/player-career.js';
+import {crownExcluded,setCrownExclusion} from '../src/succession-systems.js';
 import {tickCivic} from '../src/civic-systems.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 function fixture(){
@@ -66,4 +68,15 @@ test('shared sovereign personal progression applies once per quarterly tick and 
  g.turn=3;tickCivic(g,world);assert.equal(p.civic.xp,expected);
  for(let i=0;i<12;i++)advanceMonth(g,world);
  assert.ok(Number.isFinite(g.factions[junior].treasury));assert.ok(g.politics.people[g.politics.realms[junior].ruler]?.alive);
+});
+
+test('shared crowns preserve distinct succession exclusions and one human character across administration',()=>{
+ const {g,senior,junior,p}=fixture();assert.ok(personalUnionAction(g,'union-form',junior).ok);
+ const heir=successionPreview(g,senior);assert.ok(heir);
+ setCrownExclusion(heir,senior,true);setCrownExclusion(heir,junior,true);
+ assert.equal(crownExcluded(heir,senior),true);assert.equal(crownExcluded(heir,junior),true);
+ setCrownExclusion(heir,junior,false);assert.equal(crownExcluded(heir,senior),true);assert.equal(crownExcluded(heir,junior),false);
+ assert.ok(personalUnionAction(g,'union-switch',junior).ok);
+ assert.equal(humanControlsCharacter(g,p.id),true);assert.equal(humanControlsRealm(g,senior),false);assert.equal(humanControlsRealm(g,junior),true);
+ assert.ok(personalUnionAction(g,'union-release').ok);assert.equal(g.player,senior);assert.equal(g.politics.realms[senior].ruler,p.id);
 });

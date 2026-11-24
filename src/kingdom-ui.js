@@ -536,7 +536,7 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
      :'<p class="smallnote">No eligible court currently accepts the match.</p>')+'</details>';
   }
  }
- const crown=x.own?crownExclusionTerms(g,g.player,id):null;
+ const crown=crownExclusionTerms(g,g.player,id);
  if(crown){
   h+='<details class="rule"><summary>Crown succession rights</summary><p class="smallnote">'
    +(crown.excluded?'This character is excluded from crown succession.':'This character is eligible to inherit the crown.')

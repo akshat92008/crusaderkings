@@ -3,7 +3,7 @@ import {humanControlsRealm,humanControlsCharacter,reconcileCareer} from './playe
 import {estateLaw,estateSuccession} from './estate-succession.js';
 import {characterInteraction} from './character-agency.js';
 import {reconcileRegency,tickRegency,regencyAction} from './regency-systems.js';
-import {successionCandidates,nominateSuccessor,hereditaryLine,crownExcluded,crownExclusionTerms} from './succession-systems.js';
+import {successionCandidates,nominateSuccessor,hereditaryLine,crownExcluded,crownExclusionTerms,setCrownExclusion} from './succession-systems.js';
 import {feudalHierarchy,obligationProfile,creditEstateIncome,estateExemptionAction} from './feudal-obligations.js';
 import {estateDisputeAction} from './estate-conflicts.js';
 import {resolveVassalPetition} from './vassal-courts.js';
@@ -177,10 +177,8 @@ function changeCrownExclusion(g,id,exclude){
  if(f.prestige<terms.prestige||f.legitimacy<55)return {ok:false,msg:'Requires '+terms.prestige+' prestige and at least 55 legitimacy.'};
  f.prestige-=terms.prestige;
  f.legitimacy-=terms.legitimacy;
- if(exclude){
-  target.crownExclusion=realm;
-  if(s.nominee===id)delete s.nominee;
- }else delete target.crownExclusion;
+ setCrownExclusion(target,realm,exclude);
+ if(exclude&&s.nominee===id)delete s.nominee;
  changeOpinion(g,r.id,id,exclude?-35:20);
  const message=target.name+(exclude?' was excluded from crown succession.':' regained crown succession rights.');
  target.memories=[...target.memories,g.year+': '+message].slice(-30);

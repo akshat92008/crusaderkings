@@ -9,7 +9,14 @@ const opinion=(g,a,b)=>num(g.chronicles?.relationships?.[[a,b].sort().join('|')]
 // Representation preserves the senior branch even if its parent died first.
 // A living eligible ancestor precedes descendants; dead or ineligible ancestors
 // do not extinguish their entire branch. Foreign residents cannot take a crown yet.
-export const crownExcluded=(person,realm)=>Boolean(realm&&person?.crownExclusion===realm);
+export const crownExcluded=(person,realm)=>Boolean(realm&&(person?.crownExclusion===realm||person?.crownExclusions?.includes(realm)));
+export function setCrownExclusion(person,realm,exclude){
+ const set=new Set([...(person.crownExclusions||[]),person.crownExclusion].filter(Boolean));
+ if(exclude)set.add(realm);else set.delete(realm);
+ delete person.crownExclusion;delete person.crownExclusions;
+ if(set.size===1)person.crownExclusion=[...set][0];
+ else if(set.size>1)person.crownExclusions=[...set].sort();
+}
 export function hereditaryLine(g,head,law='eldest',crownRealm=null,branchRoot=null){
  if(!head)return [];const seen=new Set([head.id]),out=[];
  function visit(p){if(!p||seen.has(p.id))return;seen.add(p.id);if(free(g,p)&&p.realm===head.realm&&p.house===head.house&&!crownExcluded(p,crownRealm))out.push(p);const list=children(g,p).sort(byAge);if(law==='youngest')list.reverse();for(const c of list)visit(c);}
