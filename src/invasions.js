@@ -98,7 +98,7 @@ function trimArmy(a,fraction){
 }
 export function resolveInvasion(g,world,threat,result){
  const found=g.kingdom?.threats?.find(t=>t.army===threat?.army&&t.province===threat?.province);
- if(!found||found.status!=='ready')return {ok:false,msg:'No active siege at that province'};
+ if(!found||found.status!=='ready')return {ok:false,msg:'No active invasion at that province'};
  const province=g.provinces[found.province],attacker=g.armies[found.army];
  if(!attacker||!province||province.owner!==g.player||hasTruce(g,found.by,g.player))return {ok:false,msg:'The invasion is no longer valid'};
  const human=armiesOf(g,g.player).filter(a=>a.province===found.province);
@@ -114,7 +114,7 @@ export function resolveInvasion(g,world,threat,result){
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
  }else{
   captureProvince(g,war,found.by,found.province,attacker.province);province.unrest=clamp(province.unrest+27,0,100);
-  if(!result.fortBreached&&province.buildings.fort>0)province.buildings.fort--;
+  if(!result.fieldBattle&&!result.fortBreached&&province.buildings.fort>0)province.buildings.fort--;
   attacker.province=found.province;
   // Surviving defenders retreat to an owned neighboring province if possible.
   const local=world.provinces.find(p=>p.id===found.province);
@@ -134,10 +134,10 @@ export function resolveInvasion(g,world,threat,result){
 }
 export function autoResolveInvasion(g,world,threat){
  const target=g.provinces[threat.province],army=g.armies[threat.army];
- if(!target||!army)return {ok:false,msg:'Siege no longer active'};
+ if(!target||!army)return {ok:false,msg:'Invasion no longer active'};
  const defense=45+target.development*12+(target.buildings.fort||0)*45+defenseSupport(g,g.player,threat.by)+
   armiesOf(g,g.player).filter(a=>a.province===threat.province).reduce((sum,a)=>sum+troops(a)*(.7+(a.experience||0)*.4),0);
  const offense=troops(army)*armyReadiness(g,army).power*(.8+(army.morale||75)/280+(army.experience||0)*.2);
  const defended=offense<=defense*1.13;
- return resolveInvasion(g,world,threat,{victory:defended,attackerRemaining:defended?.82:.32,enemyRemaining:defended?.36:.75});
+ return resolveInvasion(g,world,threat,{victory:defended,attackerRemaining:defended?.82:.32,enemyRemaining:defended?.36:.75,fieldBattle:true});
 }

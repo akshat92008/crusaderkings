@@ -83,7 +83,7 @@ export class CampaignMap{
     c.lineWidth=3.2;c.strokeStyle='rgba(240,222,182,.84)';c.strokeText(text,x,y);c.fillStyle='rgba(45,49,40,.89)';c.fillText(text,x,y);used.push([x,y,width]);if(used.length>65)break;
    }
   }else if(this.mode==='political'){
-   const factions=this.world.factions.slice();factions.sort((a,b)=>{const ca=this.world.provinces.filter(p=>(this.game?.provinces[p.id]?.owner??p.owner)===a.id).length,cb=this.world.provinces.filter(p=>(this.game?.provinces[p.id]?.owner??p.owner)===b.id).length;return cb-ca;});
+   const factions=this.game?Object.values(this.game.factions).filter(f=>f.id!=='independent'&&f.capital):this.world.factions.slice();factions.sort((a,b)=>{const ca=this.world.provinces.filter(p=>(this.game?.provinces[p.id]?.owner??p.owner)===a.id).length,cb=this.world.provinces.filter(p=>(this.game?.provinces[p.id]?.owner??p.owner)===b.id).length;return cb-ca;});
    for(const f of factions){const [x,y]=this.toScreen(...f.capital);if(x<22||y<36||x>this.w-22||y>this.h-42)continue;
     if(this.zoom<1.6&&!['france','england','ottomans','ming','delhi','timurids','mali','inca','ashikaga','mexica','vijayanagara','ethiopia','mamluks'].includes(f.id))continue;
     const label=f.name.toUpperCase(),font=clamp(9+this.zoom*.83,10,16);c.font='bold '+font+'px Georgia,serif';
@@ -93,7 +93,7 @@ export class CampaignMap{
   }
   c.restore();
  }
- _cityMarkers(c){c.save();for(const f of this.world.factions){const [x,y]=this.toScreen(...f.capital);if(x<18||y<25||x>this.w-18||y>this.h-35)continue;drawSettlement(c,x,y,this.game?.player===f.id);}c.restore();}
+ _cityMarkers(c){c.save();for(const f of (this.game?Object.values(this.game.factions).filter(f=>f.capital&&Object.values(this.game.provinces).some(p=>p.owner===f.id)):this.world.factions)){const [x,y]=this.toScreen(...f.capital);if(x<18||y<25||x>this.w-18||y>this.h-35)continue;drawSettlement(c,x,y,this.game?.player===f.id);}c.restore();}
  _hoverTip(c){
   if(!this.hover)return;
   const [cx,cy]=this.toScreen(...this.hover.centroid),state=this.game?.provinces?.[this.hover.id],f=this.game?.factions?.[state?.owner]||this.world.factions.find(f=>f.id===this.hover.owner);
