@@ -34,3 +34,6 @@ New campaigns derive 486 playable land districts from the legacy Natural Earth p
 
 ## Phase 18: capital selection and provenance
 Initial armies and the campaign inspector now use the owned district containing the approximate political-center coordinate, with nearest-owned fallback explicitly marked. Existing map version, district IDs, ownership, boundaries and land links remain unchanged. The province inspector exposes the initial ownership classification, reference polity where available, and the number of sample points supporting a classification. Sample agreement is an internal geometry diagnostic, not a historical accuracy percentage. World metadata includes coverage counts. Reloading an existing campaign selects an owned district rather than a lost capital.
+
+### Land connectivity diagnostics
+The atlas indexes connected land components, annotates each district with its network size, and displays current owned land groups in the realm panel. Components use existing reciprocal land adjacency; islands and disconnected fragments are not connected by fabricated land routes. A reference-polity index distinguishes independent reference districts from starting playable realms. No topology or ownership changes; atlas-v2 saves remain compatible. Naval access remains limited to implemented sea basins and ports.

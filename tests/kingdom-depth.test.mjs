@@ -14,12 +14,16 @@ test('all 44 factions have distinct fictional rulers, heirs and generated royal 
 test('royal audience, stewardship and marshalship cost money and obey limits',()=>{
  const g=createGame(world),f=g.factions.ottomans,c=currentCourt(g);f.treasury=10000;
  const first=f.treasury;
+ // Training is intentionally capped at five; select a trainable fixture.
+ const council=g.politics.realms.ottomans.council,steward=g.politics.people[council.steward],marshal=g.politics.people[council.marshal];
+ steward.skills.stewardship=3;marshal.skills.martial=3;c.steward=3;c.marshal=3;
  assert.ok(courtDecision(g,world,'audience').ok);
  assert.equal(courtDecision(g,world,'audience').ok,false);
  assert.ok(courtDecision(g,world,'steward').ok);
  assert.ok(courtDecision(g,world,'marshal').ok);
  assert.ok(f.treasury<first);
- assert.equal(c.steward>=2,true);
+ assert.equal(c.steward,4);assert.equal(steward.skills.stewardship,4);assert.equal(marshal.skills.martial,4);
+ assert.ok(courtDecision(g,world,'steward').ok);assert.equal(c.steward,5);const goldAtCap=f.treasury;assert.equal(courtDecision(g,world,'steward').ok,false);assert.equal(f.treasury,goldAtCap);
  assert.ok(courtDecision(g,world,'chronicle').ok);
  assert.ok(courtDecision(g,world,'succession').ok);
 });

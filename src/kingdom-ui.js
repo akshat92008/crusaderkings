@@ -1,5 +1,5 @@
 import {COURT_OFFICES,courtCandidates,courtModifiers} from './royal-court.js';
-import {currentExpandedEvent,currentExpandedEvents,expandedDecisions} from './expanded-content.js';
+import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
 import {nonAggression,guaranteePartners,aidOptions,aidStrength} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
