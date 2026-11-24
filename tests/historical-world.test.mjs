@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import {buildHistoricalWorld,worldForSave,MAP_VERSION} from '../src/historical-world.js';
+const legacy=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
+const reference=JSON.parse(readFileSync(new URL('../data/historical-polities-1450.json',import.meta.url)));
+const original=JSON.stringify(legacy),atlas=buildHistoricalWorld(legacy,reference);
+const byId=new Map(atlas.provinces.map(p=>[p.id,p]));
+test('historical atlas separates formerly disconnected polygon components',()=>{assert.equal(atlas.meta.mapVersion,MAP_VERSION);assert.equal(atlas.provinces.length,486);assert.equal(byId.size,486);assert.equal(legacy.provinces.length,299);assert.equal(JSON.stringify(legacy),original);assert.ok(atlas.provinces.every(p=>p.geometry.type==='Polygon'&&p.legacyId));});
+test('all 44 starting profiles retain land and ownership provenance is explicit',()=>{assert.equal(atlas.factions.length,44);for(const f of atlas.factions)assert.ok(atlas.provinces.some(p=>p.owner===f.id));assert.ok(atlas.provinces.every(p=>['reference','regional approximation','playability approximation','unassigned'].includes(p.ownershipSource)));assert.equal(atlas.provinces.filter(p=>p.ownershipSource==='reference').length,97);assert.ok(atlas.provinces.filter(p=>p.owner==='independent').length>300);});
+test('land graph is reciprocal with no self edges or dangling references',()=>{let edges=0;for(const p of atlas.provinces){assert.equal(new Set(p.neighbors).size,p.neighbors.length);for(const n of p.neighbors){assert.ok(n!==p.id&&byId.has(n)&&byId.get(n).neighbors.includes(p.id));edges++;}}assert.equal(edges/2,617);});
+test('Moscow and the lower Volga are distinct connected districts',()=>{const north=byId.get('p19-north'),south=byId.get('p19');assert.equal(north.owner,'muscovy');assert.equal(south.owner,'horde');assert.ok(north.neighbors.includes(south.id));assert.ok(north.centroid[1]>54.5&&south.centroid[1]<54.5);});
+test('old and new map saves select correct immutable geography',()=>{assert.equal(worldForSave(JSON.stringify({version:1}),legacy,atlas),legacy);assert.equal(worldForSave(JSON.stringify({mapVersion:'legacy'}),legacy,atlas),legacy);assert.equal(worldForSave(JSON.stringify({mapVersion:MAP_VERSION}),legacy,atlas),atlas);assert.throws(()=>worldForSave(JSON.stringify({mapVersion:'unknown'}),legacy,atlas));assert.equal(buildHistoricalWorld(legacy,null),legacy);});
+test('historical generation is deterministic',()=>{const again=buildHistoricalWorld(legacy,reference);assert.equal(JSON.stringify(again),JSON.stringify(atlas));});

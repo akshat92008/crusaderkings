@@ -29,7 +29,7 @@ export function createGame(world,player='ottomans'){
   const troopMix=startingTroops(faction,qty);
   armies['a'+nextId]={id:'a'+nextId++,owner:faction.id,province:prov.id,...troopMix,experience:0.08,morale:78,commander:`Commander of ${faction.name}`,doctrine:militaryDoctrine(faction).id};
  }
- const game={version:1,seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
+ const game={version:1,mapVersion:world.meta?.mapVersion||'legacy',seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
  initializeKingdomSystems(game,world);
  return game;
 }
@@ -200,7 +200,7 @@ export function advanceMonth(g,world){
 export function snapshot(g){return JSON.stringify(g);}
 export function restoreGame(text,world){
  const o=JSON.parse(text);if(o.version!==1||!o.factions?.[o.player]||o.player==='independent'||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
- if(Object.keys(o.provinces).length!==world.provinces.length)throw Error('Map version mismatch');
+ if((o.mapVersion||'legacy')!==(world.meta?.mapVersion||'legacy')||Object.keys(o.provinces).length!==world.provinces.length||world.provinces.some(p=>!o.provinces[p.id]))throw Error('Map version mismatch');
  initializeKingdomSystems(o,world);
  return o;
 }

@@ -1,3 +1,4 @@
+import {buildHistoricalWorld,worldForSave} from './historical-world.js';
 import {expandedAction} from './expanded-content.js';
 import {livingAction} from './living-systems.js';
 import {diplomacyAction} from './diplomacy-systems.js';
@@ -27,18 +28,21 @@ import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,cont
 const el=id=>document.getElementById(id);
 const fmt=n=>Math.round(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const world=await fetch('data/world.json').then(r=>{if(!r.ok)throw Error(`Map data unavailable (${r.status})`);return r.json();});
-const staticById=Object.fromEntries(world.provinces.map(p=>[p.id,p]));
+const legacyWorld=await fetch('data/world.json').then(r=>{if(!r.ok)throw Error(`Map data unavailable (${r.status})`);return r.json();});
+const historicalReference=await fetch('data/historical-polities-1450.json').then(r=>r.ok?r.json():null).catch(()=>null);
+const atlasWorld=buildHistoricalWorld(legacyWorld,historicalReference);let world=atlasWorld;
+let staticById=Object.fromEntries(world.provinces.map(p=>[p.id,p]));
 let game=null,selected=null,tab='realm',marchFrom=null,diplomaticTarget='france',battle=null,battleDescriptor=null,speedInterval=null,toastTimer=null;
 const map=new CampaignMap(el('world-map'),world,onProvince);
 if(!map.terrain?.gl){const button=el('toggle-relief');button.textContent='▤ 2D MAP';button.title='3D terrain requires a WebGL2-capable browser';button.setAttribute('aria-pressed','false');button.disabled=true;}
-fetch('data/historical-polities-1450.json').then(r=>r.ok?r.json():Promise.reject(new Error('History reference unavailable'))).then(data=>map.setHistorical(data)).catch(e=>console.info('Optional 1450 history layer:',e.message));
+if(historicalReference)map.setHistorical(historicalReference);
+function useWorld(next){if(next===world)return;world=next;staticById=Object.fromEntries(world.provinces.map(p=>[p.id,p]));map.setWorld(world);}
 const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();}}
-function start(id){game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...f.capital,3.2);render();}
-function load(){try{game=restoreGame(localStorage.getItem('crown-of-nations.save'),world);el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();if(!openIncomingBattle())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
+function start(id){useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=world.provinces.find(p=>p.owner===id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...f.capital,3.2);render();}
+function load(){try{const raw=localStorage.getItem('crown-of-nations.save'),next=worldForSave(raw,legacyWorld,atlasWorld),restored=restoreGame(raw,next);useWorld(next);game=restored;el('start-screen').hidden=true;selected=Object.values(game.provinces).find(p=>p.owner===game.player)?.id||null;map.setGame(game);map.select(selected);map.focus(...player().capital,3);render();if(!openIncomingBattle())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
 function save(){if(!game)return;try{localStorage.setItem('crown-of-nations.save',snapshot(game));message('Campaign saved to this browser.');}catch(e){message(`Save failed: ${e.message}`);}}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);marchFrom=null;el('map-target-help').textContent='SELECT A PROVINCE TO INSPECT';if(r.ok&&r.type==='battle'){openBattle(r);return;}clickResult(r);}
  selected=id;map.select(id);renderInspector();}
@@ -46,7 +50,7 @@ function render(){if(!game)return;const f=player(),s=empireStats(game,game.playe
  el('resource-gold').textContent=fmt(f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
  el('faction-name').textContent=f.name;el('faction-government').textContent=f.government;
  el('faction-flag').style.background=f.color;el('faction-flag').textContent='♛';
- el('world-counter').textContent=`${world.provinces.length} PROVINCES · ${Object.values(game.factions).filter(q=>q.id!=='independent'&&Object.values(game.provinces).some(p=>p.owner===q.id)).length} CIVILIZATIONS`;
+ el('world-counter').title=world.meta.caveat;el('world-counter').textContent=`${world.provinces.length} DISTRICTS · ${Object.values(game.factions).filter(q=>q.id!=='independent'&&Object.values(game.provinces).some(p=>p.owner===q.id)).length} CIVILIZATIONS`;
  el('latest-event').textContent=game.log[0]?.text||'Your court awaits.';
  const courtButton=document.querySelector('[data-tab="court"]');if(courtButton)courtButton.classList.toggle('pending',Boolean(currentRoyalEvent(game)));
  const threat=game.kingdom?.threats?.[0],banner=el('invasion-alert');

@@ -37,6 +37,7 @@ export class CampaignMap{
   },{passive:false});
  }
  resize(){const r=this.canvas.getBoundingClientRect();this.w=Math.max(1,r.width);this.h=Math.max(1,r.height);this.dpr=Math.min(window.devicePixelRatio||1,2);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.render();}
+ setWorld(world){this.world=world;this.game=null;this.selected=null;this.hover=null;this.hoverHistorical=null;this.counties=buildDecorativeCounties(world);this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));if(this.terrain)this.terrain.world=world;this.render();}
  setGame(g){this.game=g;this.render();}
  setHistorical(data){this.history=data?.features?data:null;this.render();}
  setMode(mode){if(!['political','terrain','historical'].includes(mode))return;this.mode=mode;this.render();}
