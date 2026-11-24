@@ -16,7 +16,7 @@ import {characterDirectory,vassalDirectory,portraitMark} from './campaign-hud.js
 import {successionPreview,activeBetrothal,betrothalCandidates} from './dynastic-politics.js';
 import {characterContext,campaignLinks,characterLink,provinceLink,sectionLink,contextualButton,realmWarContext} from './campaign-context.js';
 import {COURT_OFFICES,courtCandidates,courtModifiers,courtLifeView,COURT_STANDARDS,COURT_PROJECTS,courtProjectCandidates} from './royal-court.js';
-import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
+import {currentExpandedEvents,expandedDecisions ,expandedChoiceStatus} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
 import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers,tributeAccounts,estateReviewView} from './government-institutions.js';
@@ -499,12 +499,15 @@ export function renderExpanded(g,world,esc){
  if(!g.expanded?.realms[g.player])return '';
  const r=g.player,place=id=>world.provinces.find(p=>p.id===id)?.name||id;
  const target=t=>t.faction?(g.conflict.factions[t.faction]?.kind||'Local')+' faction':t.province?place(t.province):t.partner?g.politics.people[t.person]?.name+' & '+g.politics.people[t.partner]?.name:t.person?g.politics.people[t.person]?.name:t.other?g.factions[t.other]?.name:t.army?'Field army at '+place(g.armies[t.army]?.province):'';
- const effect=e=>Object.entries(e).map(([k,v])=>k==='wedding'?'Creates a dynastic marriage':esc(k.replace(/([A-Z])/g,' $1'))+' '+(v>0?'+':'')+v).join(' · ');
- const btn=(type,id,label)=>'<button class="rowbtn" data-action="expanded" data-type="'+esc(type)+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
+ const labels={courtReputation:'Court reputation',branchXP:'Specialization experience',languageMonths:'Language study duration (months)',situationCooperation:'Regional cooperation',faithAuthority:'Religious authority',focusXP:'Lifestyle experience',securityMonths:'Security duration (months)'};
+ const effect=e=>Object.entries(e).map(([k,v])=>k==='wedding'?'Creates a dynastic marriage':esc(labels[k]||k.replace(/([A-Z])/g,' $1'))+' '+(v>0?'+':'')+v).join(' · ');
+ const btn=(type,id,label,status={ready:true})=>'<button class="rowbtn" data-action="expanded" data-type="'+esc(type)+'" data-id="'+esc(id)+'"'+(status.ready?'':' disabled title="'+esc(status.reason)+'"')+'>'+esc(label)+'</button>';
  let html=section('CAMPAIGN EVENTS'),events=currentExpandedEvents(g,r);
- if(events.length){for(const x of events){html+='<div class="rule"><h3>'+esc(x.title)+'</h3><div class="smallnote">'+esc(x.category)+' · '+esc(target(x.target)||'Realm')+' · '+Math.max(0,x.expires-g.turn)+' months remaining</div><p class="paragraph">'+esc(x.description)+'</p>';if(g.turn<(x.availableAt??x.started))html+='<p class="smallnote">Follow-up available in '+(x.availableAt-g.turn)+' months.</p>';else for(const [i,c] of x.choices.entries())html+=btn('resolve-event',x.id+':'+i,c.label+(c.cost?' ('+c.cost+'g)':''))+'<div class="smallnote">'+(effect(c.effects)||'No direct effect')+(c.next?' · Situation continues':'')+'</div>';html+='</div>';}}else html+='<p class="paragraph">No new campaign event.</p>';
- html+='<details class="rule"><summary>Additional decisions</summary>';const ds=expandedDecisions(g,world,r);
- for(const category of [...new Set(ds.map(d=>d.category))]){html+='<div class="sectiontitle">'+esc(category)+'</div>';for(const d of ds.filter(x=>x.category===category))html+='<div class="rule"><b>'+esc(d.title)+'</b><p class="paragraph">'+esc(d.description)+' '+esc(target(d.target)||'')+'</p><div class="smallnote">'+effect(d.effects)+'</div>'+(d.remaining?'<div class="smallnote">Available in '+d.remaining+' months</div>':btn('decision',d.id,'Enact ('+d.cost+'g)'))+'</div>';}
+ if(events.length){for(const x of events){html+='<div class="rule"><h3>'+esc(x.title)+'</h3><div class="smallnote">'+esc(x.category)+' · '+esc(target(x.target)||'Realm')+' · '+Math.max(0,x.expires-g.turn)+' months remaining</div><p class="paragraph">'+esc(x.description)+'</p>';if(g.turn<(x.availableAt??x.started))html+='<p class="smallnote">Follow-up available in '+(x.availableAt-g.turn)+' months.</p>';else for(const [i,c] of x.choices.entries()){const status=expandedChoiceStatus(g,r,x.target,c);html+=btn('resolve-event',x.id+':'+i,c.label+(c.cost?' ('+c.cost+'g)':''),status)+'<div class="smallnote">'+(effect(c.effects)||'No direct effect')+(c.next?' · Situation continues':'')+(status.ready?'':' · '+esc(status.reason))+'</div>';}html+='</div>';}}else html+='<p class="paragraph">No new campaign event.</p>';
+ const ds=expandedDecisions(g,world,r),ready=ds.filter(d=>d.ready);
+ html+='<details class="rule"><summary>Additional decisions · '+ready.length+' ready / '+ds.length+' relevant</summary>';
+ if(!ds.length)html+='<p class="paragraph">No decisions match the current campaign conditions.</p>';
+ for(const category of [...new Set(ds.map(d=>d.category))]){const group=ds.filter(d=>d.category===category).sort((a,b)=>Number(b.ready)-Number(a.ready)||a.title.localeCompare(b.title));html+='<details class="rule"><summary>'+esc(category)+' · '+group.filter(d=>d.ready).length+' ready</summary>';for(const d of group)html+='<div class="rule"><b>'+esc(d.title)+'</b><p class="paragraph">'+esc(d.description)+' '+esc(target(d.target)||'')+'</p><div class="smallnote">'+effect(d.effects)+'</div>'+btn('decision',d.id,'Enact ('+d.cost+'g)',d)+(d.ready?'':'<div class="smallnote">'+esc(d.reason)+'</div>')+'</div>';html+='</details>';}
  html+='</details><details class="rule"><summary>Recent campaign choices</summary>'+g.expanded.history.filter(h=>h.realm===r).slice(0,12).map(h=>'<div class="smallnote">'+esc(h.label)+'</div>').join('')+'</details>';return html;
 }
 
