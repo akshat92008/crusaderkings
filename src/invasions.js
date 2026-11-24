@@ -1,3 +1,4 @@
+import {defenseSupport,strategicPlan,raidThreshold} from './strategic-ai.js';
 import {controller,captureProvince} from './campaign-war.js';
 import {embarked} from './naval-systems.js';
 import {armyReadiness,onArmyMarch,syncRegiments,applyFortDamage} from './military-systems.js';
@@ -39,11 +40,11 @@ export function findInvasionOptions(g,world){
     const path=trace(world,army.province,neighborId,rival,g);
     if(!path)continue;
     const power=troops(army)*armyReadiness(g,army).power*(0.8+(army.morale||75)/250+(army.experience||0)*.2);
-    const advantage=power/Math.max(1,defense),distance=path.length-1;
+    const advantage=power/Math.max(1,defense+defenseSupport(g,player,rival)),distance=path.length-1;
     candidates.push({
       by:rival,army:army.id,province:target.id,staging:neighborId,
       path:path.slice(1),eta:3+distance,status:'approaching',
-      advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)
+      advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)+(strategicPlan(g,rival)?.target===player&&strategicPlan(g,rival)?.goal==='conquer'?1:0)
     });
    }
   }
@@ -57,7 +58,7 @@ export function planEnemyInvasion(g,world){
  const difficulty=g.kingdom.difficulty;
  // Strategic AI can gamble on difficult raids; it is not required to
  // always defeat the player's army in a pre-battle strength check.
- const viable=choices.filter(c=>c.advantage>=(difficulty==='hard'?.47:.66));
+ const viable=choices.filter(c=>c.advantage>=Math.max(.35,(difficulty==='hard'?.47:.66)+(raidThreshold(g,c.by,g.player)-.48)*.5));
  if(!viable.length)return null;
  const chosen=viable[0];
  g.kingdom.threats.push(chosen);
@@ -131,7 +132,7 @@ export function resolveInvasion(g,world,threat,result){
 export function autoResolveInvasion(g,world,threat){
  const target=g.provinces[threat.province],army=g.armies[threat.army];
  if(!target||!army)return {ok:false,msg:'Siege no longer active'};
- const defense=45+target.development*12+(target.buildings.fort||0)*45+
+ const defense=45+target.development*12+(target.buildings.fort||0)*45+defenseSupport(g,g.player,threat.by)+
   armiesOf(g,g.player).filter(a=>a.province===threat.province).reduce((sum,a)=>sum+troops(a)*(.7+(a.experience||0)*.4),0);
  const offense=troops(army)*armyReadiness(g,army).power*(.8+(army.morale||75)/280+(army.experience||0)*.2);
  const defended=offense<=defense*1.13;
