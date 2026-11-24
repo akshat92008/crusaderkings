@@ -1,3 +1,4 @@
+import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /**
  * Enemy-initiated wars for the existing Crown of Nations campaign.
  * Bound to real rival treasury, armies, connected provinces and three-month
@@ -27,7 +28,7 @@ export function findInvasionOptions(g,world){
   for(const neighborId of target.neighbors||[]){
    const rival=g.provinces[neighborId]?.owner;
    if(!rival||rival===player||rival==='independent'||!g.factions[rival])continue;
-   if(['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
+   if(hasTruce(g,rival,player)||['alliance','marriage'].includes(g.factions[rival].treaties?.[player]))continue;
    const warChest=g.factions[rival].treasury;
    if(warChest<90)continue;
    for(const army of armiesOf(g,rival)){
@@ -39,7 +40,7 @@ export function findInvasionOptions(g,world){
     candidates.push({
       by:rival,army:army.id,province:target.id,staging:neighborId,
       path:path.slice(1),eta:3+distance,status:'approaching',
-      advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25
+      advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)
     });
    }
   }
@@ -64,7 +65,7 @@ export function progressEnemyInvasions(g,world){
  const remaining=[];
  for(const threat of g.kingdom.threats||[]){
   const enemy=g.armies[threat.army],province=g.provinces[threat.province];
-  if(!enemy||enemy.owner!==threat.by||!province||province.owner!==g.player)continue;
+  if(!enemy||enemy.owner!==threat.by||!province||province.owner!==g.player||hasTruce(g,threat.by,g.player))continue;
   if(threat.status==='ready'){
    // If the user advances time again instead of defending, allow an
    // automated resolution. Never leave an invisible permanent siege.
@@ -94,13 +95,14 @@ export function resolveInvasion(g,world,threat,result){
  const found=g.kingdom?.threats?.find(t=>t.army===threat?.army&&t.province===threat?.province);
  if(!found||found.status!=='ready')return {ok:false,msg:'No active siege at that province'};
  const province=g.provinces[found.province],attacker=g.armies[found.army];
- if(!attacker||!province||province.owner!==g.player)return {ok:false,msg:'The invasion is no longer valid'};
+ if(!attacker||!province||province.owner!==g.player||hasTruce(g,found.by,g.player))return {ok:false,msg:'The invasion is no longer valid'};
  const human=armiesOf(g,g.player).filter(a=>a.province===found.province);
  const playerRatio=clamp(result.attackerRemaining??.5,0,1);
  const enemyRatio=clamp(result.enemyRemaining??(result.victory?.45:.78),0,1);
  for(const a of human)trimArmy(a,playerRatio);
  trimArmy(attacker,enemyRatio);
  const defended=Boolean(result.victory);
+ recordCampaignBattle(g,found.by,g.player,found.province,!defended);
  if(defended){
   g.factions[g.player].prestige+=8;
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);

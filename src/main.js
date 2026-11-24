@@ -3,7 +3,8 @@ import {BattleGame} from './battle.js';
 import {militaryDoctrine,availableFormations} from './military-doctrines.js';
 import {resolveInvasion,autoResolveInvasion} from './invasions.js';
 import {politicsAction} from './dynastic-politics.js';
-import {renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {conflictAction} from './political-conflict.js';
+import {renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -55,6 +56,7 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
   html=`<div class="label">FOREIGN AFFAIRS</div><div class="sectiontitle">SEND ENVOYS</div><select class="select" id="diplomatic-select">${nations.map(n=>`<option value="${n.id}" ${n.id===diplomaticTarget?'selected':''}>${esc(n.name)}</option>`).join('')}</select><div class="rule"><div class="label">FOREIGN POWER</div><h3 style="font-size:14px;margin:9px 0">${esc(other.name)}</h3><div class="statlist"><label>Relationship</label><strong class="${rel>0?'up':rel<0?'down':''}">${rel>0?'+':''}${rel}</strong><label>Political union</label><strong>${f.treaties[other.id]==='alliance'?'ALLIED':'NONE'}</strong><label>State form</label><strong>${esc(other.government)}</strong></div></div><div class="sectiontitle">ROYAL DIPLOMATIC ACTIONS</div><button class="rowbtn" data-action="gift">✦ Send gift (250 gold)</button><button class="rowbtn" data-action="alliance">⚜ Propose alliance (relation +35)</button><button class="rowbtn" data-action="trade">◈ Establish merchant treaty (140 gold, relation +10)</button><button class="rowbtn" data-action="marriage">♕ Arrange royal marriage (180 gold, relation +20)</button><button class="rowbtn negative" data-action="insult">⚑ Issue formal insult</button><p class="paragraph" style="margin-top:13px">Relations now support merchant treaties and dynastic marriages. Royal marriages now link actual adults and their descendants. Formal peace settlements remain simplified.</p>`;
  }else if(tab==='court'){
   html=renderCourt(game,esc);
+ }else if(tab==='political'){html=renderConflict(game,world,esc);
  }else if(tab==='trade'){
   html=renderTrade(game,world,esc);
  }else if(tab==='legacy'){
@@ -154,6 +156,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='royal-choice')clickResult(resolveRoyalEvent(game,world,Number(btn.dataset.choice)));
  if(action==='show-diplomacy'){if(btn.dataset.target==='independent'){message('Independent polities have no central court to negotiate with.');return;}tab='diplomacy';diplomaticTarget=btn.dataset.target;renderTab();}
 });
