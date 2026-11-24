@@ -1,3 +1,4 @@
+import {nonAggression,guaranteePartners,aidOptions,aidStrength} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
@@ -274,5 +275,16 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ return html+'</details>';
+}
+
+export function renderDiplomaticAgreements(g,other,esc){
+ const d=g.diplomacy,r=g.player;if(!d)return '';const name=id=>g.factions[id]?.name||id;
+ const btn=(type,id,label,input='')=>'<button class="rowbtn" data-action="diplomatic-agreement" data-type="'+esc(type)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ let html='<details class="rule"><summary>Treaties and allied support</summary>';
+ html+=nonAggression(g,r,other)?'<p class="paragraph">Non-aggression agreement active.</p>'+btn('break',other,'Repudiate agreement (prestige and legitimacy penalty)'):btn('pact',other,'Non-aggression agreement (80g)');
+ html+=btn('guarantee',other,'Guarantee independence (100g)');
+ for(const p of Object.values(d.guarantees).filter(x=>x.protected===r||x.guarantor===r))html+='<div class="smallnote">'+esc(name(p.guarantor))+' guarantees '+esc(name(p.protected))+' · '+Math.max(0,p.until-g.turn)+' months</div>';
+ for(const w of Object.values(g.conflict.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(r))){const enemy=w.attacker===r?w.defender:w.attacker,ids=aidOptions(g,r,w),field='aid-'+w.id;html+='<div class="rule"><b>War with '+esc(name(enemy))+'</b><div class="smallnote">Allied logistical support '+aidStrength(g,r,enemy)+' · abstract campaign strength, not allied field units.</div>';if(ids.length)html+='<select class="select" id="'+field+'">'+ids.map(id=>'<option value="'+esc(id)+'">'+esc(name(id))+'</option>').join('')+'</select>'+btn('aid',w.id,'Request allied aid',field);html+='</div>';}
  return html+'</details>';
 }
