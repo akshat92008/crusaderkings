@@ -43,7 +43,7 @@ function createRoute(g,world,realm,from,to,good){const e=g.economy,f=g.factions[
  if(Object.values(e.routes).filter(r=>r.realm===realm&&r.status==='active').length>=Math.max(2,own(g,realm).length*2)+(e.realms[realm].merchantGuild?2:0))return no('Trade route limit reached.');
  if(f.treasury<90)return no('Need 90 gold to establish a route.');f.treasury-=90;const id='t'+e.next++;e.routes[id]={id,realm,from,to,good,status:'active',lastVolume:0,lastValue:0,total:0,started:g.turn};return ok('Merchant route established.');}
 function flow(g,world,r){const e=g.economy,a=local(g,r.from),b=local(g,r.to),owner=g.provinces[r.to]?.owner;
- r.lastVolume=0;r.lastValue=0;if(!routeAllowed(g,world,r.realm,r.from,r.to)){r.status='closed';r.closed=g.turn;return;}
+ r.lastVolume=0;r.lastValue=0;if(portBlocked(g,r.from)||portBlocked(g,r.to)){r.suspended='blockade';return;}delete r.suspended;if(!routeAllowed(g,world,r.realm,r.from,r.to)){r.status='closed';r.closed=g.turn;return;}
  const available=Math.max(0,a.stock[r.good]-8),room=Math.max(0,capacity(b,r.good)-b.stock[r.good]);let qty=Math.floor(Math.min(available,room,5+3*(a.industries.caravan+b.industries.caravan)+a.tier+b.tier));
  const price=costOf(g,r.good),seller=g.factions[r.realm],buyer=g.factions[owner],tax=owner===r.realm?0:[0,.05,.12][e.realms[owner].tariff];
  if(owner!==r.realm)qty=Math.min(qty,Math.floor(Math.max(0,buyer.treasury)/price));
