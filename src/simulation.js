@@ -198,7 +198,7 @@ export function advanceMonth(g,world){
 }
 export function snapshot(g){return JSON.stringify(g);}
 export function restoreGame(text,world){
- const o=JSON.parse(text);if(o.version!==1||!world.factions.some(f=>f.id===o.player)||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
+ const o=JSON.parse(text);if(o.version!==1||!o.factions?.[o.player]||o.player==='independent'||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
  if(Object.keys(o.provinces).length!==world.provinces.length)throw Error('Map version mismatch');
  initializeKingdomSystems(o,world);
  return o;
