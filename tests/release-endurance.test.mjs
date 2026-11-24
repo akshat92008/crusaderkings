@@ -1,9 +1,55 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld} from '../src/historical-world.js';
-import {createGame,advanceMonth,snapshot,restoreGame,empireStats} from '../src/simulation.js';
+import {buildHistoricalWorld, expandHistoricalWorld, densifyHistoricalWorld} from '../src/historical-world.js';
+import {createGame, advanceMonth, snapshot, restoreGame, empireStats} from '../src/simulation.js';
 import {validatePortableSave} from '../src/portable-save.js';
-const read=n=>JSON.parse(readFileSync(new URL('../data/'+n,import.meta.url)));
-const world=densifyHistoricalWorld(expandHistoricalWorld(buildHistoricalWorld(read('world.json'),read('historical-polities-1450.json'))));
-for(const [realm,difficulty] of [['england','normal'],['vijayanagara','hard']])test('Release endurance on dense atlas: '+realm,{timeout:240000},()=>{let g=createGame(world,realm);g.kingdom.difficulty=difficulty;for(let i=0;i<60;i++){advanceMonth(g,world);assert.equal(g.turn,i+1);for(const f of Object.values(g.factions)){assert.ok(Number.isFinite(f.treasury)&&Number.isFinite(f.food)&&Number.isFinite(f.stability));}for(const a of Object.values(g.armies)){assert.ok(g.provinces[a.province]);assert.ok(['infantry','archers','cavalry'].every(t=>Number.isInteger(a[t])&&a[t]>=0));}if(i%12===11){const raw=snapshot(g);validatePortableSave(raw);g=restoreGame(raw,world);assert.equal(g.turn,i+1);}}assert.ok(Number.isFinite(empireStats(g,realm).balance));});
+
+const read = name => JSON.parse(readFileSync(new URL('../data/' + name, import.meta.url)));
+const world = densifyHistoricalWorld(expandHistoricalWorld(buildHistoricalWorld(read('world.json'), read('historical-polities-1450.json'))));
+const months = Number(process.env.CROWN_ENDURANCE_MONTHS ?? 60);
+assert.ok(Number.isInteger(months) && months >= 12 && months <= 3600,
+ 'CROWN_ENDURANCE_MONTHS must be a whole number between 12 and 3600.');
+
+function assertTitles(game){
+ for(const province of Object.values(game.provinces)){
+  const holding = game.politics.holdings[province.id];
+  const title = game.feudal.titles['c:' + province.id];
+  if(!game.politics.realms[province.owner]){
+   assert.equal(holding,undefined,province.id);
+   assert.equal(title,undefined,province.id);
+   continue;
+  }
+  assert.equal(holding?.realm,province.owner,province.id);
+  assert.equal(title?.holder,holding.lord,province.id);
+  assert.equal(game.politics.people[holding.lord]?.alive,true,province.id);
+  assert.equal(game.feudal.titles[title.parent]?.realm,province.owner,province.id);
+ }
+}
+
+for(const [realm,difficulty] of [['england','normal'],['vijayanagara','hard']]){
+ test('Release endurance on dense atlas: ' + realm,{timeout:Math.max(240_000,months*550)},()=>{
+  let game = createGame(world,realm);
+  game.kingdom.difficulty = difficulty;
+  for(let i=0;i<months;i++){
+   advanceMonth(game,world);
+   assert.equal(game.turn,i+1);
+   for(const faction of Object.values(game.factions)){
+    assert.ok([faction.treasury,faction.food,faction.stability].every(Number.isFinite));
+   }
+   for(const army of Object.values(game.armies)){
+    assert.ok(game.provinces[army.province]);
+    assert.ok(['infantry','archers','cavalry'].every(type=>Number.isInteger(army[type])&&army[type]>=0));
+   }
+   if(i%12===11){
+    assertTitles(game);
+    const raw = snapshot(game);
+    validatePortableSave(raw);
+    game = restoreGame(raw,world);
+    assert.equal(game.turn,i+1);
+    assertTitles(game);
+   }
+  }
+  assert.ok(Number.isFinite(empireStats(game,realm).balance));
+ });
+}

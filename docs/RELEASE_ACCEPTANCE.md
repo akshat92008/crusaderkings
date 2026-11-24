@@ -9,9 +9,17 @@ npm test
 python -m pip install playwright
 python -m playwright install chromium
 python scripts/mobile_browser_smoke.py
-````
+```
 
-The release campaign tests run the default atlas through 60 months with save/restore checkpoints. Browser QA checks desktop and 390/320px mobile views, map controls, practice battle, audio toggle and backup export/import. Results are attached to GitHub Actions. Passing source checks alone does not establish release readiness.
+The default campaign tests run two 60-month campaigns on the dense atlas and check title ownership before and after annual save/restore checkpoints. To run the 100-year release soak on both England (normal) and Vijayanagara (hard):
+
+```sh
+CROWN_ENDURANCE_MONTHS=1200 node --test tests/release-endurance.test.mjs
+```
+
+Use `CROWN_ENDURANCE_MONTHS=3600` for 300 years.
+
+Browser QA checks desktop and 390/320px mobile views, map controls, practice battle, audio toggle and backup export/import. Results are attached to GitHub Actions. Passing source checks alone does not establish release readiness.
 
 ## Manual acceptance before release
 

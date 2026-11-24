@@ -31,7 +31,13 @@ export function electionView(g,realm){
  const rows=[...candidates.values()].map(p=>({id:p.id,votes:votes.get(p.id)||0,skill:num(p.skills?.diplomacy)+num(p.skills?.martial)})).sort((a,b)=>b.votes-a.votes||b.skill-a.skill||a.id.localeCompare(b.id));
  return {candidates:rows,electors,winner:rows[0]?.id||null,nominee};
 }
-export function successionCandidates(g,realm){const s=g.politics?.realms?.[realm],head=g.politics?.people?.[s?.ruler];if(!head)return [];if(s.law==='elective')return electionView(g,realm).candidates.map(x=>g.politics.people[x.id]);const line=hereditaryLine(g,head,s.law),seen=new Set([head.id,...line.map(p=>p.id)]);const relatives=[];
+export function successionCandidates(g,realm){const s=g.politics?.realms?.[realm],head=g.politics?.people?.[s?.ruler];if(!head)return [];if(s.law==='elective')return electionView(g,realm).candidates.map(x=>g.politics.people[x.id]);
+ if(s.law==='seniority'){
+  return Object.values(g.politics.people)
+   .filter(p=>p.id!==head.id&&p.realm===realm&&p.house===head.house&&free(g,p))
+   .sort(byAge);
+ }
+ const line=hereditaryLine(g,head,s.law),seen=new Set([head.id,...line.map(p=>p.id)]);const relatives=[];
  // If descendants are exhausted, prefer siblings and their descendants before distant dynasts.
  for(const id of head.parents||[]){const parent=g.politics.people[id];for(const p of hereditaryLine(g,parent,s.law))if(p.realm===realm&&p.house===head.house&&!seen.has(p.id)){seen.add(p.id);relatives.push(p);}}
  return [...line,...relatives];}

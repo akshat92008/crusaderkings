@@ -1,11 +1,11 @@
 import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison} from './border-battle.js';
-import {participatingArmies,applyFieldLosses} from './field-forces.js';
+import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {campaignWorld} from './independence-systems.js';
 import {captureCommander} from './feudal-systems.js';
 import {strategicTargetScore,raidThreshold,defenseSupport,localCampaignForces,recordStrategicBattle} from './strategic-ai.js';
-import {controller,occupation,occupationTax,captureProvince} from './campaign-war.js';
+import {controller,occupation,occupationTax,captureProvince,transferProvince} from './campaign-war.js';
 import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
 import {onArmyMarch,armyReadiness,syncRegiments,applyFortDamage,initMilitary} from './military-systems.js';
 import {economyModifiers} from './economy-systems.js';
@@ -13,7 +13,7 @@ import {heritageModifiers} from './heritage-systems.js';
 import {civicModifiers,civicProvinceUnrest} from './civic-systems.js';
 import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
-import {politicalRevenue,politicalLevy} from './dynastic-politics.js';
+import {politicalRevenue,politicalLevy,reconcilePoliticalHoldings} from './dynastic-politics.js';
 import {initializeKingdomSystems,advanceKingdomSystems,royalDiplomacy,tradeIncome} from './kingdom-depth.js';
 import {militaryDoctrine,startingTroops} from './military-doctrines.js';
 export const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -116,8 +116,11 @@ export function concludeBattle(g,battle,result,world=null){
 
  const ratio=clamp(result.attackerRemaining??0,0,1),forces=result.fieldBattle?participatingArmies(g,battle.playerArmies||[src.id],g.player,battle.from||src.province):[src];
  const oldsize=forces.reduce((n,a)=>n+armySize(a),0);applyFortDamage(g,battle.to,result);
- for(const a of forces){onArmyMarch(g,a);applyFieldLosses(a,result,'attacker',ratio);syncRegiments(g,a);}
- const field=result.fieldBattle&&Array.isArray(battle.enemyArmies),defenders=field?participatingArmies(g,battle.enemyArmies,was,battle.to):[];for(const a of defenders){applyFieldLosses(a,result,'defender',clamp(result.enemyRemaining??.5,0,1));syncRegiments(g,a);}
+ applyFieldForceLosses(forces,result,'attacker',ratio);
+ for(const a of forces){onArmyMarch(g,a);syncRegiments(g,a);}
+ const field=result.fieldBattle&&Array.isArray(battle.enemyArmies),defenders=field?participatingArmies(g,battle.enemyArmies,was,battle.to):[];
+ applyFieldForceLosses(defenders,result,'defender',clamp(result.enemyRemaining??.5,0,1));
+ for(const a of defenders)syncRegiments(g,a);
  if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);for(const a of forces){a.province=battle.to;a.experience=clamp(a.experience+.06,0,1);}
   if(field){const retreat=world?.provinces.find(p=>p.id===battle.to)?.neighbors.find(id=>controller(g,id)===was&&g.provinces[id]?.owner===was);for(const a of defenders){if(retreat&&armySize(a)>0){a.province=retreat;a.morale=clamp((a.morale||75)-20,10,100);}else{captureCommander(g,g.player,a);delete g.armies[a.id];}}}else{const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending){captureCommander(g,g.player,defending);delete g.armies[defending.id];}}
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
@@ -155,7 +158,7 @@ export function advanceMonth(g,world){
    p.population=clamp(p.population+(p.buildings.farm>0&&g.turn%4===0?1:0),4,800);
    const adjust= (f.policies.tax===2?2:f.policies.tax===0?-2:0)+(f.policies.levy===2?1:0)-(f.policies.tolerance===2?2:f.policies.tolerance===0?-1:0)-(p.buildings.farm>0?1:0);
    p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
-   if(!occupation(g,p.id)&&p.unrest>=93 && rand(g)<.13){p.owner='independent';makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
+   if(!occupation(g,p.id)&&p.unrest>=93 && rand(g)<.13){transferProvince(g,p.id,'independent');makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
   }
   const provinces=Math.max(1,s.provinces);f.stability=clamp(f.stability+Math.sign(52-avgUnrest/provinces)*.6-(f.treasury<0?3:0)-(f.food<0?2:0),0,100);
   if(f.treasury<0&&rand(g)<.14){f.legitimacy=clamp(f.legitimacy-3,0,100);}
@@ -196,5 +199,6 @@ export function restoreGame(text,world){
  const o=JSON.parse(text);if(o.version!==1||!o.factions?.[o.player]||o.player==='independent'||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
  if((o.mapVersion||'legacy')!==(world.meta?.mapVersion||'legacy')||Object.keys(o.provinces).length!==world.provinces.length||world.provinces.some(p=>!o.provinces[p.id]))throw Error('Map version mismatch');
  initializeKingdomSystems(o,world);
+ reconcilePoliticalHoldings(o);
  return o;
 }

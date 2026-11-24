@@ -38,6 +38,20 @@ export function availableClaims(g,realm){const c=initConflict(g);return Object.v
 export function activeWar(g,a,b){return Object.values(initConflict(g).wars).find(w=>w.status==='active'&&pair(w.attacker,w.defender)===pair(a,b));}
 export function hasTruce(g,a,b){return (initConflict(g).truces[pair(a,b)]||0)>g.turn;}
 function endWar(g,w,result){settleOccupations(g,w,result);w.status=result;w.ended=g.turn;initConflict(g).truces[pair(w.attacker,w.defender)]=g.turn+36;history(g,{kind:'war',realm:w.attacker,message:w.attacker+' vs '+w.defender+': '+result});if([w.attacker,w.defender].includes(g.player))note(g,'Peace signed: '+result+'. A three-year truce follows.');}
+export function peaceTerms(g,war,realm){
+ if(war?.status!=='active'||![war.attacker,war.defender].includes(realm))return [];
+ const attacking=war.attacker===realm,opponent=attacking?war.defender:war.attacker;
+ const score=attacking?war.score:-war.score,hasGoal=occupiedGoal(g,war);
+ const amount=Math.min(300,Math.max(0,g.factions[opponent].treasury));
+ const surrender=attacking?'attacker defeated':hasGoal?'claim enforced':'white peace';
+ const terms=[
+  {id:'reparations',label:'Demand reparations',result:'reparations',amount,reason:score<65?'Requires at least +65 war score.':'',description:'Receive '+amount+' gold and return occupied land.'},
+  {id:'surrender',label:'Surrender',result:surrender,reason:'',description:surrender==='claim enforced'?'Cede the disputed district to the attacker.':'End the war and return occupied land.'},
+  {id:'white',label:'Offer white peace',result:'white peace',reason:Math.abs(score)>35||g.turn-war.started<6?'Requires six months of war and a score between −35 and +35.':'',description:'Return occupied land and end the war.'},
+ ];
+ if(attacking)terms.push({id:'enforce',label:'Enforce claim',result:'claim enforced',reason:score<65||!hasGoal?'Requires at least +65 war score and control of the war goal.':'',description:'Annex the disputed district and return other occupations.'});
+ return terms;
+}
 export function recordCampaignBattle(g,attacker,defender,province,victory){const w=activeWar(g,attacker,defender);if(!w)return;const sign=attacker===w.attacker?1:-1;w.score=cap(w.score+sign*(victory?30:-18),-100,100);if(victory&&province===w.goal&&attacker===w.attacker)w.score=Math.max(65,w.score);w.battles++;if(w.score<=-100)endWar(g,w,'attacker defeated');}
 function declare(g,realm,id){
  const c=initConflict(g),claim=c.claims[claimKey(realm,id)],pr=g.provinces[id],f=g.factions[realm],other=pr?.owner;
@@ -115,7 +129,22 @@ export function conflictAction(g,world,action,id,extra){const c=initConflict(g),
  if(action==='scheme')return startScheme(g,realm,id,extra);
  if(action==='dynastic-claim')return claimDynasticSeat(g,world,realm,id,extra);
  if(action==='declare')return declare(g,realm,id);
- if(action==='peace'){const w=c.wars[id];if(!w||w.status!=='active'||![w.attacker,w.defender].includes(realm))return no('No such active war.');if(extra==='enforce'&&w.attacker===realm&&w.score>=65&&occupiedGoal(g,w)){endWar(g,w,'claim enforced');return ok('Claim recognized; peace signed.');}if(extra==='surrender'){endWar(g,w,w.attacker===realm?'attacker defeated':occupiedGoal(g,w)?'claim enforced':'white peace');return ok('Surrender accepted; occupation resolved.');}if(extra==='reparations'&&((w.attacker===realm&&w.score>=65)||(w.defender===realm&&w.score<=-65))){const other=w.attacker===realm?w.defender:w.attacker,amount=Math.min(300,Math.max(0,g.factions[other].treasury));g.factions[other].treasury-=amount;f.treasury+=amount;endWar(g,w,'reparations');return ok('Peace signed for '+amount+' gold in reparations.');}if(extra==='white'&&Math.abs(w.score)<=35&&g.turn-w.started>=6){endWar(g,w,'white peace');return ok('White peace signed.');}return no('Peace terms not yet acceptable.');}
+ if(action==='peace'){
+  const w=c.wars[id],terms=peaceTerms(g,w,realm);
+  if(!terms.length)return no('No such active war.');
+  const term=terms.find(t=>t.id===extra);
+  if(!term||term.reason)return no(term?.reason||'Unknown peace terms.');
+  if(term.id==='reparations'){
+   const other=w.attacker===realm?w.defender:w.attacker;
+   g.factions[other].treasury-=term.amount;
+   f.treasury+=term.amount;
+  }
+  endWar(g,w,term.result);
+  if(term.id==='reparations')return ok('Peace signed for '+term.amount+' gold in reparations.');
+  if(term.id==='enforce')return ok('Claim recognized; peace signed.');
+  if(term.id==='surrender')return ok('Surrender accepted; occupation resolved.');
+  return ok('White peace signed.');
+ }
  if(!x||x.realm!==realm)return no('Select a faction in your realm.');
  if(action==='accept'&&['organizing','ultimatum','civil war'].includes(x.status)){settleFaction(g,x,'concessions',world);return ok('Faction demands accepted.');}
  if(action==='refuse'&&x.status==='ultimatum'){beginCivilWar(g,x);return ok('Civil war has begun.');}

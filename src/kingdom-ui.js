@@ -29,7 +29,7 @@ import {REGIMENTS,ENGINES,regimentOptions,armyReadiness,commanderCandidates} fro
 import {GOODS,INDUSTRIES,SETTLEMENTS,CRISES,industryCost,tradeDestinations} from './economy-systems.js';
 import {ACTIVITIES,RELICS,LEGACIES,activityDestinations,activityIncident,struggleView,heritageModifiers} from './heritage-systems.js';
 import {GOVERNMENTS,LIFESTYLES,civicModifiers,civicEvent} from './civic-systems.js';
-import {initConflict,councilVotes,availableClaims} from './political-conflict.js';
+import {initConflict,councilVotes,availableClaims,peaceTerms} from './political-conflict.js';
 /** Safe, copy-free royal court, trade and legacy interface views. */
 import {marriageCandidates,politicalRevenue,politicalLevy,politicalDispatch} from './dynastic-politics.js';
 import {currentRoyalEvent,currentCourt,tradeIncome,tradePactCount,objectives,campaignStanding} from './kingdom-depth.js';
@@ -108,7 +108,7 @@ function renderPolitics(g,esc){
  const person=id=>p.people[id];const show=c=>c?characterLink(c,esc)+' · '+c.age+'y · '+esc(c.traits.join(', '))+(c.alive?'':' · deceased'):'None';const option=c=>c?esc(c.name)+' · '+c.age+'y · '+esc(c.traits.join(', ')):'None';
  let html=renderRegency(g,esc)+section('DYNASTY AND LIVING FAMILY')+'<div class="rule"><h3>'+esc(r.house)+'</h3><p class="paragraph">'+show(r)+'</p><div class="smallnote">Consort: '+show(person(r.spouse))+'</div><div class="smallnote">Parents: '+r.parents.map(id=>show(person(id))).join(' / ')+'</div>'+r.children.map(id=>'<div class="smallnote">Child: '+show(person(id))+' · spouse: '+show(person(person(id)?.spouse))+'</div>').join('')+'</div>';
  const dispatch=politicalDispatch(g);if(dispatch)html+=section('POLITICAL DISPATCH')+'<div class="rule"><h3>'+esc(dispatch.title)+'</h3><p class="paragraph">'+esc(dispatch.description)+'</p>'+dispatch.choices.map((x,i)=>button('dispatch',i,x.label+(x.cost?' ('+x.cost+'g)':''))).join('')+'</div>';
- html+=section('SUCCESSION LAW')+'<div class="rule"><b>'+esc(s.law)+'</b><p class="paragraph">Reform costs 250 gold, requires 65 legitimacy, and is limited to once per decade.</p>'+['eldest','youngest','elective','partition'].filter(l=>l!==s.law).map(l=>button('law',l,'Adopt '+l)).join('')+'</div>';
+ html+=section('SUCCESSION LAW')+'<div class="rule"><b>'+esc(s.law)+'</b><p class="paragraph">Reform costs 250 gold, requires 65 legitimacy, and is limited to once per decade. House seniority gives the crown to the oldest eligible member of the house.</p>'+['eldest','youngest','elective','partition','seniority'].filter(l=>l!==s.law).map(l=>button('law',l,'Adopt '+l)).join('')+'</div>';
  html+=section('DYNASTIC MARRIAGES')+'<p class="paragraph">Eligible adults only. Weddings cost 180 gold; foreign matches also require +20 relations.</p>';
  const matches=marriageCandidates(g,g.player);if(matches.length){const groups=Object.groupBy?Object.groupBy(matches,x=>x.a):matches.reduce((a,x)=>((a[x.a]??=[]).push(x),a),{});for(const [id,opts] of Object.entries(groups)){const field='spouse-'+id;html+='<div class="rule"><b>'+show(person(id))+'</b><select class="select" id="'+esc(field)+'">'+opts.map(x=>'<option value="'+esc(x.b)+'">'+esc(x.label)+'</option>').join('')+'</select>'+button('marry',id,'Celebrate marriage (180g)','',field)+'</div>';}}else html+='<p class="paragraph">No eligible foreign matches at present.</p>';
  html+=section('ROYAL COUNCIL');const candidates=Object.values(p.people).filter(c=>c.alive&&c.realm===g.player&&c.age>=18&&c.id!==r.id&&!Object.values(s.council).includes(c.id)&&!Object.values(g.royalCourt?.realms[g.player]?.offices||{}).some(o=>o.person===c.id));
@@ -126,7 +126,7 @@ function renderPolitics(g,esc){
 }
 
 export function renderConflict(g,world,esc){
- const c=initConflict(g),realm=g.player,p=g.politics,btn=(action,id,label,extra='',input='')=>'<button class="rowbtn" data-action="conflict" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ const c=initConflict(g),realm=g.player,p=g.politics,btn=(action,id,label,extra='',input='',disabled=false)=>'<button class="rowbtn"'+(disabled?' disabled':'')+' data-action="conflict" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
  const name=id=>g.factions[id]?.name||id,place=id=>world.provinces.find(x=>x.id===id)?.name||id;
  let html=section('COUNCIL AUTHORITY')+'<div class="rule"><b>'+esc(c.council[realm]||'advisory')+'</b><p class="paragraph">Binding councils can veto succession reform, title revocation and formal claim wars. Support varies by proposal.</p>'+btn('council','binding','Empower council (150g)')+btn('council','advisory','Return to advisory (150g)')+'</div>';
  for(const v of councilVotes(g,realm)){const person=p.people[v.id],war=councilVotes(g,realm,'war').find(x=>x.id===v.id),rev=councilVotes(g,realm,'revoke').find(x=>x.id===v.id);html+='<div class="rule"><b>'+characterLink(person,esc)+' · '+esc(v.role)+'</b><div class="smallnote">Law '+(v.yes?'YES':'NO')+' · War '+(war?.yes?'YES':'NO')+' · Revocation '+(rev?.yes?'YES':'NO')+'</div>'+ (v.favor?'<div class="smallnote">Favor pledged</div>':btn('favor',v.id,'Secure favor (80g)'))+'</div>';}
@@ -144,7 +144,15 @@ export function renderConflict(g,world,esc){
  if(!claims.length)html+='<p class="paragraph">No active claims. Use the chancellor to establish one.</p>';
  for(const x of claims)html+='<div class="rule"><b>'+provinceLink(x.province,world,esc)+'</b><div class="smallnote">Expires in '+Math.max(0,x.expires-g.turn)+' months · '+esc(name(g.provinces[x.province].owner))+'</div>'+btn('declare',x.province,'Declare claim war (5 prestige)')+'</div>';
  html+=section('WARS AND PEACE');const wars=Object.values(c.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm));if(!wars.length)html+='<p class="paragraph">No formal claim wars.</p>';
- for(const w of wars)html+='<div class="rule"><b>'+esc(name(w.attacker))+' vs '+esc(name(w.defender))+'</b><div class="smallnote">Goal '+provinceLink(w.goal,world,esc)+' · Attacker war score '+w.score+' · Battles '+w.battles+'</div><p class="paragraph">Occupied territories: '+(Object.values(g.campaignWar.occupations).filter(o=>o.war===w.id).map(o=>provinceLink(o.province,world,esc)+' ('+esc(name(o.by))+')').join(', ')||'None')+'</p>'+btn('peace',w.id,'Demand reparations','reparations')+btn('peace',w.id,'Surrender','surrender')+btn('peace',w.id,'Offer white peace','white')+(w.attacker===realm?btn('peace',w.id,'Enforce claim','enforce'):'')+'</div>';
+ for(const w of wars){
+  const terms=peaceTerms(g,w,realm);
+  const occupied=Object.values(g.campaignWar.occupations).filter(o=>o.war===w.id);
+  html+='<div class="rule"><b>'+esc(name(w.attacker))+' vs '+esc(name(w.defender))+'</b><div class="smallnote">Goal '+provinceLink(w.goal,world,esc)+' · Your war score '+(w.attacker===realm?w.score:-w.score)+' · Battles '+w.battles+'</div>';
+  html+='<p class="paragraph">Occupied territories: '+(occupied.map(o=>provinceLink(o.province,world,esc)+' ('+esc(name(o.by))+')').join(', ')||'None')+'</p>';
+  html+='<p class="smallnote">Signing peace starts a three-year truce.</p>';
+  for(const term of terms)html+='<div>'+btn('peace',w.id,term.label,term.id,'',Boolean(term.reason))+'<p class="smallnote">'+esc(term.reason||term.description)+'</p></div>';
+  html+='</div>';
+ }
  html+=section('POLITICAL HISTORY')+c.history.filter(x=>x.realm===realm).slice(0,12).map(x=>'<div class="rule"><div class="smallnote">'+esc(x.message)+'</div></div>').join('');
  return html;
 }
@@ -338,9 +346,19 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
  h+=section('PERSONAL RESOURCES')+'<div class="statlist">'+stat('Personal wealth',fmt(p.wealth||0)+'g')+stat('Influence',characterInfluence(g,p.id)+'/100')+stat('Ambition',esc(characterAgenda(g,p.id)||'Not yet established'))+'</div>';if(x.own&&x.canServe&&p.id!==s.ruler&&g.politics.people[s.ruler].age>=18)h+='<div class="rule">'+btn('politics','personal-gift',p.id,'Personal gift (40 personal gold)')+btn('politics','personal-patronage',p.id,'Sponsor patronage (120 treasury gold)')+btn('politics','personal-rebuke',p.id,'Public rebuke (5 influence)')+'<p class="smallnote">Personal actions have a shared yearly cooldown and affect political relationships.</p></div>';
  if(p.id!==s.ruler)h+='<p class="paragraph">Opinion of your ruler: '+personalOpinion(g,s.ruler,p.id)+'</p>';
  h+=section('FAMILY')+(x.family.length?x.family.map(y=>'<div class="rule"><small>'+esc(y.relation)+'</small> '+link(y.id)+'</div>').join(''):'<p class="paragraph">No recorded close relatives.</p>');
+ const seniorTitles=x.titles.filter(t=>t.tier!=='province');
+ if(seniorTitles.length){
+  h+=section('TITLES')+seniorTitles.map(t=>'<div class="rule"><b>'+esc(t.name)+'</b><div class="smallnote">'+(t.tier==='crown'?'Crown title':'Regional title')+'</div></div>').join('');
+ }
  h+=section('LAND AND DUTIES')+(x.council.length||x.offices.length?'<p class="paragraph">'+esc([...x.council,...x.offices].join(' · '))+'</p>':'<p class="paragraph">No appointed court office.</p>');
  for(const a of x.armies)h+='<div class="rule">Commands '+fmt(a.troops)+' troops at '+place(a.province)+'</div>';
- for(const a of x.holdings)h+='<div class="rule">'+place(a.id)+'<div class="smallnote">Loyalty '+fmt(a.loyalty)+'% · Wealth '+fmt(a.wealth)+'g</div>'+(x.own&&a.lord!==s.ruler&&p.alive?btn('politics','gift',a.id,'Send gift (100g)')+(a.loyalty<45?btn('politics','concede',a.id,'Concede autonomy (150g)'):''):'')+'</div>';
+ for(const a of x.holdings){
+  const title=g.feudal?.titles['c:'+a.id],historic=title?.deJureRealm;
+  const historicalNote=historic&&historic!==a.realm
+   ?' · 1450 campaign jurisdiction: '+esc(g.factions[historic]?.name||historic)
+   :'';
+  h+='<div class="rule">'+place(a.id)+'<div class="smallnote">Loyalty '+fmt(a.loyalty)+'% · Wealth '+fmt(a.wealth)+'g'+historicalNote+'</div>'+(x.own&&a.lord!==s.ruler&&p.alive?btn('politics','gift',a.id,'Send gift (100g)')+(a.loyalty<45?btn('politics','concede',a.id,'Concede autonomy (150g)'):''):'')+'</div>';
+ }
  if(!x.own){h+=section('FOREIGN RELATIONS')+'<button class="rowbtn" data-action="show-diplomacy" data-target="'+esc(p.realm)+'">Open diplomacy with '+esc(g.factions[p.realm]?.name||p.realm)+'</button>';return h;}
  if(!x.canServe)return h;
  h+=section('AVAILABLE ACTIONS');
@@ -355,6 +373,10 @@ export function renderProvinceLord(g,world,id,esc){const h=g.politics?.holdings?
 export function renderCampaignHub(g,esc){const x=campaignLinks(g),r=g.politics?.people?.[x.ruler];return '<div class="rule campaign-hub"><h3>Your kingdom</h3><p>Sovereign: '+characterLink(r,esc)+'</p><div class="hub-links">'+sectionLink('dynasty','Dynasty & inheritance',esc)+sectionLink('council','Royal council',esc)+sectionLink('characters','Character finder',esc)+sectionLink('vassals',x.vassals+' vassals · '+x.disloyal+' disloyal holdings',esc)+sectionLink('military',x.armies+' armies · '+fmt(x.troops)+' troops',esc)+sectionLink('diplomacy','Foreign relations',esc)+sectionLink('political',realmWarContext(g).length+' active wars · Politics',esc,'WARS AND PEACE')+sectionLink('economy','Treasury & production',esc)+sectionLink('stories','Events & decisions',esc)+sectionLink('society','Culture & government',esc)+sectionLink('naval','Fleets & overseas travel',esc)+'</div></div>';}
 
 export function renderProvinceConnections(g,world,id,esc){const p=g.provinces[id],local=g.economy?.provinces?.[id];if(!p)return '';const owner=p.owner,our=owner===g.player&&controller(g,id)===g.player,btn=(type,label)=>contextualButton('conflict',type,id,label,esc);let out='';
+ const title=g.feudal?.titles['c:'+id],district=g.feudal?.titles[title?.parent],historic=title?.deJureRealm;
+ if(district){
+  out+='<div class="rule"><b>'+esc(district.name)+'</b><div class="statlist">'+stat('Current realm',esc(g.factions[owner]?.name||owner))+(historic&&historic!==owner?stat('1450 campaign jurisdiction',esc(g.factions[historic]?.name||historic)):'')+'</div></div>';
+ }
  if(local)out+='<div class="rule"><b>Local economy</b><div class="statlist">'+stat('Grain reserve',fmt(local.stock?.grain||0))+stat('Timber reserve',fmt(local.stock?.timber||0))+stat('Tools reserve',fmt(local.stock?.tools||0))+stat('Shortage',fmt(local.shortage||0))+'</div>'+(our?sectionLink('economy','Manage production and trade',esc):'')+'</div>';
  if(our){out+=sectionLink('titles','Manage land titles',esc)+sectionLink('military','Manage field armies',esc);if(g.naval?.ports?.[id])out+=sectionLink('naval','Manage port and fleet',esc);}
  else if(owner!==g.player&&g.politics?.realms?.[owner]){const claim=availableClaims(g,g.player).find(c=>c.province===id),wars=realmWarContext(g,owner),scheme=Object.values(g.conflict?.schemes||{}).find(s=>s.realm===g.player&&s.target===id&&s.kind==='fabricate'&&s.status==='active');out+='<div class="rule"><b>Claims and war</b>'+(wars.length?'<p class="paragraph">Active war · Score '+wars[0].ourScore+'</p>'+sectionLink('political','War and peace terms',esc,'WARS AND PEACE'):claim?btn('declare','Declare claim war (5 prestige)'):scheme?'<p class="smallnote">Claim in preparation · '+Math.max(0,scheme.due-g.turn)+' months remaining.</p>':contextualButton('conflict','scheme','fabricate','Fabricate claim (110g)',esc,id))+'</div>';}
