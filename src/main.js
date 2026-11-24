@@ -175,7 +175,7 @@ function onBattleFinished(result){
   if(!battle)return;el('battle-return').disabled=true;
   if(!practice){
    if(defense){const r=resolveInvasion(game,world,battleDescriptor.threat,result);if(!r.ok)message(r.msg);}
-   else concludeBattle(game,battleDescriptor,result,world);
+   else {const r=concludeBattle(game,battleDescriptor,result,world);if(r&&!r.ok)message(r.msg);}
   }
   battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;
   document.body.style.overflow='';render();if(!practice)save();
