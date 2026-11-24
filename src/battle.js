@@ -156,7 +156,7 @@ export class BattleGame{
   const type=mySlots[i],slotCount=mySlots.filter(t=>t===type).length;
   const unitCount=descriptor.fieldBattle?regimentTroops(a,mySlots,i):(a[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?-26:24;
   const g=formation('p'+i,'attacker',type,i,[0,0],unitCount,'#4b98b3');
-  g.z=position;g.targetZ=position;g.orderZ=position;
+  const depth=descriptor.fieldBattle?(type==='archers'?7:type==='cavalry'?2:0)*Math.sign(position):0;g.z=position+depth;g.targetZ=g.z;g.orderZ=g.z;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
   g.routed=unitCount<1;if(descriptor.fieldBattle)Object.assign(g,fieldStats(alliedFieldArmies,garrison,type));else{g.profile=regimentProfile(game,a,type);g.readiness=armyReadiness(game,a);}g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,playerFaction,militaryDoctrine(playerFaction).formations[0]);
   if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;if(descriptor.interactive&&!g.routed)issueFieldOrder(g,'hold');}this.groups.push(g);
@@ -165,7 +165,7 @@ export class BattleGame{
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
   const unitCount=descriptor.fieldBattle?regimentTroops(enemies,enemySlots,i):(enemies[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?24:-24;
   const g=formation('e'+i,'defender',type,i,[0,0],unitCount,enemy?.color||'#b86855');
-  g.z=position;g.targetZ=position;g.orderZ=position;
+  const depth=descriptor.fieldBattle?(type==='archers'?7:type==='cavalry'?2:0)*Math.sign(position):0;g.z=position+depth;g.targetZ=g.z;g.orderZ=g.z;
   g.life=clamp(unitCount/(type==='infantry'?50:type==='archers'?32:22)*100,10,100);
   g.routed=unitCount<1;if(descriptor.fieldBattle&&!descriptor.showcase)Object.assign(g,fieldStats(hostileFieldArmies,hostileGarrison,type));else{g.profile=regimentProfile(game,enemyArmy||enemies,type);g.readiness=armyReadiness(game,enemyArmy||enemies);}g.morale=g.readiness.morale;g.initialLife=g.life;g.troopCount=unitCount;attachTactics(g,enemy,militaryDoctrine(enemy).formations[i%militaryDoctrine(enemy).formations.length]);
   if(descriptor.fieldBattle){initializeFieldGroup(g);if(descriptor.defenseMode)g.facingZ*=-1;}this.groups.push(g);
@@ -202,7 +202,7 @@ export class BattleGame{
  command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];const points=all&&order==='move'?formationMovePoints(groups,point):null;let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,points?points.get(g.id):point))changed=true;if(changed){this.audio?.play('order');this.report();}return changed;}
  startAssault(){if(!this.deployment||this.renderLost)return false;this.deployment=false;this.paused=false;this.frameRemainder=0;this.audio?.unlock();this.audio?.play('horn');this.last=performance.now();this.report();return true;}
  update(dt){this.elapsed+=dt;
- if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);this.audio?.update(this.groups,this.elapsed,this.camera);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
+ if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e&&!g.contact&&!g.moving&&g.attackPulse<=0){const next=chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type);if(next!==g.formationId)attachTactics(g,this.game.factions[this.descriptor.enemy],next);}}}stepField(this,dt);this.audio?.update(this.groups,this.elapsed,this.camera);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
  for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
   const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
   const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];

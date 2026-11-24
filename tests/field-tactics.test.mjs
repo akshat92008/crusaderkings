@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,stableFieldTarget,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
+import {initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,stableFieldTarget,rangedWeapon,weaponReach,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
 import {armyFormationSlots} from '../src/military-doctrines.js';
 function unit(id,side,type,x,z,extra={}){return initializeFieldGroup({id,side,type,x,z,order:0,troopCount:40,morale:85,damage:10,armor:1,speed:4,range:type==='archers'?14:2.5,cooldown:0,phase:0,...extra});}
 test('hold and move orders persist rather than returning to automatic pursuit',()=>{const a=unit('a','attacker','infantry',0,20),b=unit('b','defender','infantry',0,-20),s={groups:[a,b],projectiles:[]};assert.ok(issueFieldOrder(a,'hold'));for(let i=0;i<20;i++)stepField(s,.1);assert.equal(a.z,20);assert.ok(issueFieldOrder(a,'move',[10,20]));for(let i=0;i<60;i++)stepField(s,.1);assert.equal(a.fieldOrder,'hold');assert.ok(Math.abs(a.x-10)<.4);});
@@ -65,4 +65,22 @@ test('engaged target does not flip for a marginally closer enemy',()=>{
 test('archers hold and fire instead of fleeing a cavalry charge automatically',()=>{
  const a=unit('a','attacker','archers',0,0),b=unit('b','defender','cavalry',0,3);
  issueFieldOrder(b,'charge');stepField({groups:[a,b],projectiles:[]},.1);assert.equal(a.z,0);assert.ok(a.attackSerial>0);
+});
+
+test('archer volley spends ammunition at release and only hurts on arrival',()=>{
+ const a=unit('a','attacker','archers',0,0),b=unit('b','defender','infantry',0,12);
+ issueFieldOrder(a,'hold');issueFieldOrder(b,'hold');b.cooldown=99;
+ const s={groups:[a,b],projectiles:[]};stepField(s,.1);assert.equal(a.ammo,23);assert.equal(b.life,100);assert.equal(s.projectiles.length,1);
+ stepField(s,.5);assert.ok(b.life<100);assert.equal(s.projectiles.length,0);const life=b.life;stepField(s,.1);assert.equal(b.life,life);
+});
+test('spent archers and ordered charges use sidearms rather than infinite ranged damage',()=>{
+ const a=unit('a','attacker','archers',0,0),b=unit('b','defender','infantry',0,9);a.ammo=0;issueFieldOrder(a,'hold');issueFieldOrder(b,'hold');b.cooldown=99;
+ const s={groups:[a,b],projectiles:[]};stepField(s,.1);assert.equal(a.weaponMode,'melee');assert.equal(b.life,100);assert.equal(s.projectiles.length,0);
+ b.z=1;stepField(s,.1);assert.ok(b.life<100);assert.equal(a.ammo,0);
+ a.ammo=12;issueFieldOrder(a,'charge');assert.equal(rangedWeapon(a),false);assert.equal(weaponReach(a),2.1);
+});
+test('melee formations stop moving when engaging an enemy within reach',()=>{
+ const a=unit('a','attacker','infantry',0,0),b=unit('b','defender','infantry',0,2);
+ issueFieldOrder(a,'charge');issueFieldOrder(b,'hold');stepField({groups:[a,b]},.1);
+ assert.equal(a.contact,true);assert.equal(a.moving,false);assert.equal(a.z,0);assert.ok(b.life<100);
 });
