@@ -78,6 +78,11 @@ try:
     lord.get_by_text('Estate exemptions',exact=True).click()
     lord.get_by_role('button',name='Grant tax exemption',exact=True).click()
     assert lord.get_by_text('Tax exemption in effect',exact=True).count()==1
+    province=page.locator('#province-panel').get_attribute('data-province')
+    lord.get_by_text('Estate succession',exact=True).click()
+    lord.locator('[id^="estate-law-province-"]').select_option('reversion')
+    lord.get_by_role('button',name='Amend succession (75g)',exact=True).click()
+    page.wait_for_function("id=>JSON.parse(localStorage.getItem('crown-of-nations.save')).politics.holdings[id].successionLaw==='reversion'",arg=province)
    page.locator('[data-action="pin"][data-type="province"]').click()
    assert page.locator('[data-action="pin"][data-type="province"]').get_attribute('aria-pressed')=='true'
    assert page.locator('[data-section="recruit"]').is_visible()
