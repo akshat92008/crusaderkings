@@ -1,4 +1,4 @@
-import {buildHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
+import {buildHistoricalWorld,expandHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
 import {expandedAction} from './expanded-content.js';
 import {livingAction} from './living-systems.js';
 import {diplomacyAction} from './diplomacy-systems.js';
@@ -30,7 +30,7 @@ const fmt=n=>Math.round(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const legacyWorld=await fetch('data/world.json').then(r=>{if(!r.ok)throw Error(`Map data unavailable (${r.status})`);return r.json();});
 const historicalReference=await fetch('data/historical-polities-1450.json').then(r=>r.ok?r.json():null).catch(()=>null);
-const atlasWorld=buildHistoricalWorld(legacyWorld,historicalReference);let world=atlasWorld;
+const atlasV2=buildHistoricalWorld(legacyWorld,historicalReference),atlasWorld=expandHistoricalWorld(atlasV2);let world=atlasWorld;
 let staticById=Object.fromEntries(world.provinces.map(p=>[p.id,p]));
 let game=null,selected=null,tab='realm',marchFrom=null,diplomaticTarget='france',battle=null,battleDescriptor=null,speedInterval=null,toastTimer=null;
 const map=new CampaignMap(el('world-map'),world,onProvince);
@@ -42,7 +42,7 @@ const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();}}
 function start(id){useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);render();}
-function load(){try{const raw=localStorage.getItem('crown-of-nations.save'),next=worldForSave(raw,legacyWorld,atlasWorld),restored=restoreGame(raw,next);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();if(!openIncomingBattle())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
+function load(){try{const raw=localStorage.getItem('crown-of-nations.save'),next=worldForSave(raw,legacyWorld,atlasV2,atlasWorld),restored=restoreGame(raw,next);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();if(!openIncomingBattle())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
 function save(){if(!game)return;try{localStorage.setItem('crown-of-nations.save',snapshot(game));message('Campaign saved to this browser.');}catch(e){message(`Save failed: ${e.message}`);}}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);marchFrom=null;el('map-target-help').textContent='SELECT A PROVINCE TO INSPECT';if(r.ok&&r.type==='battle'){openBattle(r);return;}clickResult(r);}
  selected=id;map.select(id);renderInspector();}
@@ -159,7 +159,7 @@ function advanceWithInvasions(){
 }
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-faction').innerHTML=world.factions.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<option value="${f.id}" ${f.id==='ottomans'?'selected':''}>${esc(f.name)} — ${esc(f.continent)}</option>`).join('');
-function renderStartFaction(){const f=world.factions.find(f=>f.id===el('start-faction').value),d=militaryDoctrine(f);el('start-faction-info').textContent=`${f.government} · ${f.continent} · ${d.name} · Signature: ${d.unique} · ${d.mix.map(x=>Math.round(x*100)+'%').join(' / ')} infantry / archers / cavalry`; }
+function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value),d=militaryDoctrine(f);el('start-faction-info').textContent=`${f.government} · ${f.continent} · ${d.name} · Signature: ${d.unique} · ${d.mix.map(x=>Math.round(x*100)+'%').join(' / ')} infantry / archers / cavalry`; }
 el('start-faction').addEventListener('change',renderStartFaction);renderStartFaction();
 el('start-new').addEventListener('click',()=>start(el('start-faction').value));
 try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}

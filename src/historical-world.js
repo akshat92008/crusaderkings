@@ -55,4 +55,294 @@ export function buildHistoricalWorld(legacy,history){if(!history?.features?.leng
  const geography={factions,provinces:ps},components=landComponents(geography);for(const [i,ids] of components.entries())for(const id of ids){const p=ps.find(p=>p.id===id);p.landComponent=i+1;p.landComponentSize=ids.length;}for(const f of factions){f.startingSeat=capitalDistrict(geography,f.id);f.startingGeography=realmGeography(geography,f.id);}
  return {meta:{...legacy.meta,coverage:atlasCoverage(geography),landConnectivity:{components:components.length,largest:components[0]?.length||0},title:'Crown of Nations 1450 — Historical Atlas',mapVersion:MAP_VERSION,provinceCount:ps.length,caveat:'Synthetic gameplay districts aligned approximately to incomplete 1450 polity references; aggregated realms and fallback regions are not verified historical boundaries.',mapSource:'Natural Earth public domain; Cliopatria/Seshat CC BY 4.0, adapted'},factions,provinces:ps};
 }
-export function worldForSave(raw,legacy,atlas){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;throw Error('Saved map version is unavailable');}
+// Version 3 adds reference-based starting profiles without altering version 2.
+export const EXPANDED_MAP_VERSION='atlas-1450-v3';
+export const ATLAS_ADDITIONS=[
+ {
+  "id": "scotland",
+  "name": "Kingdom of Scotland",
+  "continent": "Europe",
+  "capital": [
+   -3.19,
+   55.95
+  ],
+  "government": "Monarchy",
+  "color": "#476d96",
+  "specialty": "highland",
+  "doctrineProfile": "highland",
+  "civicProfile": [
+   "feudal",
+   "Scottish",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Kingdom of Scotland"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "brittany",
+  "name": "Duchy of Brittany",
+  "continent": "Europe",
+  "capital": [
+   -1.55,
+   47.22
+  ],
+  "government": "Duchy",
+  "color": "#a89b81",
+  "specialty": "chivalry",
+  "doctrineProfile": "chivalry",
+  "civicProfile": [
+   "feudal",
+   "Breton",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Duchy of Brittany"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "kalmar",
+  "name": "Kalmar Union",
+  "continent": "Europe",
+  "capital": [
+   12.57,
+   55.68
+  ],
+  "government": "Union monarchy",
+  "color": "#b6a25c",
+  "specialty": "maritime",
+  "doctrineProfile": "maritime",
+  "civicProfile": [
+   "feudal",
+   "Scandinavian",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Kalmar Union",
+   "(Kalmar Union)"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "genoa",
+  "name": "Republic of Genoa",
+  "continent": "Europe",
+  "capital": [
+   8.93,
+   44.41
+  ],
+  "government": "Merchant republic",
+  "color": "#97485e",
+  "specialty": "maritime",
+  "doctrineProfile": "maritime",
+  "civicProfile": [
+   "republic",
+   "Ligurian",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Republic of Genoa"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "venice",
+  "name": "Republic of Venice",
+  "continent": "Europe",
+  "capital": [
+   12.33,
+   45.44
+  ],
+  "government": "Merchant republic",
+  "color": "#985a35",
+  "specialty": "maritime",
+  "doctrineProfile": "maritime",
+  "civicProfile": [
+   "republic",
+   "Venetian",
+   "Latin Christianity"
+  ],
+  "referenceNames": [
+   "Republic of Venice"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "cyprus",
+  "name": "Kingdom of Cyprus",
+  "continent": "Asia",
+  "capital": [
+   33.36,
+   35.17
+  ],
+  "government": "Monarchy",
+  "color": "#8c83ac",
+  "specialty": "chivalry",
+  "doctrineProfile": "chivalry",
+  "civicProfile": [
+   "feudal",
+   "Cypriot",
+   "Christian traditions"
+  ],
+  "referenceNames": [
+   "Kingdom of Cyprus"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "oirats",
+  "name": "Four Oirats",
+  "continent": "Asia",
+  "capital": [
+   96,
+   47
+  ],
+  "government": "Confederation",
+  "color": "#9a785a",
+  "specialty": "steppe",
+  "doctrineProfile": "steppe",
+  "civicProfile": [
+   "steppe",
+   "Oirat",
+   "Buddhist and local traditions"
+  ],
+  "referenceNames": [
+   "Four Oirats"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "chagatai",
+  "name": "Chagatai Khanate",
+  "continent": "Asia",
+  "capital": [
+   81.3,
+   43.9
+  ],
+  "government": "Khanate",
+  "color": "#727ca1",
+  "specialty": "steppe",
+  "doctrineProfile": "steppe",
+  "civicProfile": [
+   "steppe",
+   "Chagatai",
+   "Islamic and local traditions"
+  ],
+  "referenceNames": [
+   "Chagatai Khanate"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "tibet",
+  "name": "Tibetan polities",
+  "continent": "Asia",
+  "capital": [
+   91.13,
+   29.65
+  ],
+  "government": "Regional polities",
+  "color": "#9d8447",
+  "specialty": "highland",
+  "doctrineProfile": "highland",
+  "civicProfile": [
+   "regional",
+   "Tibetan",
+   "Tibetan Buddhism"
+  ],
+  "referenceNames": [
+   "Tibet"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "lanxang",
+  "name": "Lan Xang",
+  "continent": "Asia",
+  "capital": [
+   102.14,
+   19.89
+  ],
+  "government": "Monarchy",
+  "color": "#739753",
+  "specialty": "elephant",
+  "doctrineProfile": "elephant",
+  "civicProfile": [
+   "tributary",
+   "Lao",
+   "Theravada Buddhism"
+  ],
+  "referenceNames": [
+   "Lan Xang"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "sunda",
+  "name": "Sunda Kingdom",
+  "continent": "Asia",
+  "capital": [
+   106.8,
+   -6.6
+  ],
+  "government": "Monarchy",
+  "color": "#478b83",
+  "specialty": "river",
+  "doctrineProfile": "river",
+  "civicProfile": [
+   "regional",
+   "Sundanese",
+   "Hindu-Buddhist and local traditions"
+  ],
+  "referenceNames": [
+   "Sunda Kingdom"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ },
+ {
+  "id": "zayyanid",
+  "name": "Zayyanid realm",
+  "continent": "Africa",
+  "capital": [
+   -1.32,
+   34.88
+  ],
+  "government": "Sultanate",
+  "color": "#a97153",
+  "specialty": "chivalry",
+  "doctrineProfile": "chivalry",
+  "civicProfile": [
+   "sultanate",
+   "Maghrebi",
+   "Sunni Islam"
+  ],
+  "referenceNames": [
+   "Zayyanid dynasty"
+  ],
+  "initialTreasury": 1000,
+  "initialPrestige": 12
+ }
+];
+export function expandHistoricalWorld(atlas){
+ if(atlas.meta?.mapVersion!==MAP_VERSION)return atlas;
+ const world=JSON.parse(JSON.stringify(atlas)),added=[];
+ for(const profile of ATLAS_ADDITIONS){const districts=world.provinces.filter(p=>p.owner==='independent'&&profile.referenceNames.includes(p.historicalPolity)&&Number.isFinite(p.referenceSamples)&&p.referenceSamples>0&&p.referenceMatches/p.referenceSamples>=.5);if(!districts.length)continue;
+ const {referenceNames,...f}=JSON.parse(JSON.stringify(profile));f.initialTreasury=1000+Math.min(600,districts.length*50);f.referenceNames=referenceNames;f.referenceProfile=true;world.factions.push(f);added.push(f.id);
+ for(const [i,p] of districts.entries()){p.owner=f.id;p.ownershipSource='reference';p.name=f.name+' · District '+(i+1);}}
+ for(const f of world.factions){f.startingSeat=capitalDistrict(world,f.id);f.startingGeography=realmGeography(world,f.id);}
+ world.meta={...world.meta,mapVersion:EXPANDED_MAP_VERSION,coverage:atlasCoverage(world),addedProfiles:added,caveat:'Synthetic districts aligned approximately to incomplete 1450 polity references. Additional playable profiles and political-center coordinates are gameplay abstractions; borders are not verified.'};return world;
+}
+export function worldForSave(raw,legacy,atlas,expanded=atlas){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;if(version===EXPANDED_MAP_VERSION&&expanded.meta.mapVersion===EXPANDED_MAP_VERSION)return expanded;throw Error('Saved map version is unavailable');}

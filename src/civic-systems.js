@@ -30,7 +30,7 @@ const PROFILES={
 };
 export const LIFESTYLES={diplomacy:{name:'Diplomacy',skill:'diplomacy',perks:['Courtly grace','Trusted envoy','Peace broker']},martial:{name:'Warfare',skill:'martial',perks:['Drilled retinue','Logistics master','Veteran commander']},stewardship:{name:'Administration',skill:'stewardship',perks:['Estate accounts','Efficient works','Prosperous realm']},intrigue:{name:'Intrigue',skill:'intrigue',perks:['Careful listener','Network of informants','Master negotiator']},learning:{name:'Scholarship',skill:'learning',perks:['Royal library','Patron of scholars','Learned ruler']}};
 function log(g,msg){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}
-const profile=f=>PROFILES[f.id]||['regional',f.name,'Local spiritual traditions'];
+const profile=f=>PROFILES[f.id]||(Array.isArray(f.civicProfile)&&GOVERNMENTS[f.civicProfile[0]]?f.civicProfile:['regional',f.name,'Local spiritual traditions']);
 const person=(g,id)=>g.politics.people[id];
 const ruler=(g,realm)=>person(g,g.politics.realms[realm]?.ruler);
 function character(g,c){if(c.civic)return c.civic;const origin=g.civic.realms[c.realm];return c.civic={culture:origin?.culture||'Local',faith:origin?.faith||'Local',focus:null,xp:0,perks:[],stress:0,guardian:null,education:0,lastFocus:-60};}

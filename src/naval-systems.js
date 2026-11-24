@@ -3,11 +3,11 @@
 import {controller} from './campaign-war.js';
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const BASINS={
- atlantic:['england','france','burgundy','castile','portugal','morocco'],
- baltic:['imperial','poland','novgorod'],
- mediterranean:['aragon','castile','morocco','ottomans','mamluks'],
+ atlantic:['england','france','burgundy','castile','portugal','morocco','scotland','brittany','kalmar'],
+ baltic:['imperial','poland','novgorod','kalmar'],
+ mediterranean:['aragon','castile','morocco','ottomans','mamluks','genoa','venice','cyprus','zayyanid'],
  indian:['kilwa','gujarat','bengal','vijayanagara','bahmani','malacca'],
- eastAsian:['ming','joseon','ashikaga','dai-viet','majapahit','malacca','ayutthaya'],
+ eastAsian:['ming','joseon','ashikaga','dai-viet','majapahit','malacca','ayutthaya','sunda'],
  pacific:['maori','fiji']
 };
 export const SHIPS={transport:{name:'Transport',cost:120,timber:10,tools:2,capacity:70,power:1,upkeep:3},galley:{name:'War galley',cost:180,timber:14,tools:4,capacity:15,power:16,upkeep:5},warship:{name:'Armed sailing ship',cost:260,timber:20,tools:6,capacity:25,power:26,upkeep:8}};
