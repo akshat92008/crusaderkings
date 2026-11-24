@@ -1,3 +1,7 @@
+import {campaignArmyPower,borderBattleOutcome,proportionalLoss} from './border-battle.js';
+import {armyReadiness,syncRegiments} from './military-systems.js';
+import {embarked} from './naval-systems.js';
+import {controller} from './campaign-war.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {hookStrength} from './intrigue-systems.js';
 import {independenceMembers,foundBreakaway} from './independence-systems.js';
@@ -80,12 +84,24 @@ function settleFaction(g,x,result,world){
 }
 function beginCivilWar(g,x){x.status='civil war';x.startedWar=g.turn;x.rebels=power(g,x.members);x.score=0;x.months=0;noteIf(g,x.realm,'The '+x.kind+' faction raised an army against the crown.');}
 function noteIf(g,realm,msg){if(realm===g.player)note(g,msg);}
-function campaignRound(g,x,boost=0,world){const f=g.factions[x.realm],forces=army(g,x.realm),strength=forces.reduce((n,a)=>n+size(a),0),c=initConflict(g);
- if(x.status!=='civil war')return;
- const royal=(strength+boost+35)*(.8+rng(c)*.4),rebel=Math.max(0,x.rebels)*(.8+rng(c)*.4);
- const success=royal>=rebel;x.score=cap(x.score+(success?25:-20),-100,100);x.months++;
- for(const a of forces){const ratio=success?.96:.91;for(const k of ['infantry','archers','cavalry'])a[k]=Math.max(0,Math.round(a[k]*ratio));}
- x.rebels=Math.max(0,Math.round(x.rebels*(success?.81:.95)));
+// Only armies in contested provinces or their immediately adjacent home provinces
+// can participate. Ships and armies on foreign campaigns do not teleport home.
+export function civilWarForces(g,x,world){
+ const members=new Set(x.members.filter(id=>g.provinces[id]?.owner===x.realm));
+ const theater=new Set(members);
+ for(const p of world.provinces)if(members.has(p.id))for(const id of p.neighbors||[])if(controller(g,id)===x.realm&&g.provinces[id]?.owner===x.realm)theater.add(id);
+ const forces=army(g,x.realm).filter(a=>size(a)>0&&theater.has(a.province)&&controller(g,a.province)===x.realm&&!embarked(g,a.id));
+ return {forces,troops:forces.reduce((n,a)=>n+size(a),0),power:forces.reduce((n,a)=>n+campaignArmyPower(a,armyReadiness(g,a)),0)};
+}
+function campaignRound(g,x,boost=0,world){const f=g.factions[x.realm],{forces,troops:strength,power:ready}=civilWarForces(g,x,world),c=initConflict(g);
+ if(x.status!=='civil war'||x.lastRound===g.turn)return;
+ x.lastRound=g.turn;
+ // Mobilization represents better logistics, not soldiers appearing from nowhere.
+ const royal=ready*(1+Math.min(.25,boost/Math.max(1,ready))),rebel=Math.max(0,x.rebels);
+ const outcome=borderBattleOutcome(royal,rebel,rng(c)),success=outcome.victory;
+ x.score=cap(x.score+(success?25:-20),-100,100);x.months++;
+ for(const a of forces){proportionalLoss(a,outcome.attackerLoss);syncRegiments(g,a);}
+ x.rebels=Math.max(0,Math.round(x.rebels*(1-(royal>0?outcome.defenderLoss:0))));
  for(const id of x.members)if(g.provinces[id]?.owner===x.realm)g.provinces[id].unrest=cap(g.provinces[id].unrest+(success?-2:6),0,100);
  f.treasury-=Math.min(80,Math.max(0,strength*.04));
  if(x.score>=75||x.rebels<=10)settleFaction(g,x,'royal victory',world);else if(x.score<=-60||x.months>=18)settleFaction(g,x,x.score>0?'royal victory':'rebel victory',world);
@@ -100,7 +116,7 @@ export function conflictAction(g,world,action,id,extra){const c=initConflict(g),
  if(action==='accept'&&['organizing','ultimatum','civil war'].includes(x.status)){settleFaction(g,x,'concessions',world);return ok('Faction demands accepted.');}
  if(action==='refuse'&&x.status==='ultimatum'){beginCivilWar(g,x);return ok('Civil war has begun.');}
  if(action==='negotiate'&&['organizing','ultimatum'].includes(x.status)){if(f.treasury<150||g.turn-(x.lastNegotiation??-100)<6)return no('Negotiation needs 150 gold and a six-month interval.');f.treasury-=150;x.lastNegotiation=g.turn;x.pressure=cap(x.pressure-30,0,100);for(const id of x.members){const v=g.politics.holdings[id];if(v?.realm===realm)v.loyalty=cap(v.loyalty+12,0,100);}x.status='organizing';return ok('Negotiations reduced faction pressure.');}
- if(action==='mobilize'&&x.status==='civil war'){if(f.treasury<150||x.lastMobilize===g.turn)return no('Mobilization costs 150 gold, once per month.');f.treasury-=150;x.lastMobilize=g.turn;campaignRound(g,x,120,world);return ok('Royal troops confronted the rebel army.');}
+ if(action==='mobilize'&&x.status==='civil war'){if(f.treasury<150||x.lastMobilize===g.turn||x.lastRound===g.turn)return no('Mobilization costs 150 gold; only one campaign round per month.');f.treasury-=150;x.lastMobilize=g.turn;campaignRound(g,x,120,world);return ok('Royal troops confronted the rebel army.');}
  return no('Action unavailable at this stage.');
 }
 export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.turn)return;c.lastTick=g.turn;
@@ -114,7 +130,7 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  if(!members.length){if(x)settleFaction(g,x,'dissolved',world);continue;}
  if(!x){const recent=Object.values(c.factions).some(x=>x.realm===realm&&x.ended!==undefined&&g.turn-x.ended<24);if(recent)continue;const key='f'+c.next++;const claimant=f.legitimacy<48?claimantCandidates(g,realm).find(c=>g.politics.people[c.person].age>=18):null;const separatists=claimant?[]:independenceMembers(g,world,realm,members);const kind=claimant?'claimant':separatists.length?'independence':local.filter(([id,v])=>members.includes(id)&&v.tax===2).length?'tax':local.filter(([id,v])=>members.includes(id)&&v.levy===2).length?'levy':'liberty';x=c.factions[key]={id:key,realm,kind,claimant:claimant?.person||null,members,pressure:15,status:'organizing',started:g.turn};noteIf(g,realm,'Discontented vassals formed a '+kind+' faction.');}
  x.members=x.kind==='independence'?independenceMembers(g,world,realm,members):members;if(!x.members.length){settleFaction(g,x,'dissolved',world);continue;}x.power=power(g,x.members);x.pressure=cap(x.pressure+Math.max(5,x.members.length*4),0,100);
- if(realm!==g.player&&x.pressure>=55){if(f.treasury>200&&x.power>army(g,realm).reduce((n,a)=>n+size(a),0)*.6)settleFaction(g,x,'concessions',world);else beginCivilWar(g,x);continue;}
+ if(realm!==g.player&&x.pressure>=55){if(f.treasury>200&&x.power>civilWarForces(g,x,world).power*.6)settleFaction(g,x,'concessions',world);else beginCivilWar(g,x);continue;}
  if(x.pressure>=70&&x.status==='organizing'){x.status='ultimatum';x.deadline=g.turn+6;noteIf(g,realm,'A faction issued an ultimatum. Respond within six months.');}
  if(x.status==='ultimatum'&&g.turn>=x.deadline)beginCivilWar(g,x);
  }
