@@ -1,3 +1,4 @@
+import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {updateFieldCharacters} from './battle-presentation.js';
 /**
  * Crown of Nations — Three.js battle renderer with real KayKit skinned infantry.
@@ -92,7 +93,7 @@ export class ThreeBattleScene {
    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);inst.frustumCulled=false;inst.count=0;this.scene.add(inst);this.batches[kind]=inst;
   }
   this.groups=new Map();this.templates={};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
-  this.environment=buildMedievalBattlefield(this.scene,config);
+  this.environment=buildMedievalBattlefield(this.scene,config);if(config.fortLevel===0)applyFieldAtmosphere(this.scene,this.renderer,config.biome);
   this.prepareCharacters();
  }
  async prepareCharacters(){

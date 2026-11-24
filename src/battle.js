@@ -1,3 +1,4 @@
+import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {participatingArmies,aggregateForce,regimentTroops} from './field-forces.js';
 import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from './battle-presentation.js';
 import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
@@ -7,7 +8,7 @@ import {BattleModelArt} from './glb-art.js';
 import {armyFormationSlots,militaryDoctrine,startingTroops,combatStatistics,chooseCounterFormation,availableFormations} from './military-doctrines.js';
 import {ThreeBattleScene as BundledBattleScene} from './three-battle.bundle.js';
 // The shipped bundle stays self-hosted; field animation uses the shared runtime adapter.
-class ThreeBattleScene extends BundledBattleScene{updateCharacters(groups,dt){if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);return super.updateCharacters(groups,dt);}}
+class ThreeBattleScene extends BundledBattleScene{constructor(canvas,config){super(canvas,config);if(config?.fortLevel===0)applyFieldAtmosphere(this.scene,this.renderer,config.biome);}updateCharacters(groups,dt){if(groups?.some(g=>g.fieldOrder))return updateFieldCharacters(this,groups,dt);return super.updateCharacters(groups,dt);}}
 const TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vec=(x=0,y=0,z=0)=>[x,y,z];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];

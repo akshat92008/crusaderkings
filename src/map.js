@@ -3,7 +3,7 @@ import {occupation} from './campaign-war.js';
 import {ReliefMap} from './relief-map.js';
 import {
  atlasPaper,atlasColor,buildDecorativeCounties,drawGeoPath,drawSea,drawLand,
- drawTopography,drawDivisions,drawRosette,atlasBorders,drawSettlement,drawOceanLettering
+ drawTopography,drawDivisions,drawRosette,atlasBorders,drawSettlement,drawOceanLettering,buildAtlasEdges,drawPoliticalEdges,atlasArmyGroups
 } from './atlas-art.js';
 
 /** Crown of Nations — living political atlas over the existing campaign game. */
@@ -20,7 +20,7 @@ export class CampaignMap{
   this.canvas=canvas;this.ctx=canvas.getContext('2d');this.world=world;this.onProvince=onProvince;
   this.game=null;this.selected=null;this.hover=null;this.hoverHistorical=null;
   this.zoom=1.02;this.panX=0;this.panY=0;this.drag=null;this.mode='political';this.history=null;this.useRelief=true;
-  this.counties=buildDecorativeCounties(world);this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));this.paper=this.ctx?atlasPaper(this.ctx):null;
+  this.counties=buildDecorativeCounties(world);this.edges=buildAtlasEdges(world);this.provinceIndex=new Map(world.provinces.map(p=>[p.id,p]));this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));this.paper=this.ctx?atlasPaper(this.ctx):null;
   this.dirty=true;
   const terrainCanvas=document.getElementById('terrain-map');this.terrain=terrainCanvas?new ReliefMap(terrainCanvas,()=>this.render(),world):null;
   const obs=new ResizeObserver(()=>this.resize());obs.observe(canvas.parentElement);this.resize();
@@ -36,13 +36,14 @@ export class CampaignMap{
  pinchState(){const [a,b]=[...this.pointers.values()];return {x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,distance:Math.hypot(a[0]-b[0],a[1]-b[1])};}
  zoomAt(x,y,factor){const old=this.zoom,next=clamp(old*factor,bounds.minZoom,bounds.maxZoom);const dx=x-this.w/2-this.panX,dy=y-this.h/2-this.panY;this.panX-=dx*(next/old-1);this.panY-=dy*(next/old-1);this.zoom=next;this.render();}
  resize(){const r=this.canvas.getBoundingClientRect();this.w=Math.max(1,r.width);this.h=Math.max(1,r.height);this.dpr=Math.min(window.devicePixelRatio||1,2);this.canvas.width=Math.round(this.w*this.dpr);this.canvas.height=Math.round(this.h*this.dpr);this.render();}
- setWorld(world){this.world=world;this.game=null;this.selected=null;this.hover=null;this.hoverHistorical=null;this.counties=buildDecorativeCounties(world);this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));if(this.terrain)this.terrain.world=world;this.render();}
+ setWorld(world){this.world=world;this.game=null;this.selected=null;this.hover=null;this.hoverHistorical=null;this.counties=buildDecorativeCounties(world);this.edges=buildAtlasEdges(world);this.provinceIndex=new Map(world.provinces.map(p=>[p.id,p]));this.ownerColors=Object.fromEntries(world.factions.map(f=>[f.id,f.color]));if(this.terrain)this.terrain.world=world;this.render();}
  setGame(g){this.game=g;this.render();}
  setHistorical(data){this.history=data?.features?data:null;this.render();}
  setMode(mode){if(!['political','terrain','historical'].includes(mode))return;this.mode=mode;this.render();}
  setRelief(v){this.useRelief=Boolean(v);this.render();}
  get compression(){return this.useRelief&&this.terrain?.ready?0.82:1;}
  select(id){this.selected=id;this.render();}
+ setMarchOrigin(id){this.marchOrigin=id;this.render();}
  focus(lon,lat,z=2.6){this.zoom=clamp(z,bounds.minZoom,bounds.maxZoom);this.panX=-lon*this.scale();this.panY=lat*this.scale()*this.compression;this.render();}
  focusOldWorld(){this.focus(56,33,2.05);}
  scale(){return Math.min(this.w/355,this.h/150)*this.zoom;}
@@ -54,9 +55,9 @@ export class CampaignMap{
  _drawProvinceColors(c,s){
   c.save();c.lineJoin='round';for(const p of this.world.provinces){
    const owner=this.game?.provinces?.[p.id]?.owner??p.owner;
-   c.beginPath();drawGeoPath(c,p.geometry);c.fillStyle=atlasColor(this.game?.factions?.[owner]?.color||this.ownerColors[owner]||'#b4b09a',.29);
-   c.globalAlpha=owner===this.game?.player?0.87:0.77;c.fill('evenodd');c.globalAlpha=1;
-   c.lineWidth=clamp(1.35/s,.05,.52);c.strokeStyle='rgba(54,43,31,.50)';c.stroke();
+   c.beginPath();drawGeoPath(c,p.geometry);c.fillStyle=atlasColor(this.game?.factions?.[owner]?.color||this.ownerColors[owner]||'#b4b09a',owner===this.game?.player?.toString()? .10:.23);
+   c.globalAlpha=owner===this.game?.player?0.96:0.84;c.fill('evenodd');c.globalAlpha=1;
+   c.lineWidth=clamp(.72/s,.025,.32);c.strokeStyle='rgba(54,43,31,.30)';c.stroke();
    const o=occupation(this.game||{},p.id);if(o){c.save();c.strokeStyle=this.game.factions[o.by]?.color||'#c18e48';c.lineWidth=clamp(3/s,.13,1.2);c.setLineDash([4/s,2/s]);c.stroke();c.restore();}
   }c.restore();
  }
@@ -66,12 +67,12 @@ export class CampaignMap{
   for(let i=0;i<this.history.features.length;i++){const f=this.history.features[i];c.beginPath();drawGeoPath(c,f.geometry);c.fillStyle=polityColor(i);c.globalAlpha=.83;c.fill('evenodd');c.globalAlpha=1;c.strokeStyle='rgba(55,44,35,.75)';c.lineWidth=clamp(1.35/s,.06,.65);c.stroke();}
   c.restore();
  }
- _markArmy(c,a){const province=this.world.provinces.find(p=>p.id===a.province);if(!province)return;
+ _markArmy(c,a,offset=0){const province=this.provinceIndex.get(a.province);if(!province)return;
   const [x,y]=this.toScreen(...province.centroid);if(x<20||y<32||x>this.w-25||y>this.h-30)return;
   const mine=a.owner===this.game?.player;
-  c.save();c.translate(x,y-15);c.shadowColor='rgba(26,29,20,.58)';c.shadowBlur=5;c.fillStyle=mine?'#c9a04d':'#6c5c55';c.strokeStyle='#2e3430';c.lineWidth=1.3;
+  c.save();c.translate(x+offset,y-15);c.shadowColor='rgba(26,29,20,.58)';c.shadowBlur=5;c.fillStyle=mine?'#c9a04d':'#6c5c55';c.strokeStyle='#2e3430';c.lineWidth=1.3;
   c.beginPath();c.moveTo(-6,-12);c.lineTo(6,-12);c.lineTo(6,5);c.lineTo(0,11);c.lineTo(-6,5);c.closePath();c.fill();c.stroke();c.shadowBlur=0;
-  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText('⚔',0,-2);c.restore();
+  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText('⚔',0,-2);if(this.zoom>=2.1||mine){const text=a.troops>=1000?(a.troops/1000).toFixed(1).replace(/\.0$/,'')+'k':String(a.troops);c.font='bold 10px system-ui';const w=c.measureText(text).width+10;c.fillStyle=mine?'#423820':'#3b3834';c.fillRect(-w/2,13,w,15);c.fillStyle='#fff0c8';c.fillText(text,0,20);}c.restore();
  }
  _realmSeats(){const factions=this.game?Object.values(this.game.factions).filter(f=>f.id!=='independent'&&f.capital):this.world.factions;const states=this.game?.provinces,world={...this.world,factions},by=new Map(world.provinces.map(p=>[p.id,p]));return factions.map(f=>{const seat=capitalDistrict(world,f.id,states);return seat?{f,point:by.get(seat.id).centroid,count:world.provinces.filter(p=>(states?states[p.id]?.owner:p.owner)===f.id).length}:null;}).filter(Boolean).sort((a,b)=>b.count-a.count||a.f.id.localeCompare(b.f.id));}
  _labels(c,s,seats){
@@ -116,9 +117,10 @@ export class CampaignMap{
   }else{
    if(this.mode==='political')this._drawProvinceColors(c,s);
    if(this.mode==='terrain'){c.globalAlpha=.36;this._drawProvinceColors(c,s);c.globalAlpha=1;}
-   if(this.mode==='political')drawDivisions(c,this.counties,s,this.zoom>.73);
+   if(this.mode==='political'){drawDivisions(c,this.counties,s,this.zoom>=4.5&&this.w>=700);const a=this.toGeo(0,h),b=this.toGeo(w,0);drawPoliticalEdges(c,this.edges,id=>this.game?.provinces?.[id]?.owner??this.provinceIndex.get(id)?.owner,s,[a[0],a[1],b[0],b[1]]);}
   }
   if(this.mode!=='historical')drawTopography(c,this.world,s);
+  if(this.marchOrigin&&this.game){const p=this.provinceIndex.get(this.marchOrigin);for(const id of p?.neighbors||[]){const dest=this.provinceIndex.get(id);if(!dest)continue;const friendly=this.game.provinces[id]?.owner===this.game.player;c.beginPath();drawGeoPath(c,dest.geometry);c.fillStyle=friendly?'rgba(105,190,149,.24)':'rgba(222,126,83,.28)';c.fill('evenodd');c.strokeStyle=friendly?'#c2f0b8':'#ffd0a1';c.lineWidth=clamp(2.6/s,.08,.8);c.stroke();}}
   // Borders of selected/hovered playable provinces always remain interactive.
   const selected=this.world.provinces.find(p=>p.id===this.selected);
   if(selected){c.beginPath();drawGeoPath(c,selected.geometry);c.fillStyle='rgba(255,217,126,.14)';c.fill('evenodd');c.lineWidth=clamp(3.4/s,.12,.95);c.strokeStyle='#fff0b7';c.stroke();}
@@ -127,15 +129,15 @@ export class CampaignMap{
   drawOceanLettering(c,view,w,h);
   const seats=this._realmSeats();if(this.mode!=='terrain')this._labels(c,s,seats);
   this._cityMarkers(c,seats);
-  if(this.game){for(const a of Object.values(this.game.armies||{}))if(!this.game.naval?.voyages?.[a.id])this._markArmy(c,a);}
-  if(w>340&&h>280)drawRosette(c,75,h-108,24);
+  if(this.game){const groups=atlasArmyGroups(this.game.armies,this.game.naval?.voyages),counts=new Map();for(const a of groups){const n=counts.get(a.province)||0;counts.set(a.province,n+1);this._markArmy(c,a,n*17);}}
+  if(w>700&&h>350)drawRosette(c,55,h-75,20);
   // Atlas masthead is ink on translucent parchment; not part of geography.
   c.save();c.fillStyle='rgba(234,217,176,.87)';c.strokeStyle='rgba(102,84,53,.63)';c.lineWidth=1.1;
-  const bx=w*.5-111; c.fillRect(bx,19,222,34);c.strokeRect(bx,19,222,34);
-  c.font='bold 13px Georgia';c.textAlign='center';c.fillStyle='#51442f';c.fillText(this.mode==='historical'?'THE HISTORICAL ATLAS':this.mode==='terrain'?'RELIEF OF THE EARTH':'THE KINGDOMS OF 1450',w/2,40);
-  c.restore();atlasBorders(c,w,h);
+  const bx=w*.5-111; if(w>=700){c.fillRect(bx,19,222,34);c.strokeRect(bx,19,222,34);
+  c.font='bold 13px Georgia';c.textAlign='center';c.fillStyle='#51442f';c.fillText(this.mode==='historical'?'THE HISTORICAL ATLAS':this.mode==='terrain'?'RELIEF OF THE EARTH':'THE KINGDOMS OF 1450',w/2,40);}
+  c.restore();if(w>=700)atlasBorders(c,w,h);
   c.font='10px Georgia';c.textAlign='left';c.textBaseline='alphabetic';c.fillStyle='rgba(47,48,38,.83)';
-  c.fillText(this.mode==='historical'?'CLIOPATRIA / SESHAT · CC BY 4.0 · INCOMPLETE COVERAGE':this.mode==='terrain'?'TERRAIN VIEW · STYLIZED RELIEF':'POLITICAL MAP · DECORATIVE COUNTY LINES',25,h-24);
+  if(w>=700)c.fillText(this.mode==='historical'?'CLIOPATRIA / SESHAT · CC BY 4.0 · INCOMPLETE COVERAGE':this.mode==='terrain'?'TERRAIN VIEW · STYLIZED RELIEF':'POLITICAL MAP · APPROXIMATE HISTORICAL DISTRICTS',25,h-24);
   this._hoverTip(c);
  }
 }
