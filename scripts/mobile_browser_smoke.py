@@ -26,6 +26,11 @@ try:
    box=page.locator('#world-map').bounding_box();assert box['height']>=height*.45,box
    page.screenshot(path=str(OUT/(name+'-map.png')))
    page.click('#open-management')
+   page.locator('.campaign-hub [data-character]').first.click()
+   assert page.locator('.character-hero').is_visible()
+   assert page.locator('.character-skills').is_visible()
+   page.locator('[data-character-back]').click()
+   assert page.locator('.campaign-hub').is_visible()
    for work in ['realm','court','foreign','war','people']:
     page.locator('[data-workspace="'+work+'"]').click()
     assert 1<=page.locator('#tabs .tab:visible').count()<=5
