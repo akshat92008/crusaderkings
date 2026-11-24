@@ -43,6 +43,8 @@ try:
    page.locator('.campaign-hub [data-character]').first.click()
    assert page.locator('.character-hero').is_visible()
    assert page.locator('.character-skills').is_visible()
+   assert page.locator('#tab-content').get_by_text('PERSONAL RESOURCES',exact=True).is_visible()
+   assert page.locator('#tab-content').get_by_text('Personal wealth',exact=True).is_visible()
    page.locator('[data-action="pin"][data-type="character"]').click()
    assert page.locator('[data-action="pin"][data-type="character"]').get_attribute('aria-pressed')=='true'
    page.locator('[data-character-back]').click()
