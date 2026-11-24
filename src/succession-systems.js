@@ -5,6 +5,17 @@ const num=n=>Number.isFinite(n)?n:0;
 const free=(g,p)=>p?.alive&&g.feudal?.prisoners?.[p.id]?.status!=='held';
 const byAge=(a,b)=>b.age-a.age||a.id.localeCompare(b.id);
 const children=(g,p)=>[...new Set(p?.children||[])].map(id=>g.politics.people[id]).filter(Boolean);
+export const GENDER_LAWS={equal:'Equal inheritance',male_preference:'Male preference',female_preference:'Female preference',male_only:'Male only',female_only:'Female only'};
+export const FAITH_LAWS={any:'Any faith',same_faith:'Crown faith required'};
+export function crownPolicy(g,realm){const s=g.politics?.realms?.[realm];return {gender:Object.hasOwn(GENDER_LAWS,s?.genderLaw)?s.genderLaw:'equal',faith:Object.hasOwn(FAITH_LAWS,s?.faithLaw)?s.faithLaw:'any'};}
+export function crownPolicyEligible(g,realm,p){
+ if(!p)return false;const {gender,faith}=crownPolicy(g,realm);
+ if(gender==='male_only'&&p.sex!=='male'||gender==='female_only'&&p.sex!=='female')return false;
+ const official=g.civic?.realms?.[realm]?.faith,personal=p.civic?.faith??g.civic?.realms?.[p.realm]?.faith;
+ return faith!=='same_faith'||!official||personal===official;
+}
+function branchOrder(g,realm,law){const {gender}=crownPolicy(g,realm);const preferred=gender==='male_preference'?'male':gender==='female_preference'?'female':null;return (a,b)=>(preferred?Number(b.sex===preferred)-Number(a.sex===preferred):0)||(law==='youngest'?a.age-b.age||b.id.localeCompare(a.id):byAge(a,b));}
+export function marriageLineage(a,b){const mother=a.sex==='female'?a:b,father=a.sex==='male'?a:b;return mother.marriageLineage==='maternal'&&father.marriageLineage==='maternal'?mother:father;}
 const opinion=(g,a,b)=>num(g.chronicles?.relationships?.[[a,b].sort().join('|')]?.opinion);
 // Representation preserves the senior branch even if its parent died first.
 // A living eligible ancestor precedes descendants; dead or ineligible ancestors
@@ -19,15 +30,15 @@ export function setCrownExclusion(person,realm,exclude){
 }
 export function hereditaryLine(g,head,law='eldest',crownRealm=null,branchRoot=null){
  if(!head)return [];const seen=new Set([head.id]),out=[];
- function visit(p){if(!p||seen.has(p.id))return;seen.add(p.id);if(free(g,p)&&p.realm===head.realm&&p.house===head.house&&!crownExcluded(p,crownRealm))out.push(p);const list=children(g,p).sort(byAge);if(law==='youngest')list.reverse();for(const c of list)visit(c);}
- const list=branchRoot?[branchRoot]:children(g,head).sort(byAge);if(law==='youngest')list.reverse();for(const c of list)visit(c);
+ function visit(p){if(!p||seen.has(p.id))return;seen.add(p.id);if(free(g,p)&&p.realm===head.realm&&p.house===head.house&&!crownExcluded(p,crownRealm)&&(!crownRealm||crownPolicyEligible(g,crownRealm,p)))out.push(p);const list=children(g,p).sort(branchOrder(g,crownRealm,law));for(const c of list)visit(c);}
+ const list=branchRoot?[branchRoot]:children(g,head).sort(branchOrder(g,crownRealm,law));for(const c of list)visit(c);
  return out;
 }
-export function partitionRepresentatives(g,head){const seen=new Set(),out=[];for(const child of children(g,head).sort(byAge)){const rep=hereditaryLine(g,head,'eldest',head.realm,child)[0];if(rep&&!seen.has(rep.id)){seen.add(rep.id);out.push(rep);}}return out;}
+export function partitionRepresentatives(g,head){const seen=new Set(),out=[];for(const child of children(g,head).sort(branchOrder(g,head.realm,'eldest'))){const rep=hereditaryLine(g,head,'eldest',head.realm,child)[0];if(rep&&!seen.has(rep.id)){seen.add(rep.id);out.push(rep);}}return out;}
 export function electionView(g,realm){
  const s=g.politics?.realms?.[realm],head=g.politics?.people?.[s?.ruler];if(!head)return {candidates:[],electors:[],winner:null,nominee:null};
  const people=g.politics.people,local=p=>free(g,p)&&p.realm===realm&&p.age>=18,weights=new Map(),candidates=new Map(),council=new Set(Object.values(s.council||{}));
- const add=p=>{if(local(p)&&p.id!==head.id&&!crownExcluded(p,realm))candidates.set(p.id,p);};
+ const add=p=>{if(local(p)&&p.id!==head.id&&!crownExcluded(p,realm)&&crownPolicyEligible(g,realm,p))candidates.set(p.id,p);};
  const addVote=(id,weight)=>{if(local(people[id])||id===head.id)weights.set(id,(weights.get(id)||0)+weight);};
  addVote(head.id,3);
  for(const p of hereditaryLine(g,head))add(p);
@@ -43,8 +54,8 @@ export function electionView(g,realm){
 export function successionCandidates(g,realm){const s=g.politics?.realms?.[realm],head=g.politics?.people?.[s?.ruler];if(!head)return [];const residence=personalUnion(g,realm)?.junior===realm?head.realm:realm;if(s.law==='elective')return electionView(g,realm).candidates.map(x=>g.politics.people[x.id]);
  if(s.law==='seniority'){
   return Object.values(g.politics.people)
-   .filter(p=>p.id!==head.id&&p.realm===residence&&p.house===head.house&&free(g,p)&&!crownExcluded(p,realm))
-   .sort(byAge);
+   .filter(p=>p.id!==head.id&&p.realm===residence&&p.house===head.house&&free(g,p)&&!crownExcluded(p,realm)&&crownPolicyEligible(g,realm,p))
+   .sort(branchOrder(g,realm,'eldest'));
  }
  const line=hereditaryLine(g,head,s.law,realm),seen=new Set([head.id,...line.map(p=>p.id)]);const relatives=[];
  // If descendants are exhausted, prefer siblings and their descendants before distant dynasts.
