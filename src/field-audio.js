@@ -1,4 +1,4 @@
-// Original procedural sound effects. No downloads, music or external assets.
+// Original procedural sound effects plus optional, locally supplied battle music.
 const limits={steel:.15,arrow:.20,hoof:.28,rout:.8,horn:1.1,wind:2.2,order:.15,victory:1,defeat:1};
 export function fieldAudioEvents(groups,seen,elapsed,ambientDue=0){const events=[];for(const g of groups){const old=seen.get(g.id)||{attack:0,routed:false};if((g.attackSerial||0)>old.attack)events.push({kind:g.type==='archers'?'arrow':g.type==='cavalry'?'hoof':'steel',x:g.x,z:g.z});if(g.routed&&!old.routed&&g.life>0)events.push({kind:'rout',x:g.x,z:g.z});seen.set(g.id,{attack:g.attackSerial||0,routed:!!g.routed});}if(elapsed>=ambientDue){events.push({kind:'wind',x:0,z:0});if(groups.some(g=>g.type==='cavalry'&&g.moving&&!g.routed))events.push({kind:'hoof',x:0,z:0});}return events;}
 export class FieldAudio{
@@ -17,3 +17,17 @@ export class FieldAudio{
  close(){if(this.closed)return;this.closed=true;this.silence();try{this.master?.disconnect();this.ctx?.close?.()?.catch?.(()=>{});}catch{}}
 }
 export function browserFieldAudio(enabled=true){return new FieldAudio(()=>{const C=globalThis.AudioContext||globalThis.webkitAudioContext;return C?new C():null;},enabled);}
+
+// The music element is created only on an explicit start/resume gesture. Missing
+// files, autoplay rejection and unsupported codecs never affect the simulation.
+export class BattleMusic{
+ constructor(factory,enabled=true){this.factory=factory;this.enabled=!!enabled;this.active=false;this.closed=false;this.media=null;}
+ sync(active,enabled=this.enabled){this.active=!!active;this.enabled=!!enabled;if(this.closed)return false;
+  if(!this.active||!this.enabled){try{this.media?.pause();}catch{}return false;}
+  try{if(!this.media){this.media=this.factory?.();if(!this.media)return false;this.media.loop=true;this.media.volume=.22;this.media.preload='none';}
+   const result=this.media.play();result?.catch?.(()=>{});return true;
+  }catch{return false;}
+ }
+ close(){if(this.closed)return;this.closed=true;this.active=false;try{this.media?.pause();if(this.media){this.media.removeAttribute?.('src');this.media.load?.();}}catch{}this.media=null;}
+}
+export function browserBattleMusic(enabled=true){return new BattleMusic(()=>typeof Audio==='function'?new Audio('assets/audio/war%20theme.ogg'):null,enabled);}
