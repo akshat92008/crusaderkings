@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
-import {buildHistoricalWorld,worldForSave,MAP_VERSION} from '../src/historical-world.js';
+import {buildHistoricalWorld,worldForSave,MAP_VERSION,capitalDistrict,atlasCoverage} from '../src/historical-world.js';
 const legacy=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const reference=JSON.parse(readFileSync(new URL('../data/historical-polities-1450.json',import.meta.url)));
 const original=JSON.stringify(legacy),atlas=buildHistoricalWorld(legacy,reference);
@@ -12,3 +12,8 @@ test('land graph is reciprocal with no self edges or dangling references',()=>{l
 test('Moscow and the lower Volga are distinct connected districts',()=>{const north=byId.get('p19-north'),south=byId.get('p19');assert.equal(north.owner,'muscovy');assert.equal(south.owner,'horde');assert.ok(north.neighbors.includes(south.id));assert.ok(north.centroid[1]>54.5&&south.centroid[1]<54.5);});
 test('old and new map saves select correct immutable geography',()=>{assert.equal(worldForSave(JSON.stringify({version:1}),legacy,atlas),legacy);assert.equal(worldForSave(JSON.stringify({mapVersion:'legacy'}),legacy,atlas),legacy);assert.equal(worldForSave(JSON.stringify({mapVersion:MAP_VERSION}),legacy,atlas),atlas);assert.throws(()=>worldForSave(JSON.stringify({mapVersion:'unknown'}),legacy,atlas));assert.equal(buildHistoricalWorld(legacy,null),legacy);});
 test('historical generation is deterministic',()=>{const again=buildHistoricalWorld(legacy,reference);assert.equal(JSON.stringify(again),JSON.stringify(atlas));});
+
+test('all starting seats resolve to owned land and are explicitly marked approximate',()=>{for(const f of atlas.factions){const seat=capitalDistrict(atlas,f.id);assert.ok(seat);assert.equal(byId.get(seat.id).owner,f.id);assert.deepEqual(f.startingSeat,seat);assert.ok(['contains reference center','nearest owned district'].includes(seat.method));}assert.equal(capitalDistrict(atlas,'unknown'),null);});
+test('capital selection respects changing ownership and never selects a lost district',()=>{const f=atlas.factions.find(f=>atlas.provinces.filter(p=>p.owner===f.id).length>1),seat=capitalDistrict(atlas,f.id),state=Object.fromEntries(atlas.provinces.map(p=>[p.id,{owner:p.owner}]));state[seat.id].owner='independent';const next=capitalDistrict(atlas,f.id,state);assert.ok(next&&next.id!==seat.id);for(const p of atlas.provinces)if(state[p.id].owner===f.id)state[p.id].owner='independent';assert.equal(capitalDistrict(atlas,f.id,state),null);});
+test('capital selection prefers a containing polygon over a misleading centroid',()=>{const shape=(x,y)=>({type:'Polygon',coordinates:[[[x,y],[x+2,y],[x+2,y+2],[x,y+2],[x,y]]]});const w={factions:[{id:'a',capital:[1,1]}],provinces:[{id:'contains',owner:'a',centroid:[2,2],geometry:shape(0,0)},{id:'other',owner:'a',centroid:[1,1],geometry:shape(3,3)}]};assert.deepEqual(capitalDistrict(w,'a'),{id:'contains',method:'contains reference center'});});
+test('provenance counters cover every district and sample confidence stays bounded',()=>{const c=atlasCoverage(atlas);assert.deepEqual(c,atlas.meta.coverage);assert.equal(c.reference+c['regional approximation']+c['playability approximation']+c.unassigned,atlas.provinces.length);for(const p of atlas.provinces.filter(p=>p.ownershipSource==='reference')){assert.ok(p.referenceSamples>0);assert.ok(p.referenceMatches>0&&p.referenceMatches<=p.referenceSamples);}assert.ok(c.referencePolities>0&&c.unmappedPolities>0);});
