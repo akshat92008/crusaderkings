@@ -105,7 +105,7 @@ function prepare(g,p){
 }
 function disrupt(g,r,p){
  if(!knownThreats(g,r).includes(p)||p.disrupted||g.factions[r].treasury<90)return no('Requires a discovered foreign plot, 90 gold and no prior disruption.');
- g.factions[r].treasury-=90;p.preparation=cap((p.preparation||0)-12,-20,25);p.due+=3;p.disrupted=true;note(g,r,'Counterintelligence disrupted a discovered political scheme.');return ok('Disruption completed.');
+ g.factions[r].treasury-=90;p.preparation=cap((p.preparation||0)-12,-20,25);p.due+=3;p.disrupted=true;p.disruptedAt=g.turn;note(g,r,'Counterintelligence disrupted a discovered political scheme.');return ok('Disruption completed.');
 }
 function recruit(g,p,id){const f=g.factions[p.realm];if(p.agents.length>=3||!agentOptions(g,p).some(c=>c.id===id)||f.treasury<60)return no('Requires an available court agent, 60 gold and a free agent slot.');f.treasury-=60;p.agents.push(id);return ok('Agent recruited.');}
 function generateSecret(g,r,target){const s=g.intrigue;let secret=Object.values(s.secrets).find(x=>x.person===target.id&&!x.exposed&&x.kind!=='contested');if(!secret){const kinds=Object.keys(SECRETS).filter(k=>k!=='contested'),kind=kinds[Math.floor(random(s)*kinds.length)],id='s'+s.next++;secret=s.secrets[id]={id,person:target.id,kind,known:[],created:g.turn,exposed:false};}if(!secret.known.includes(r))secret.known.push(r);return secret;}
