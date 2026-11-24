@@ -1,3 +1,4 @@
+import {humanControlsRealm,reconcileCareer} from './player-career.js';
 import {initLandless,tickLandless} from './landless-systems.js';
 import {initAgency,tickAgency} from './character-agency.js';
 import {initRegencies} from './regency-systems.js';
@@ -282,7 +283,7 @@ function aiMonthly(g,world){
  // Cap each rival to one infrastructure action and one recruitment decision
  // per cycle. No API calls, runaway build loops or invented "learning".
  for(const f of world.factions){
-  if(f.id===g.player)continue;
+  if(humanControlsRealm(g,f.id))continue;
   const nation=g.factions[f.id],land=provinces(g,f.id);
   if(!nation||!land.length)continue;
   if(g.turn%3===0&&nation.treasury>450){
@@ -315,7 +316,7 @@ export function advanceKingdomSystems(g,world){
  // Trade is already included in the campaign balance.
  tickStrategy(g,world);
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);tickChronicles(g,world);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);tickLandless(g,world);
+ tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);tickChronicles(g,world);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);tickLandless(g,world);reconcileCareer(g);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');

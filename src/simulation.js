@@ -1,3 +1,4 @@
+import {humanControlsRealm,reconcileCareer} from './player-career.js';
 import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison} from './border-battle.js';
 import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
@@ -204,13 +205,13 @@ export function advanceMonth(g,world){
  }
  // Rival rulers periodically recruit and contest border provinces. Player wars remain manual.
  if(g.turn%8===0){
-  const challengers=Object.values(g.armies).filter(a=>a.owner!==g.player && a.owner!=='independent'&&!a.contingent&&!embarked(g,a.id)&&!g.kingdom.threats.some(t=>t.army===a.id)&&armySize(a)>45);
+  const challengers=Object.values(g.armies).filter(a=>!humanControlsRealm(g,a.owner) && a.owner!=='independent'&&!a.contingent&&!embarked(g,a.id)&&!g.kingdom.threats.some(t=>t.army===a.id)&&armySize(a)>45);
   const shuffled=challengers.slice().sort((a,b)=>(a.id.length*17+g.turn)%31-(b.id.length*17+g.turn)%31);
   let campaigns=0;const acted=new Set();
   for(const a of shuffled){
    if(campaigns>=3)break;if(acted.has(a.id))continue;
    const origin=world.provinces.find(p=>p.id===a.province);if(!origin||controller(g,origin.id)!==a.owner)continue;
-   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&controller(g,p.id)!==a.owner&&controller(g,p.id)!==g.player&&(!occupation(g,p.id)||p.owner===a.owner)&&!nonAggression(g,a.owner,controller(g,p.id))&&!hasTruce(g,a.owner,controller(g,p.id))&&!['alliance','marriage'].includes(g.factions[a.owner].treaties[controller(g,p.id)]));
+   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&controller(g,p.id)!==a.owner&&!humanControlsRealm(g,controller(g,p.id))&&(!occupation(g,p.id)||p.owner===a.owner)&&!nonAggression(g,a.owner,controller(g,p.id))&&!hasTruce(g,a.owner,controller(g,p.id))&&!['alliance','marriage'].includes(g.factions[a.owner].treaties[controller(g,p.id)]));
    if(!potential.length)continue;
    const native=localCampaignForces(g,a).filter(x=>!acted.has(x.id));if(!native.length)continue;
    const combined=native.reduce((n,v)=>n+campaignArmyPower(v,armyReadiness(g,v)),0);
@@ -245,6 +246,6 @@ export function restoreGame(text,world){
  const o=JSON.parse(text);if(o.version!==1||!o.factions?.[o.player]||o.player==='independent'||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
  if((o.mapVersion||'legacy')!==(world.meta?.mapVersion||'legacy')||Object.keys(o.provinces).length!==world.provinces.length||world.provinces.some(p=>!o.provinces[p.id]))throw Error('Map version mismatch');
  initializeKingdomSystems(o,world);
- reconcilePoliticalHoldings(o);
+ reconcilePoliticalHoldings(o);reconcileCareer(o);
  return o;
 }

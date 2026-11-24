@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {campaignArmyPower,campaignGarrison} from './border-battle.js';
 import {nearestOwnedRoute} from './campaign-balance.js';
 import {nonAggression,aidStrength,diplomaticSupport,fieldContingentsAt} from './diplomacy-systems.js';
@@ -46,8 +47,8 @@ function positionArmy(g,world,realm,plan){
 }
 export function tickStrategy(g,world){const s=initStrategy(g,world);if(s.lastTick===g.turn)return;s.lastTick=g.turn;for(const [id,p] of Object.entries(s.pacts))if(p.expires<=g.turn||p.members.some(id=>!land(g,id).length)||war(g,...p.members))delete s.pacts[id];
  for(const [key,x] of Object.entries(s.lessons))if(g.turn-x.last>36)delete s.lessons[key];
- if(g.turn%3!==0)return;for(const realm of Object.keys(g.politics.realms)){if(!land(g,realm).length)continue;const old=s.plans[realm];if(!old||old.review<=g.turn||old.ruler!==ruler(g,realm)?.id){const plan=choosePlan(g,world,realm);if(old&&old.goal===plan.goal&&old.target===plan.target)plan.since=old.since;s.plans[realm]=plan;}const p=s.plans[realm];if(realm===g.player)continue;positionArmy(g,world,realm,p);
+ if(g.turn%3!==0)return;for(const realm of Object.keys(g.politics.realms)){if(!land(g,realm).length)continue;const old=s.plans[realm];if(!old||old.review<=g.turn||old.ruler!==ruler(g,realm)?.id){const plan=choosePlan(g,world,realm);if(old&&old.goal===plan.goal&&old.target===plan.target)plan.since=old.since;s.plans[realm]=plan;}const p=s.plans[realm];if(humanControlsRealm(g,realm))continue;positionArmy(g,world,realm,p);
  const f=g.factions[realm];if(g.turn%6===0&&p.goal==='recover'&&f.treasury>220){const v=Object.entries(g.politics.holdings).filter(([id,h])=>h.realm===realm&&controller(g,id)===realm&&h.loyalty<35).sort((a,b)=>a[1].loyalty-b[1].loyalty)[0];if(v){f.treasury-=100;v[1].loyalty=cap(v[1].loyalty+15,0,100);}}
- if(g.turn%12===0&&p.goal==='defend'&&p.target&&f.treasury>450){const partner=borderRealms(g,world,realm).filter(id=>id!==p.target&&id!==g.player&&relation(g,id,realm)>=0&&threatAssessment(g,world,id,p.target)>=50&&!war(g,id,realm)&&!war(g,id,p.target)).sort((a,b)=>militaryStrength(g,b)-militaryStrength(g,a))[0];if(partner){const key=pair(realm,partner)+'|'+p.target;if(!s.pacts[key]){f.treasury-=100;s.pacts[key]={id:key,target:p.target,members:[realm,partner],expires:g.turn+60};}}}
+ if(g.turn%12===0&&p.goal==='defend'&&p.target&&f.treasury>450){const partner=borderRealms(g,world,realm).filter(id=>id!==p.target&&!humanControlsRealm(g,id)&&relation(g,id,realm)>=0&&threatAssessment(g,world,id,p.target)>=50&&!war(g,id,realm)&&!war(g,id,p.target)).sort((a,b)=>militaryStrength(g,b)-militaryStrength(g,a))[0];if(partner){const key=pair(realm,partner)+'|'+p.target;if(!s.pacts[key]){f.treasury-=100;s.pacts[key]={id:key,target:p.target,members:[realm,partner],expires:g.turn+60};}}}
  if(g.turn%12===0&&p.goal==='diplomacy'&&p.target&&f.treasury>450&&!war(g,realm,p.target)){const other=g.factions[p.target];f.treasury-=80;other.treasury+=80;f.relations[p.target]=cap(relation(g,realm,p.target)+8,-100,100);other.relations[realm]=cap(relation(g,p.target,realm)+8,-100,100);}
  }}
