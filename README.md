@@ -4,7 +4,7 @@
 
 ![World map preview](docs/world-preview.png)
 
-> **State of development: vertical-slice prototype, NOT a complete historical grand-strategy game.** Historical polities and starting dates are inspired by the real year 1450, but the 299 province polygons are generated test geometry and **do not represent verified historical borders**. The 44 factions are representative rather than comprehensive; initial economy and military numbers are fictional balance data. Manual battles have geometric placeholder soldiers, not final production art. Review [known limitations](docs/KNOWN_LIMITATIONS.md).
+> **State of development: playable development build.** The default atlas has 56 starting realms and 576 approximate gameplay districts. Historical-reference alignment is incomplete; the game is fictional alternate history, not an exact 1450 reconstruction. See [release acceptance](docs/RELEASE_ACCEPTANCE.md) and [known limitations](docs/KNOWN_LIMITATIONS.md). Earlier milestone descriptions below describe legacy versions.
 
 ## Play locally — no dependency installation
 
@@ -18,8 +18,8 @@ The game runs locally after the files load; it does not need a game server, npm 
 
 ## What works today
 
-- 299 generated map provinces across **Europe, Asia, Africa, North America, South America, and Oceania**. Pan/zoom/inspect on a bundled coastlines map.
-- 44 **playable named polities** with thematic faction identities and starting geographic positions.
+- 576 approximate gameplay districts across six continents; 56 starting playable realms. Pan/zoom/inspect, political and historical layers, mobile touch gestures.
+- Map-first interface with five on-demand management workspaces, searchable realm selection and portable save import/export.
 - Monthly calendar progression, treasury, revenue, upkeep, food, unrest, stability, legitimacy, prestige, and population growth.
 - Three classes of **royal decrees**: taxation, recruitment laws, and tolerance.
 - Four **province buildings**: farms, markets, barracks, and forts; each upgrades three times.
@@ -29,7 +29,7 @@ The game runs locally after the files load; it does not need a game server, npm 
 - Native instanced **WebGL2 renderer**, with an alternate Canvas 2D renderer projecting 3D cuboids when WebGL2 is unavailable. Does not rely on external 3D engines or CDNs.
 - Rival AI invests, recruits, and fights limited autonomous border conflicts. Not full diplomatic/strategic AI.
 - Diplomatic gifts, improved relations, alliance proposals, insults, an event chronicle, manual and automatic time progression.
-- Browser localStorage save/continue; deterministic campaign simulation core.
+- Browser localStorage save/continue, automatic monthly saves, portable JSON export/import; deterministic campaign simulation core.
 
 ## Controls
 

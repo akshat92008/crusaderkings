@@ -114,3 +114,5 @@
 #realm-search{display:block;width:100%;min-height:44px;padding:10px 12px;margin:8px 0;border:1px solid var(--line);background:#132629;color:var(--ink);border-radius:4px;font:inherit;font-size:16px}.first-turn-guide{text-align:left;margin:10px 0;color:var(--muted);font-size:12px}.first-turn-guide summary{cursor:pointer;min-height:40px;display:flex;align-items:center;color:var(--goldlight)}.first-turn-guide p{font-size:12px;line-height:1.6}
 
 #battle-sound[aria-pressed=false]{opacity:.65}#battle-sound{white-space:nowrap;min-height:40px}
+
+#import-status{font-size:12px;color:#e9b8a0;overflow-wrap:anywhere}#import-save{min-height:44px}

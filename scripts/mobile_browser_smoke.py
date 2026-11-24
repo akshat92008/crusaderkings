@@ -63,6 +63,13 @@ try:
     page.click('#battle-move-tap');page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
     page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
     print(name,'PASS: practice battle deployment, running battle, touch orders and return')
+   if name=='desktop':
+    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
+    with page.expect_download() as info: page.click('#export-save')
+    backup=info.value.path().read_bytes();assert b'"player":"england"' in backup
+    page.reload(wait_until='domcontentloaded');page.locator('#realm-search').wait_for(state='visible')
+    page.locator('#save-file').set_input_files({'name':'campaign.json','mimeType':'application/json','buffer':backup})
+    page.locator('#start-screen').wait_for(state='hidden');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    page.close()

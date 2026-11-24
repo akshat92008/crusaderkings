@@ -1,3 +1,4 @@
+import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistCampaign} from './portable-save.js';
 import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
 import {currentExpandedEvents} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
@@ -45,8 +46,10 @@ const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok)message(r?.msg||'Action unavailable');else{message(r.msg);render();}}
 function start(id){useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);render();}
-function load(){try{const raw=localStorage.getItem('crown-of-nations.save'),next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();if(!openIncomingBattle())message('Saved campaign restored.');}catch(e){message(`Unable to load save: ${e.message}`);}}
-function save(){if(!game)return;try{localStorage.setItem('crown-of-nations.save',snapshot(game));message('Campaign saved to this browser.');}catch(e){message(`Save failed: ${e.message}`);}}
+function loadRaw(raw,portable=false){if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable)persistCampaign(localStorage,snapshot(restored));clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();if(!openIncomingBattle())message('Saved campaign restored.');}
+function load(){try{loadRaw(localStorage.getItem(SAVE_KEY));}catch(e){message('Unable to load save: '+e.message);}}
+function save(notify=true){if(!game||battle)return false;try{persistCampaign(localStorage,snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){if(notify!==false)message('Save failed: '+e.message);return false;}}
+function exportSave(){if(!game||battle)return;const blob=new Blob([snapshot(game)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=saveFilename(game);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Campaign backup exported.');}
 function setDrawer(next){const open=next==='management'||next==='province';document.querySelector('.map-options').open=false;el('management-panel').hidden=next!=='management';el('province-drawer').hidden=next!=='province';el('panel-scrim').hidden=!open;el('open-management').setAttribute('aria-expanded',String(next==='management'));el('open-province').setAttribute('aria-expanded',String(next==='province'));}
 function cancelMarch(){marchFrom=null;map.setMarchOrigin(null);el('cancel-march').hidden=true;el('map-target-help').textContent='Tap a province to inspect';}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);cancelMarch();if(r.ok&&r.type==='battle'){openBattle(r);return;}clickResult(r);}
@@ -168,7 +171,7 @@ function openIncomingBattle(){
 function advanceWithInvasions(){
  if(!game||battle)return;
  if(openIncomingBattle())return;
- advanceMonth(game,world);render();
+ advanceMonth(game,world);render();save(false);
  if(openIncomingBattle()&&speedInterval){
   clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';
  }
@@ -181,6 +184,9 @@ el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-f
 el('start-new').addEventListener('click',()=>{if(atlasWorld.factions.some(f=>f.id===el('start-faction').value))start(el('start-faction').value);});
 try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
 el('load-existing').addEventListener('click',load);
+el('import-save').addEventListener('click',()=>el('save-file').click());
+el('save-file').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{if(f.size>MAX_SAVE_BYTES)throw Error('Save exceeds 20 MB.');loadRaw(await f.text(),true);}catch(err){el('import-status').textContent='Could not import: '+err.message;message('Could not import: '+err.message);}});
+el('export-save').addEventListener('click',exportSave);
 el('save-game').addEventListener('click',save);
 el('next-month').addEventListener('click',advanceWithInvasions);
 el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceWithInvasions();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
@@ -265,4 +271,4 @@ el('invasion-auto').addEventListener('click',()=>{
  if(r.ok){message(r.msg);render();save();}
 });
 
-window.addEventListener('beforeunload',()=>{if(game){try{localStorage.setItem('crown-of-nations.save',snapshot(game));}catch{}}});
+window.addEventListener('pagehide',()=>{if(game&&!battle)save(false);});
