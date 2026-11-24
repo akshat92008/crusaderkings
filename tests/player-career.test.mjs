@@ -62,3 +62,25 @@ test('sovereign campaign commands cannot be issued from a vassal perspective',()
  for(const result of [build(g,id,'farm'),recruit(g,id,'infantry'),startMarch(g,world,id,'p1'),setPolicy(g,'tax',0),negotiate(g,'france','gift',world)])assert.equal(result.ok,false);
  assert.equal(snapshot(g),before);
 });
+
+test('vassal perspective keeps the liege autonomous in lifestyles and royal household administration',async()=>{
+ const {tickRoleplay}=await import('../src/roleplay-systems.js');
+ const {tickRoyalCourt}=await import('../src/royal-court.js');
+ for(const vassal of [false,true]){
+  const g=vassal?fixture().g:createGame(world,'england'),r=g.politics.people[g.politics.realms.england.ruler];
+  r.age=40;r.civic.focus='stewardship';r.civic.roleplay={branches:{},selected:{},lastBranch:{},history:[],lastCoping:-120};
+  g.factions.england.treasury=10000;
+  g.turn=12;tickRoleplay(g,'england',r);tickRoyalCourt(g);
+  assert.equal(!!r.civic.roleplay.selected.stewardship,vassal);
+  if(vassal)assert.ok(g.royalCourt.realms.england.project||Object.keys(g.royalCourt.realms.england.offices).length>0||g.royalCourt.realms.england.reputation>50);
+  else assert.equal(Object.keys(g.royalCourt.realms.england.offices).length,0);
+ }
+});
+test('an autonomous liege responds to low cohesion while a sovereign retains policy control',async()=>{
+ const {tickCivic}=await import('../src/civic-systems.js');
+ for(const vassal of [false,true]){
+  const g=vassal?fixture().g:createGame(world,'england'),s=g.civic.realms.england;
+  s.policy='coercion';s.cohesion=15;g.turn=3;tickCivic(g,world);
+  assert.equal(s.policy,vassal?'pluralism':'coercion');
+ }
+});

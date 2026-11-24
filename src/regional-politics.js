@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Regional political institutions. Existing province, lord and civic records remain authoritative.
 // These are alternate-history gameplay abstractions, not a uniform account of historical societies.
 import {controller} from './campaign-war.js';
@@ -104,7 +105,7 @@ export function tickRegionalPolitics(g,r,land){
    note(g,r,state(g,r,true),'Competing military houses challenged the shogunal court; local unrest increased.');
   }
  }
- if(r===g.player||g.turn<12||g.turn%12!==0||f.treasury<800)return;
+ if(humanControlsRealm(g,r)||g.turn<12||g.turn%12!==0||f.treasury<800)return;
  const v=regionalPoliticalView(g,r,land);if(!v.canAct)return;
  if(k==='regional'){const p=v.candidates.slice().sort((a,b)=>a.loyalty-b.loyalty||a.id.localeCompare(b.id))[0];if(p&&p.loyalty<65)regionalPoliticalAction(g,r,'regional:grant',p.id);}
  if(k==='sultanate'&&(g.civic.realms[r].patronage??50)<75)regionalPoliticalAction(g,r,'sultanate:scholar',v.candidates[0].id);

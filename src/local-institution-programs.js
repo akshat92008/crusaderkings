@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 // Additional institutional choices; no independent economy, army or title records.
 import {controller} from './campaign-war.js';
 import {isImprisoned} from './feudal-systems.js';
@@ -57,7 +58,7 @@ export function tickLocalPrograms(g,r,land){
    s.active=null;note(g,r,s,'The institutional program in '+x.province+' was completed.');
   }
  }
- if(r===g.player||g.turn<12||g.turn%12!==0||f.treasury<800)return;
+ if(humanControlsRealm(g,r)||g.turn<12||g.turn%12!==0||f.treasury<800)return;
  const v=localProgramView(g,r,land);if(!v.canStart)return;
  if(k==='military'){const target=v.targets.slice().sort((a,b)=>a.loyalty-b.loyalty||a.id.localeCompare(b.id))[0];if(target.loyalty<65)localProgramAction(g,r,'military:commission',target.id);}
  if(k==='city'){const target=v.targets.slice().sort((a,b)=>b.unrest-a.unrest||a.id.localeCompare(b.id))[0];if(target.unrest>=15||target.trust<55)localProgramAction(g,r,'city:works',target.id);}
