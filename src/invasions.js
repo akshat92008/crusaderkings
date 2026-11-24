@@ -2,7 +2,7 @@ import {campaignArmyPower,campaignGarrison,automaticDefense} from './border-batt
 import {applyFieldLosses} from './field-forces.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {captureCommander} from './feudal-systems.js';
-import {defenseSupport,strategicPlan,raidThreshold} from './strategic-ai.js';
+import {defenseSupport,strategicPlan,raidThreshold,recordStrategicBattle} from './strategic-ai.js';
 import {controller,captureProvince} from './campaign-war.js';
 import {embarked} from './naval-systems.js';
 import {armyReadiness,onArmyMarch,syncRegiments,applyFortDamage} from './military-systems.js';
@@ -129,7 +129,7 @@ export function resolveInvasion(g,world,threat,result){
   }
   g.factions[found.by].prestige+=8;
  }
- recordCampaignBattle(g,found.by,g.player,found.province,!defended);
+ recordCampaignBattle(g,found.by,g.player,found.province,!defended);recordStrategicBattle(g,found.by,g.player,!defended,1-enemyRatio);recordStrategicBattle(g,g.player,found.by,defended,1-playerRatio);
  g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);
  const msg=defended?'Your defenders repelled '+g.factions[found.by].name+' at '+found.province:
   g.factions[found.by].name+' captured '+found.province+' after a successful assault';

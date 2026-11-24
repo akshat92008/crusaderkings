@@ -4,7 +4,7 @@ import {capitalDistrict} from './historical-world.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {campaignWorld} from './independence-systems.js';
 import {captureCommander} from './feudal-systems.js';
-import {strategicTargetScore,raidThreshold,defenseSupport} from './strategic-ai.js';
+import {strategicTargetScore,raidThreshold,defenseSupport,localCampaignForces,recordStrategicBattle} from './strategic-ai.js';
 import {controller,occupation,occupationTax,captureProvince} from './campaign-war.js';
 import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
 import {onArmyMarch,armyReadiness,syncRegiments,applyFortDamage,initMilitary} from './military-systems.js';
@@ -165,22 +165,22 @@ export function advanceMonth(g,world){
  if(g.turn%8===0){
   const challengers=Object.values(g.armies).filter(a=>a.owner!==g.player && a.owner!=='independent'&&!embarked(g,a.id)&&!g.kingdom.threats.some(t=>t.army===a.id)&&armySize(a)>45);
   const shuffled=challengers.slice().sort((a,b)=>(a.id.length*17+g.turn)%31-(b.id.length*17+g.turn)%31);
-  let campaigns=0;
+  let campaigns=0;const acted=new Set();
   for(const a of shuffled){
-   if(campaigns>=3)break;
+   if(campaigns>=3)break;if(acted.has(a.id))continue;
    const origin=world.provinces.find(p=>p.id===a.province);if(!origin||controller(g,origin.id)!==a.owner)continue;
    const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&controller(g,p.id)!==a.owner&&controller(g,p.id)!==g.player&&(!occupation(g,p.id)||p.owner===a.owner)&&!nonAggression(g,a.owner,controller(g,p.id))&&!hasTruce(g,a.owner,controller(g,p.id))&&!['alliance','marriage'].includes(g.factions[a.owner].treaties[controller(g,p.id)]));
    if(!potential.length)continue;
-   const target=potential.slice().sort((x,y)=>strategicTargetScore(g,world,a,y)-strategicTargetScore(g,world,a,x)||x.id.localeCompare(y.id))[0];if(rand(g)>1-raidThreshold(g,a.owner,controller(g,target.id))||strategicTargetScore(g,world,a,target)<-15)continue;
+   const forces=localCampaignForces(g,a).filter(x=>!acted.has(x.id));if(!forces.length)continue;const combined=forces.reduce((n,v)=>n+campaignArmyPower(v,armyReadiness(g,v)),0);const target=potential.slice().sort((x,y)=>strategicTargetScore(g,world,a,y,combined)-strategicTargetScore(g,world,a,x,combined)||x.id.localeCompare(y.id))[0];if(rand(g)>1-raidThreshold(g,a.owner,controller(g,target.id))||strategicTargetScore(g,world,a,target,combined)<-15)continue;for(const v of forces)acted.add(v.id);
    const defense=campaignGarrison(target)+defenseSupport(g,controller(g,target.id),a.owner)+armiesAt(g,target.id,controller(g,target.id)).reduce((sum,v)=>sum+campaignArmyPower(v,armyReadiness(g,v)),0);
-   const attack=campaignArmyPower(a,armyReadiness(g,a))+aidStrength(g,a.owner,controller(g,target.id)),outcome=borderBattleOutcome(attack,defense,rand(g));
-   const previous=controller(g,target.id),defending=armiesAt(g,target.id,previous);proportionalLoss(a,outcome.attackerLoss);syncRegiments(g,a);for(const d of defending){proportionalLoss(d,outcome.defenderLoss);syncRegiments(g,d);d.morale=clamp(d.morale-(outcome.victory?18:4),10,100);}
+   const attack=combined+aidStrength(g,a.owner,controller(g,target.id)),outcome=borderBattleOutcome(attack,defense,rand(g));
+   const previous=controller(g,target.id),defending=armiesAt(g,target.id,previous);for(const v of forces){proportionalLoss(v,outcome.attackerLoss);syncRegiments(g,v);}recordStrategicBattle(g,a.owner,previous,outcome.victory,outcome.attackerLoss);recordStrategicBattle(g,previous,a.owner,!outcome.victory,outcome.defenderLoss);for(const d of defending){proportionalLoss(d,outcome.defenderLoss);syncRegiments(g,d);d.morale=clamp(d.morale-(outcome.victory?18:4),10,100);}
    if(outcome.victory){
     const previous=controller(g,target.id),war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
     const retreat=world.provinces.find(p=>p.id===target.id)?.neighbors.find(id=>controller(g,id)===previous&&g.provinces[id]?.owner===previous);for(const defender of defending){if(retreat&&armySize(defender)>0){defender.province=retreat;}else{captureCommander(g,a.owner,defender);delete g.armies[defender.id];}}
-    onArmyMarch(g,a);a.province=target.id;recordCampaignBattle(g,a.owner,previous,target.id,true);g.factions[a.owner].prestige+=3;
+    for(const v of forces){onArmyMarch(g,v);v.province=target.id;}recordCampaignBattle(g,a.owner,previous,target.id,true);g.factions[a.owner].prestige+=3;
     makeLog(g,`${ownerName(g,a.owner)} seized ${target.id} from ${ownerName(g,previous)} after a border conflict.`);campaigns++;
-   }else{a.morale=clamp(a.morale-14,10,100);onArmyMarch(g,a);recordCampaignBattle(g,a.owner,previous,target.id,false);campaigns++;}
+   }else{for(const v of forces){v.morale=clamp(v.morale-14,10,100);onArmyMarch(g,v);}recordCampaignBattle(g,a.owner,previous,target.id,false);campaigns++;}
   }
  }
  // Recruitment is handled once in advanceKingdomSystems.
