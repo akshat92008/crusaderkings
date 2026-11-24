@@ -55,6 +55,8 @@ try:
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert page.locator('#battle-start').is_visible()
+    page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='false'
+    page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='true'
     page.wait_for_timeout(500);page.screenshot(path=str(OUT/(name+'-battle-deployment.png')),timeout=45000)
     page.click('#battle-start');page.wait_for_timeout(700)
     page.click('#battle-zoom-in');page.click('#battle-zoom-out');page.click('#battle-move-tap');assert page.locator('#battle-move-tap').get_attribute('aria-pressed')=='true'

@@ -1,3 +1,4 @@
+import {browserFieldAudio} from './field-audio.js';
 import {regimentPalette,projectileTrail,disposeFieldMaterials} from './field-visuals.js';
 import {fieldScenery,suppressFortScenery,battleContactShadow} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
@@ -107,7 +108,7 @@ function attachTactics(group,faction,formationId){
  return group;
 }
 export class BattleGame{
- constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=Boolean(descriptor.interactive);this.deployment=Boolean(descriptor.interactive);this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.last=performance.now();const coarse=window.matchMedia?.('(pointer: coarse)').matches||false,hasWebGL2=Boolean(canvas.getContext('webgl2'));
+ constructor(canvas,descriptor,game,onFinish,onStatus){this.canvas=canvas;this.descriptor=descriptor;this.game=game;this.onFinish=onFinish;this.onStatus=onStatus;this.running=true;this.paused=Boolean(descriptor.interactive);this.deployment=Boolean(descriptor.interactive);this.done=false;this.elapsed=0;this.selected=0;this.camera={yaw:.38,distance:72,target:[0,0,-3],eye:[0,55,80]};this.drag=null;this.keys=new Set();this.projectiles=[];this.audio=browserFieldAudio(descriptor.soundEnabled!==false);this.last=performance.now();const coarse=window.matchMedia?.('(pointer: coarse)').matches||false,hasWebGL2=Boolean(canvas.getContext('webgl2'));
  if(hasWebGL2){
   try{
    const province=game.provinces?.[descriptor.to],fortLevel=descriptor.fieldBattle?0:province?.buildings?.fort||0;
@@ -171,7 +172,7 @@ export class BattleGame{
  this.selected=0;
  this.terrain=[];let randSeed=1450;const rng=()=>((randSeed=(randSeed*1664525+1013904223)>>>0)/4294967296);
  for(let i=0;i<105;i++){let x=(rng()-.5)*125,z=(rng()-.5)*100;if(Math.abs(z)<33&&Math.abs(x)<44)continue;this.terrain.push({x,z,h:1.4+rng()*5,r:rng(),type:rng()>.55?'tree':'rock'});}
- this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){if(!this.deployment&&!this.done)this.paused=!this.paused;e.preventDefault();this.report();}};
+ this._onKeyDown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;this.keys.add(e.key.toLowerCase());if(/^Digit[1-6]$/.test(e.code)){this.selected=Number(e.code.slice(-1))-1;this.report();}if(e.code==='Space'){if(!this.deployment&&!this.done)this.togglePause();e.preventDefault();}};
  this._onKeyUp=e=>this.keys.delete(e.key.toLowerCase());this._onWheel=e=>{e.preventDefault();this.cameraGoal=null;this.camera.distance=clamp(this.camera.distance+e.deltaY*.065,35,165);};
  this._onContext=e=>e.preventDefault();this._onDown=e=>{if(e.button===2){e.preventDefault();const target=this.rayGround(e.offsetX,e.offsetY);const group=this.groups[this.selected];if(target&&group?.side==='attacker'&&!group.routed){if(this.descriptor.fieldBattle){this.command(this.selected,'move',[target[0],target[2]]);return;}group.targetX=clamp(target[0],-64,64);group.targetZ=clamp(target[2],-46,46);group.manual=true;}return;}if(e.button===0){this.drag={x:e.clientX,y:e.clientY,moved:0,pointer:e.pointerId};canvas.setPointerCapture?.(e.pointerId);}};
  this._onMove=e=>{if(this.drag&&this.drag.pointer===e.pointerId){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;this.drag.moved+=Math.hypot(dx,dy);if(this.drag.moved>3){this.cameraGoal=null;this.camera.target[0]-=dx*.08;this.camera.target[2]-=dy*.08;}}};
@@ -196,10 +197,10 @@ export class BattleGame{
   const g=this.groups[index];if(!g||g.side!=='attacker'||g.routed)return false;
   g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;this.report();return true;
  }
- command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed)this.report();return changed;}
- startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.last=performance.now();this.report();return true;}
+ command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed){this.audio?.play('order');this.report();}return changed;}
+ startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.audio?.unlock();this.audio?.play('horn');this.last=performance.now();this.report();return true;}
  update(dt){this.elapsed+=dt;
- if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
+ if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);this.audio?.update(this.groups,this.elapsed,this.camera);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
  for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
   const enemies=this.groups.filter(o=>o.side!==g.side&&!o.routed);
   const e=enemies.sort((a,b)=>dist([a.x,0,a.z],[g.x,0,g.z])-dist([b.x,0,b.z],[g.x,0,g.z]))[0];
@@ -257,11 +258,12 @@ export class BattleGame{
  const vp=this.ctx.render(obj,this.getCamera(),this.groups,this.elapsed);if(this.scenery&&vp)this.scenery.render(vp,this.sceneryPlacements);
  }
  loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;this.updateCamera(dt);if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
- finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;
+ finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;this.audio?.silence();this.audio?.play(victory?'victory':'defeat');
   const roster={attacker:battleRoster(this.groups,'attacker',!!this.descriptor?.fieldBattle),defender:battleRoster(this.groups,'defender',!!this.descriptor?.fieldBattle)},fraction=roster.attacker.fraction,enemies=roster.defender.fraction;
   this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,roster,fieldBattle:!!this.descriptor?.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
  }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
- togglePause(){if(this.deployment||this.done)return;this.paused=!this.paused;this.report();}
- stop(){this.running=false;cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.canvas.removeEventListener('pointercancel',this._onCancel);this.scenery?.dispose();this.ctx?.dispose?.();}
+ setSound(enabled){this.audio?.setEnabled(enabled);}
+ togglePause(){if(this.deployment||this.done)return;this.paused=!this.paused;if(this.paused)this.audio?.silence();else this.audio?.unlock();this.report();}
+ stop(){this.running=false;this.audio?.close();cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.canvas.removeEventListener('pointercancel',this._onCancel);this.scenery?.dispose();this.ctx?.dispose?.();}
 }
