@@ -1,3 +1,4 @@
+import {initMilitary,tickMilitary} from './military-systems.js';
 import {initEconomy,tickEconomy,economyModifiers} from './economy-systems.js';
 import {initHeritage,tickHeritage,heritageModifiers} from './heritage-systems.js';
 import {initCivic,tickCivic,civicModifiers} from './civic-systems.js';
@@ -41,13 +42,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -286,7 +287,7 @@ export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  // Trade is already included in the campaign balance.
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);
+ tickPolitics(g,world);tickConflict(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
