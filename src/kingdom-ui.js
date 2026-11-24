@@ -81,7 +81,7 @@ export function renderLegacy(g,esc){
 }
 
 function renderPolitics(g,esc){
- const p=g.politics;if(!p)return '';const s=p.realms[g.player],r=p.people[s.ruler],vassals=Object.entries(p.holdings).filter(([id,v])=>v.realm===g.player&&g.provinces[id]?.owner===g.player);
+ const p=g.politics;if(!p)return '';const s=p.realms[g.player],r=p.people[s.ruler],vassals=Object.entries(p.holdings).filter(([id,v])=>v.realm===g.player&&g.provinces[id]?.owner===g.player&&v.lord!==r.id);
  const button=(action,id,label,extra='',input='')=>'<button class="rowbtn" data-action="politics" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
  const person=id=>p.people[id];const show=c=>c?esc(c.name)+' · '+c.age+'y · '+esc(c.traits.join(', '))+(c.alive?'':' · deceased'):'None';
  let html=(s.regent?'<div class="rule"><b>Regency</b><p class="paragraph">'+show(person(s.regent))+' governs during the sovereign’s minority.</p></div>':'')+section('DYNASTY AND LIVING FAMILY')+'<div class="rule"><h3>'+esc(r.house)+'</h3><p class="paragraph">'+show(r)+'</p><div class="smallnote">Consort: '+show(person(r.spouse))+'</div><div class="smallnote">Parents: '+r.parents.map(id=>show(person(id))).join(' / ')+'</div>'+r.children.map(id=>'<div class="smallnote">Child: '+show(person(id))+' · spouse: '+show(person(person(id)?.spouse))+'</div>').join('')+'</div>';
