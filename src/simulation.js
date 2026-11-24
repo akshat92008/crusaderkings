@@ -1,3 +1,4 @@
+import {heritageModifiers} from './heritage-systems.js';
 import {civicModifiers,civicProvinceUnrest} from './civic-systems.js';
 import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
@@ -34,7 +35,7 @@ export function empireStats(g,owner){
  const tax=[.65,1,1.5][f?.policies.tax??1];
  const trade=tradeIncome(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const taxIncome=Math.round(heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade;
  const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0));
  const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
@@ -75,7 +76,7 @@ export function recruit(g,provinceId,type='infantry'){
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
- const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy));a[type]+=recruited;
+ const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy));a[type]+=recruited;
  a.doctrine=doctrine.id;
  makeLog(g,`${recruited} ${type} recruited in ${provinceId}.`);
  return {ok:true,msg:doctrine.unique+' tradition: regiment recruited'};
@@ -175,7 +176,7 @@ export function advanceMonth(g,world){
   for(const f of world.factions){
    if(f.id===g.player)continue;
    let troops=Object.values(g.armies).filter(a=>a.owner===f.id);const a=troops[0];
-   if(a&&f.id!=='independent'&&g.factions[f.id].treasury>600&&armySize(a)<190){g.factions[f.id].treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];}
+   if(a&&f.id!=='independent'&&g.factions[f.id].treasury>600&&armySize(a)<190){g.factions[f.id].treasury-=120;const count=Math.max(1,Math.round(35*politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy)),mix=startingTroops(f,count);for(const k of ['infantry','archers','cavalry'])a[k]+=mix[k];}
   }
  }
  if(g.turn%12===0)makeLog(g,`A new year begins: ${g.year}. Courts across the world revise their ambitions.`);
