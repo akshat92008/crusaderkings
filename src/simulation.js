@@ -1,3 +1,4 @@
+import {onArmyMarch,armyReadiness,syncRegiments,applyFortDamage,initMilitary} from './military-systems.js';
 import {economyModifiers} from './economy-systems.js';
 import {heritageModifiers} from './heritage-systems.js';
 import {civicModifiers,civicProvinceUnrest} from './civic-systems.js';
@@ -77,7 +78,7 @@ export function recruit(g,provinceId,type='infantry'){
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
- const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy));a[type]+=recruited;
+ const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy));a[type]+=recruited;initMilitary(g);syncRegiments(g,a);
  a.doctrine=doctrine.id;
  makeLog(g,`${recruited} ${type} recruited in ${provinceId}.`);
  return {ok:true,msg:doctrine.unique+' tradition: regiment recruited'};
@@ -90,21 +91,21 @@ export function startMarch(g,world,fromId,toId){
  if(!isAdjacent(world,fromId,toId))return {ok:false,msg:'Armies can currently move only to connected provinces'};
  const army=armiesAt(g,fromId,g.player)[0];
  if(!army||armySize(army)<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
- if(target.owner===g.player){army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
+ if(target.owner===g.player){onArmyMarch(g,army);army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
  if(hasTruce(g,g.player,target.owner))return {ok:false,msg:'A peace treaty bars this attack.'};
  if(g.factions[g.player].treaties[target.owner]==='alliance')return {ok:false,msg:'Cannot attack an ally'};
  const defenders=armiesAt(g,toId,target.owner);
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
  const garrison=45+target.development*12+target.buildings.fort*45;
- return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:target.owner};
+ return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:target.owner};
 }
 export function concludeBattle(g,battle,result){
  const src=g.armies[battle.attacker];if(!src)return;
  const dst=g.provinces[battle.to];const was=dst.owner;
  recordCampaignBattle(g,g.player,was,battle.to,!!result.victory);
  const ratio=clamp(result.attackerRemaining??0,0,1);
- const oldsize=armySize(src);
- src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);
+ const oldsize=armySize(src);onArmyMarch(g,src);applyFortDamage(g,battle.to,result);
+ src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);syncRegiments(g,src);
  if(result.victory){dst.owner=g.player;dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
   const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending)delete g.armies[defending.id];
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
@@ -162,13 +163,13 @@ export function advanceMonth(g,world){
    if(!potential.length||rand(g)>.48)continue;
    const target=potential.find(p=>activeWar(g,a.owner,p.owner)?.goal===p.id)||potential[Math.floor(rand(g)*potential.length)];
    const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,target.owner).reduce((sum,v)=>sum+armySize(v),0);
-   const attack=armySize(a)*(0.75+rand(g)*.7);
+   const attack=armySize(a)*armyReadiness(g,a).power*(0.75+rand(g)*.7);
    if(attack>defense*.88){
     const previous=target.owner;recordCampaignBattle(g,a.owner,previous,target.id,true);target.owner=a.owner;target.unrest=clamp(target.unrest+25,0,100);
     const losses=clamp(defense/Math.max(1,attack)*.29,.07,.44);
     a.infantry=Math.round(a.infantry*(1-losses));a.archers=Math.round(a.archers*(1-losses));a.cavalry=Math.round(a.cavalry*(1-losses));
     for(const defender of armiesAt(g,target.id,previous))delete g.armies[defender.id];
-    a.province=target.id;g.factions[a.owner].prestige+=3;
+    onArmyMarch(g,a);a.province=target.id;g.factions[a.owner].prestige+=3;
     makeLog(g,`${ownerName(g,a.owner)} seized ${target.id} from ${ownerName(g,previous)} after a border conflict.`);campaigns++;
    }
   }
