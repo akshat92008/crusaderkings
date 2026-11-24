@@ -1,5 +1,5 @@
 import {controller,initCampaignWar,tickCampaignWar} from './campaign-war.js';
-import {embarked,initNaval,tickNaval} from './naval-systems.js';
+import {embarked,initNaval,tickNaval,portBlocked} from './naval-systems.js';
 import {initMilitary,tickMilitary} from './military-systems.js';
 import {initEconomy,tickEconomy,economyModifiers} from './economy-systems.js';
 import {initHeritage,tickHeritage,heritageModifiers} from './heritage-systems.js';
@@ -61,7 +61,8 @@ export function tradeIncome(g,id){
  for(const pact of Object.values(g.kingdom?.tradePacts||{})){
   if(!pact.partners.includes(id))continue;
   const other=pact.partners.find(x=>x!==id);
-  value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2);
+  const blockadeFactor=who=>Object.values(g.naval?.ports||{}).some(p=>g.provinces[p.province]?.owner===who&&portBlocked(g,p.province))?.65:1;
+  value+=Math.min(85,6+marketSum(id)*3+marketSum(other)*2)*Math.min(blockadeFactor(id),blockadeFactor(other));
  }
  return Math.round(value*civicModifiers(g,id).trade*heritageModifiers(g,id).trade);
 }
