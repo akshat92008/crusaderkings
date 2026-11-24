@@ -26,7 +26,7 @@ try:
    box=page.locator('#world-map').bounding_box();assert box['height']>=height*.45,box
    page.screenshot(path=str(OUT/(name+'-map.png')))
    assert page.locator('#hud-ruler').is_visible()
-   page.locator('.map-options summary').click();page.locator('[data-priority-tab="search"]').click()
+   page.locator('#quick-nav [data-priority-tab="search"]').click()
    page.fill('#campaign-query','military');assert page.locator('.finder-row').count()>0
    page.fill('#campaign-query','no-such-result-xyz');assert page.locator('.finder-row').count()==0
    page.fill('#campaign-query','council');page.locator('.finder-row[data-priority-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
@@ -43,13 +43,19 @@ try:
    page.locator('.campaign-hub [data-character]').first.click()
    assert page.locator('.character-hero').is_visible()
    assert page.locator('.character-skills').is_visible()
+   page.locator('[data-action="pin"][data-type="character"]').click()
+   assert page.locator('[data-action="pin"][data-type="character"]').get_attribute('aria-pressed')=='true'
    page.locator('[data-character-back]').click()
    assert page.locator('.campaign-hub').is_visible()
    for work in ['realm','court','foreign','war','people']:
     page.locator('[data-workspace="'+work+'"]').click()
     assert 1<=page.locator('#tabs .tab:visible').count()<=8
-   page.click('#close-management');page.click('#open-province')
+   page.click('#close-management');page.locator('#army-outliner summary').click()
+   assert page.locator('#outliner-list [data-character]').count()==1
+   page.locator('#army-outliner summary').click();page.click('#open-province')
    assert page.locator('#province-drawer').is_visible()
+   page.locator('[data-action="pin"][data-type="province"]').click()
+   assert page.locator('[data-action="pin"][data-type="province"]').get_attribute('aria-pressed')=='true'
    assert page.locator('[data-section="recruit"]').is_visible()
    assert page.locator('[data-section="command"]').is_visible()
    page.locator('[data-section="command"] [data-type="commander"]').first.click()

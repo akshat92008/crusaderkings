@@ -1,3 +1,4 @@
+import {renderPinButton} from './campaign-outliner.js';
 import {feudalHierarchy,obligationProfile} from './feudal-obligations.js';
 import {estateDisputes} from './estate-conflicts.js';
 import {vassalCourt,vassalLiege,pendingVassalPetitions} from './vassal-courts.js';
@@ -330,7 +331,7 @@ export function renderExpanded(g,world,esc){
 }
 
 export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);if(!x)return '<p>Character no longer available.</p>';const p=x.person,s=g.politics.realms[g.player],f=g.factions[g.player],btn=(action,type,id,label,extra='',input='')=>contextualButton(action,type,id,label,esc,extra,input),link=id=>characterLink(g.politics.people[id],esc),place=id=>provinceLink(id,world,esc);
- let h='<button class="rowbtn" data-character-back>‹ Back to previous screen</button><div class="character-hero">'+portrait(p,esc)+'<span class="eyebrow">'+esc(g.factions[p.realm]?.name||p.realm)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.house)+' · '+p.age+' years · '+(p.alive?(x.prisoner?'Imprisoned':'Living'):'Deceased')+(x.sovereign?' · Sovereign':'')+'</p><p>'+esc((p.traits||[]).join(' · '))+'</p></div><div class="character-skills">'+Object.entries(p.skills||{}).map(([skill,value])=>'<div><small>'+esc(skill)+'</small><b>'+value+'/5</b></div>').join('')+'</div>';
+ let h='<button class="rowbtn" data-character-back>‹ Back to previous screen</button>'+renderPinButton(g,'character',p.id,esc)+'<div class="character-hero">'+portrait(p,esc)+'<span class="eyebrow">'+esc(g.factions[p.realm]?.name||p.realm)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.house)+' · '+p.age+' years · '+(p.alive?(x.prisoner?'Imprisoned':'Living'):'Deceased')+(x.sovereign?' · Sovereign':'')+'</p><p>'+esc((p.traits||[]).join(' · '))+'</p></div><div class="character-skills">'+Object.entries(p.skills||{}).map(([skill,value])=>'<div><small>'+esc(skill)+'</small><b>'+value+'/5</b></div>').join('')+'</div>';
  if(p.id!==s.ruler)h+='<p class="paragraph">Opinion of your ruler: '+personalOpinion(g,s.ruler,p.id)+'</p>';
  h+=section('FAMILY')+(x.family.length?x.family.map(y=>'<div class="rule"><small>'+esc(y.relation)+'</small> '+link(y.id)+'</div>').join(''):'<p class="paragraph">No recorded close relatives.</p>');
  h+=section('LAND AND DUTIES')+(x.council.length||x.offices.length?'<p class="paragraph">'+esc([...x.council,...x.offices].join(' · '))+'</p>':'<p class="paragraph">No appointed court office.</p>');
