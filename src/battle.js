@@ -1,3 +1,4 @@
+import {fieldFrameSteps,renderInterval} from './render-performance.js';
 import {browserFieldAudio} from './field-audio.js';
 import {regimentPalette,projectileTrail,disposeFieldMaterials} from './field-visuals.js';
 import {fieldScenery,suppressFortScenery,battleContactShadow} from './field-scenery.js';
@@ -118,7 +119,7 @@ export class BattleGame{
   }
   catch(error){console.warn('Skinned character renderer unavailable, using native WebGL:',error);this.ctx=new Renderer(canvas);}
  }else this.ctx=new CanvasFallback(canvas);
- if(descriptor.fieldBattle){const seed=[...String(descriptor.to||'practice')].reduce((n,c)=>(Math.imul(n,31)+c.charCodeAt(0))>>>0,1450);this.fieldLandscape=fieldScenery(seed,this.biome||'temperate',coarse||this.ctx instanceof CanvasFallback);}
+ this.mobile=coarse;this.frameRemainder=0;if(descriptor.fieldBattle){const seed=[...String(descriptor.to||'practice')].reduce((n,c)=>(Math.imul(n,31)+c.charCodeAt(0))>>>0,1450);this.fieldLandscape=fieldScenery(seed,this.biome||'temperate',coarse||this.ctx instanceof CanvasFallback);}
  // The existing campaign and combat simulation are retained. The asset art layer
  // loads optional scenery from CC0 Kenney packs or this repository's source library.
  this.scenery=null;this.sceneryPlacements=[];
@@ -178,7 +179,7 @@ export class BattleGame{
  this._onMove=e=>{if(this.drag&&this.drag.pointer===e.pointerId){const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;this.drag.moved+=Math.hypot(dx,dy);if(this.drag.moved>3){this.cameraGoal=null;this.camera.target[0]-=dx*.08;this.camera.target[2]-=dy*.08;}}};
  this._onUp=e=>{if(this.drag?.pointer!==e.pointerId)return;if(this.drag.moved<8){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;if(this.tapMove){const p=this.rayGround(x,y);this.tapMove=false;if(p)this.command(this.selected,'move',[p[0],p[2]]);this.report();this.drag=null;return;}let best=-1,d=24;for(let i=0;i<6;i++){const p=this.project([this.groups[i].x,1,this.groups[i].z]);if(!p)continue;let v=Math.hypot(p[0]-x,p[1]-y);if(v<d){best=i;d=v;}}if(best>=0){this.selected=best;this.report();}}this.drag=null;};
  window.addEventListener('keydown',this._onKeyDown);window.addEventListener('keyup',this._onKeyUp);canvas.addEventListener('wheel',this._onWheel,{passive:false});canvas.addEventListener('contextmenu',this._onContext);canvas.addEventListener('pointerdown',this._onDown);window.addEventListener('pointermove',this._onMove);window.addEventListener('pointerup',this._onUp);this._onCancel=()=>{this.drag=null;};canvas.addEventListener('pointercancel',this._onCancel);
- this.report();this.loop=this.loop.bind(this);this.raf=requestAnimationFrame(this.loop);
+ this._onVisibility=()=>{this.last=performance.now();this.frameRemainder=0;if(document.hidden)this.audio?.silence();};document.addEventListener('visibilitychange',this._onVisibility);this.report();this.loop=this.loop.bind(this);this.raf=requestAnimationFrame(this.loop);
  }
  focusCamera(mode){const goal=cameraDestination(mode,this.groups,this.selected);if(!goal)return false;this.cameraGoal=goal;return true;}
  updateCamera(dt){const c=this.camera,k=this.keys;if(['q','e','w','a','s','d'].some(x=>k.has(x)))this.cameraGoal=null;if(this.cameraGoal&&blendCamera(c,this.cameraGoal,dt))this.cameraGoal=null;if(k.has('q'))c.yaw-=dt*.9;if(k.has('e'))c.yaw+=dt*.9;if(k.has('w'))c.target[2]-=dt*22;if(k.has('s'))c.target[2]+=dt*22;if(k.has('a'))c.target[0]-=dt*22;if(k.has('d'))c.target[0]+=dt*22;c.target[0]=clamp(c.target[0],-90,90);c.target[2]=clamp(c.target[2],-75,75);}
@@ -198,7 +199,7 @@ export class BattleGame{
   g.x=(lane-1)*26+(index-2.5)*3.3;g.orderX=g.x;g.targetX=g.x;g.anchorX=g.x;g.anchorZ=g.z;this.report();return true;
  }
  command(index,order,point,all=false){if(!this.descriptor?.fieldBattle||this.done)return false;const groups=all?this.groups.filter(g=>g.side==='attacker'): [this.groups[index]];let changed=false;for(const g of groups)if(g?.side==='attacker'&&issueFieldOrder(g,order,point))changed=true;if(changed){this.audio?.play('order');this.report();}return changed;}
- startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.audio?.unlock();this.audio?.play('horn');this.last=performance.now();this.report();return true;}
+ startAssault(){if(!this.deployment)return false;this.deployment=false;this.paused=false;this.frameRemainder=0;this.audio?.unlock();this.audio?.play('horn');this.last=performance.now();this.report();return true;}
  update(dt){this.elapsed+=dt;
  if(this.descriptor?.fieldBattle){if(this.nextFieldPlan===undefined||this.elapsed>=this.nextFieldPlan){coordinateFieldAI(this);this.nextFieldPlan=this.elapsed+4;}if(this.elapsed%6<dt){for(const g of this.groups.filter(g=>g.side==='defender'&&!g.routed)){const e=fieldTarget(g,this.groups.filter(o=>o.side==='attacker'&&!o.routed));if(e)attachTactics(g,this.game.factions[this.descriptor.enemy],chooseCounterFormation(this.game.factions[this.descriptor.enemy],e.type,g.type));}}stepField(this,dt);this.audio?.update(this.groups,this.elapsed,this.camera);const l=fieldStrength(this.groups,'attacker'),r=fieldStrength(this.groups,'defender');if(l<=0||r<=0||this.elapsed>=220)this.finish(l>0&&(r<=0||l>r),l,r);return;}
  for(const g of this.groups){if(g.routed)continue;g.phase+=dt*(g.type==='cavalry'?10:5);
@@ -257,13 +258,13 @@ export class BattleGame{
  if(this.descriptor.fieldBattle)for(const effect of this.effects||[])for(const p of battleImpactParticles(effect)){const color=p.kind==='dust'?[.59,.51,.36]:p.kind==='rout'?[.80,.69,.47]:[1,.80,.39];instance(obj,p.x,p.y,p.z,p.size,p.size,p.size,color,'sphere');}
  const vp=this.ctx.render(obj,this.getCamera(),this.groups,this.elapsed);if(this.scenery&&vp)this.scenery.render(vp,this.sceneryPlacements);
  }
- loop(now){if(!this.running)return;let dt=clamp((now-this.last)/1000,0,.045);this.last=now;this.updateCamera(dt);if(!this.paused&&!this.done)this.update(dt);if(!(this.ctx instanceof CanvasFallback)||!this.softwareRenderAt||now-this.softwareRenderAt>90){this.render();this.softwareRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor((this.elapsed-dt)*2))this.report();this.raf=requestAnimationFrame(this.loop);}
+ loop(now){if(!this.running)return;const dt=clamp((now-this.last)/1000,0,.2);this.last=now;if(document.hidden){this.frameRemainder=0;this.raf=requestAnimationFrame(this.loop);return;}this.updateCamera(Math.min(dt,.05));const before=this.elapsed;if(this.descriptor.fieldBattle){const next=fieldFrameSteps(this.frameRemainder,dt,!this.paused&&!this.done);this.frameRemainder=next.remainder;for(let i=0;i<next.steps&&!this.done;i++)this.update(1/30);}else if(!this.paused&&!this.done)this.update(Math.min(dt,.045));const interval=renderInterval(this.ctx instanceof CanvasFallback,this.mobile);if(this.lastRenderAt==null||now-this.lastRenderAt>=interval-2){this.render();this.lastRenderAt=now;}if(Math.floor(this.elapsed*2)!==Math.floor(before*2))this.report();this.raf=requestAnimationFrame(this.loop);}
  finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;this.audio?.silence();this.audio?.play(victory?'victory':'defeat');
   const roster={attacker:battleRoster(this.groups,'attacker',!!this.descriptor?.fieldBattle),defender:battleRoster(this.groups,'defender',!!this.descriptor?.fieldBattle)},fraction=roster.attacker.fraction,enemies=roster.defender.fraction;
   this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,roster,fieldBattle:!!this.descriptor?.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
  }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
  setSound(enabled){this.audio?.setEnabled(enabled);}
- togglePause(){if(this.deployment||this.done)return;this.paused=!this.paused;if(this.paused)this.audio?.silence();else this.audio?.unlock();this.report();}
- stop(){this.running=false;this.audio?.close();cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.canvas.removeEventListener('pointercancel',this._onCancel);this.scenery?.dispose();this.ctx?.dispose?.();}
+ togglePause(){if(this.deployment||this.done)return;this.paused=!this.paused;this.frameRemainder=0;if(this.paused)this.audio?.silence();else this.audio?.unlock();this.report();}
+ stop(){this.running=false;this.audio?.close();document.removeEventListener('visibilitychange',this._onVisibility);cancelAnimationFrame(this.raf);window.removeEventListener('keydown',this._onKeyDown);window.removeEventListener('keyup',this._onKeyUp);this.canvas.removeEventListener('wheel',this._onWheel);this.canvas.removeEventListener('contextmenu',this._onContext);this.canvas.removeEventListener('pointerdown',this._onDown);window.removeEventListener('pointermove',this._onMove);window.removeEventListener('pointerup',this._onUp);this.canvas.removeEventListener('pointercancel',this._onCancel);this.scenery?.dispose();this.ctx?.dispose?.();}
 }
