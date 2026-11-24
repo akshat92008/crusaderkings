@@ -1,0 +1,123 @@
+// Visually reviewed 4×4 icon sheets. Browser-safe sprite coordinates, no game-state mutation.
+export const ICON_SHEETS={
+  "personality": "Strategy_game_trait_icon_sheet_807567b6.jpg",
+  "traits": "Character_trait_icon_sheet_fe2300f5.jpg",
+  "skills": "Medieval_strategy_game_skill_icons_c1080878.jpg",
+  "council": "Medieval_political_office_icon_s…_7042e0b0.jpg",
+  "government": "Create_historical_strategy_game_…_7e8a58fa.jpg",
+  "resources": "Medieval_strategy_game_icon_sheet_8967b69f.jpg"
+};
+export const ICON_NAMES={
+  "personality": [
+    "brave",
+    "craven",
+    "ambitious",
+    "content",
+    "honest",
+    "deceitful",
+    "generous",
+    "greedy",
+    "compassionate",
+    "sadistic",
+    "just",
+    "arbitrary",
+    "patient",
+    "impatient",
+    "diligent",
+    "lazy"
+  ],
+  "traits": [
+    "intelligent",
+    "genius",
+    "slow",
+    "strong",
+    "weak",
+    "healthy",
+    "sickly",
+    "beautiful",
+    "charismatic",
+    "shy",
+    "sociable",
+    "paranoid",
+    "zealous",
+    "cynical",
+    "temperate",
+    "gluttonous"
+  ],
+  "skills": [
+    "diplomacy",
+    "martial",
+    "stewardship",
+    "intrigue",
+    "learning",
+    "prowess",
+    "strategy",
+    "administration",
+    "scholarship",
+    "medicine",
+    "theology",
+    "commerce",
+    "leadership",
+    "engineering",
+    "seduction",
+    "espionage"
+  ],
+  "council": [
+    "monarch",
+    "chancellor",
+    "marshal",
+    "steward",
+    "spymaster",
+    "religious adviser",
+    "court physician",
+    "regent",
+    "commander",
+    "governor",
+    "treasurer",
+    "royal tutor",
+    "royal architect",
+    "ambassador",
+    "judge",
+    "court musician"
+  ],
+  "government": [
+    "feudal monarchy",
+    "imperial government",
+    "merchant republic",
+    "tribal confederation",
+    "nomadic khanate",
+    "sultanate",
+    "theocratic government",
+    "bureaucratic monarchy",
+    "infantry",
+    "archers",
+    "light cavalry",
+    "heavy cavalry",
+    "war elephants",
+    "levy soldiers",
+    "elite professional troops",
+    "army commander"
+  ],
+  "resources": [
+    "gold",
+    "prestige",
+    "piety",
+    "legitimacy",
+    "renown",
+    "influence",
+    "population",
+    "manpower",
+    "food supplies",
+    "trade",
+    "development",
+    "stability",
+    "unrest",
+    "military morale",
+    "authority",
+    "diplomatic relations"
+  ]
+};
+export function iconSpec(group,name){const key=String(name||'').toLowerCase().trim().replace(/_/g,' ');const i=ICON_NAMES[group]?.indexOf(key==='scholar'&&group==='council'?'religious adviser':key)??-1;if(i<0)return null;return {path:'assets/icons/'+encodeURIComponent(ICON_SHEETS[group]),x:(i%4)*100/3,y:Math.floor(i/4)*100/3};}
+export function artIcon(group,name){const a=iconSpec(group,name);return a?'<span class="game-art-icon" aria-hidden="true" style="background-image:url(\''+a.path+'\');background-position:'+a.x+'% '+a.y+'%"></span>':'';}
+export function traitIcon(name){return artIcon('personality',name)||artIcon('traits',name);}
+export function setupMenuVideo(doc=document){const screen=doc.getElementById('start-screen'),video=doc.getElementById('menu-video');if(!screen||!video)return;const preference=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');const sync=()=>{if(screen.hidden||doc.hidden||preference?.matches){video.pause();return;}video.play()?.catch(()=>{});};new MutationObserver(sync).observe(screen,{attributes:true,attributeFilter:['hidden']});doc.addEventListener('visibilitychange',sync);preference?.addEventListener?.('change',sync);sync();}
