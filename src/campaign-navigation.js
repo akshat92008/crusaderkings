@@ -13,7 +13,8 @@ export function realmPriorities(g,stats,royalEvent=false,expandedEvents=0){const
  if(f.treasury<0||stats.balance<0)add('economy','Treasury under pressure',f.treasury<0?'Treasury is in debt.':'Monthly expenses exceed income.',f.treasury<0?'urgent':'attention');
  if(f.food<30||stats.foodDelta<0)add('economy','Food supply',f.food<30?'Food reserves are low.':'Food reserves are falling.');
  if(f.stability<45)add('decrees','Low stability','Review your laws and provincial unrest.');
- if(royalEvent||expandedEvents)add('court','Court decisions waiting',(Number(Boolean(royalEvent))+expandedEvents)+' pending decision(s).');
+ if(royalEvent)add('court','Royal court decision','A court decision is waiting.');
+ if(expandedEvents>0)add('stories','Campaign events waiting',expandedEvents+' pending campaign event(s).');
  const factions=Object.values(g.conflict?.factions||{}).filter(x=>x.realm===g.player&&['organizing','ultimatum','civil war'].includes(x.status)&&x.pressure>=65);if(factions.length)add('political','Faction pressure','Review powerful internal opposition.','urgent');
  return out.sort((a,b)=>Number(b.level==='urgent')-Number(a.level==='urgent'));}
 
