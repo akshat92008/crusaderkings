@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {fieldContingentSupports} from './diplomacy-systems.js';
 import {isImprisoned} from './feudal-systems.js';
 import {controller} from './campaign-war.js';
@@ -47,7 +48,7 @@ export function tickMilitary(g,world){const m=initMilitary(g);if(m.lastTick===g.
  if(size(a)<=0){r.commander=null;continue;}
  const demand=Math.max(2,Math.ceil(size(a)/90));if(friendly&&l&&l.stock.grain>=demand){l.stock.grain-=demand;r.supply=cap(r.supply+8,0,100);r.fatigue=cap(r.fatigue-7,0,100);}else{r.supply=cap(r.supply-(friendly?7:13),0,100);r.fatigue=cap(r.fatigue+6,0,100);}
  if(r.supply<20){for(const t of types)a[t]=Math.floor(a[t]*.97);a.morale=cap(a.morale-4,10,100);syncRegiments(g,a);}
- if(!a.contingent&&a.owner!==g.player&&g.turn%12===0&&g.factions[a.owner].treasury>500){if(!r.commander){const candidates=commanderCandidates(g,a.id),marshal=g.politics.realms[a.owner]?.council.marshal;r.commander=(candidates.find(c=>c.id===marshal)||candidates[0])?.id??null;}if(friendly&&l&&l.stock.tools>=4&&l.stock.timber>=8&&!r.engines.ram){g.factions[a.owner].treasury-=150;l.stock.tools-=4;l.stock.timber-=8;r.engines.ram=1;}}
+ if(!a.contingent&&!humanControlsRealm(g,a.owner)&&g.turn%12===0&&g.factions[a.owner].treasury>500){if(!r.commander){const candidates=commanderCandidates(g,a.id),marshal=g.politics.realms[a.owner]?.council.marshal;r.commander=(candidates.find(c=>c.id===marshal)||candidates[0])?.id??null;}if(friendly&&l&&l.stock.tools>=4&&l.stock.timber>=8&&!r.engines.ram){g.factions[a.owner].treasury-=150;l.stock.tools-=4;l.stock.timber-=8;r.engines.ram=1;}}
  }}
 // Tactical gate and tower objectives are separate from render assets.
 export function createSiegeState(fortLevel,defenseMode=false){const level=cap(Number(fortLevel)||0,0,3);if(!level)return null;const hp=80+level*65;return {level,assaultSide:defenseMode?'defender':'attacker',structures:[{id:'gate',name:'Gate',x:0,z:-18,hp,max:hp},{id:'left',name:'West tower',x:-24,z:-18,hp:hp*.65,max:hp*.65},{id:'right',name:'East tower',x:24,z:-18,hp:hp*.65,max:hp*.65}]};}

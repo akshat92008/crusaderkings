@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {courtModifiers} from './royal-court.js';
 import {healthPenalty} from './living-systems.js';
 import {institutionModifiers} from './government-institutions.js';
@@ -124,6 +125,6 @@ export function tickCivic(g,world){const c=initCivic(g,world);if(c.lastTick===g.
   if(r.realm===realm&&g.turn%12===0)for(const id of r.children){const child=person(g,id);if(!child?.alive||child.age<6||child.age>18)continue;const cc=character(g,child),guardian=person(g,cc.guardian);if(guardian?.alive){const sk=Object.keys(guardian.skills).sort((a,b)=>guardian.skills[b]-guardian.skills[a])[0];cc.education+=guardian.skills[sk];if(cc.education>=8){child.skills[sk]=cap(child.skills[sk]+1,1,5);cc.education-=8;}}}
   if(c.events[realm]&&(!civicEvent(g,realm)||g.turn-c.events[realm].turn>12))delete c.events[realm];
   if(g.turn%9===0&&!c.events[realm]){const low=land.filter(p=>c.provinces[p.id]?.acceptance<50),eligible=EVENTS.filter(e=>!['language_petition','ritual_dispute','market_rights','customary_mediation'].includes(e[0])||low.length);const e=eligible[Math.floor(random(c)*eligible.length)];c.events[realm]={id:e[0],turn:g.turn,province:e[3]==='province'?(low.length?low:land)[Math.floor(random(c)*(low.length||land.length))].id:null};}
-  if(realm!==g.player){if(g.turn%18===0&&f.treasury>650)governmentAction(g,realm);const e=civicEvent(g,realm);if(e&&g.turn%9===0)resolveCivicEvent(g,realm,f.treasury>350?1:0);if(s.cohesion<45&&s.policy!=='pluralism')s.policy='pluralism';}
+  if(!humanControlsRealm(g,realm)){if(g.turn%18===0&&f.treasury>650)governmentAction(g,realm);const e=civicEvent(g,realm);if(e&&g.turn%9===0)resolveCivicEvent(g,realm,f.treasury>350?1:0);if(s.cohesion<45&&s.policy!=='pluralism')s.policy='pluralism';}
  }
 }
