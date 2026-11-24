@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from '../src/battle-presentation.js';
+import {formationOffsets,soldierWorldPose,visualMode,soldierCombatPose,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from '../src/battle-presentation.js';
 test('formation shapes are centered and distinct',()=>{for(const id of ['shield_wall','cavalry_wedge','pike_square','longbow_line','encirclement','flank','skirmish']){const p=formationOffsets(11,id);assert.equal(p.length,11);assert.ok(Math.abs(p.reduce((n,x)=>n+x[0],0))<1e-9);assert.ok(Math.abs(p.reduce((n,x)=>n+x[1],0))<1e-9);}assert.notDeepEqual(formationOffsets(11,'pike_square'),formationOffsets(11,'cavalry_wedge'));});
 test('formation offsets rotate with direction and retreat poses travel away',()=>{const g={x:10,z:20,facingX:1,facingZ:0,life:80};const p=soldierWorldPose(g,[0,2]);assert.ok(Math.abs(p.x-12)<1e-9);assert.ok(Math.abs(p.z-20)<1e-9);g.routed=true;g.routAge=2;assert.ok(soldierWorldPose(g,[0,0]).x<10);assert.equal(visibleSoldierCount(g,10),8);g.routAge=3;assert.equal(visibleSoldierCount(g,10),0);});
 test('renderer adapter interpolates soldier transforms and plays actual attack state',()=>{const u={root:{position:{x:0,z:0,set(x,y,z){this.x=x;this.z=z;}},rotation:{y:0}},actions:{},mode:'idle',mixer:{update(){},time:0}};const scene={modelsReady:true,groups:new Map([['a',[u]]]),prepareSquad(){}};const g={id:'a',x:0,z:0,facingX:0,facingZ:1,life:100,formationId:'shield_wall',type:'infantry'};updateFieldCharacters(scene,[g],0);g.x=10;g.moving=true;updateFieldCharacters(scene,[g],.05);assert.ok(u.root.position.x>0&&u.root.position.x<10);assert.equal(u.mode,'walk');g.attackPulse=.3;updateFieldCharacters(scene,[g],.05);assert.equal(visualMode(g),'attack');assert.equal(u.mode,'attack');});
@@ -12,3 +12,13 @@ test('impact particles are bounded, deterministic and disappear at expiry',()=>{
 test('visible soldiers cannot exceed the actual regiment troop count',()=>{assert.equal(visibleSoldierCount({life:100,troopCount:2},11),2);assert.equal(visibleSoldierCount({life:100,troopCount:0},11),0);assert.equal(visibleSoldierCount({life:50,troopCount:2},11),1);});
 
 test('paused presentation does not advance animation or snap established soldier transforms',()=>{const u={root:{position:{x:0,y:0,z:0,set(x,y,z){Object.assign(this,{x,y,z});}},rotation:{y:0}},actions:{},mode:'idle',mixer:{update(){throw Error('paused mixer advanced');},time:0}};const scene={modelsReady:true,groups:new Map([['a',[u]]]),prepareSquad(){}};const g={id:'a',x:0,z:0,life:100,troopCount:1,formationId:'shield_wall',type:'infantry'};updateFieldCharacters(scene,[g],0);g.x=10;updateFieldCharacters(scene,[g],0);assert.equal(u.root.position.x,0);});
+
+test('melee front ranks attack while supporting ranks hold and ranged volleys stagger',()=>{
+ const g={type:'infantry',attackPulse:.2,contact:true,moving:false};
+ assert.equal(soldierCombatPose(g,[0,2],0,12).mode,'attack');
+ assert.equal(soldierCombatPose(g,[0,-2],1,12).mode,'idle');
+ assert.ok(soldierCombatPose(g,[0,2],0,12).lunge>0);
+ const bow={type:'archers',lastAttackRanged:true,attackPulse:.65};
+ assert.equal(soldierCombatPose(bow,[0,-2],0,12).mode,'attack');
+ assert.equal(soldierCombatPose(bow,[0,-2],1,12).mode,'idle');
+});

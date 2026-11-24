@@ -5,7 +5,7 @@ import {regimentPalette,projectileTrail,disposeFieldMaterials} from './field-vis
 import {fieldScenery,suppressFortScenery,battleContactShadow} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {participatingArmies,aggregateForce,regimentTroops,combinedFieldStats} from './field-forces.js';
-import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from './battle-presentation.js';
+import {formationOffsets,soldierWorldPose,visualMode,soldierCombatPose,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from './battle-presentation.js';
 import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 /* Native WebGL2 real-time 3D tactical battle, no CDN dependencies. */
@@ -245,7 +245,7 @@ export class BattleGame{
  for(let k=0;k<this.groups.length;k++){const g=this.groups[k],field=!!this.descriptor.fieldBattle;if(field){const shadow=battleContactShadow(g);if(shadow)obj.push(shadow);}if(g.routed&&(!field||(g.routAge||0)>=3))continue;const n=field?visibleSoldierCount(g,Math.round(g.initial*(this.ctx instanceof CanvasFallback?.65:1))):Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const offsets=field?formationOffsets(n,g.formationId,g.type):null;const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
   const palette=regimentPalette(g.side,g.type),base=field?palette.cloth:g.side==='attacker'?[.34,.63,.73]:g.color?.startsWith('#')?factionRgb(g.color):[.75,.34,.31];const head=[.76,.64,.48],shield=g.side==='attacker'?[.20,.34,.43]:[.43,.24,.19];
   if(!(this.ctx.isThreeBattle&&this.ctx.modelsReady))for(let i=0;i<n;i++){const col=i%cols,row=Math.floor(i/cols);const ox=(col-(cols-1)/2)*spacing,oz=(row-Math.floor(n/cols)/2)*spacing;
-   const pose=field?soldierWorldPose(g,offsets[i]):null,px=pose?.x??g.x+ox,pz=pose?.z??g.z+oz,walk=(!field||visualMode(g)==='walk')?Math.sin(this.elapsed*7+i*.55)*.045:0;
+   const action=field?soldierCombatPose(g,offsets[i],i,n):null,pose=field?soldierWorldPose(g,[offsets[i][0],offsets[i][1]+action.lunge]):null,px=pose?.x??g.x+ox,pz=pose?.z??g.z+oz,walk=(!field||action.mode==='walk')?Math.sin(this.elapsed*7+i*.55)*.045:0;
    if(g.type==='cavalry'){instance(obj,px,.52+walk,pz,.88,.65,1.5,[.37,.32,.27],'sphere');instance(obj,px,1.15+walk,pz,.48,.76,.43,base,'cylinder');instance(obj,px,1.68+walk,pz,.31,.29,.31,head,'sphere');instance(obj,px,1.87+walk,pz,.40,.28,.42,C.steel,'cone');
    } else {instance(obj,px,.75+walk,pz,.44,.80,.38,base,'cylinder');instance(obj,px,1.30+walk,pz,.29,.29,.29,head,'sphere');instance(obj,px,1.52+walk,pz,.36,.29,.36,C.steel,'cone');instance(obj,px-.15,.18+walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');instance(obj,px+.15,.18-walk,pz,.13,.40,.14,[.28,.26,.25],'cylinder');}
    if(g.type==='infantry'){instance(obj,px+.29,.85+walk,pz,.16,.65,.38,shield);instance(obj,px-.31,1+walk,pz,.085,1.5,.085,C.steel,'cylinder');}
