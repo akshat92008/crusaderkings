@@ -7,7 +7,8 @@ import {conflictAction} from './political-conflict.js';
 import {civicAction,civicModifiers} from './civic-systems.js';
 import {heritageAction} from './heritage-systems.js';
 import {economyAction,economyModifiers} from './economy-systems.js';
-import {renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
+import {militaryAction} from './military-systems.js';
+import {renderMilitary,renderEconomy,renderHeritage,renderCivic,renderConflict,renderCourt,renderTrade,renderLegacy} from './kingdom-ui.js';
 import {courtDecision,resolveRoyalEvent,currentRoyalEvent,tradeIncome,objectives,campaignStanding} from './kingdom-depth.js';
 import {createGame,restoreGame,snapshot,MONTHS,BUILDINGS,POLICY,empireStats,controlled,armiesAt,armySize,advanceMonth,setPolicy,build,recruit,startMarch,concludeBattle,negotiate,ownerName} from './simulation.js';
 const el=id=>document.getElementById(id);
@@ -63,6 +64,7 @@ function renderTab(){if(!game)return;for(const b of document.querySelectorAll('.
  }else if(tab==='society'){html=renderCivic(game,world,esc);
  }else if(tab==='heritage'){html=renderHeritage(game,world,esc);
  }else if(tab==='economy'){html=renderEconomy(game,world,esc);
+ }else if(tab==='military'){html=renderMilitary(game,world,esc);
  }else if(tab==='trade'){
   html=renderTrade(game,world,esc);
  }else if(tab==='legacy'){
@@ -88,10 +90,11 @@ function openBattle(desc){desc.interactive=true;el('battle-screen').hidden=false
 function onBattleStatus(status){
  el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
- el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+g.type.toUpperCase()+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
+ el('battle-units').innerHTML=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>'+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');
  const choices=availableFormations(game.factions[game.player]);
  el('battle-formation').innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' · '+Math.round(o.damage*100)+'% attack / '+Math.round(o.defense*100)+'% defense</option>').join('');
  if(unit)el('battle-formation').value=unit.formationId;
+ const fort=el('battle-fort-status');if(fort){fort.hidden=!status.siege;fort.textContent=status.siege?status.siege.structures.map(q=>q.name+' '+Math.round(q.hp/q.max*100)+'%').join(' · '):'';}
  el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;
 }
 function onBattleFinished(result){
@@ -163,6 +166,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));
  if(action==='court-decision')clickResult(courtDecision(game,world,type));
  if(action==='politics'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(politicsAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='military'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(militaryAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='economy'){const input=btn.dataset.input?el(btn.dataset.input):null,third=btn.dataset.third?el(btn.dataset.third):null;clickResult(economyAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,third?.value));}
  if(action==='heritage'){const input=btn.dataset.input?el(btn.dataset.input):null,guest=btn.dataset.guest?el(btn.dataset.guest):null;clickResult(heritageAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra,guest?.value));}
  if(action==='civic'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(civicAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
