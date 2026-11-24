@@ -1,3 +1,4 @@
+import {humanControlsRealm,humanControlsCharacter} from './player-career.js';
 // Character-owned political capital, independent ambitions and real wealth transfers.
 import {changeOpinion,personalOpinion} from './chronicle-systems.js';
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),num=n=>Number.isFinite(n)?n:0;
@@ -25,7 +26,7 @@ export function tickAgency(g){const root=initAgency(g);if(root.lastTick===g.turn
  // Estate income is transferred, not created: personal accounts and estate reserves remain separate.
  if(x.lastIncome!==g.turn){for(const h of estate){const draw=Math.min(25,Math.floor(Math.max(0,num(h.wealth))*.12));h.wealth-=draw;p.wealth=num(p.wealth)+draw;}x.lastIncome=g.turn;}
  const standing=(council.has(p.id)?3:0)+(estate.length?2:0)+(p.id===s.ruler?2:0);x.influence=cap(x.influence+standing-(standing?0:2),0,100);
- if(p.id===s.ruler&&r===g.player||g.turn-x.lastAction<12)continue;
+ if(humanControlsCharacter(g,p.id)||p.id===s.ruler&&humanControlsRealm(g,r)||g.turn-x.lastAction<12)continue;
  if(x.agenda==='develop ability'&&p.wealth>=60){const skill=Object.keys(p.skills||{}).sort((a,b)=>num(p.skills[a])-num(p.skills[b])||a.localeCompare(b))[0];if(skill&&p.skills[skill]<5){p.wealth-=60;p.skills[skill]++;x.lastAction=g.turn;note(g,p,p.name+' invested in '+skill+' training.');continue;}}
  if(x.agenda==='accumulate wealth'||x.agenda==='secure household')continue;
  const peers=important.filter(q=>q.id!==p.id&&q.id!==s.ruler&&q.age>=18),hostile=x.agenda==='undermine rival';const target=peers.sort((a,b)=>hostile?personalOpinion(g,p.id,a.id)-personalOpinion(g,p.id,b.id)||a.id.localeCompare(b.id):personalOpinion(g,p.id,b.id)-personalOpinion(g,p.id,a.id)||characterInfluence(g,b.id)-characterInfluence(g,a.id)||a.id.localeCompare(b.id))[0];

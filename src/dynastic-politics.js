@@ -1,3 +1,4 @@
+import {humanControlsRealm,reconcileCareer} from './player-career.js';
 import {estateLaw,estateSuccession} from './estate-succession.js';
 import {characterInteraction} from './character-agency.js';
 import {reconcileRegency,tickRegency,regencyAction} from './regency-systems.js';
@@ -145,12 +146,12 @@ function arrangeAiBetrothals(g){
  const p=g.politics;
  for(const [realm,state] of Object.entries(p.realms)){
   const faction=g.factions[realm],plan=g.strategy?.plans?.[realm];
-  if(realm===g.player||faction.treasury<550||plan?.goal!=='diplomacy')continue;
+  if(humanControlsRealm(g,realm)||faction.treasury<550||plan?.goal!=='diplomacy')continue;
   if(Object.values(p.betrothals||{}).some(x=>x.sponsor===realm&&validBetrothal(g,x)))continue;
   const heir=children(p,p.people[state.ruler]).filter(betrothalAge).sort((a,b)=>b.age-a.age||a.id.localeCompare(b.id))[0];
   if(!heir)continue;
   const best=betrothalCandidates(g,realm,heir.id)
-   .filter(x=>x.realm!==realm&&x.realm!==g.player&&x.accepted&&x.score>=60)
+   .filter(x=>x.realm!==realm&&!humanControlsRealm(g,x.realm)&&x.accepted&&x.score>=60)
    .sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id))[0];
   if(best)arrangeBetrothal(g,realm,heir,best);
  }
@@ -238,7 +239,7 @@ function death(g,world,c){const p=g.politics;c.alive=false;c.deathYear=g.year;if
  if(s)reconcileRegency(g,realm);
 }
 
-export function removePoliticalCharacter(g,world,id){const c=g.politics.people[id];if(!c?.alive)return false;death(g,world,c);sync(g,c.realm);syncTitles(g);return true;}
+export function removePoliticalCharacter(g,world,id){const c=g.politics.people[id];if(!c?.alive)return false;death(g,world,c);sync(g,c.realm);syncTitles(g);reconcileCareer(g);return true;}
 
 // Original, contextual event templates. Effects operate on the actual target character/holding.
 const DISPATCHES=[
@@ -296,17 +297,17 @@ export function tickPolitics(g,world){const p=initPolitics(g,world);if(p.lastTic
  if(g.turn%12===0){
   arrangeAiBetrothals(g);
   // Royal AI chooses partners with existing relations; domestic matches keep family lines alive.
-  for(const [realm,s] of Object.entries(p.realms)){const r=p.people[s.ruler];if(realm===g.player)continue;for(const a of [r,...children(p,r)]){if(a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&x.realm!==g.player&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];if(match&&marry(g,a,p.people[match.b]).ok){}else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:'House of '+realm+' consorts'});link(a,b);}}}
+  for(const [realm,s] of Object.entries(p.realms)){const r=p.people[s.ruler];if(humanControlsRealm(g,realm))continue;for(const a of [r,...children(p,r)]){if(a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];if(match&&marry(g,a,p.people[match.b]).ok){}else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:'House of '+realm+' consorts'});link(a,b);}}}
  }
  reconcileMarriageTreaties(g);
- if(g.turn%3===0){const estates=Object.fromEntries(Object.keys(p.realms).map(r=>[r,politicalEstates(g,r)])),hierarchies=Object.fromEntries(Object.keys(p.realms).map(r=>[r,feudalHierarchy(g,r)]));for(const [id,v] of Object.entries(p.holdings)){const f=g.factions[v.realm],lord=p.people[v.lord];if(!f||!lord)continue;if(v.lord===p.realms[v.realm].ruler){v.loyalty=100;continue;}const target=clamp(55+(f.legitimacy-50)*.4+(f.stability-50)*.25-(v.tax-1)*15-(v.levy-1)*10+(v.autonomy-1)*10+(v.exemptions?.tax?6:0)+(v.exemptions?.levy?6:0)-(lord.traits.includes('ambitious')?12:0)+personalOpinion(g,p.realms[v.realm].ruler,lord.id)*.20+regionalLoyalty(g,id)+authorityModifiers(g,v.realm,estates[v.realm]).loyalty-(estates[v.realm]?.byLord[v.lord]?.grievance||0),0,100);v.loyalty=clamp(v.loyalty+clamp(target-v.loyalty,-4,4),0,100);creditEstateIncome(g,id,Math.max(0,Math.round(g.provinces[id].development*(3-v.tax))),hierarchies[v.realm]);if(v.realm!==g.player&&v.loyalty<20&&v.autonomy===2&&f.treasury<150&&!v.exemptions?.levy)estateExemptionAction(g,v.realm,id,'levy',true,true);if(v.realm!==g.player&&v.loyalty<35&&f.treasury>=150){f.treasury-=150;v.loyalty+=20;v.autonomy=2;}
+ if(g.turn%3===0){const estates=Object.fromEntries(Object.keys(p.realms).map(r=>[r,politicalEstates(g,r)])),hierarchies=Object.fromEntries(Object.keys(p.realms).map(r=>[r,feudalHierarchy(g,r)]));for(const [id,v] of Object.entries(p.holdings)){const f=g.factions[v.realm],lord=p.people[v.lord];if(!f||!lord)continue;if(v.lord===p.realms[v.realm].ruler){v.loyalty=100;continue;}const target=clamp(55+(f.legitimacy-50)*.4+(f.stability-50)*.25-(v.tax-1)*15-(v.levy-1)*10+(v.autonomy-1)*10+(v.exemptions?.tax?6:0)+(v.exemptions?.levy?6:0)-(lord.traits.includes('ambitious')?12:0)+personalOpinion(g,p.realms[v.realm].ruler,lord.id)*.20+regionalLoyalty(g,id)+authorityModifiers(g,v.realm,estates[v.realm]).loyalty-(estates[v.realm]?.byLord[v.lord]?.grievance||0),0,100);v.loyalty=clamp(v.loyalty+clamp(target-v.loyalty,-4,4),0,100);creditEstateIncome(g,id,Math.max(0,Math.round(g.provinces[id].development*(3-v.tax))),hierarchies[v.realm]);if(!humanControlsRealm(g,v.realm)&&v.loyalty<20&&v.autonomy===2&&f.treasury<150&&!v.exemptions?.levy)estateExemptionAction(g,v.realm,id,'levy',true,true);if(!humanControlsRealm(g,v.realm)&&v.loyalty<35&&f.treasury>=150){f.treasury-=150;v.loyalty+=20;v.autonomy=2;}
   const key='grievance:'+id,old=p.situations[key];if(v.loyalty<35){p.situations[key]={id:key,realm:v.realm,province:id,lord:v.lord,phase:v.loyalty<20?'ultimatum':'grievance',started:old?.started??g.turn};if(!old&&v.realm===g.player)log(g,lord.name+' is organizing opposition to the crown.');if(v.loyalty<15&&g.turn-p.situations[key].started>=12&&roll(p)<.25){g.provinces[id].unrest=clamp(g.provinces[id].unrest+25,0,100);f.stability=clamp(f.stability-8,0,100);v.loyalty=25;log(g,lord.name+' resisted royal authority; provincial unrest increased.');}}else if(old)delete p.situations[key];
  }}
  for(const realm of Object.keys(p.realms)){
   p.dispatches??={};p.dispatchHistory??={};
   if(p.dispatches[realm]&&(!politicalDispatch(g,realm)||g.turn-p.dispatches[realm].turn>12))delete p.dispatches[realm];
   if(g.turn%6===0)scheduleDispatch(g,realm);
-  if(realm!==g.player&&g.turn%6===0){const d=politicalDispatch(g,realm);if(d){const options=d.choices.map((x,i)=>({x,i})).filter(({x})=>x.cost<=g.factions[realm].treasury-150||x.cost===0);const chosen=options.sort((a,b)=>(b.x.loyalty-b.x.cost*.03)-(a.x.loyalty-a.x.cost*.03))[0];if(chosen)resolvePoliticalDispatch(g,realm,chosen.i);}}
+  if(!humanControlsRealm(g,realm)&&g.turn%6===0){const d=politicalDispatch(g,realm);if(d){const options=d.choices.map((x,i)=>({x,i})).filter(({x})=>x.cost<=g.factions[realm].treasury-150||x.cost===0);const chosen=options.sort((a,b)=>(b.x.loyalty-b.x.cost*.03)-(a.x.loyalty-a.x.cost*.03))[0];if(chosen)resolvePoliticalDispatch(g,realm,chosen.i);}}
   const s=p.realms[realm],civic=g.civic?.realms[realm];if(civic?.government==='republic'&&g.turn-(civic.lastElection??0)>=60){const h=successor(p,realm,g);civic.lastElection=g.turn;if(h){const previous=p.people[s.ruler];s.ruler=h.id;delete s.nominee;for(const hld of Object.values(p.holdings))if(hld.realm===realm&&hld.lord===previous.id){hld.lord=h.id;hld.loyalty=100;}syncTitles(g);g.kingdom.courts[realm].successions++;g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy+4,0,100);for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;if(realm===g.player)log(g,previous.name+' left office. '+h.name+' won the republic’s election.');}}
   tickRegency(g,realm);
   sync(g,realm);

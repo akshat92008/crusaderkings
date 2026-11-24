@@ -182,6 +182,32 @@ try:
     page.click('#battle-return')
     assert page.locator('#battle-screen').is_hidden()
     print('desktop PASS: call allied field contingent, march to the frontier, deploy in battle')
+   if name=='desktop':
+    page.reload(wait_until='domcontentloaded')
+    page.locator('#realm-search').wait_for(state='visible')
+    page.locator('#save-file').set_input_files({'name':'career-base.json','mimeType':'application/json','buffer':backup})
+    page.locator('#start-screen').wait_for(state='hidden')
+    page.click('#open-management')
+    page.get_by_text('Play as a landed vassal',exact=True).click()
+    page.locator('#career-person').wait_for(state='visible')
+    person=page.locator('#career-person').input_value()
+    page.get_by_role('button',name='Begin vassal career',exact=True).click()
+    assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
+    assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).playerCareer.person")==person
+    page.click('#close-management')
+    page.click('#open-province')
+    assert page.locator('[data-action="recruit"]').count()==0
+    page.click('#close-province')
+    page.click('#next-month')
+    page.click('#save-game')
+    assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).playerCareer.mode")=='vassal'
+    page.reload(wait_until='domcontentloaded')
+    page.locator('#load-existing').wait_for(state='visible')
+    page.click('#load-existing')
+    page.click('#open-management')
+    assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
+    page.screenshot(path=str(OUT/'desktop-vassal-career.png'))
+    print('desktop PASS: playable vassal role, crown controls restricted, progression and save/reload')
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    page.close()
