@@ -1,0 +1,35 @@
+name: Extended campaign endurance
+on:
+  push:
+    branches: ['codex/release-endurance-gate']
+    paths:
+      - '.github/workflows/release-endurance.yml'
+      - 'tests/release-endurance.test.mjs'
+  workflow_dispatch:
+    inputs:
+      months:
+        description: 'Campaign months (12–3600)'
+        required: true
+        default: '1200'
+        type: string
+permissions:
+  contents: read
+jobs:
+  endurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        realm: [england, vijayanagara]
+    env:
+      CROWN_ENDURANCE_MONTHS: ${{ inputs.months || '1200' }}
+      CROWN_ENDURANCE_REALM: ${{ matrix.realm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: |
+          node --test --test-name-pattern="Release endurance on dense atlas: $CROWN_ENDURANCE_REALM" tests/release-endurance.test.mjs
