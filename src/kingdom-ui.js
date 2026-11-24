@@ -505,7 +505,7 @@ export function renderExpanded(g,world,esc){
  if(!g.expanded?.realms[g.player])return '';
  const r=g.player,place=id=>world.provinces.find(p=>p.id===id)?.name||id;
  const target=t=>t.faction?(g.conflict.factions[t.faction]?.kind||'Local')+' faction':t.province?place(t.province):t.partner?g.politics.people[t.person]?.name+' & '+g.politics.people[t.partner]?.name:t.person?g.politics.people[t.person]?.name:t.other?g.factions[t.other]?.name:t.army?'Field army at '+place(g.armies[t.army]?.province):'';
- const labels={courtReputation:'Court reputation',branchXP:'Specialization experience',languageMonths:'Language study duration (months)',situationCooperation:'Regional cooperation',faithAuthority:'Religious authority',focusXP:'Lifestyle experience',securityMonths:'Security duration (months)'};
+ const labels={officeCorruption:'Administrative corruption',courtReputation:'Court reputation',branchXP:'Specialization experience',languageMonths:'Language study duration (months)',situationCooperation:'Regional cooperation',faithAuthority:'Religious authority',focusXP:'Lifestyle experience',securityMonths:'Security duration (months)'};
  const effect=e=>Object.entries(e).map(([k,v])=>k==='wedding'?'Creates a dynastic marriage':esc(labels[k]||k.replace(/([A-Z])/g,' $1'))+' '+(v>0?'+':'')+v).join(' · ');
  const btn=(type,id,label,status={ready:true})=>'<button class="rowbtn" data-action="expanded" data-type="'+esc(type)+'" data-id="'+esc(id)+'"'+(status.ready?'':' disabled title="'+esc(status.reason)+'"')+'>'+esc(label)+'</button>';
  let html=section('CAMPAIGN EVENTS'),events=currentExpandedEvents(g,r);
