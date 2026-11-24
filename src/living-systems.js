@@ -1,4 +1,4 @@
-import {humanControlsRealm} from './player-career.js';
+import {humanControlsRealm,humanControlsCharacter} from './player-career.js';
 // Character health, cadet house records, and realm-specific cultural institutions.
 // These are abstract fictional game mechanics, not historical or medical advice.
 import {controller} from './campaign-war.js';
@@ -29,9 +29,9 @@ export function livingAction(g,world,action,id,extra){initLiving(g);const r=g.pl
 export function tickLiving(g,world,removeCharacter){const s=initLiving(g);if(s.lastTick===g.turn)return;s.lastTick=g.turn;if(g.turn%3!==0)return;
  const affected=new Set(Object.values(g.economy?.crises||{}).filter(x=>x.kind==='epidemic').map(x=>g.provinces[x.province]?.owner));
  for(const p of Object.values(g.politics.people)){if(!p.alive){delete s.health[p.id];continue;}if(!g.politics.realms[p.realm])continue;if(!p.cadetBranch){const parent=p.parents.map(id=>g.politics.people[id]).find(x=>x?.cadetBranch&&x.house===p.house);if(parent)p.cadetBranch=parent.cadetBranch;}
- const h=s.health[p.id],risk=affected.has(p.realm)?.07:p.age>=65?.018:.004;
+ const h=s.health[p.id],risk=(affected.has(p.realm)?.07:p.age>=65?.018:.004)+(p.civic?.stress>=75?.025:0)+(p.age<6?.008:0);
  if(!h?.severity){if(random(s)<risk){const x=health(g,p);x.condition=affected.has(p.realm)?'epidemic illness':'illness';x.severity=25+Math.floor(random(s)*25);x.started=g.turn;if(p.id===ruler(g,p.realm)?.id)note(g,p.realm,p.name+' became ill.');}continue;}
- const doc=office(g,p.realm,'physician'),change=(random(s)<.64?-10:9)-(h.until>=g.turn?5:0)-(doc?Math.floor(doc.skills.learning/2):0)+(affected.has(p.realm)?4:0);h.severity=cap(h.severity+change,0,100);if(!h.severity){h.condition='well';if(p.id===ruler(g,p.realm)?.id)note(g,p.realm,p.name+' recovered.');}else if(h.severity>=85&&random(s)<.18){if(removeCharacter(g,world,p.id))note(g,p.realm,p.name+' died after illness.');}
+ const doc=office(g,p.realm,'physician');if(!humanControlsCharacter(g,p.id)&&p.id!==ruler(g,p.realm)?.id&&p.age>=18&&!isImprisoned(g,p.id)&&h.severity>=40&&p.wealth>=45&&g.turn-h.lastCare>=6){p.wealth-=45;h.lastCare=g.turn;h.until=g.turn+3;h.severity=cap(h.severity-(doc?12:7),0,100);if(!h.severity){h.condition='well';continue;}}const change=(random(s)<.64?-10:9)-(h.until>=g.turn?5:0)-(doc?Math.floor(doc.skills.learning/2):0)+(affected.has(p.realm)?4:0)+(p.civic?.stress>=75?3:0);h.severity=cap(h.severity+change,0,100);if(!h.severity){h.condition='well';if(p.id===ruler(g,p.realm)?.id)note(g,p.realm,p.name+' recovered.');}else if(h.severity>=85&&random(s)<.18){if(removeCharacter(g,world,p.id))note(g,p.realm,p.name+' died after illness.');}
  }
  for(const [r,x] of Object.entries(s.realms)){const f=g.factions[r],land=own(g,r);if(!land.length)continue;for(const role of ['physician','faithAdvisor','culturePatron'])if(x[role]&&(!adult(g,r,x[role])||x[role]===ruler(g,r)?.id))x[role]=null;
  const advisor=office(g,r,'faithAdvisor');if(advisor){const supported=land.filter(p=>g.identity.institutions[p.id]?.level>0);for(const p of supported){const l=g.civic.provinces[p.id];if(x.policy==='relief')l.localTrust=cap(l.localTrust+2,0,100);if(x.policy==='mediation')l.acceptance=cap(l.acceptance+2,0,100);}if(supported.length&&g.identity.realms[r])g.identity.realms[r].faithAuthority=cap(g.identity.realms[r].faithAuthority+Math.floor(advisor.skills.learning/2),0,100);}

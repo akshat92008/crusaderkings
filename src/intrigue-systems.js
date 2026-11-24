@@ -1,4 +1,4 @@
-import {humanControlsRealm} from './player-career.js';
+import {humanControlsRealm,humanControlsCharacter} from './player-career.js';
 import {roleplayModifiers} from './roleplay-systems.js';
 import {courtModifiers} from './royal-court.js';
 // Fictional character-level political schemes. All resolution is abstract and probabilistic.
@@ -165,10 +165,11 @@ function maintainNetwork(g,r){
   g.factions[r].treasury-=10;
  }
 }
+export function startPersonalScheme(g,actorId,targetId,kind){const s=initIntrigue(g),actor=free(g,actorId),target=free(g,targetId),d=PLOTS[kind];if(!actor||!target||!d||!['undermine','discredit','befriend','reconcile'].includes(kind)||actor.realm!==target.realm||!eligibleTarget(g,actor.realm,actor,target,kind)||humanControlsCharacter(g,actorId)||Object.values(s.plots).some(p=>p.status==='active'&&p.actor===actorId)||Object.values(s.plots).filter(p=>p.autonomous&&p.realm===actor.realm&&p.status==='active').length>=4)return no('Personal scheme unavailable.');const cost=kind==='undermine'||kind==='discredit'?70:50;if((actor.wealth||0)<cost)return no('Insufficient personal wealth.');actor.wealth-=cost;const id='p'+s.next++;s.plots[id]={id,realm:actor.realm,actor:actor.id,target:target.id,targetRealm:target.realm,kind,category:plotCategory(kind),agents:[],started:g.turn,due:g.turn+d.months,status:'active',autonomous:true,spent:cost,history:[{turn:g.turn,label:'Personal scheme begun',cost}]};return ok('Personal scheme begun.');}
 function autonomousScheme(g,r){
  const s=g.intrigue;if(Object.values(s.plots).some(p=>p.autonomous&&p.realm===r&&p.status==='active'))return;
  const me=ruler(g,r),people=Object.values(g.politics.people).filter(p=>p.id!==me?.id&&free(g,p.id)?.realm===r);
- const actor=people.filter(p=>p.wealth>=80&&(p.traits||[]).some(t=>['ambitious','deceitful','gregarious','wrathful'].includes(t))).sort((a,b)=>(b.skills?.intrigue||0)-(a.skills?.intrigue||0)||a.id.localeCompare(b.id))[0];
+ const actor=people.filter(p=>!humanControlsCharacter(g,p.id)&&p.wealth>=80&&(p.traits||[]).some(t=>['ambitious','deceitful','gregarious','wrathful'].includes(t))).sort((a,b)=>(b.skills?.intrigue||0)-(a.skills?.intrigue||0)||a.id.localeCompare(b.id))[0];
  if(!actor)return;const peers=people.filter(p=>p.id!==actor.id),rival=peers.filter(p=>personalOpinion(g,actor.id,p.id)<=-25&&localHoldings(g,r,p.id).length).sort((a,b)=>personalOpinion(g,actor.id,a.id)-personalOpinion(g,actor.id,b.id)||a.id.localeCompare(b.id))[0];
  const target=rival||peers.filter(p=>eligibleTarget(g,r,actor,p,'befriend')).sort((a,b)=>personalOpinion(g,actor.id,b.id)-personalOpinion(g,actor.id,a.id)||a.id.localeCompare(b.id))[0];
  if(!target)return;const kind=rival?'undermine':'befriend',cost=kind==='undermine'?70:50;actor.wealth-=cost;

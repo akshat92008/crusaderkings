@@ -1,3 +1,4 @@
+import {resolvePersonalDilemma,personalDilemmas} from './character-agency.js';
 import {personalUnion,unionPartners,unionTerms} from './personal-unions.js';
 import {CAREER_TABS,campaignTab,careerPriorities,renderCareerCharacter,renderCareerProvince,renderCareerLinks} from './campaign-access.js';
 import {careerAction,careerView,vassalCareer,renderCareer,renderCareerEntry} from './player-career.js';
@@ -72,7 +73,7 @@ function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,worl
  selected=id;map.select(id);renderInspector();setDrawer('province');}
 function render(){if(!game)return;const f=player(),s=empireStats(game,game.player),career=careerView(game);
  el('resource-prestige').textContent=fmt(f.prestige||0);el('resource-legitimacy').textContent=fmt(f.legitimacy||0)+'%';el('resource-gold').parentElement.parentElement.title=career?'Personal gold; estate funds shown in career panel':'Treasury '+fmt(f.treasury)+' · monthly balance '+fmt(s.balance);el('resource-gold').textContent=fmt(career?career.person?.wealth||0:f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
- const ruler=career?career.person:game.politics?.people?.[game.politics?.realms?.[game.player]?.ruler],mark=portraitMark(ruler);el('hud-ruler').hidden=!ruler;el('hud-ruler-name').textContent=ruler?.name||'—';el('hud-portrait').innerHTML=portraitImage(ruler)||esc(mark.initials);el('hud-portrait').style.background=mark.color;el('quick-nav').hidden=false;el('open-management').textContent=career?'Manage career':'Manage kingdom';for(const b of el('quick-nav').querySelectorAll('[data-priority-tab]'))b.hidden=!!career&&!CAREER_TABS.includes(b.dataset.priorityTab);const outliner=campaignOutliner(game,world);el('outliner-count').textContent=outliner.count;el('outliner-list').innerHTML=renderCampaignOutliner(outliner,esc);el('faction-name').textContent=f.name;el('faction-government').textContent=career?'Vassal career':f.government;
+ const ruler=career?career.person:game.politics?.people?.[game.politics?.realms?.[game.player]?.ruler],mark=portraitMark(ruler);el('hud-ruler').hidden=!ruler;el('hud-ruler-name').textContent=(ruler?.name||'—')+(ruler&&personalDilemmas(game,ruler.id).length?' · !':'');el('hud-portrait').innerHTML=portraitImage(ruler)||esc(mark.initials);el('hud-portrait').style.background=mark.color;el('quick-nav').hidden=false;el('open-management').textContent=career?'Manage career':'Manage kingdom';for(const b of el('quick-nav').querySelectorAll('[data-priority-tab]'))b.hidden=!!career&&!CAREER_TABS.includes(b.dataset.priorityTab);const outliner=campaignOutliner(game,world);el('outliner-count').textContent=outliner.count;el('outliner-list').innerHTML=renderCampaignOutliner(outliner,esc);el('faction-name').textContent=f.name;el('faction-government').textContent=career?'Vassal career':f.government;
  el('faction-flag').style.background=f.color;el('faction-flag').innerHTML=assetImage(realmArt(f.id),'realm-emblem')||'♛';
  el('world-counter').title=world.meta.caveat;el('world-counter').textContent=`${world.provinces.length} DISTRICTS · ${Object.values(game.factions).filter(q=>q.id!=='independent'&&Object.values(game.provinces).some(p=>p.owner===q.id)).length} REALMS`;
  el('latest-event').textContent=game.log[0]?.text||'Your court awaits.';
@@ -257,6 +258,7 @@ el('tab-content').addEventListener('change',e=>{if(e.target.id==='people-scope'|
 });
 document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selected=Number(unit.dataset.unit);battle.report();return;}
  const btn=e.target.closest('[data-action]');if(!btn||!game||battle)return;const action=btn.dataset.action,type=btn.dataset.type;
+ if(action==='personal-life'){clickResult(resolvePersonalDilemma(game,btn.dataset.id,type));return;}
  if(action==='career'){const id=btn.dataset.input?el(btn.dataset.input)?.value:btn.dataset.id;const result=careerAction(game,type,id,btn.dataset.extra);if(result.ok&&type==='start'){cancelMarch();pageHistory.reset();tab='realm';characterId=null;}clickResult(result);return;}
  if(action==='pin'){clickResult(toggleCampaignPin(game,type,btn.dataset.id));return;}
  if(vassalCareer(game))return;
