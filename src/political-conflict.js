@@ -1,3 +1,4 @@
+import {humanControlsRealm} from './player-career.js';
 import {regencyPermission} from './regency-systems.js';
 import {claimDynasticSeat,validDynasticClaim} from './dynastic-ties.js';
 import {estatePower} from './realm-authority.js';
@@ -163,12 +164,12 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  if(!members.length){if(x)settleFaction(g,x,'dissolved',world);continue;}
  if(!x){const recent=Object.values(c.factions).some(x=>x.realm===realm&&x.ended!==undefined&&g.turn-x.ended<24);if(recent)continue;const key='f'+c.next++;const claimant=f.legitimacy<48?claimantCandidates(g,realm).find(c=>g.politics.people[c.person].age>=18):null;const separatists=claimant?[]:independenceMembers(g,world,realm,members);const kind=claimant?'claimant':separatists.length?'independence':local.filter(([id,v])=>members.includes(id)&&v.tax===2).length?'tax':local.filter(([id,v])=>members.includes(id)&&v.levy===2).length?'levy':'liberty';x=c.factions[key]={id:key,realm,kind,claimant:claimant?.person||null,members,pressure:15,status:'organizing',started:g.turn};noteIf(g,realm,'Discontented vassals formed a '+kind+' faction.');}
  x.members=x.kind==='independence'?independenceMembers(g,world,realm,members):members;if(!x.members.length){settleFaction(g,x,'dissolved',world);continue;}x.power=power(g,x.members);const royal=civilWarForces(g,x,world).power,ratio=x.power/Math.max(1,royal),lords=new Set(x.members.map(id=>g.politics.holdings[id]?.lord)).size;x.strengthRatio=Math.round(ratio*100);x.pressure=cap(x.pressure+Math.max(5,Math.min(28,Math.round(lords*2+ratio*9))),0,100);
- if(realm!==g.player&&x.pressure>=55){if(f.treasury>200&&x.power>civilWarForces(g,x,world).power*.6)settleFaction(g,x,'concessions',world);else beginCivilWar(g,x);continue;}
+ if(!humanControlsRealm(g,realm)&&x.pressure>=55){if(f.treasury>200&&x.power>civilWarForces(g,x,world).power*.6)settleFaction(g,x,'concessions',world);else beginCivilWar(g,x);continue;}
  if(x.pressure>=70&&x.status==='organizing'){x.status='ultimatum';x.deadline=g.turn+6;noteIf(g,realm,'A faction issued an ultimatum. Respond within six months.');}
  if(x.status==='ultimatum'&&g.turn>=x.deadline)beginCivilWar(g,x);
  }
  // AI prepares claims on neighboring realms and may declare wars it can afford.
- if(g.turn%12===0)for(const [realm,s] of Object.entries(g.politics.realms)){if(realm===g.player)continue;const f=g.factions[realm],r=g.politics.people[s.ruler];const plan=strategicPlan(g,realm);if((plan?.goal!=='conquer'&&!r.traits.includes('ambitious'))||f.treasury<400||plan?.goal==='recover')continue;
+ if(g.turn%12===0)for(const [realm,s] of Object.entries(g.politics.realms)){if(humanControlsRealm(g,realm))continue;const f=g.factions[realm],r=g.politics.people[s.ruler];const plan=strategicPlan(g,realm);if((plan?.goal!=='conquer'&&!r.traits.includes('ambitious'))||f.treasury<400||plan?.goal==='recover')continue;
  const targets=[...new Set(holdings(g,realm).flatMap(([id])=>world.provinces.find(p=>p.id===id)?.neighbors||[]))].filter(id=>{const o=g.provinces[id]?.owner;return o&&o!==realm&&g.politics.realms[o]&&f.treaties[o]!=='alliance'&&!nonAggression(g,realm,o)&&!hasTruce(g,realm,o);});
  targets.sort((a,b)=>Number(g.provinces[b].owner===plan?.target)-Number(g.provinces[a].owner===plan?.target)||a.localeCompare(b));const claim=availableClaims(g,realm).find(x=>targets.includes(x.province)&&!activeWar(g,realm,g.provinces[x.province].owner)&&militaryStrength(g,realm)>=.65*(militaryStrength(g,g.provinces[x.province].owner)+defenseSupport(g,g.provinces[x.province].owner,realm)));if(claim){declare(g,realm,claim.province);continue;}
  if(targets.length&&rng(c)<.4)startScheme(g,realm,'fabricate',targets[0]);
