@@ -204,7 +204,7 @@ export function politicsAction(g,world,action,id,extra){const p=initPolitics(g,w
   return result;
  }
  if(action==='authority')return authorityAction(g,g.player,id,councilPermission(g,g.player,'law'));
- if(['court-appoint','court-dismiss'].includes(action))return courtAction(g,g.player,action,id,extra);
+ if(['court-appoint','court-dismiss','court-standard','court-audience','court-audience-answer','court-project'].includes(action))return courtAction(g,g.player,action,id,extra);
  if(action==='dispatch')return resolvePoliticalDispatch(g,g.player,Number(id));
  if(action==='marry'){const a=p.people[id],b=p.people[extra];if(a?.realm!==g.player||!marriageCandidates(g,g.player).some(x=>x.a===id&&x.b===extra))return {ok:false,msg:'Select an eligible royal pair.'};return marry(g,a,b);}
  if(action==='appoint'){const candidate=live(p,extra);if(!Object.hasOwn(s.council,id)||!candidate||candidate.realm!==g.player||candidate.age<18||isImprisoned(g,candidate.id)||candidate.id===r.id||Object.values(s.council).includes(candidate.id)||Object.values(g.royalCourt?.realms[g.player]?.offices||{}).some(o=>o.person===candidate.id)||f.treasury<80)return {ok:false,msg:'Select an adult unassigned courtier and have 80 gold.'};f.treasury-=80;s.council[id]=candidate.id;sync(g,g.player);log(g,candidate.name+' appointed '+id+'.');return {ok:true,msg:'Council appointment confirmed.'};}
