@@ -128,7 +128,7 @@ function openIncomingSiege(){
  const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
  const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
  openBattle({defenseMode:true,attacker:stationed?.id||null,enemyArmy:threat.army,enemy:threat.by,
-  to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison,
+  to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison+defenseSupport(game,game.player,threat.by),
   threat:{army:threat.army,province:threat.province}});
  return true;
 }
