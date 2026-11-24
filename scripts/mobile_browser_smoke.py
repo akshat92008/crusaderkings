@@ -52,7 +52,11 @@ try:
    assert page.locator('[data-action="recruit"][data-type="infantry"]').is_visible()
    page.screenshot(path=str(OUT/(name+'-province.png')))
    page.click('#close-province');page.click('#zoom-in');page.click('#zoom-out')
-   page.locator('.map-options summary').click();page.click('#show-map-modes');assert page.locator('#map-modes').is_visible()
+   page.locator('.map-options summary').click()
+   # The actual pointer hit must reach the map option, not the adjacent quick nav.
+   option=page.locator('#show-map-modes');option.scroll_into_view_if_needed();box=option.bounding_box()
+   assert page.evaluate('([x,y])=>document.elementFromPoint(x,y)?.closest("#show-map-modes")!==null',[box['x']+box['width']/2,box['y']+box['height']/2]), 'Map options obscured by another interface layer'
+   page.click('#show-map-modes');assert page.locator('#map-modes').is_visible()
    page.locator('[data-mapmode="terrain"]').click()
    page.locator('[data-mapmode="political"]').click()
    if name=='mobile':
