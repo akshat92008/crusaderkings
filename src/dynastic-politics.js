@@ -63,6 +63,8 @@ function death(g,world,c){const p=g.politics;c.alive=false;c.deathYear=g.year;if
  for(const [role,id] of Object.entries(s?.council||{}))if(id===c.id)s.council[role]=person(g,world,realm,35,{house:'Court of '+g.factions[realm].name}).id;
 }
 
+export function removePoliticalCharacter(g,world,id){const c=g.politics.people[id];if(!c?.alive)return false;death(g,world,c);sync(g,c.realm);syncTitles(g);return true;}
+
 // Original, contextual event templates. Effects operate on the actual target character/holding.
 const DISPATCHES=[
  {id:'levy_petition',title:'The levy petition',target:'vassal',test:(g,v)=>v.levy===2,desc:n=>n+' petitions for relief from compulsory military service.',choices:[['Reduce levy obligations',0,18,'levy',0],['Pay for local supplies',100,10],['Reject the petition',0,-13]]},

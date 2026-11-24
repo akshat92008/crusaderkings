@@ -1,3 +1,4 @@
+import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty} from './feudal-systems.js';
 import {regionalDecision,AMBITIONS,currentChain,relationshipList,personalOpinion} from './chronicle-systems.js';
@@ -114,6 +115,7 @@ export function renderConflict(g,world,esc){
  for(const x of running)html+='<div class="rule"><b>'+esc(x.kind)+' · '+esc(place(x.target))+'</b><div class="smallnote">'+Math.max(0,x.due-g.turn)+' months remaining · '+x.chance+'% estimated success</div></div>';
  const own=Object.values(g.provinces).filter(x=>x.owner===realm),foreign=Object.values(g.provinces).filter(x=>x.owner!==realm&&p.realms[x.owner]);
  for(const [type,label,targets] of [['fabricate','Fabricate claim (110g)',foreign],['undermine','Undermine foreign court (100g)',foreign],['sway','Sway vassal (60g)',own],['investigate','Investigate estate (80g)',own]]){const field='scheme-'+type;html+='<div class="rule"><b>'+esc(label)+'</b><select class="select" id="'+field+'">'+targets.map(v=>'<option value="'+esc(v.id)+'">'+esc(place(v.id))+' · '+esc(name(v.owner))+'</option>').join('')+'</select>'+btn('scheme',type,'Begin scheme','',field)+'</div>';}
+ html+=renderIntrigue(g,esc);
  html+=section('TERRITORIAL CLAIMS');const claims=availableClaims(g,realm);
  if(!claims.length)html+='<p class="paragraph">No active claims. Use the chancellor to establish one.</p>';
  for(const x of claims)html+='<div class="rule"><b>'+esc(place(x.province))+'</b><div class="smallnote">Expires in '+Math.max(0,x.expires-g.turn)+' months · '+esc(name(g.provinces[x.province].owner))+'</div>'+btn('declare',x.province,'Declare claim war (5 prestige)')+'</div>';
@@ -239,4 +241,18 @@ export function renderIdentity(g,world,esc){
  html+=section('INNOVATION TREE');const available=researchOptions(g,realm);if(s.research)html+='<div class="rule"><b>Researching '+esc(INNOVATIONS[s.research.id].name)+'</b><p class="paragraph">'+Math.round(s.research.progress)+' / '+INNOVATIONS[s.research.id].cost+' research points</p></div>';
  for(const [id,d] of Object.entries(INNOVATIONS))html+='<div class="rule"><b>'+esc(d.name)+' · '+(s.innovations.includes(id)?'Discovered':available.includes(id)?'Available':'Locked')+'</b><p class="paragraph">'+esc(d.desc)+'</p>'+(d.requires.length?'<div class="smallnote">Requires '+d.requires.map(k=>esc(INNOVATIONS[k].name)).join(', ')+'</div>':'')+(!s.research&&available.includes(id)?btn('research',id,'Commission (150g)'):'')+'</div>';
  return html;
+}
+
+export function renderIntrigue(g,esc){
+ const realm=g.player,s=g.intrigue,name=id=>g.politics.people[id]?.name||id;
+ if(!s)return '';
+ const btn=(type,id,label,input='')=>'<button class="rowbtn" data-action="intrigue" data-type="'+esc(type)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ const options=people=>people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+' · '+esc(g.factions[p.realm]?.name||p.realm)+'</option>').join('');
+ let html=section('CHARACTER INTRIGUE')+'<details class="rule"><summary>Plots, secrets and counterespionage</summary><p class="paragraph">Run one character plot at a time. Agents increase success but may expose the conspiracy.</p>';
+ const active=activePlots(g,realm);
+ for(const p of active){const odds=plotOdds(g,p),field='agent-'+p.id,agents=agentOptions(g,p);html+='<div class="rule"><b>'+esc(PLOTS[p.kind].name)+' · '+esc(name(p.target))+'</b><div class="smallnote">'+Math.max(0,p.due-g.turn)+' months · '+odds.chance+'% success · '+odds.exposure+'% exposure · '+p.agents.length+'/3 agents</div>'+ (agents.length&&p.agents.length<3?'<select class="select" id="'+field+'">'+options(agents)+'</select>'+btn('agent',p.id,'Recruit agent (60g)',field):'')+btn('cancel',p.id,'Abandon plot')+'</div>';}
+ if(!active.length)for(const [id,d] of Object.entries(PLOTS)){const field='plot-'+id,targets=plotTargets(g,realm,id);if(targets.length)html+='<div class="rule"><b>'+esc(d.name)+'</b><div class="smallnote">'+d.cost+'g · '+d.months+' months</div><select class="select" id="'+field+'">'+options(targets)+'</select>'+btn('start',id,'Begin plot',field)+'</div>';}
+ html+='<div class="rule"><b>Counterespionage</b><p class="paragraph">'+Math.max(0,(s.security[realm]?.until||0)-g.turn)+' months remaining.</p>'+btn('security','','Strengthen security (120g)')+'</div>';
+ for(const x of knownSecrets(g,realm)){const strength=hookStrength(g,realm,x.person);html+='<div class="rule"><b>'+esc(name(x.person))+' · '+esc(SECRETS[x.kind].name)+'</b>'+btn('expose',x.id,'Expose secret')+(strength?'<div class="smallnote">Political leverage '+strength+'/3</div>':x.usedBy?.includes(realm)?'<div class="smallnote">Leverage already used</div>':btn('blackmail',x.id,'Obtain leverage'))+(strength&&Object.values(g.politics.holdings).some(v=>v.realm===realm&&v.lord===x.person)?btn('favor',x.person,'Spend leverage for loyalty'):'')+'</div>';}
+ html+='<div class="sectiontitle">INTELLIGENCE HISTORY</div>'+s.history.filter(x=>x.realm===realm).slice(0,8).map(x=>'<div class="smallnote">'+esc(x.message)+'</div>').join('')+'</details>';return html;
 }

@@ -1,3 +1,4 @@
+import {hookStrength} from './intrigue-systems.js';
 import {independenceMembers,foundBreakaway} from './independence-systems.js';
 import {claimantCandidates,installClaimant,isImprisoned,capturePrisoner} from './feudal-systems.js';
 import {personalOpinion} from './chronicle-systems.js';
@@ -19,7 +20,7 @@ function history(g,entry){const c=initConflict(g);c.history.unshift({turn:g.turn
 export function councilVotes(g,realm,proposal='law'){
  const c=initConflict(g),s=g.politics.realms[realm],f=g.factions[realm];if(!s||!f)return [];
  return Object.entries(s.council).filter(([,id])=>g.politics.people[id]?.alive&&!isImprisoned(g,id)).map(([role,id])=>{const person=g.politics.people[id],favor=(c.favors[councilKey(realm,id)]||0)>g.turn;
- const score=18+(f.legitimacy-50)*.7+(f.stability-50)*.3+(person.traits.includes('ambitious')?-20:0)+(person.traits.includes('content')?15:0)+(person.traits.includes('just')&&proposal==='revoke'?-28:0)+(person.traits.includes('cautious')&&proposal==='war'?-25:0)+(role==='marshal'&&proposal==='war'?22:0)+(favor?55:0)+personalOpinion(g,s.ruler,id)*.35;
+ const score=18+(f.legitimacy-50)*.7+(f.stability-50)*.3+(person.traits.includes('ambitious')?-20:0)+(person.traits.includes('content')?15:0)+(person.traits.includes('just')&&proposal==='revoke'?-28:0)+(person.traits.includes('cautious')&&proposal==='war'?-25:0)+(role==='marshal'&&proposal==='war'?22:0)+(favor?55:0)+personalOpinion(g,s.ruler,id)*.35+hookStrength(g,realm,id)*18;
  return {role,id,yes:score>=25,score:Math.round(score),favor};});
 }
 export function councilPermission(g,realm,proposal){const c=initConflict(g);if(c.council[realm]!=='binding')return true;const v=councilVotes(g,realm,proposal);return v.filter(x=>x.yes).length>v.length/2;}
