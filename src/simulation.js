@@ -1,3 +1,5 @@
+import {controller,occupation,occupationTax,captureProvince} from './campaign-war.js';
+import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
 import {onArmyMarch,armyReadiness,syncRegiments,applyFortDamage,initMilitary} from './military-systems.js';
 import {economyModifiers} from './economy-systems.js';
 import {heritageModifiers} from './heritage-systems.js';
@@ -37,9 +39,9 @@ export function empireStats(g,owner){
  const tax=[.65,1,1.5][f?.policies.tax??1];
  const trade=tradeIncome(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const taxIncome=Math.round(economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade;
- const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0));
+ const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0))+navalUpkeep(g,owner);
  const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
  return {provinces:p.length,income,trade,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops:Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a),0),population:p.reduce((s,a)=>s+a.population,0)};
 }
@@ -54,7 +56,7 @@ export function setPolicy(g,key,value){
 }
 export function build(g,provinceId,kind){
  const p=g.provinces[provinceId],f=g.factions[g.player],b=BUILDINGS[kind];
- if(!p||p.owner!==g.player)return {ok:false,msg:'Select your own province'};
+ if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  if(!b)return {ok:false,msg:'Unknown building'};
  const level=p.buildings[kind]||0;
  if(level>=3)return {ok:false,msg:'Maximum building level reached'};
@@ -68,7 +70,7 @@ export function build(g,provinceId,kind){
 }
 export function recruit(g,provinceId,type='infantry'){
  const p=g.provinces[provinceId],f=g.factions[g.player];
- if(!p||p.owner!==g.player)return {ok:false,msg:'Select your own province'};
+ if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  const prices={infantry:110,archers:150,cavalry:240};if(!Object.hasOwn(prices,type))return {ok:false,msg:'Unknown troop type'};
  const doctrine=militaryDoctrine(g.player);
  const primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
@@ -86,30 +88,31 @@ export function recruit(g,provinceId,type='infantry'){
 export function isAdjacent(world,src,dst){return !!world.provinces.find(p=>p.id===src)?.neighbors?.includes(dst);}
 export function startMarch(g,world,fromId,toId){
  const src=g.provinces[fromId],target=g.provinces[toId];
- if(!src||!target||src.owner!==g.player)return {ok:false,msg:'Select an owned province to march from'};
+ if(!src||!target||controller(g,fromId)!==g.player)return {ok:false,msg:'Select an owned province to march from'};
  if(fromId===toId)return {ok:false,msg:'Choose another province'};
  if(!isAdjacent(world,fromId,toId))return {ok:false,msg:'Armies can currently move only to connected provinces'};
  const army=armiesAt(g,fromId,g.player)[0];
- if(!army||armySize(army)<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
- if(target.owner===g.player){onArmyMarch(g,army);army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
- if(hasTruce(g,g.player,target.owner))return {ok:false,msg:'A peace treaty bars this attack.'};
- if(g.factions[g.player].treaties[target.owner]==='alliance')return {ok:false,msg:'Cannot attack an ally'};
- const defenders=armiesAt(g,toId,target.owner);
+ if(!army||embarked(g,army.id)||armySize(army)<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
+ if(controller(g,toId)===g.player){onArmyMarch(g,army);army.province=toId;makeLog(g,`${army.commander} marched to ${toId}.`);return {ok:true,type:'move',msg:'Army moved'};}
+ const opponent=controller(g,toId);if(occupation(g,toId)&&opponent!==target.owner&&!activeWar(g,g.player,opponent))return {ok:false,msg:'Cannot attack a third-party occupation without formal war.'};
+ if(hasTruce(g,g.player,opponent))return {ok:false,msg:'A peace treaty bars this attack.'};
+ if(g.factions[g.player].treaties[opponent]==='alliance')return {ok:false,msg:'Cannot attack an ally'};
+ const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
  const garrison=45+target.development*12+target.buildings.fort*45;
- return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:target.owner};
+ return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
 export function concludeBattle(g,battle,result){
  const src=g.armies[battle.attacker];if(!src)return;
- const dst=g.provinces[battle.to];const was=dst.owner;
+ const dst=g.provinces[battle.to];const was=controller(g,battle.to),war=activeWar(g,g.player,was);
  recordCampaignBattle(g,g.player,was,battle.to,!!result.victory);
  const ratio=clamp(result.attackerRemaining??0,0,1);
  const oldsize=armySize(src);onArmyMarch(g,src);applyFortDamage(g,battle.to,result);
  src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);syncRegiments(g,src);
- if(result.victory){dst.owner=g.player;dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
+ if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
   const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending)delete g.armies[defending.id];
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
-  makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Won'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
+  makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
  } else {src.morale=clamp(src.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${armySize(src)} survivors.`);}
 }
 export function negotiate(g,other,action,world={factions:[]}){
@@ -141,7 +144,7 @@ export function advanceMonth(g,world){
    p.population=clamp(p.population+(p.buildings.farm>0&&g.turn%4===0?1:0),4,800);
    const adjust= (f.policies.tax===2?2:f.policies.tax===0?-2:0)+(f.policies.levy===2?1:0)-(f.policies.tolerance===2?2:f.policies.tolerance===0?-1:0)-(p.buildings.farm>0?1:0);
    p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
-   if(p.unrest>=93 && rand(g)<.13){p.owner='independent';makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
+   if(!occupation(g,p.id)&&p.unrest>=93 && rand(g)<.13){p.owner='independent';makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
   }
   const provinces=Math.max(1,s.provinces);f.stability=clamp(f.stability+Math.sign(52-avgUnrest/provinces)*.6-(f.treasury<0?3:0)-(f.food<0?2:0),0,100);
   if(f.treasury<0&&rand(g)<.14){f.legitimacy=clamp(f.legitimacy-3,0,100);}
@@ -153,19 +156,19 @@ export function advanceMonth(g,world){
  }
  // Rival rulers periodically recruit and contest border provinces. Player wars remain manual.
  if(g.turn%8===0){
-  const challengers=Object.values(g.armies).filter(a=>a.owner!==g.player && a.owner!=='independent' && armySize(a)>45);
+  const challengers=Object.values(g.armies).filter(a=>a.owner!==g.player && a.owner!=='independent'&&!embarked(g,a.id) && armySize(a)>45);
   const shuffled=challengers.slice().sort((a,b)=>(a.id.length*17+g.turn)%31-(b.id.length*17+g.turn)%31);
   let campaigns=0;
   for(const a of shuffled){
    if(campaigns>=3)break;
-   const origin=world.provinces.find(p=>p.id===a.province);if(!origin||g.provinces[origin.id].owner!==a.owner)continue;
-   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&p.owner!==a.owner&&p.owner!==g.player&&!hasTruce(g,a.owner,p.owner)&&g.factions[a.owner].treaties[p.owner]!=='alliance');
+   const origin=world.provinces.find(p=>p.id===a.province);if(!origin||controller(g,origin.id)!==a.owner)continue;
+   const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&!occupation(g,p.id)&&p.owner!==a.owner&&p.owner!==g.player&&!hasTruce(g,a.owner,p.owner)&&g.factions[a.owner].treaties[p.owner]!=='alliance');
    if(!potential.length||rand(g)>.48)continue;
    const target=potential.find(p=>activeWar(g,a.owner,p.owner)?.goal===p.id)||potential[Math.floor(rand(g)*potential.length)];
    const defense=45+target.development*13+target.buildings.fort*48+armiesAt(g,target.id,target.owner).reduce((sum,v)=>sum+armySize(v),0);
    const attack=armySize(a)*armyReadiness(g,a).power*(0.75+rand(g)*.7);
    if(attack>defense*.88){
-    const previous=target.owner;recordCampaignBattle(g,a.owner,previous,target.id,true);target.owner=a.owner;target.unrest=clamp(target.unrest+25,0,100);
+    const previous=target.owner,war=activeWar(g,a.owner,previous);recordCampaignBattle(g,a.owner,previous,target.id,true);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
     const losses=clamp(defense/Math.max(1,attack)*.29,.07,.44);
     a.infantry=Math.round(a.infantry*(1-losses));a.archers=Math.round(a.archers*(1-losses));a.cavalry=Math.round(a.cavalry*(1-losses));
     for(const defender of armiesAt(g,target.id,previous))delete g.armies[defender.id];
