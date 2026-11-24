@@ -4,10 +4,12 @@ on:
     branches: [main]
     paths:
       - 'src/faith-institutions.js'
+      - 'src/culture-systems.js'
       - 'src/identity-systems.js'
       - 'src/heritage-systems.js'
       - 'src/kingdom-ui.js'
       - 'scripts/faith_browser_smoke.py'
+      - 'scripts/culture_browser_smoke.py'
       - '.github/workflows/faith-browser.yml'
   workflow_dispatch:
 permissions:
@@ -24,6 +26,7 @@ jobs:
       - run: python -m pip install playwright
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/faith_browser_smoke.py
+      - run: python scripts/culture_browser_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
