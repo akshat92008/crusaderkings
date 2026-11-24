@@ -124,10 +124,31 @@ export function startMarch(g,world,fromId,toId){
  const defenders=[...armiesAt(g,toId,opponent),...fieldContingentsAt(g,opponent,toId,g.player)];
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
  const garrison=campaignGarrison(target)+defenseSupport(g,opponent,g.player);
- return {ok:true,type:'battle',attacker:army.id,playerArmies:[...forces,...allies].map(a=>a.id),attackTroops:total+alliedTroops,alliedTroops,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
+ return {ok:true,type:'battle',campaignTurn:g.turn,attacker:army.id,playerArmies:[...forces,...allies].map(a=>a.id),attackTroops:total+alliedTroops,alliedTroops,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
+}
+// A live field result is tied to the deployment that created it. Legacy
+// non-field callers retain their existing behavior for old campaign fixtures.
+export function validateFieldResult(g,battle,result,world=null){
+ const no=msg=>({ok:false,msg});
+ if(!battle||battle.resolved||battle.campaignTurn!==g.turn)return no('This battle report is expired or already applied.');
+ if(typeof result?.victory!=='boolean'||![result.attackerRemaining,result.enemyRemaining].every(n=>Number.isFinite(n)&&n>=0&&n<=1))return no('Invalid field battle result.');
+ const army=g.armies[battle.attacker];
+ if(!army||army.owner!==g.player||army.contingent||embarked(g,army.id)||armySize(army)<1||army.province!==battle.from)return no('The attacking army is no longer deployed.');
+ if(!g.provinces[battle.to]||controller(g,battle.from)!==g.player||controller(g,battle.to)!==battle.enemy||battle.enemy===g.player||mayEnterWithAccess(g,g.player,battle.to))return no('The battlefield is no longer contested.');
+ if(nonAggression(g,g.player,battle.enemy)||hasTruce(g,g.player,battle.enemy)||['alliance','marriage'].includes(g.factions[g.player].treaties[battle.enemy]))return no('A peace agreement now bars this battle.');
+ if(world){
+  if(!isAdjacent(world,battle.from,battle.to))return no('The battlefield is no longer adjacent.');
+  // startMarch cannot move forces here: the hostile controller and absence of
+  // military passage were checked above. Recompute the authoritative roster.
+  const live=startMarch(g,world,battle.from,battle.to);
+  const same=(a,b)=>Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every(id=>b.includes(id));
+  if(!live.ok||live.type!=='battle'||live.attacker!==battle.attacker||!same(live.playerArmies,battle.playerArmies)||!same(live.enemyArmies,battle.enemyArmies)||live.attackTroops!==battle.attackTroops||live.defenseTroops!==battle.defenseTroops||live.defenseGarrison!==battle.defenseGarrison)return no('The deployed forces changed; issue a fresh march order.');
+ }
+ return {ok:true};
 }
 export function concludeBattle(g,battle,result,world=null){
- const src=g.armies[battle.attacker];if(!src)return;
+ if(result?.fieldBattle&&battle?.type==='battle'){const valid=validateFieldResult(g,battle,result,world);if(!valid.ok)return valid;battle.resolved=true;}
+ const src=g.armies[battle.attacker];if(!src||!g.provinces[battle.to])return {ok:false,msg:'The battle no longer exists.'};
  const dst=g.provinces[battle.to];const was=controller(g,battle.to),war=activeWar(g,g.player,was);
 
  const ratio=clamp(result.attackerRemaining??0,0,1),forces=result.fieldBattle?participatingArmies(g,battle.playerArmies||[src.id],g.player,battle.from||src.province,was):[src];
@@ -143,6 +164,7 @@ export function concludeBattle(g,battle,result,world=null){
   recordCampaignBattle(g,g.player,was,battle.to,true);
   makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-forces.reduce((n,a)=>n+armySize(a),0)} casualties.`);
  } else {recordCampaignBattle(g,g.player,was,battle.to,false);for(const a of forces)a.morale=clamp(a.morale-20,10,100);g.factions[g.player].prestige=Math.max(0,g.factions[g.player].prestige-5);makeLog(g,`Defeat at ${battle.to}. Your army fell back with ${forces.reduce((n,a)=>n+armySize(a),0)} survivors.`);}
+ return {ok:true,msg:'Battle result applied.'};
 }
 export function negotiate(g,other,action,world={factions:[]}){
  if(other===g.player||other==='independent'||!g.factions[other])return {ok:false,msg:'Invalid diplomatic target'};
