@@ -302,7 +302,7 @@ export function renderExpanded(g,world,esc){
  if(!g.expanded?.realms[g.player])return '';
  const r=g.player,place=id=>world.provinces.find(p=>p.id===id)?.name||id;
  const target=t=>t.faction?(g.conflict.factions[t.faction]?.kind||'Local')+' faction':t.province?place(t.province):t.partner?g.politics.people[t.person]?.name+' & '+g.politics.people[t.partner]?.name:t.person?g.politics.people[t.person]?.name:t.other?g.factions[t.other]?.name:t.army?'Field army at '+place(g.armies[t.army]?.province):'';
- const effect=e=>Object.entries(e).map(([k,v])=>esc(k.replace(/([A-Z])/g,' $1'))+' '+(v>0?'+':'')+v).join(' · ');
+ const effect=e=>Object.entries(e).map(([k,v])=>k==='wedding'?'Creates a dynastic marriage':esc(k.replace(/([A-Z])/g,' $1'))+' '+(v>0?'+':'')+v).join(' · ');
  const btn=(type,id,label)=>'<button class="rowbtn" data-action="expanded" data-type="'+esc(type)+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
  let html=section('CAMPAIGN EVENTS'),x=currentExpandedEvent(g,r);
  if(x){html+='<div class="rule"><h3>'+esc(x.title)+'</h3><div class="smallnote">'+esc(x.category)+' · '+esc(target(x.target)||'Realm')+' · '+Math.max(0,x.expires-g.turn)+' months remaining</div><p class="paragraph">'+esc(x.description)+'</p>';if(g.turn<(x.availableAt??x.started))html+='<p class="smallnote">Follow-up available in '+(x.availableAt-g.turn)+' months.</p>';else for(const [i,c] of x.choices.entries())html+=btn('resolve',i,c.label+(c.cost?' ('+c.cost+'g)':''))+'<div class="smallnote">'+(effect(c.effects)||'No direct effect')+(c.next?' · Situation continues':'')+'</div>';html+='</div>';}else html+='<p class="paragraph">No new campaign event.</p>';
