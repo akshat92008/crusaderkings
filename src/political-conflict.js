@@ -43,7 +43,7 @@ function declare(g,realm,id){
  const c=initConflict(g),claim=c.claims[claimKey(realm,id)],pr=g.provinces[id],f=g.factions[realm],other=pr?.owner;
  if(!claim||claim.expires<=g.turn||!validDynasticClaim(g,claim)||!pr||other===realm||!g.politics.realms[other])return no('A valid foreign territorial claim is required.');
  if(['alliance','marriage'].includes(f.treaties[other])||nonAggression(g,realm,other)||hasTruce(g,realm,other)||activeWar(g,realm,other))return no('Alliance, truce or existing war prevents declaration.');
- if(!councilPermission(g,realm,'war'))return no('The council voted against this war.');
+ if(!councilPermission(g,realm,'war'))return no('The council or regent rejected this war.');
  if(f.prestige<5)return no('Need 5 prestige.');f.prestige-=5;
  const key='w'+c.next++;c.wars[key]={id:key,attacker:realm,defender:other,goal:id,score:0,battles:0,started:g.turn,status:'active'};
  if(realm===g.player||other===g.player)note(g,g.factions[realm].name+' declared a claim war on '+g.factions[other].name+' for '+id+'.');
