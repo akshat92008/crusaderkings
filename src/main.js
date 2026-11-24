@@ -134,7 +134,7 @@ function onBattleFinished(result){
  el('battle-return').onclick=()=>{
   if(!practice){
    if(defense){const r=resolveInvasion(game,world,battleDescriptor.threat,result);if(!r.ok)message(r.msg);}
-   else concludeBattle(game,battleDescriptor,result);
+   else concludeBattle(game,battleDescriptor,result,world);
   }
   battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;
   document.body.style.overflow='';render();if(!practice)save();
@@ -143,10 +143,10 @@ function onBattleFinished(result){
 function openIncomingBattle(){
  const threat=game?.kingdom?.threats?.find(t=>t.status==='ready');
  if(!threat||battle)return false;
- const stationed=armiesAt(game,threat.province,game.player)[0],defense=game.provinces[threat.province];
+ const defenders=armiesAt(game,threat.province,game.player).filter(a=>!game.naval?.voyages?.[a.id]),stationed=defenders[0],defense=game.provinces[threat.province];
  const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
  const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
- openBattle({defenseMode:true,attacker:stationed?.id||null,enemyArmy:threat.army,enemy:threat.by,
+ openBattle({defenseMode:true,attacker:stationed?.id||null,playerArmies:defenders.map(a=>a.id),enemyArmy:threat.army,enemyArmies:[threat.army],enemy:threat.by,
   to:threat.province,defenseTroops:armySize(enemyArmy),defenseGarrison:garrison+defenseSupport(game,game.player,threat.by),
   threat:{army:threat.army,province:threat.province}});
  return true;

@@ -1,3 +1,4 @@
+import {participatingArmies,aggregateForce,regimentTroops} from './field-forces.js';
 import {formationOffsets,soldierWorldPose,visualMode,visibleSoldierCount,updateFieldCharacters,cameraDestination,blendCamera,battleRoster,battleImpactParticles} from './battle-presentation.js';
 import {FIELD_ORDERS,initializeFieldGroup,issueFieldOrder,fieldTarget,fieldStrength,stepField,coordinateFieldAI} from './field-tactics.js';
 import {armyReadiness,regimentProfile,createSiegeState,siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
@@ -140,14 +141,14 @@ export class BattleGame{
 
  const playerFaction=game.factions[game.player],enemy=game.factions[descriptor.enemy],fieldArmy=game.armies[descriptor.attacker];
  const garrison=startingTroops(playerFaction,descriptor.defenseMode?(descriptor.defenseGarrison||90):0);
- const a=fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
+ const a=descriptor.fieldBattle?aggregateForce(participatingArmies(game,descriptor.playerArmies||[descriptor.attacker],game.player,descriptor.defenseMode?descriptor.to:descriptor.from),garrison):fieldArmy?{...fieldArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(fieldArmy[t]||0)+garrison[t]]))}:garrison;
  const enemyArmy=descriptor.enemyArmy&&game.armies[descriptor.enemyArmy];
- const enemies=enemyArmy?{...enemyArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(enemyArmy[t]||0)+(descriptor.defenseMode?0:startingTroops(enemy,descriptor.defenseGarrison||0)[t])]))}:startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseMode?0:descriptor.defenseGarrison||0)));
+ const enemies=descriptor.fieldBattle&&!descriptor.showcase?aggregateForce(participatingArmies(game,descriptor.enemyArmies||[descriptor.enemyArmy],descriptor.enemy,descriptor.defenseMode?null:descriptor.to),startingTroops(enemy,descriptor.defenseMode?0:descriptor.defenseGarrison||0)):enemyArmy?{...enemyArmy,...Object.fromEntries(['infantry','archers','cavalry'].map(t=>[t,(enemyArmy[t]||0)+(descriptor.defenseMode?0:startingTroops(enemy,descriptor.defenseGarrison||0)[t])]))}:startingTroops(enemy,Math.max(95,(descriptor.defenseTroops||0)+(descriptor.defenseMode?0:descriptor.defenseGarrison||0)));
  this.siege=descriptor.fieldBattle?null:createSiegeState(game.provinces?.[descriptor.to]?.buildings?.fort||0,!!descriptor.defenseMode);this.groups=[];
  const mySlots=armyFormationSlots(playerFaction,a,6),enemySlots=armyFormationSlots(enemy,enemies,6);
  for(let i=0;i<6;i++){
   const type=mySlots[i],slotCount=mySlots.filter(t=>t===type).length;
-  const unitCount=(a[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?-26:24;
+  const unitCount=descriptor.fieldBattle?regimentTroops(a,mySlots,i):(a[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?-26:24;
   const g=formation('p'+i,'attacker',type,i,[0,0],unitCount,'#4b98b3');
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?52:type==='archers'?32:23)*100,10,100);
@@ -156,7 +157,7 @@ export class BattleGame{
  }
  for(let i=0;i<6;i++){
   const type=enemySlots[i],slotCount=enemySlots.filter(t=>t===type).length;
-  const unitCount=(enemies[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?24:-24;
+  const unitCount=descriptor.fieldBattle?regimentTroops(enemies,enemySlots,i):(enemies[type]||0)/Math.max(1,slotCount),position=descriptor.defenseMode?24:-24;
   const g=formation('e'+i,'defender',type,i,[0,0],unitCount,enemy?.color||'#b86855');
   g.z=position;g.targetZ=position;g.orderZ=position;
   g.life=clamp(unitCount/(type==='infantry'?50:type==='archers'?32:22)*100,10,100);

@@ -1,3 +1,4 @@
+import {participatingArmies,applyFieldLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
 import {campaignWorld} from './independence-systems.js';
@@ -105,17 +106,18 @@ export function startMarch(g,world,fromId,toId){
  const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
  const garrison=45+target.development*12+target.buildings.fort*45+defenseSupport(g,opponent,g.player);
- return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
+ return {ok:true,type:'battle',attacker:army.id,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
-export function concludeBattle(g,battle,result){
+export function concludeBattle(g,battle,result,world=null){
  const src=g.armies[battle.attacker];if(!src)return;
  const dst=g.provinces[battle.to];const was=controller(g,battle.to),war=activeWar(g,g.player,was);
 
  const ratio=clamp(result.attackerRemaining??0,0,1);
  const oldsize=armySize(src);onArmyMarch(g,src);applyFortDamage(g,battle.to,result);
- src.infantry=Math.round(src.infantry*ratio);src.archers=Math.round(src.archers*ratio);src.cavalry=Math.round(src.cavalry*ratio);syncRegiments(g,src);
+ applyFieldLosses(src,result,'attacker',ratio);syncRegiments(g,src);
+ const field=result.fieldBattle&&Array.isArray(battle.enemyArmies),defenders=field?participatingArmies(g,battle.enemyArmies,was,battle.to):[];for(const a of defenders){applyFieldLosses(a,result,'defender',clamp(result.enemyRemaining??.5,0,1));syncRegiments(g,a);}
  if(result.victory){captureProvince(g,war,g.player,battle.to,src.province);dst.unrest=clamp(dst.unrest+25,0,100);src.province=battle.to;src.experience=clamp(src.experience+.06,0,1);
-  const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending){captureCommander(g,g.player,defending);delete g.armies[defending.id];}
+  if(field){const retreat=world?.provinces.find(p=>p.id===battle.to)?.neighbors.find(id=>controller(g,id)===was&&g.provinces[id]?.owner===was);for(const a of defenders){if(retreat&&armySize(a)>0){a.province=retreat;a.morale=clamp((a.morale||75)-20,10,100);}else{captureCommander(g,g.player,a);delete g.armies[a.id];}}}else{const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);if(defending){captureCommander(g,g.player,defending);delete g.armies[defending.id];}}
   g.factions[g.player].prestige+=8;g.factions[g.player].legitimacy=clamp(g.factions[g.player].legitimacy+2,0,100);
   recordCampaignBattle(g,g.player,was,battle.to,true);
   makeLog(g,`Victory! ${dst.owner===g.player?'Your forces seized':'Your forces occupied'} ${battle.to} from ${ownerName(g,was)}. ${oldsize-armySize(src)} casualties.`);
