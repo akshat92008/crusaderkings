@@ -1,3 +1,4 @@
+import {realmArt} from './game-art.js';
 import {pickArmyMarker} from './campaign-hud.js';
 import {geographicIndex,seatSignature,frameCoalescer} from './render-performance.js';
 import {capitalDistrict} from './historical-world.js';
@@ -75,7 +76,7 @@ export class CampaignMap{
   this.armyMarkers??=[];const marker={province:a.province,owner:a.owner,troops:a.troops,x:x+offset,y:y-15,halfWidth:11,bottom:12};this.armyMarkers.push(marker);
   c.save();c.translate(x+offset,y-15);c.shadowColor='rgba(26,29,20,.58)';c.shadowBlur=5;c.fillStyle=mine?'#c9a04d':'#6c5c55';c.strokeStyle='#2e3430';c.lineWidth=1.3;
   c.beginPath();c.moveTo(-6,-12);c.lineTo(6,-12);c.lineTo(6,5);c.lineTo(0,11);c.lineTo(-6,5);c.closePath();c.fill();c.stroke();c.shadowBlur=0;
-  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText('⚔',0,-2);if(this.zoom>=2.1||mine){const text=a.troops>=1000?(a.troops/1000).toFixed(1).replace(/\.0$/,'')+'k':String(a.troops);c.font='bold 10px system-ui';const w=c.measureText(text).width+10;marker.halfWidth=Math.max(11,w/2);marker.bottom=29;c.fillStyle=mine?'#423820':'#3b3834';c.fillRect(-w/2,13,w,15);c.fillStyle='#fff0c8';c.fillText(text,0,20);}c.restore();
+  c.fillStyle='#ede4c7';c.font='bold 10px Georgia';c.textAlign='center';c.textBaseline='middle';const art=realmArt(a.owner);this.realmArtCache??=new Map();let icon=art&&this.realmArtCache.get(art);if(art&&!icon){icon=new Image();icon.onload=()=>this.render();icon.src=art;this.realmArtCache.set(art,icon);}if(icon?.complete&&icon.naturalWidth)c.drawImage(icon,-9,-11,18,18);else c.fillText('⚔',0,-2);if(this.zoom>=2.1||mine){const text=a.troops>=1000?(a.troops/1000).toFixed(1).replace(/\.0$/,'')+'k':String(a.troops);c.font='bold 10px system-ui';const w=c.measureText(text).width+10;marker.halfWidth=Math.max(11,w/2);marker.bottom=29;c.fillStyle=mine?'#423820':'#3b3834';c.fillRect(-w/2,13,w,15);c.fillStyle='#fff0c8';c.fillText(text,0,20);}c.restore();
  }
  _realmSeats(){const key=seatSignature(this.world,this.game);if(this.seatCache?.key===key)return this.seatCache.value;const factions=this.game?Object.values(this.game.factions).filter(f=>f.id!=='independent'&&f.capital):this.world.factions;const states=this.game?.provinces,world={...this.world,factions},by=new Map(world.provinces.map(p=>[p.id,p]));const value=factions.map(f=>{const seat=capitalDistrict(world,f.id,states);return seat?{f,point:by.get(seat.id).centroid,count:world.provinces.filter(p=>(states?states[p.id]?.owner:p.owner)===f.id).length}:null;}).filter(Boolean).sort((a,b)=>b.count-a.count||a.f.id.localeCompare(b.f.id));this.seatCache={key,value};return value;}
  _labels(c,s,seats){

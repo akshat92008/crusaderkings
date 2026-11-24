@@ -4,6 +4,10 @@ from zipfile import ZipFile
 ROOT=Path(__file__).resolve().parents[1]
 zip_path=ROOT/'dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip'
 required=[
+ 'crown-of-nations/assets/game-art/manifest.json',
+ 'crown-of-nations/assets/game-art/portraits/western-00.webp',
+ 'crown-of-nations/assets/game-art/events/council-00.webp',
+ 'crown-of-nations/assets/game-art/realms/europe-00.webp',
  'crown-of-nations/assets/icons/Strategy_game_trait_icon_sheet_807567b6.jpg',
  'crown-of-nations/assets/icons/Character_trait_icon_sheet_fe2300f5.jpg',
  'crown-of-nations/assets/icons/Medieval_strategy_game_skill_icons_c1080878.jpg',

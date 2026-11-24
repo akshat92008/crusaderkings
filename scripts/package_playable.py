@@ -16,6 +16,7 @@ keep += [str(p.relative_to(ROOT)) for folder in ('src','data') for p in (ROOT/fo
 keep += ['assets/icons/Strategy_game_trait_icon_sheet_807567b6.jpg','assets/icons/Character_trait_icon_sheet_fe2300f5.jpg','assets/icons/Medieval_strategy_game_skill_icons_c1080878.jpg','assets/icons/Medieval_political_office_icon_s…_7042e0b0.jpg','assets/icons/Create_historical_strategy_game_…_7e8a58fa.jpg','assets/icons/Medieval_strategy_game_icon_sheet_8967b69f.jpg','assets/video/Medieval_war_table_map_animation_ac51bb4b.mp4']
 keep += ['assets/favicon.svg','assets/court-theme.css','assets/court-compass.svg','assets/monarch-crest.svg','docs/HISTORICAL_CONTEXT.md']
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/battle/characters').rglob('*') if p.is_file()]
+keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/game-art').rglob('*') if p.is_file()]
 text = ('CROWN OF NATIONS: 1450 — CULTURAL WARFARE PLAYTEST\n'
         'This is a playable development preview, not a finished game.\n\n'
         'Extract the ZIP. In a terminal inside crown-of-nations run:\n'
