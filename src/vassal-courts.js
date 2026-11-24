@@ -1,3 +1,4 @@
+import {feudalHierarchy} from './feudal-obligations.js';
 // Landed subjects are autonomous estate managers with saved petitions and agendas.
 import {politicalEstates,authorityLevel} from './realm-authority.js';
 import {controller} from './campaign-war.js';
@@ -5,7 +6,7 @@ const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),num=n=>Number.isFinite(n)?n:0,live=
 const skills={chancellor:'diplomacy',marshal:'martial',steward:'stewardship',spymaster:'intrigue',scholar:'learning'};
 export function initVassalCourts(g){return g.vassalCourts??={version:1,courts:{},petitions:{},history:[],lastTick:-1};}
 export function vassalCourt(g,id){return g.vassalCourts?.courts?.[id]||null;}
-export function vassalLiege(g,id){const p=live(g,id);if(!p)return null;const crown=g.politics.realms[p.realm]?.ruler,regions=Object.values(g.feudal?.titles||{}).filter(t=>t.realm===p.realm&&t.tier==='regional'),own=regions.filter(t=>t.holder===id);if(own.length)return crown;const regional=regions.filter(t=>t.holder!==id&&t.holder!==crown&&free(g,t.holder)&&t.members.some(key=>g.politics.holdings[key]?.lord===id)).sort((a,b)=>a.id.localeCompare(b.id))[0];return regional?.holder||crown;}
+export function vassalLiege(g,id){const p=live(g,id);if(!p)return null;const h=feudalHierarchy(g,p.realm);return h.byLord[id]?.liege??null;}
 function note(g,r,id,message){const s=initVassalCourts(g);s.history.unshift({realm:r,person:id,turn:g.turn,message});s.history=s.history.slice(0,160);if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}}
 function local(g,r,id){return Object.entries(g.politics.holdings).filter(([k,h])=>h.realm===r&&h.lord===id&&g.provinces[k]?.owner===r&&controller(g,k)===r);}
 function eligible(g,p){return p&&p.age>=18&&free(g,p.id)&&p.id!==g.politics.realms[p.realm]?.ruler;}
