@@ -21,3 +21,23 @@ test('legacy agency migrates and prunes dead records',()=>{const g=start(),r=hea
 import {effectiveCharacterSkill} from '../src/character-agency.js';
 import {armyReadiness} from '../src/military-systems.js';
 test('poor health and severe stress reduce performed skill without altering trained attributes',()=>{const g=start(),p=add(g,'sick-commander',{skills:{martial:5},civic:{stress:90}});g.living.health[p.id]={condition:'illness',severity:75};assert.equal(effectiveCharacterSkill(g,p,'martial'),2);assert.equal(p.skills.martial,5);g.living.health[p.id].severity=0;p.civic.stress=0;assert.equal(effectiveCharacterSkill(g,p,'martial'),5);});
+
+test('invalid personal dilemmas disappear immediately and void without punishing a former ruler',()=>{
+ const g=start(),r=head(g),a=add(g,'departing-petitioner'),b=add(g,'remaining-disputant');r.age=35;
+ const root=initAgency(g);root.dilemmas.departure={id:'departure',actor:a.id,target:b.id,recipient:r.id,realm:'england',kind:'rivalry',status:'pending',deadline:9};
+ assert.equal(personalDilemmas(g,r.id).length,1);
+ a.realm='france';
+ assert.equal(personalDilemmas(g,r.id).length,0);
+ assert.equal(resolvePersonalDilemma(g,'departure','decline').ok,false);
+ g.turn=1;tickAgency(g);
+ assert.equal(root.dilemmas.departure.status,'void');
+ assert.ok(!root.history.some(x=>x.person===a.id&&x.text==='An unanswered personal petition lapsed.'));
+ const copy=restoreGame(snapshot(g),world);
+ assert.equal(copy.agency.dilemmas.departure.status,'void');
+});
+test('valid but unanswered personal dilemmas still lapse with political consequences',()=>{
+ const g=start(),r=head(g),a=add(g,'waiting-petitioner'),b=add(g,'waiting-disputant');r.age=35;
+ const root=initAgency(g);root.dilemmas.waiting={id:'waiting',actor:a.id,target:b.id,recipient:r.id,realm:'england',kind:'rivalry',status:'pending',deadline:0};
+ g.turn=1;tickAgency(g);assert.equal(root.dilemmas.waiting.status,'lapsed');
+ assert.ok(root.history.some(x=>x.person===a.id&&x.text==='An unanswered personal petition lapsed.'));
+});
