@@ -1,3 +1,4 @@
+import {effectiveCharacterSkill} from './character-agency.js';
 import {humanControlsRealm,humanControlsCharacter} from './player-career.js';
 import {roleplayModifiers} from './roleplay-systems.js';
 import {courtModifiers} from './royal-court.js';
@@ -69,7 +70,7 @@ function defense(g,r){const v=security(g,r),sp=free(g,g.politics.realms[r]?.coun
 export function plotOdds(g,p){
  const r=p.actor?free(g,p.actor):ruler(g,p.realm),target=live(g,p.target),sp=free(g,g.politics.realms[p.realm]?.council?.spymaster);if(!r||!target)return {chance:0,exposure:100};
  const agents=(p.agents||[]).filter(id=>free(g,id)&&g.politics.people[id].realm===p.realm),power=agents.reduce((n,id)=>n+(g.politics.people[id].skills?.intrigue||1)*3,0),security=defense(g,target.realm),category=plotCategory(p.kind),preparation=cap(p.preparation||0,-20,25);
- const chance=category==='personal'?45+(r.skills?.diplomacy||1)*6+personalOpinion(g,r.id,target.id)*.25+power*.5+preparation:35+(r.skills?.intrigue||1)*5+(sp?.skills.intrigue||1)*3+power-security+courtModifiers(g,p.realm).scheme+roleplayModifiers(g,p.realm).scheme+preparation+(p.kind==='investigate'?18:p.kind==='assassinate'?-12:0);
+ const chance=category==='personal'?45+effectiveCharacterSkill(g,r,'diplomacy')*6+personalOpinion(g,r.id,target.id)*.25+power*.5+preparation:35+effectiveCharacterSkill(g,r,'intrigue')*5+(sp?.skills.intrigue||1)*3+power-security+courtModifiers(g,p.realm).scheme+roleplayModifiers(g,p.realm).scheme+preparation+(p.kind==='investigate'?18:p.kind==='assassinate'?-12:0);
  const approach=SCHEME_APPROACHES[p.approach];
  return {chance:Math.round(cap(chance+(approach?.chance||0),8,90)),exposure:Math.round(cap((category==='personal'?10+Math.max(0,-personalOpinion(g,r.id,target.id))*.3:20+security+agents.length*5-(sp?.skills.intrigue||1)*4)+(p.discoveredAt!==undefined?15:0)+(approach?.exposure||0),8,85))};
 }
@@ -172,8 +173,7 @@ function autonomousScheme(g,r){
  const actor=people.filter(p=>!humanControlsCharacter(g,p.id)&&p.wealth>=80&&(p.traits||[]).some(t=>['ambitious','deceitful','gregarious','wrathful'].includes(t))).sort((a,b)=>(b.skills?.intrigue||0)-(a.skills?.intrigue||0)||a.id.localeCompare(b.id))[0];
  if(!actor)return;const peers=people.filter(p=>p.id!==actor.id),rival=peers.filter(p=>personalOpinion(g,actor.id,p.id)<=-25&&localHoldings(g,r,p.id).length).sort((a,b)=>personalOpinion(g,actor.id,a.id)-personalOpinion(g,actor.id,b.id)||a.id.localeCompare(b.id))[0];
  const target=rival||peers.filter(p=>eligibleTarget(g,r,actor,p,'befriend')).sort((a,b)=>personalOpinion(g,actor.id,b.id)-personalOpinion(g,actor.id,a.id)||a.id.localeCompare(b.id))[0];
- if(!target)return;const kind=rival?'undermine':'befriend',cost=kind==='undermine'?70:50;actor.wealth-=cost;
- const id='p'+s.next++;s.plots[id]={id,realm:r,actor:actor.id,target:target.id,targetRealm:r,kind,category:plotCategory(kind),agents:[],started:g.turn,due:g.turn+PLOTS[kind].months,status:'active',autonomous:true};
+ if(!target)return;const kind=rival?'undermine':'befriend';startPersonalScheme(g,actor.id,target.id,kind);
 }
 export function tickIntrigue(g,world,removeCharacter){const s=initIntrigue(g);if(s.lastTick===g.turn)return;s.lastTick=g.turn;for(const p of Object.values(s.plots)){if(p.status==='active'&&g.turn>=p.due)finish(g,world,p,removeCharacter);else if(p.status==='active')checkDiscovery(g,p,s);else if(p.ended!==undefined&&g.turn-p.ended>60)delete s.plots[p.id];}
  for(const [id,h] of Object.entries(s.hooks))if(h.expires<=g.turn||!live(g,h.person))delete s.hooks[id];

@@ -102,3 +102,6 @@ export function playerLifeAction(g,actorId,action,target){const p=live(g,actorId
  else return no('Unknown personal action.');x.lastPlayerAction=g.turn;return ok('Personal action completed.');}
 function reviewChosenGoal(g,p){const x=record(g,p.id),q=personalGoalStatus(g,p);if(!q||q.status!=='active')return;if(q.kind==='friend'&&!live(g,q.target)?.alive){x.chosenGoal.status='failed';return;}if(q.progress>=q.required){x.chosenGoal.status='completed';x.chosenGoal.ended=g.turn;x.goals['player:'+q.kind]=1;x.influence=cap(x.influence+8,0,100);stress(p,-8);note(g,p,p.name+' fulfilled '+q.label+'.','goal',q.target||null);}}
 export function personalPoliticalSupport(g,person,liege){const a=g.agency?.people?.[person]?.bonds?.[liege];return a?cap((num(a.trust)-num(a.grievance))*.08,-8,8):0;}
+
+// Health and stress modify performed work, never the underlying trained skill.
+export function effectiveCharacterSkill(g,p,skill){if(!p?.alive)return 1;const base=cap(num(p.skills?.[skill])||1,1,5),severity=num(g.living?.health?.[p.id]?.severity),stressValue=num(p.civic?.stress);return Math.max(1,base-Math.floor(severity/35)-(stressValue>=85?1:0));}
