@@ -1,3 +1,4 @@
+import {regionalDecision,AMBITIONS,currentChain,relationshipList,personalOpinion} from './chronicle-systems.js';
 import {temperament,strategicPlan,threatAssessment,borderRealms,militaryStrength,defenseSupport} from './strategic-ai.js';
 import {occupation,controller} from './campaign-war.js';
 import {SHIPS,fleetStats,fleetDestinations,blockadeTargets,portBlocked,embarked,navalUpkeep} from './naval-systems.js';
@@ -194,4 +195,17 @@ export function renderStrategy(g,world,esc){
  for(const p of Object.values(s.pacts).filter(p=>p.members.includes(realm)&&p.expires>g.turn))html+='<div class="rule"><b>'+esc(p.members.filter(id=>id!==realm).map(name).join(', '))+' · Against '+esc(name(p.target))+'</b><div class="smallnote">'+Math.max(0,p.expires-g.turn)+' months remaining · Combined reserve support '+defenseSupport(g,realm,p.target)+'</div>'+btn('leave',p.id,'Dissolve pact')+'</div>';
  html+=section('FOREIGN RULERS');for(const f of others){const p=strategicPlan(g,f.id),t=temperament(g,f.id);html+='<details class="rule"><summary>'+esc(f.name)+' · '+esc(t.name)+'</summary><p class="paragraph">Objective: '+esc(p?.goal||'unassessed')+(p?.target?' · '+esc(name(p.target)):'')+'</p><div class="smallnote">Aggression '+t.aggression+' · Prudence '+t.prudence+' · Commerce '+t.commerce+' · Diplomacy '+t.diplomacy+'</div></details>';}
  return html;
+}
+
+export function renderStories(g,world,esc){
+ const realm=g.player,s=g.chronicles.realms[realm],r=g.politics.people[g.politics.realms[realm].ruler],d=regionalDecision(g,realm);
+ const btn=(action,id,label,input='')=>'<button class="rowbtn" data-action="story" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ let html=section('REGIONAL DECISION')+'<div class="rule"><h3>'+esc(d[0])+'</h3><p class="paragraph">'+esc(d[1])+'</p><div class="smallnote">180g · '+Math.max(0,36-g.turn+s.decisionAt)+' months cooldown remaining</div>'+btn('decision','','Enact decision')+'</div>';
+ html+=section('PERSONAL AMBITIONS');
+ if(s.ambition){const a=AMBITIONS[s.ambition.id];html+='<div class="rule"><h3>'+esc(a.name)+'</h3><p class="paragraph">'+esc(a.desc)+'</p><div class="smallnote">Reward: '+a.reward+' prestige and dynastic renown, 6 legitimacy.</div>'+btn('abandon','','Abandon ambition (-5 prestige)')+'</div>';}else for(const [id,a] of Object.entries(AMBITIONS)){if(s.completed.some(x=>x.ambition===id&&x.ruler===r.id))continue;html+='<div class="rule"><b>'+esc(a.name)+'</b><p class="paragraph">'+esc(a.desc)+'</p>'+btn('ambition',id,'Choose ambition')+'</div>';}
+ html+=section('FRIENDS AND RIVALS');const people=Object.values(g.politics.people).filter(p=>p.alive&&p.realm===realm&&p.age>=18&&p.id!==r.id);
+ html+='<p class="paragraph">Personal opinions influence council votes and provincial lord loyalty.</p><select class="select" id="story-person">'+people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+' · opinion '+personalOpinion(g,r.id,p.id)+'</option>').join('')+'</select>'+btn('befriend','','Offer friendship (90g)','story-person')+btn('challenge','','Challenge courtier','story-person');
+ for(const x of relationshipList(g,realm).filter(x=>g.politics.people[x.other]?.alive).sort((a,b)=>b.opinion-a.opinion))html+='<div class="rule"><b>'+esc(g.politics.people[x.other].name)+'</b><div class="smallnote">'+esc(x.kind)+' · Opinion '+x.opinion+'</div></div>';
+ html+=section('ONGOING STORIES');const x=currentChain(g);if(x){html+='<div class="rule"><h3>'+esc(x.name)+' · '+(x.stage+1)+'/3</h3><b>'+esc(x.title)+'</b><p class="paragraph">'+esc(x.desc)+'</p>'+(x.target&&g.politics.people[x.target]?'<p class="paragraph">Courtier: '+esc(g.politics.people[x.target].name)+'</p>':'')+(g.turn>=x.due?x.choices.map((ch,i)=>btn('chain',i,ch[0]+(ch[1]?' ('+ch[1]+'g)':''))).join(''):'<div class="smallnote">Next stage in '+(x.due-g.turn)+' months</div>')+'</div>';}else html+='<p class="paragraph">No active storyline. Succession, noble discontent, disasters, trade and rivalries may trigger new stories.</p>';
+ html+=section('COURT CHRONICLE')+g.chronicles.history.filter(x=>x.realm===realm).slice(0,20).map(x=>'<div class="rule"><div class="smallnote">'+esc(x.message)+'</div></div>').join('');return html;
 }
