@@ -220,7 +220,7 @@ el('export-save').addEventListener('click',exportSave);
 el('save-game').addEventListener('click',save);
 function restorePage(entry){tab=entry.tab;if(entry.character&&game?.politics?.people?.[entry.character])openCharacter(entry.character,false);else navigateTab(entry.tab,entry.section,false);}
 el('nav-back').addEventListener('click',()=>restorePage(pageHistory.back()));el('nav-forward').addEventListener('click',()=>restorePage(pageHistory.forward()));
-el('game-speed').addEventListener('change',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=setInterval(advanceWithInvasions,speedDelay(el('game-speed').value));}});
+el('game-speed').addEventListener('change',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=setInterval(()=>{if(!game||battle)return;advanceWithInvasions();},speedDelay(el('game-speed').value));}});
 el('next-month').addEventListener('click',advanceWithInvasions);
 el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceWithInvasions();},speedDelay(el('game-speed').value));el('auto-time').textContent='Ⅱ';message('Time is running');}});
 el('focus-capital').addEventListener('click',()=>{if(game){const seat=capitalDistrict(world,game.player,game.provinces);if(seat){selected=seat.id;map.select(selected);map.focus(...staticById[selected].centroid,3.2);renderInspector();}}});
