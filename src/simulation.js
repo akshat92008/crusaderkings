@@ -1,7 +1,7 @@
 import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison} from './border-battle.js';
 import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
-import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
+import {nonAggression,aidStrength,diplomaticSupport,mayEnterWithAccess} from './diplomacy-systems.js';
 import {campaignWorld} from './independence-systems.js';
 import {captureCommander} from './feudal-systems.js';
 import {strategicTargetScore,raidThreshold,defenseSupport,localCampaignForces,recordStrategicBattle} from './strategic-ai.js';
@@ -96,13 +96,26 @@ export function recruit(g,provinceId,type='infantry'){
 export function isAdjacent(world,src,dst){return !!world.provinces.find(p=>p.id===src)?.neighbors?.includes(dst);}
 export function startMarch(g,world,fromId,toId){
  const src=g.provinces[fromId],target=g.provinces[toId];
- if(!src||!target||controller(g,fromId)!==g.player)return {ok:false,msg:'Select an owned province to march from'};
+ if(!src||!target)return {ok:false,msg:'Select two valid provinces.'};
  if(fromId===toId)return {ok:false,msg:'Choose another province'};
  if(!isAdjacent(world,fromId,toId))return {ok:false,msg:'Armies can currently move only to connected provinces'};
  const forces=armiesAt(g,fromId,g.player).filter(a=>armySize(a)>0).sort((a,b)=>armySize(b)-armySize(a)||a.id.localeCompare(b.id)),army=forces[0],total=forces.reduce((n,a)=>n+armySize(a),0);
  if(!army||total<20)return {ok:false,msg:'No field army here. Recruit soldiers first.'};
- if(controller(g,toId)===g.player){for(const a of forces){onArmyMarch(g,a);a.province=toId;}makeLog(g,`${total} troops marched to ${toId}.`);return {ok:true,type:'move',msg:total+' troops moved'};}
- const opponent=controller(g,toId);if(occupation(g,toId)&&opponent!==target.owner&&target.owner!==g.player)return {ok:false,msg:'Cannot attack a third-party occupation without formal war.'};
+ const home=controller(g,fromId)===g.player,fromAccess=mayEnterWithAccess(g,g.player,fromId);
+ if(!home&&!fromAccess)return {ok:false,msg:'Movement requires controlled territory or active military passage.'};
+ const opponent=controller(g,toId),access=mayEnterWithAccess(g,g.player,toId);
+ if(opponent===g.player||access){
+  for(const a of forces){
+   onArmyMarch(g,a);
+   if(access)a.passage??={home:fromId};
+   else delete a.passage;
+   a.province=toId;
+  }
+  makeLog(g,`${total} troops marched to ${toId}.`);
+  return {ok:true,type:'move',msg:total+' troops moved'};
+ }
+ if(fromAccess)return {ok:false,msg:'Military passage permits transit. Launch attacks from your own controlled territory.'};
+ if(occupation(g,toId)&&opponent!==target.owner&&target.owner!==g.player)return {ok:false,msg:'Cannot attack a third-party occupation without formal war.'};
  if(nonAggression(g,g.player,opponent)||hasTruce(g,g.player,opponent))return {ok:false,msg:'A peace treaty bars this attack.'};
  if(['alliance','marriage'].includes(g.factions[g.player].treaties[opponent]))return {ok:false,msg:'Cannot attack an allied realm'};
  const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));

@@ -10,7 +10,7 @@ import {currentExpandedEvents} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
 import {expandedAction} from './expanded-content.js';
 import {livingAction} from './living-systems.js';
-import {diplomacyAction} from './diplomacy-systems.js';
+import {diplomacyAction,mayEnterWithAccess} from './diplomacy-systems.js';
 import {governmentAction} from './government-institutions.js';
 import {intrigueAction} from './intrigue-systems.js';
 import {campaignWorld} from './independence-systems.js';
@@ -131,7 +131,14 @@ function renderInspector(){if(!game)return;let p=staticById[selected],state=game
  text+='<details class="province-section" data-section="lord"><summary>Local lord & vassal contract</summary>'+renderProvinceLord(game,world,selected,esc)+'</details><details class="province-section" data-section="connections"><summary>Economy, titles & claims</summary>'+renderProvinceConnections(game,world,selected,esc)+'</details>';const local=game.civic?.provinces[selected];
  if(own){const recruitButtons=['infantry','archers','cavalry'].map(t=>{const q=recruitmentQuote(game,selected,t);return '<button data-action="recruit" data-type="'+t+'" '+(player().treasury<q.cost?'disabled':'')+'>'+t.charAt(0).toUpperCase()+t.slice(1)+'<small>'+fmt(q.count)+' troops · '+fmt(q.cost)+' gold</small></button>';}).join('');
  text+=`<p class="paragraph">${yourArmy?`${fmt(localTroops)} troops stationed here · ${yourArmies.length} armies. All local troops march together.`:'No army stationed here.'}</p><button class="btnblock" data-action="march" ${!yourArmy||localTroops<20?'disabled':''}>Move or attack</button>${yourArmy?'<details class="province-section" data-section="command" open><summary>Army & commander</summary>'+yourArmies.map(a=>'<div class="rule"><b>'+fmt(armySize(a))+' troops</b>'+renderArmyCommand(game,a,esc,'province')+'</div>').join('')+'</details>':''}<details class="province-section" data-section="recruit"><summary>Recruit troops</summary><div class="building-grid">${recruitButtons}</div></details><details class="province-section" data-section="build"><summary>Improve province</summary><div class="building-grid">${Object.entries(BUILDINGS).map(([kind,b])=>{const level=state.buildings[kind],cost=Math.round(b.cost*(level+1)*civicModifiers(game,game.player).build*economyModifiers(game,game.player).cost);return '<button data-action="build" data-type="'+kind+'" '+(level>=3||player().treasury<cost?'disabled':'')+'>'+esc(b.icon)+' '+esc(b.name)+'<small>Level '+level+' / 3 · '+(level>=3?'Complete':fmt(cost)+' gold')+'</small></button>';}).join('')}</div></details>`;
- }else{text+=`<div class="sectiontitle">FOREIGN TERRITORY</div><p class="paragraph">To invade, select a neighboring owned province with a field army and choose <strong>Issue March / Attack Order</strong>. Then select this province on the world map.</p><button class="btnblock secondary" data-action="show-diplomacy" data-target="${state.owner}">✦ DIPLOMATIC OPTIONS</button>`;}
+ }else{
+  text+='<div class="sectiontitle">FOREIGN TERRITORY</div>';
+  if(mayEnterWithAccess(game,game.player,selected)){
+   text+='<p class="paragraph">Military passage is active. This district can be crossed with a field army.</p>';
+   if(yourArmy)text+='<button class="btnblock" data-action="march" '+(localTroops<20?'disabled':'')+'>Continue march · '+fmt(localTroops)+' troops</button>';
+  }
+  text+='<button class="btnblock secondary" data-action="show-diplomacy" data-target="'+esc(state.owner)+'">✦ DIPLOMATIC OPTIONS</button>';
+ }
  text+=`<details class="province-section" data-section="details"><summary>Province details</summary>${local?'<div class="rule"><b>'+esc(local.culture)+'</b><p class="paragraph">'+esc(local.faith)+' · '+fmt(local.acceptance)+'% acceptance</p></div>':''}<div class="sectiontitle">ADJACENT PROVINCES</div><p class="paragraph">${p.neighbors.length} connected land provinces. ${p.neighbors.filter(n=>game.provinces[n].owner!==state.owner).length} under foreign control.${p.landComponentSize===1?' No land route: use an available naval route where possible.':p.landComponentSize?' Land network: '+p.landComponentSize+' districts.':''}</p><div class="divider"></div><p class="paragraph">${p.ownershipSource?`Starting ownership: ${esc(p.ownershipSource)}.${p.historicalPolity?' Reference polity: '+esc(p.historicalPolity)+'.':''}${p.referenceInherited?' Inherited from the parent gameplay district.':''}${Number.isFinite(p.referenceSamples)&&p.referenceSamples>0&&p.historicalPolity?' Sample agreement: '+p.referenceMatches+'/'+p.referenceSamples+' points.':''} `:''}${p.nameSource?' Geographic name, not a historical county title.':''} Gameplay districts are approximate, not verified historical counties.</p></details></div>`;
  const panel=el('province-panel'),sameProvince=panel.dataset.province===selected,hadCommand=!!panel.querySelector('[data-section="command"]'),open=sameProvince?[...panel.querySelectorAll('details[open]')].map(d=>d.dataset.section):[];panel.dataset.province=selected;panel.innerHTML=text;for(const d of panel.querySelectorAll('details'))d.open=open.includes(d.dataset.section)||d.dataset.section==='command'&&(!sameProvince||!hadCommand);
 }
@@ -231,7 +238,7 @@ el('tab-content').addEventListener('change',e=>{if(e.target.id==='people-scope'|
 document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selected=Number(unit.dataset.unit);battle.report();return;}
  const btn=e.target.closest('[data-action]');if(!btn||!game)return;const action=btn.dataset.action,type=btn.dataset.type;
  if(action==='pin'){clickResult(toggleCampaignPin(game,type,btn.dataset.id));return;}
- if(action==='march'){setDrawer(null);marchFrom=selected;map.setMarchOrigin(selected);el('cancel-march').hidden=false;el('map-target-help').textContent='⚔ SELECT ADJACENT DESTINATION';message('Highlighted land neighbors: green for friendly territory, amber for foreign territory. Treaties may restrict attacks.');}
+ if(action==='march'){setDrawer(null);marchFrom=selected;map.setMarchOrigin(selected);el('cancel-march').hidden=false;el('map-target-help').textContent='⚔ SELECT ADJACENT DESTINATION';message('Choose an adjacent district. Foreign territory may allow transit or lead to a battle, depending on treaties.');}
  if(action==='recruit')clickResult(recruit(game,selected,type));
  if(action==='build')clickResult(build(game,selected,type));
  if(['gift','alliance','insult','trade','marriage'].includes(action))clickResult(negotiate(game,diplomaticTarget,action,world));

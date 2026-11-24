@@ -1,8 +1,8 @@
 import {characterInfluence,characterAgenda} from './character-agency.js';
 import {regencyView,regentCandidates} from './regency-systems.js';
-import {successionCandidates,electionView} from './succession-systems.js';
+import {successionCandidates,electionView,crownExclusionTerms,crownExcluded} from './succession-systems.js';
 import {renderPinButton} from './campaign-outliner.js';
-import {feudalHierarchy,obligationProfile} from './feudal-obligations.js';
+import {feudalHierarchy,obligationProfile,EXEMPTION_COOLDOWN} from './feudal-obligations.js';
 import {estateDisputes} from './estate-conflicts.js';
 import {vassalCourt,vassalLiege,pendingVassalPetitions} from './vassal-courts.js';
 import {marriageTerms,activeMarriageLinks,dynasticClaimOptions} from './dynastic-ties.js';
@@ -11,12 +11,12 @@ import {AUTHORITY,authorityLevel,politicalEstates,authorityModifiers} from './re
 import {civilWarForces} from './political-conflict.js';
 import {COUNCIL_TASKS,councilTaskTargets} from './council-tasks.js';
 import {characterDirectory,vassalDirectory,portraitMark} from './campaign-hud.js';
-import {successionPreview} from './dynastic-politics.js';
+import {successionPreview,activeBetrothal,betrothalCandidates} from './dynastic-politics.js';
 import {characterContext,campaignLinks,characterLink,provinceLink,sectionLink,contextualButton,realmWarContext} from './campaign-context.js';
 import {COURT_OFFICES,courtCandidates,courtModifiers} from './royal-court.js';
 import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
-import {nonAggression,guaranteePartners,aidOptions,aidStrength} from './diplomacy-systems.js';
+import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
@@ -119,7 +119,8 @@ function renderPolitics(g,esc){
  for(const [role,d] of Object.entries(COURT_OFFICES)){const o=offices[role],field='household-'+role,opts=courtCandidates(g,g.player,role);html+='<div class="rule"><b>'+esc(d.name)+'</b><p class="paragraph">'+esc(d.description)+' · '+d.salary+'g per quarter</p>'+(o?'<div class="smallnote">'+show(person(o.person))+'</div>'+button('court-dismiss',role,'Dismiss'):(opts.length?'<select class="select" id="'+field+'">'+opts.map(c=>'<option value="'+esc(c.id)+'">'+option(c)+' · '+esc(d.skill)+' '+c.skills[d.skill]+'</option>').join('')+'</select>'+button('court-appoint',role,'Appoint ('+(d.salary+40)+'g)','',''+field):'<div class="smallnote">No eligible unassigned adult.</div>'))+'</div>';}html+='</details>';
  html+=section('VASSAL CONTRACTS')+'<p class="paragraph">Tax yield '+Math.round(politicalRevenue(g,g.player)*100)+'% · recruitment yield '+Math.round(politicalLevy(g,g.player)*100)+'%. Raising obligations reduces loyalty.</p>';
  for(const [id,v] of vassals){html+='<div class="rule"><h3>'+esc(id.toUpperCase())+' · '+show(person(v.lord))+'</h3><div class="smallnote">Loyalty '+Math.round(v.loyalty)+'% · Wealth '+Math.round(v.wealth)+'g</div>';
- for(const kind of ['tax','levy','autonomy'])html+='<div class="smallnote">'+kind+': '+['Low','Standard','High'][v[kind]]+'</div>'+[0,1,2].filter(n=>n!==v[kind]).map(n=>button(kind,id,'Set '+kind+' '+['low','standard','high'][n],n)).join('');
+ for(const kind of ['tax','levy','autonomy'])html+='<div class="smallnote">'+kind+': '+(v.exemptions?.[kind]?'Exempt':['Low','Standard','High'][v[kind]])+'</div>'+(v.exemptions?.[kind]?'':[0,1,2].filter(n=>n!==v[kind]).map(n=>button(kind,id,'Set '+kind+' '+['low','standard','high'][n],n)).join(''));
+ html+=renderEstateCharter(g,v,(type,label,extra)=>button(type,id,label,extra));
  html+=button('gift',id,'Send gift (100g)')+button('replace',id,'Revoke and appoint (10 legitimacy)')+(v.loyalty<45?button('concede',id,'Negotiate concession (150g)'):'')+'</div>';}
  html+=section('POLITICAL SITUATIONS');const situations=Object.values(p.situations).filter(x=>x.realm===g.player);html+=situations.length?situations.map(x=>'<div class="rule"><b>'+esc(x.phase.toUpperCase())+' · '+esc(x.province)+'</b><p class="paragraph">'+show(person(x.lord))+' opposes royal authority. Negotiate or risk unrest.</p></div>').join(''):'<p class="paragraph">No active vassal grievances.</p>';
  return html;
@@ -318,6 +319,11 @@ export function renderDiplomaticAgreements(g,other,esc){
  let html='<details class="rule"><summary>Treaties and allied support</summary>';const links=activeMarriageLinks(g,r,other);if(links.length)html+='<p class="smallnote">Living dynastic ties: '+links.map(x=>characterLink(g.politics.people[x.a],esc)+' × '+characterLink(g.politics.people[x.b],esc)).join(', ')+'</p>';
  html+=nonAggression(g,r,other)?'<p class="paragraph">Non-aggression agreement active.</p>'+btn('break',other,'Repudiate agreement (prestige and legitimacy penalty)'):btn('pact',other,'Non-aggression agreement (80g)');
  html+=btn('guarantee',other,'Guarantee independence (100g)');
+ const access=militaryAccess(g,r,other),accessReason=militaryAccessTerms(g,r,other);
+ html+='<div class="rule"><b>Military passage</b><p class="smallnote">Transit uses the army’s own supplies. Visiting armies withdraw when passage ends.</p>'
+  +(access?'<p class="smallnote">Access remains open for '+(access.until-g.turn)+' months.</p>'
+   :accessReason?'<p class="smallnote">'+esc(accessReason)+'</p>':btn('access',other,'Request military passage (90g)'))
+  +'</div>';
  for(const p of Object.values(d.guarantees).filter(x=>x.protected===r||x.guarantor===r))html+='<div class="smallnote">'+esc(name(p.guarantor))+' guarantees '+esc(name(p.protected))+' · '+Math.max(0,p.until-g.turn)+' months</div>';
  for(const w of Object.values(g.conflict.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(r))){const enemy=w.attacker===r?w.defender:w.attacker,ids=aidOptions(g,r,w),field='aid-'+w.id;html+='<div class="rule"><b>War with '+esc(name(enemy))+'</b><div class="smallnote">Allied logistical support '+aidStrength(g,r,enemy)+' · abstract campaign strength, not allied field units.</div>';if(ids.length)html+='<select class="select" id="'+field+'">'+ids.map(id=>'<option value="'+esc(id)+'">'+esc(name(id))+'</option>').join('')+'</select>'+btn('aid',w.id,'Request allied aid',field);html+='</div>';}
  return html+'</details>';
@@ -346,6 +352,31 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
  h+=section('PERSONAL RESOURCES')+'<div class="statlist">'+stat('Personal wealth',fmt(p.wealth||0)+'g')+stat('Influence',characterInfluence(g,p.id)+'/100')+stat('Ambition',esc(characterAgenda(g,p.id)||'Not yet established'))+'</div>';if(x.own&&x.canServe&&p.id!==s.ruler&&g.politics.people[s.ruler].age>=18)h+='<div class="rule">'+btn('politics','personal-gift',p.id,'Personal gift (40 personal gold)')+btn('politics','personal-patronage',p.id,'Sponsor patronage (120 treasury gold)')+btn('politics','personal-rebuke',p.id,'Public rebuke (5 influence)')+'<p class="smallnote">Personal actions have a shared yearly cooldown and affect political relationships.</p></div>';
  if(p.id!==s.ruler)h+='<p class="paragraph">Opinion of your ruler: '+personalOpinion(g,s.ruler,p.id)+'</p>';
  h+=section('FAMILY')+(x.family.length?x.family.map(y=>'<div class="rule"><small>'+esc(y.relation)+'</small> '+link(y.id)+'</div>').join(''):'<p class="paragraph">No recorded close relatives.</p>');
+ const promise=activeBetrothal(g,id);
+ if(promise){
+  h+='<div class="rule"><b>Betrothed to</b> '+link(promise.a===id?promise.b:promise.a)
+   +'<p class="smallnote">The wedding takes place when both are adults, the courts agree, and the sponsoring realm can pay 180 gold.</p>'
+   +(x.own?btn('politics','break-betrothal',id,'Break betrothal')+(promise.partner!==promise.sponsor?'<p class="smallnote">Breaking the promise costs 15 relations with the other court.</p>':''):'')+'</div>';
+ }else if(x.own&&p.age<18&&p.alive){
+  const options=betrothalCandidates(g,g.player,id);
+  if(options.length){
+   const field='profile-betrothal',willing=options.filter(o=>o.accepted);
+   h+='<details class="rule"><summary>Arrange betrothal</summary><p class="smallnote">The promise reserves this match. A diplomatic marriage tie begins at the wedding.</p>'
+    +(willing.length?'<label for="'+field+'" class="smallnote">Choose a royal match</label><select class="select" id="'+field+'">'
+      +willing.map(o=>'<option value="'+esc(o.id)+'">'+esc(g.politics.people[o.id].name)+' · '+esc(g.factions[o.realm].name)+'</option>').join('')
+      +'</select>'+btn('politics','betroth',id,'Arrange betrothal (60g)','',field)
+     :'<p class="smallnote">No eligible court currently accepts the match.</p>')+'</details>';
+  }
+ }
+ const crown=x.own?crownExclusionTerms(g,g.player,id):null;
+ if(crown){
+  h+='<details class="rule"><summary>Crown succession rights</summary><p class="smallnote">'
+   +(crown.excluded?'This character is excluded from crown succession.':'This character is eligible to inherit the crown.')
+   +' Children retain their own inheritance rights. Requires 55 legitimacy and council approval where applicable.</p>'
+   +btn('politics',crown.excluded?'restore-inheritance':'disinherit',id,
+    (crown.excluded?'Restore rights':'Disinherit from the crown')+' ('+crown.prestige+' prestige, '+crown.legitimacy+' legitimacy)')
+   +'</details>';
+ }
  const seniorTitles=x.titles.filter(t=>t.tier!=='province');
  if(seniorTitles.length){
   h+=section('TITLES')+seniorTitles.map(t=>'<div class="rule"><b>'+esc(t.name)+'</b><div class="smallnote">'+(t.tier==='crown'?'Crown title':'Regional title')+'</div></div>').join('');
@@ -362,14 +393,44 @@ export function renderCharacter(g,world,id,esc){const x=characterContext(g,id);i
  if(!x.own){h+=section('FOREIGN RELATIONS')+'<button class="rowbtn" data-action="show-diplomacy" data-target="'+esc(p.realm)+'">Open diplomacy with '+esc(g.factions[p.realm]?.name||p.realm)+'</button>';return h;}
  if(!x.canServe)return h;
  h+=section('AVAILABLE ACTIONS');
- if(!p.spouse){const opts=marriageCandidates(g,g.player).filter(m=>m.a===p.id),field='profile-spouse';h+='<details class="rule" open><summary>Arrange marriage</summary>'+(opts.length?'<select class="select" id="'+field+'">'+opts.map(m=>'<option value="'+esc(m.b)+'">'+esc(m.label)+(m.realm!==g.player?' · '+(marriageTerms(g,p,g.politics.people[m.b]).accepted?'willing':'not willing'):'')+'</option>').join('')+'</select>'+btn('politics','marry',id,'Celebrate wedding (180g)','',field):'<p class="paragraph">No eligible royal match.</p>')+'</details>';}
+ if(!p.spouse&&!promise){const opts=marriageCandidates(g,g.player).filter(m=>m.a===p.id),field='profile-spouse';h+='<details class="rule" open><summary>Arrange marriage</summary>'+(opts.length?'<select class="select" id="'+field+'">'+opts.map(m=>'<option value="'+esc(m.b)+'">'+esc(m.label)+(m.realm!==g.player?' · '+(marriageTerms(g,p,g.politics.people[m.b]).accepted?'willing':'not willing'):'')+'</option>').join('')+'</select>'+btn('politics','marry',id,'Celebrate wedding (180g)','',field):'<p class="paragraph">No eligible royal match.</p>')+'</details>';}
  const armies=Object.values(g.armies).filter(a=>a.owner===g.player&&!embarked(g,a.id)&&commanderCandidates(g,a.id).some(c=>c.id===id));if(armies.length){const field='profile-army';h+='<details class="rule" open><summary>Military command</summary><select class="select" id="'+field+'">'+armies.map(a=>'<option value="'+esc(a.id)+'">'+fmt(a.infantry+a.archers+a.cavalry)+' troops · '+esc(world.provinces.find(q=>q.id===a.province)?.name||a.province)+'</option>').join('')+'</select><button class="rowbtn" data-action="profile-command" data-id="'+esc(id)+'" data-input="'+field+'">Appoint as commander</button></details>';}
  const eligibleCouncil=p.id!==s.ruler&&!Object.values(s.council).includes(id)&&!Object.values(g.royalCourt?.realms?.[g.player]?.offices||{}).some(o=>o.person===id);
  if(eligibleCouncil)h+='<details class="rule"><summary>Appoint to council</summary>'+Object.entries(s.council).map(([role,person])=>'<p class="smallnote">'+esc(role)+' · Current: '+link(person)+'</p>'+btn('politics','appoint',role,'Appoint '+p.name+' (80g)',id)).join('')+'</details>';
  const offices=Object.entries(COURT_OFFICES).filter(([role])=>!g.royalCourt?.realms?.[g.player]?.offices?.[role]&&courtCandidates(g,g.player,role).some(c=>c.id===id));if(offices.length)h+='<details class="rule"><summary>Household offices</summary>'+offices.map(([role,d])=>'<p class="smallnote">'+esc(d.description)+' · '+d.salary+'g per quarter</p>'+btn('politics','court-appoint',role,d.name+' ('+(d.salary+40)+'g)',id)).join('')+'</details>';
  const titles=titleList(g,g.player).filter(t=>t.tier==='province'&&t.holder===s.ruler&&controller(g,t.province)===g.player&&id!==s.ruler);if(titles.length)h+='<details class="rule"><summary>Grant a crown holding</summary><select class="select" id="profile-title">'+titles.map(t=>'<option value="'+esc(t.id)+'">'+esc(world.provinces.find(q=>q.id===t.province)?.name||t.province)+'</option>').join('')+'</select><button class="rowbtn" data-action="profile-grant" data-id="'+esc(id)+'" data-input="profile-title">Grant selected holding</button></details>';
  return h;}
-export function renderProvinceLord(g,world,id,esc){const h=g.politics?.holdings?.[id],p=g.politics?.people?.[h?.lord];if(!h||!p)return '<p class="smallnote">No recorded local lord.</p>';const own=h.realm===g.player&&g.provinces[id]?.owner===g.player&&controller(g,id)===g.player,sovereign=g.politics.realms[h.realm]?.ruler===p.id,btn=(type,label,extra='')=>contextualButton('politics',type,id,label,esc,extra);let out='<div class="rule"><b>'+ (sovereign?'Crown holding':'Local lord')+'</b><p>'+characterLink(p,esc)+'</p><div class="smallnote">Loyalty '+fmt(h.loyalty)+'% · Wealth '+fmt(h.wealth)+'g</div>';if(own&&!sovereign){for(const key of ['tax','levy','autonomy'])out+='<div class="smallnote">'+esc(key)+': '+['Low','Standard','High'][h[key]]+'</div><div class="contract-options">'+[0,1,2].filter(n=>n!==h[key]).map(n=>btn(key,['Low','Standard','High'][n],n)).join('')+'</div>';out+=btn('gift','Send gift (100g)')+(h.loyalty<45?btn('concede','Negotiate concession (150g)'):'');}return out+'</div>';}
+function renderEstateCharter(g,holding,button){
+ const remaining=Math.max(0,(holding.lastCharter??-EXEMPTION_COOLDOWN)+EXEMPTION_COOLDOWN-g.turn);
+ let html='<details class="rule"><summary>Estate exemptions</summary><p class="smallnote">An exemption removes the estate’s tax or levy contribution and adds 22 loyalty. Revocation costs 10 legitimacy and 25 estate loyalty.</p>';
+ if(remaining)html+='<p class="smallnote">Charter amendments reopen in '+remaining+' months.</p>';
+ for(const [key,label] of [['tax','Tax'],['levy','Levy']]){
+  const active=Boolean(holding.exemptions?.[key]);
+  html+='<div class="smallnote">'+label+' exemption '+(active?'in effect':'available')+'</div>';
+  if(!remaining)html+=button(active?'charter-revoke':'charter-grant',(active?'Revoke ':'Grant ')+label.toLowerCase()+' exemption',key);
+ }
+ return html+'</details>';
+}
+
+export function renderProvinceLord(g,world,id,esc){
+ const h=g.politics?.holdings?.[id],p=g.politics?.people?.[h?.lord];
+ if(!h||!p)return '<p class="smallnote">No recorded local lord.</p>';
+ const own=h.realm===g.player&&g.provinces[id]?.owner===g.player&&controller(g,id)===g.player;
+ const sovereign=g.politics.realms[h.realm]?.ruler===p.id;
+ const btn=(type,label,extra='')=>contextualButton('politics',type,id,label,esc,extra);
+ let out='<div class="rule"><b>'+(sovereign?'Crown holding':'Local lord')+'</b><p>'+characterLink(p,esc)+'</p><div class="smallnote">Loyalty '+fmt(h.loyalty)+'% · Wealth '+fmt(h.wealth)+'g</div>';
+ if(own&&!sovereign){
+  const labels=['Low','Standard','High'];
+  for(const key of ['tax','levy','autonomy']){
+   const exempt=h.exemptions?.[key];
+   out+='<div class="smallnote">'+esc(key)+': '+(exempt?'Exempt':labels[h[key]])+'</div>';
+   if(!exempt)out+='<div class="contract-options">'+[0,1,2].filter(n=>n!==h[key]).map(n=>btn(key,labels[n],n)).join('')+'</div>';
+  }
+  out+=renderEstateCharter(g,h,btn);
+  out+=btn('gift','Send gift (100g)')+(h.loyalty<45?btn('concede','Negotiate concession (150g)'):'');
+ }
+ return out+'</div>';
+}
 export function renderCampaignHub(g,esc){const x=campaignLinks(g),r=g.politics?.people?.[x.ruler];return '<div class="rule campaign-hub"><h3>Your kingdom</h3><p>Sovereign: '+characterLink(r,esc)+'</p><div class="hub-links">'+sectionLink('dynasty','Dynasty & inheritance',esc)+sectionLink('council','Royal council',esc)+sectionLink('characters','Character finder',esc)+sectionLink('vassals',x.vassals+' vassals · '+x.disloyal+' disloyal holdings',esc)+sectionLink('military',x.armies+' armies · '+fmt(x.troops)+' troops',esc)+sectionLink('diplomacy','Foreign relations',esc)+sectionLink('political',realmWarContext(g).length+' active wars · Politics',esc,'WARS AND PEACE')+sectionLink('economy','Treasury & production',esc)+sectionLink('stories','Events & decisions',esc)+sectionLink('society','Culture & government',esc)+sectionLink('naval','Fleets & overseas travel',esc)+'</div></div>';}
 
 export function renderProvinceConnections(g,world,id,esc){const p=g.provinces[id],local=g.economy?.provinces?.[id];if(!p)return '';const owner=p.owner,our=owner===g.player&&controller(g,id)===g.player,btn=(type,label)=>contextualButton('conflict',type,id,label,esc);let out='';
@@ -385,7 +446,7 @@ export function renderProvinceConnections(g,world,id,esc){const p=g.provinces[id
 const portrait=(p,esc)=>{const a=portraitMark(p);return '<span class="portrait-mark" style="background:'+a.color+'">'+esc(a.initials)+'</span>';};
 const charCard=(p,esc,detail='')=>'<div class="person-row">'+portrait(p,esc)+'<div>'+characterLink(p,esc)+'<small>'+esc(detail||p.house||'')+'</small></div></div>';
 export function renderCharacterDirectory(g,esc,state){const rows=characterDirectory(g,state),skills=['martial','diplomacy','stewardship','intrigue','learning'];return section('CHARACTER FINDER')+'<div class="directory-controls"><input id="people-query" type="search" placeholder="Search people, houses or traits" aria-label="Search characters" value="'+esc(state.query)+'"><select id="people-scope" class="select" aria-label="Character scope">'+[['court','Your realm'],['family','Your dynasty'],['foreign','Foreign characters'],['all','All characters']].map(([id,n])=>'<option value="'+id+'" '+(state.scope===id?'selected':'')+'>'+n+'</option>').join('')+'</select><select id="people-sort" class="select" aria-label="Sort characters">'+['name','age',...skills].map(id=>'<option value="'+id+'" '+(state.sort===id?'selected':'')+'>'+id.charAt(0).toUpperCase()+id.slice(1)+'</option>').join('')+'</select></div><p class="smallnote">'+rows.length+' matching characters'+(rows.length>80?' · first 80 shown; narrow search':'')+'</p><div class="directory-list">'+rows.slice(0,80).map(p=>charCard(p,esc,p.age+'y · '+(g.factions[p.realm]?.name||p.realm)+' · Martial '+p.skills.martial+' · Diplomacy '+p.skills.diplomacy)).join('')+'</div>';}
-export function renderDynasty(g,esc){const p=g.politics,s=p.realms[g.player],r=p.people[s.ruler],heir=successionPreview(g,g.player),node=id=>p.people[id]?charCard(p.people[id],esc,p.people[id].age+'y · '+(p.people[id].alive?'Living':'Deceased')+(heir?.id===id?' · HEIR':'')):'',row=(label,ids)=>'<div class="family-generation"><small>'+label+'</small>'+ids.map(node).join('')+'</div>';const line=successionCandidates(g,g.player),election=s.law==='elective'?electionView(g,g.player):null,ballot=election?section('CROWN ELECTION')+'<div class="rule"><p class="paragraph">Landed electors and councillors vote independently. Your nomination influences your own vote and supporters.</p>'+election.candidates.slice(0,20).map(x=>'<div class="rule">'+characterLink(p.people[x.id],esc)+' · '+x.votes+' votes'+(x.id===election.nominee?' · Nominated':'')+(x.id===election.winner?' · Leading':'')+contextualButton('politics','nominate-successor',x.id,'Nominate',esc)+'</div>').join('')+'<details><summary>Elector votes ('+election.electors.length+')</summary>'+election.electors.map(x=>'<p class="smallnote">'+characterLink(p.people[x.id],esc)+' → '+characterLink(p.people[x.vote],esc)+' · Weight '+x.weight+'</p>').join('')+'</details></div>':section('LINE OF SUCCESSION')+'<div class="rule">'+(line.length?line.slice(0,12).map((x,i)=>'<p class="smallnote">'+(i+1)+'. '+characterLink(x,esc)+'</p>').join(''):'<p class="paragraph">No eligible dynastic successor.</p>')+'</div>';return section('DYNASTY AND SUCCESSION')+'<div class="rule"><h3>'+esc(r.house)+'</h3><p class="paragraph">Succession: '+esc(s.law)+' · Expected heir: '+characterLink(heir,esc)+'</p></div>'+renderRegency(g,esc)+ballot+row('Parents',r.parents||[])+row('Sovereign and consort',[r.id,r.spouse].filter(Boolean))+row('Children',r.children||[])+row('Grandchildren',(r.children||[]).flatMap(id=>p.people[id]?.children||[]))+sectionLink('court','Marriage arrangements and succession laws',esc,'SUCCESSION LAW');}
+export function renderDynasty(g,esc){const p=g.politics,s=p.realms[g.player],r=p.people[s.ruler],heir=successionPreview(g,g.player),node=id=>p.people[id]?charCard(p.people[id],esc,p.people[id].age+'y · '+(p.people[id].alive?'Living':'Deceased')+(heir?.id===id?' · HEIR':'')+(crownExcluded(p.people[id],g.player)?' · Crown rights revoked':'')):'',row=(label,ids)=>'<div class="family-generation"><small>'+label+'</small>'+ids.map(node).join('')+'</div>';const line=successionCandidates(g,g.player),election=s.law==='elective'?electionView(g,g.player):null,ballot=election?section('CROWN ELECTION')+'<div class="rule"><p class="paragraph">Landed electors and councillors vote independently. Your nomination influences your own vote and supporters.</p>'+election.candidates.slice(0,20).map(x=>'<div class="rule">'+characterLink(p.people[x.id],esc)+' · '+x.votes+' votes'+(x.id===election.nominee?' · Nominated':'')+(x.id===election.winner?' · Leading':'')+contextualButton('politics','nominate-successor',x.id,'Nominate',esc)+'</div>').join('')+'<details><summary>Elector votes ('+election.electors.length+')</summary>'+election.electors.map(x=>'<p class="smallnote">'+characterLink(p.people[x.id],esc)+' → '+characterLink(p.people[x.vote],esc)+' · Weight '+x.weight+'</p>').join('')+'</details></div>':section('LINE OF SUCCESSION')+'<div class="rule">'+(line.length?line.slice(0,12).map((x,i)=>'<p class="smallnote">'+(i+1)+'. '+characterLink(x,esc)+'</p>').join(''):'<p class="paragraph">No eligible dynastic successor.</p>')+'</div>';return section('DYNASTY AND SUCCESSION')+'<div class="rule"><h3>'+esc(r.house)+'</h3><p class="paragraph">Succession: '+esc(s.law)+' · Expected heir: '+characterLink(heir,esc)+'</p></div>'+renderRegency(g,esc)+ballot+row('Parents',r.parents||[])+row('Sovereign and consort',[r.id,r.spouse].filter(Boolean))+row('Children',r.children||[])+row('Grandchildren',(r.children||[]).flatMap(id=>p.people[id]?.children||[]))+sectionLink('court','Marriage arrangements and succession laws',esc,'SUCCESSION LAW');}
 export function renderCouncilDirectory(g,esc,world){const p=g.politics,s=p.realms[g.player],r=p.people[s.ruler],f=g.factions[g.player],skills={chancellor:'diplomacy',marshal:'martial',steward:'stewardship',spymaster:'intrigue',scholar:'learning'},duties={chancellor:'Foreign relations and political negotiations',marshal:'Military training and levies',steward:'Tax efficiency and administration',spymaster:'Intelligence and schemes',scholar:'Scholarship and community reconciliation'},busy=new Set([...Object.values(s.council),...Object.values(g.royalCourt?.realms?.[g.player]?.offices||{}).map(o=>o.person)]);return section('ROYAL COUNCIL')+Object.entries(s.council).map(([role,id])=>{const skill=skills[role]||'learning',field='council-candidate-'+role,opts=Object.values(p.people).filter(c=>c.alive&&c.realm===g.player&&c.age>=18&&c.id!==r.id&&!busy.has(c.id)&&!isImprisoned(g,c.id)).sort((a,b)=>b.skills[skill]-a.skills[skill]);return '<div class="rule"><h3>'+esc(role)+'</h3><p class="smallnote">'+esc(duties[role]||'Government duties')+'</p>'+(p.people[id]?charCard(p.people[id],esc,skill+' '+p.people[id].skills[skill]+'/5'):'Vacant')+(opts.length?'<select class="select" id="'+field+'">'+opts.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+' · '+c.skills[skill]+'/5</option>').join('')+'</select>'+contextualButton('politics','appoint',role,'Appoint (80g)',esc,'',field):'<p class="smallnote">No available candidate.</p>')+renderCouncilAssignments(g,world,role,esc)+'</div>';}).join('')+sectionLink('court','Household offices',esc,'ROYAL HOUSEHOLD OFFICES')+sectionLink('political','Council authority and voting',esc,'COUNCIL AUTHORITY');}
 export function renderVassalDirectory(g,world,esc,sort){const est=politicalEstates(g,g.player),level=authorityLevel(g,g.player),mod=authorityModifiers(g,g.player,est),hierarchy=feudalHierarchy(g,g.player),obligations=obligationProfile(g,g.player,hierarchy),rows=vassalDirectory(g,sort);if(sort==='power')rows.sort((a,b)=>(est.byLord[b.id]?.power||0)-(est.byLord[a.id]?.power||0));const wait=Math.max(0,(g.authority?.realms?.[g.player]?.changed??-120)+60-g.turn),controls=[level-1,level+1].filter(n=>n>=0&&n<=3).map(n=>contextualButton('politics','authority',String(n),(n>level?'Raise: ':'Lower: ')+AUTHORITY[n].name+(n>level?' (200g)':''),esc)).join('');
 const petitions=pendingVassalPetitions(g,g.player),requests=petitions.length?section('VASSAL PETITIONS')+petitions.map(x=>'<div class="rule"><b>'+characterLink(g.politics.people[x.person],esc)+' · '+esc(x.kind==='tax'?'Lower taxation':x.kind==='autonomy'?'More autonomy':'Council seat')+'</b><p class="smallnote">'+provinceLink(x.province,world,esc)+' · '+Math.max(0,x.deadline-g.turn)+' months to respond</p>'+contextualButton('politics','vassal-petition',x.id,'Accept',esc,'accept')+contextualButton('politics','vassal-petition',x.id,'Compromise (75g)',esc,'compromise')+contextualButton('politics','vassal-petition',x.id,'Reject',esc,'reject')+'</div>').join(''):'';

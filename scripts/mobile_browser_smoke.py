@@ -36,6 +36,13 @@ try:
    page.fill('#people-query','no-matching-person-xyz');assert page.locator('.directory-list .person-row').count()==0
    page.fill('#people-query','');assert page.locator('.directory-list .person-row').count()>0
    page.locator('#tabs [data-tab="dynasty"]').click();assert page.locator('.family-generation').count()==4
+   if name=='desktop':
+    children=page.locator('.family-generation').filter(has=page.get_by_text('Children',exact=True))
+    children.locator('[data-character]').first.click()
+    rights=page.get_by_text('Crown succession rights',exact=True)
+    rights.click()
+    assert page.locator('#tab-content [data-type="disinherit"]').is_visible()
+    page.locator('[data-character-back]').click()
    page.locator('#tabs [data-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
    page.locator('#tabs [data-tab="vassals"]').click();assert page.locator('#vassal-sort').is_visible()
    page.locator('[data-workspace="realm"]').click();page.click('#close-management')
@@ -57,6 +64,12 @@ try:
    assert page.locator('#outliner-list [data-character]').count()==1
    page.locator('#army-outliner summary').click();page.click('#open-province')
    assert page.locator('#province-drawer').is_visible()
+   if name=='desktop':
+    lord=page.locator('#province-drawer [data-section="lord"]')
+    lord.locator('summary').first.click()
+    lord.get_by_text('Estate exemptions',exact=True).click()
+    lord.get_by_role('button',name='Grant tax exemption',exact=True).click()
+    assert lord.get_by_text('Tax exemption in effect',exact=True).count()==1
    page.locator('[data-action="pin"][data-type="province"]').click()
    assert page.locator('[data-action="pin"][data-type="province"]').get_attribute('aria-pressed')=='true'
    assert page.locator('[data-section="recruit"]').is_visible()
