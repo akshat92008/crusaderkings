@@ -5,6 +5,7 @@ import {cultureAction,cultureModifiers,tickCulture,cultureLeadership} from './cu
 // Institutions and traditions are fictional campaign abstractions, not claims
 // about the beliefs or historical capabilities of actual communities.
 import {controller} from './campaign-war.js';
+import {subholdingProfile} from './subholdings.js';
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const own=(g,r)=>Object.values(g.provinces).filter(p=>p.owner===r&&controller(g,p.id)===r);
 const ruler=(g,r)=>g.politics.people[g.politics.realms[r]?.ruler];
@@ -76,7 +77,7 @@ export function identityAction(g,world,action,id,extra){const s=initIdentity(g,w
 export function tickIdentity(g,world){const s=initIdentity(g,world);if(s.lastTick===g.turn)return;s.lastTick=g.turn;if(g.turn%3!==0)return;
  const network=innovationNetwork(g,world),known=discoveredSnapshot(g);
  for(const [r,state] of Object.entries(s.realms)){const f=g.factions[r],c=g.civic.realms[r],land=own(g,r);if(!land.length){if(state.faithCharter?.council||state.faithExchange)tickFaithCharter(g,r,land);if(state.culturalCourt?.study)tickCulture(g,r,land);continue;}const mod=identityModifiers(g,r);
- let backing=0;for(const p of land){const i=s.institutions[p.id],l=g.civic.provinces[p.id];if(i.level&&i.faith===l.faith){l.localTrust=cap(l.localTrust+i.level,0,100);l.devotion=cap(l.devotion+1,0,100);if(i.faith===c.faith)backing+=i.level;}l.acceptance=cap(l.acceptance+mod.acceptance,0,100);}
+ let backing=0;for(const p of land){const i=s.institutions[p.id],l=g.civic.provinces[p.id];if(i.level&&i.faith===l.faith){l.localTrust=cap(l.localTrust+i.level,0,100);l.devotion=cap(l.devotion+1,0,100);if(i.faith===c.faith)backing+=i.level;}const temple=subholdingProfile(g,p.id).temple;if(temple){l.localTrust=cap(l.localTrust+temple,0,100);if(l.faith===c.faith)backing+=temple;}l.acceptance=cap(l.acceptance+mod.acceptance,0,100);}
  state.faithAuthority=cap(state.faithAuthority+cap((45+Math.min(40,backing*5)-state.faithAuthority)*.15,-3,3),0,100);if(state.faithAuthority>=70&&g.turn%12===0)f.legitimacy=cap(f.legitimacy+1,0,100);
  tickFaithCharter(g,r,land);tickCulture(g,r,land);
  if(state.research){const rr=state.research,d=INNOVATIONS[rr.id];rr.progress+=5+(ruler(g,r).skills.learning||1)+mod.research+researchPatronBonus(g,r)+innovationDiffusion(g,world,r,rr.id,network,known).bonus;if(rr.progress>=d.cost){state.innovations.push(rr.id);state.research=null;note(g,r,d.name+' discovered.');}}
