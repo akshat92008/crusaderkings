@@ -1,3 +1,4 @@
+import {civicModifiers,civicProvinceUnrest} from './civic-systems.js';
 import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
 import {politicalRevenue,politicalLevy} from './dynastic-politics.js';
@@ -33,7 +34,7 @@ export function empireStats(g,owner){
  const tax=[.65,1,1.5][f?.policies.tax??1];
  const trade=tradeIncome(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const taxIncome=Math.round(civicModifiers(g,owner).tax*politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade;
  const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0));
  const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
@@ -54,7 +55,7 @@ export function build(g,provinceId,kind){
  if(!b)return {ok:false,msg:'Unknown building'};
  const level=p.buildings[kind]||0;
  if(level>=3)return {ok:false,msg:'Maximum building level reached'};
- const price=b.cost*(level+1);
+ const price=Math.round(b.cost*(level+1)*civicModifiers(g,g.player).build);
  if(f.treasury<price)return {ok:false,msg:`Need ${price} gold`};
  f.treasury-=price;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);
  if(kind==='farm')p.unrest=clamp(p.unrest-3,0,100);
@@ -74,7 +75,7 @@ export function recruit(g,provinceId,type='infantry'){
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
- const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)));a[type]+=recruited;
+ const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy));a[type]+=recruited;
  a.doctrine=doctrine.id;
  makeLog(g,`${recruited} ${type} recruited in ${provinceId}.`);
  return {ok:true,msg:doctrine.unique+' tradition: regiment recruited'};
@@ -113,7 +114,7 @@ export function negotiate(g,other,action,world={factions:[]}){
  if(action==='trade'||action==='marriage')return royalDiplomacy(g,world,other,action);
  const f=g.factions[g.player],o=g.factions[other];const relation=f.relations[other]||0;
  if(action==='gift'){
-  if(f.treasury<250)return {ok:false,msg:'Need 250 gold'};f.treasury-=250;o.treasury+=250;f.relations[other]=clamp(relation+20,-100,100);o.relations[g.player]=clamp((o.relations[g.player]||0)+20,-100,100);
+  if(f.treasury<250)return {ok:false,msg:'Need 250 gold'};f.treasury-=250;o.treasury+=250;f.relations[other]=clamp(relation+20+(civicModifiers(g,g.player).diplomacy||0),-100,100);o.relations[g.player]=clamp((o.relations[g.player]||0)+20,-100,100);
   makeLog(g,`Envoys delivered a 250-gold gift to ${o.name}.`);return {ok:true,msg:'Relations improved'};
  }
  if(action==='alliance'){if(activeWar(g,g.player,other))return {ok:false,msg:'Negotiate peace before seeking an alliance.'};
@@ -136,7 +137,7 @@ export function advanceMonth(g,world){
   for(const p of controlled(g,f.id)){
    p.population=clamp(p.population+(p.buildings.farm>0&&g.turn%4===0?1:0),4,800);
    const adjust= (f.policies.tax===2?2:f.policies.tax===0?-2:0)+(f.policies.levy===2?1:0)-(f.policies.tolerance===2?2:f.policies.tolerance===0?-1:0)-(p.buildings.farm>0?1:0);
-   p.unrest=clamp(p.unrest+adjust+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
+   p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
    if(p.unrest>=93 && rand(g)<.13){p.owner='independent';makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
   }
   const provinces=Math.max(1,s.provinces);f.stability=clamp(f.stability+Math.sign(52-avgUnrest/provinces)*.6-(f.treasury<0?3:0)-(f.food<0?2:0),0,100);
