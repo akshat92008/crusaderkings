@@ -1,4 +1,4 @@
-import {borderBattleOutcome,proportionalLoss} from './border-battle.js';
+import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison} from './border-battle.js';
 import {participatingArmies,applyFieldLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
 import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
@@ -107,7 +107,7 @@ export function startMarch(g,world,fromId,toId){
  if(['alliance','marriage'].includes(g.factions[g.player].treaties[opponent]))return {ok:false,msg:'Cannot attack an allied realm'};
  const defenders=armiesAt(g,toId,opponent).filter(a=>!embarked(g,a.id));
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
- const garrison=45+target.development*12+target.buildings.fort*45+defenseSupport(g,opponent,g.player);
+ const garrison=campaignGarrison(target)+defenseSupport(g,opponent,g.player);
  return {ok:true,type:'battle',attacker:army.id,playerArmies:forces.map(a=>a.id),attackTroops:total,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
 export function concludeBattle(g,battle,result,world=null){
@@ -172,8 +172,8 @@ export function advanceMonth(g,world){
    const potential=origin.neighbors.map(id=>g.provinces[id]).filter(p=>p&&controller(g,p.id)!==a.owner&&controller(g,p.id)!==g.player&&(!occupation(g,p.id)||p.owner===a.owner)&&!nonAggression(g,a.owner,controller(g,p.id))&&!hasTruce(g,a.owner,controller(g,p.id))&&!['alliance','marriage'].includes(g.factions[a.owner].treaties[controller(g,p.id)]));
    if(!potential.length)continue;
    const target=potential.slice().sort((x,y)=>strategicTargetScore(g,world,a,y)-strategicTargetScore(g,world,a,x)||x.id.localeCompare(y.id))[0];if(rand(g)>1-raidThreshold(g,a.owner,controller(g,target.id))||strategicTargetScore(g,world,a,target)<-15)continue;
-   const defense=45+target.development*13+target.buildings.fort*48+defenseSupport(g,controller(g,target.id),a.owner)+armiesAt(g,target.id,controller(g,target.id)).reduce((sum,v)=>sum+armySize(v),0);
-   const attack=armySize(a)*armyReadiness(g,a).power+aidStrength(g,a.owner,controller(g,target.id)),outcome=borderBattleOutcome(attack,defense,rand(g));
+   const defense=campaignGarrison(target)+defenseSupport(g,controller(g,target.id),a.owner)+armiesAt(g,target.id,controller(g,target.id)).reduce((sum,v)=>sum+campaignArmyPower(v,armyReadiness(g,v)),0);
+   const attack=campaignArmyPower(a,armyReadiness(g,a))+aidStrength(g,a.owner,controller(g,target.id)),outcome=borderBattleOutcome(attack,defense,rand(g));
    const previous=controller(g,target.id),defending=armiesAt(g,target.id,previous);proportionalLoss(a,outcome.attackerLoss);syncRegiments(g,a);for(const d of defending){proportionalLoss(d,outcome.defenderLoss);syncRegiments(g,d);d.morale=clamp(d.morale-(outcome.victory?18:4),10,100);}
    if(outcome.victory){
     const previous=controller(g,target.id),war=activeWar(g,a.owner,previous);captureProvince(g,war,a.owner,target.id,a.province);target.unrest=clamp(target.unrest+25,0,100);
