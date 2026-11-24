@@ -433,7 +433,7 @@ function stepConditional(g,a,def,x,members,cache){
  x.healthyReviews=m.healthy?(x.healthyReviews||0)+1:0;
  if(m.healthy)x.cooperation=cap(x.cooperation+30,0,100);else x.cooperation=cap(x.cooperation-3,0,100);
  if(x.healthyReviews>=2){settleRegional(g,a,def,x,members,'negotiated');return;}
- for(const id of members)if(id!==g.player&&g.turn%12===0&&g.factions[id].treasury>700&&random(a)<.30)struggleAction(g,id,def.id,'special');
+ for(const id of members)if(!humanControlsRealm(g,id)&&g.turn%12===0&&g.factions[id].treasury>700&&random(a)<.30)struggleAction(g,id,def.id,'special');
 }
 function stepStruggles(g){const a=g.heritage,cache=new Map();for(const p of Object.values(g.provinces)){if(p.owner==='independent'||(g.campaignWar?.occupations?.[p.id]&&g.campaignWar.occupations[p.id].by!==p.owner))continue;if(!cache.has(p.owner))cache.set(p.owner,[]);cache.get(p.owner).push(p);}for(const def of STRUGGLES){const x=a.struggles[def.id],model=STRUGGLE_MODELS[def.id],members=def.members.filter(id=>g.factions[id]&&cache.get(id)?.length),minimum=def.domestic?1:2;
  if(def.conditional){stepConditional(g,a,def,x,members,cache);continue;}
@@ -442,7 +442,7 @@ function stepStruggles(g){const a=g.heritage,cache=new Map();for(const p of Obje
  const [warWeight,treatyWeight,cooperationWeight]=model.weights;let tension=wars*warWeight+treaties*treatyWeight+(wars?1:0),cooperation=treaties*cooperationWeight-wars*2;x.catalysts=[...(wars?[{name:'Active regional wars',value:wars}]:[]),...(treaties?[{name:'Regional agreements',value:treaties}]:[])];
  if(def.domestic){const d=domesticConditions(g,members[0]);tension+=(d.pressure>=50?4:0)+(d.loyalty<40?4:d.loyalty>=70?-2:0)+(d.claims>=2?2:0);cooperation+=d.loyalty>=65&&d.pressure<30?3:d.pressure>=60?-3:0;x.catalysts.push({name:'Estate loyalty',value:Math.round(d.loyalty)},{name:'Faction pressure',value:Math.round(d.pressure)},{name:'Living claimants',value:d.claims});}
  x.tension=cap(x.tension+tension,0,100);x.cooperation=cap(x.cooperation+cooperation,0,100);
- for(const id of members){x.influence[id]=(x.influence[id]||0)+Math.max(1,Math.round(regionalLand(g,id).length/3));if(id!==g.player&&g.turn%12===0&&g.factions[id].treasury>600&&random(a)<.30)struggleAction(g,id,def.id,model.phases.includes(x.phase)&&random(a)<.5?'special':x.tension>55?'mediation':random(a)<.5?'commerce':'pressure');}
+ for(const id of members){x.influence[id]=(x.influence[id]||0)+Math.max(1,Math.round(regionalLand(g,id).length/3));if(!humanControlsRealm(g,id)&&g.turn%12===0&&g.factions[id].treasury>600&&random(a)<.30)struggleAction(g,id,def.id,model.phases.includes(x.phase)&&random(a)<.5?'special':x.tension>55?'mediation':random(a)<.5?'commerce':'pressure');}
  const previous=x.phase;x.phase=x.tension>=70?'hostility':x.cooperation>=65&&x.tension<45?'conciliation':x.tension>=45?'rivalry':'competition';
  if(previous!==x.phase){regionalHistory(g,x,'Entered '+x.phase);if(members.includes(g.player))record(g,g.player,def.name+' entered '+x.phase+'.');}
  if(x.phase==='conciliation'&&x.cooperation>=90){settleRegional(g,a,def,x,members,'negotiated');continue;}
