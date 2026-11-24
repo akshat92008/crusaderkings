@@ -116,6 +116,7 @@ export class BattleGame{
   try{
    this.scenery=new BattleModelArt(this.ctx.gl);
    const load=(id,...paths)=>{(async()=>{for(const path of paths){const result=await this.scenery?.load(id,new URL(path,import.meta.url));if(result)break;}})();};
+   if(!descriptor.fieldBattle){
    load('wall','../assets/battle/kenney/wall.glb','../source/low-ruined-wall-section-optimized.glb');
    load('gate','../assets/battle/kenney/gate.glb');
    load('tower','../assets/battle/kenney/tower-square-base.glb');
@@ -124,6 +125,7 @@ export class BattleGame{
    this.sceneryPlacements.push({id:'gate',x:0,z:-42,size:6.5});
    for(const x of [-31,31])this.sceneryPlacements.push({id:'tower',x,z:-42,size:10});
    this.sceneryPlacements.push({id:'catapult',x:29,z:22,size:7});
+   }
    const indianFactions=new Set(['vijayanagara','delhi','bahmani','bengal','gujarat','malwa','jaunpur']);
    if(indianFactions.has(game.player)||indianFactions.has(descriptor.enemy)){
     load('temple','../source/south-indian-small-temple-kadamba-style-optimized%20(1).glb');
@@ -223,7 +225,7 @@ export class BattleGame{
  for(let x=-65;x<=65;x+=13)for(let z=-52;z<=52;z+=13){let shade=(Math.sin(x*17+z*9)+1)/14;instance(obj,x,-.006,z,12,.016,12,[.28+shade,.34+shade,.275+shade]);}
  for(const t of this.terrain){if(t.type==='tree'){instance(obj,t.x,.8,t.z,.8,1.7,.8,C.trunk);instance(obj,t.x,t.h*.64,t.z,t.h*.88,t.h*.95,t.h*.88,C.leaf,'cone');}else{instance(obj,t.x,.5,t.z,1.2+t.r,1+t.r,1.2+t.r,C.stone,'sphere');}}
  // Defensive fort visual near the far side of the field.
- for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
+ if(!this.descriptor.fieldBattle)for(let i=-3;i<=3;i++){let x=i*9;instance(obj,x,1.5,-42,8,3,2.6,C.stone);if(i%2===0){instance(obj,x,3.55,-42,3,1.5,3,C.stone);instance(obj,x,4.4,-42,3.8,1.1,3.8,[.49,.45,.38],'cone');}}
  }
  if(this.siege)for(const q of this.siege.structures){const height=q.hp>0?1+3*q.hp/q.max:.35;instance(obj,q.x,height/2,q.z,q.id==='gate'?9:5,height,3,q.hp>0?C.stone:C.earth);}
  for(let k=0;k<this.groups.length;k++){const g=this.groups[k];if(g.routed)continue;const n=Math.max(3,Math.round(g.initial*g.life/100*(this.ctx instanceof CanvasFallback?.65:1)));const cols=g.type==='cavalry'?5:6;const spacing=g.type==='cavalry'?1.25:.73;
@@ -245,7 +247,7 @@ export class BattleGame{
  finish(victory,leftPower,rightPower=null){if(this.done)return;this.done=true;this.paused=true;
   const fractionFor=side=>{const units=this.groups.filter(g=>g.side===side),total=units.reduce((n,g)=>n+(g.troopCount||0),0);return clamp(units.reduce((n,g)=>n+(g.routed?0:(g.troopCount||0)*g.life/Math.max(1,g.initialLife||100)),0)/Math.max(1,total),0,1);};
   const fraction=fractionFor('attacker'),enemies=fractionFor('defender');
-  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
+  this.report();this.onFinish({victory,attackerRemaining:fraction,enemyRemaining:enemies,fieldBattle:!!this.descriptor.fieldBattle,fortBreached:!!this.siege&&siegeBreached(this.siege),seconds:Math.round(this.elapsed)});
  }
  retreat(){this.finish(false,this.groups.filter(g=>g.side==='attacker'&&!g.routed).reduce((s,g)=>s+g.life,0));}
  togglePause(){this.paused=!this.paused;this.report();}
