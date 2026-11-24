@@ -1,3 +1,4 @@
+import {initConflict,councilVotes,availableClaims} from './political-conflict.js';
 /** Safe, copy-free royal court, trade and legacy interface views. */
 import {marriageCandidates,politicalRevenue,politicalLevy,politicalDispatch} from './dynastic-politics.js';
 import {currentRoyalEvent,currentCourt,tradeIncome,tradePactCount,objectives,campaignStanding} from './kingdom-depth.js';
@@ -86,5 +87,28 @@ function renderPolitics(g,esc){
  for(const kind of ['tax','levy','autonomy'])html+='<div class="smallnote">'+kind+': '+['Low','Standard','High'][v[kind]]+'</div>'+[0,1,2].filter(n=>n!==v[kind]).map(n=>button(kind,id,'Set '+kind+' '+['low','standard','high'][n],n)).join('');
  html+=button('gift',id,'Send gift (100g)')+button('replace',id,'Revoke and appoint (10 legitimacy)')+(v.loyalty<45?button('concede',id,'Negotiate concession (150g)'):'')+'</div>';}
  html+=section('POLITICAL SITUATIONS');const situations=Object.values(p.situations).filter(x=>x.realm===g.player);html+=situations.length?situations.map(x=>'<div class="rule"><b>'+esc(x.phase.toUpperCase())+' · '+esc(x.province)+'</b><p class="paragraph">'+show(person(x.lord))+' opposes royal authority. Negotiate or risk unrest.</p></div>').join(''):'<p class="paragraph">No active vassal grievances.</p>';
+ return html;
+}
+
+export function renderConflict(g,world,esc){
+ const c=initConflict(g),realm=g.player,p=g.politics,btn=(action,id,label,extra='',input='')=>'<button class="rowbtn" data-action="conflict" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ const name=id=>g.factions[id]?.name||id,place=id=>world.provinces.find(x=>x.id===id)?.name||id;
+ let html=section('COUNCIL AUTHORITY')+'<div class="rule"><b>'+esc(c.council[realm]||'advisory')+'</b><p class="paragraph">Binding councils can veto succession reform, title revocation and formal claim wars. Support varies by proposal.</p>'+btn('council','binding','Empower council (150g)')+btn('council','advisory','Return to advisory (150g)')+'</div>';
+ for(const v of councilVotes(g,realm)){const person=p.people[v.id],war=councilVotes(g,realm,'war').find(x=>x.id===v.id),rev=councilVotes(g,realm,'revoke').find(x=>x.id===v.id);html+='<div class="rule"><b>'+esc(person.name)+' · '+esc(v.role)+'</b><div class="smallnote">Law '+(v.yes?'YES':'NO')+' · War '+(war?.yes?'YES':'NO')+' · Revocation '+(rev?.yes?'YES':'NO')+'</div>'+ (v.favor?'<div class="smallnote">Favor pledged</div>':btn('favor',v.id,'Secure favor (80g)'))+'</div>';}
+ html+=section('FACTIONS AND CIVIL WARS');
+ const factions=Object.values(c.factions).filter(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
+ if(!factions.length)html+='<p class="paragraph">No organized opposition. Vassals below 42 loyalty can form factions.</p>';
+ for(const x of factions){html+='<div class="rule"><h3>'+esc(x.kind.toUpperCase())+' faction · '+esc(x.status)+'</h3><p class="paragraph">'+x.members.map(id=>esc(place(id))).join(', ')+'</p><div class="smallnote">Pressure '+x.pressure+'% · Estimated rebel strength '+(x.rebels??x.power??0)+(x.status==='ultimatum'?' · '+Math.max(0,x.deadline-g.turn)+' months to respond':'')+(x.status==='civil war'?' · War score '+x.score:'')+'</div>'+btn('accept',x.id,'Accept demands')+(x.status==='civil war'?btn('mobilize',x.id,'Mobilize royal army (150g)'):btn('negotiate',x.id,'Negotiate (150g)'))+(x.status==='ultimatum'?btn('refuse',x.id,'Reject ultimatum — civil war'):'')+'</div>';}
+ html+=section('INTRIGUE AND CHANCERY');
+ const running=Object.values(c.schemes).filter(x=>x.realm===realm&&x.status==='active');
+ for(const x of running)html+='<div class="rule"><b>'+esc(x.kind)+' · '+esc(place(x.target))+'</b><div class="smallnote">'+Math.max(0,x.due-g.turn)+' months remaining · '+x.chance+'% estimated success</div></div>';
+ const own=Object.values(g.provinces).filter(x=>x.owner===realm),foreign=Object.values(g.provinces).filter(x=>x.owner!==realm&&p.realms[x.owner]);
+ for(const [type,label,targets] of [['fabricate','Fabricate claim (110g)',foreign],['undermine','Undermine foreign court (100g)',foreign],['sway','Sway vassal (60g)',own],['investigate','Investigate estate (80g)',own]]){const field='scheme-'+type;html+='<div class="rule"><b>'+esc(label)+'</b><select class="select" id="'+field+'">'+targets.map(v=>'<option value="'+esc(v.id)+'">'+esc(place(v.id))+' · '+esc(name(v.owner))+'</option>').join('')+'</select>'+btn('scheme',type,'Begin scheme','',field)+'</div>';}
+ html+=section('TERRITORIAL CLAIMS');const claims=availableClaims(g,realm);
+ if(!claims.length)html+='<p class="paragraph">No active claims. Use the chancellor to establish one.</p>';
+ for(const x of claims)html+='<div class="rule"><b>'+esc(place(x.province))+'</b><div class="smallnote">Expires in '+Math.max(0,x.expires-g.turn)+' months · '+esc(name(g.provinces[x.province].owner))+'</div>'+btn('declare',x.province,'Declare claim war (5 prestige)')+'</div>';
+ html+=section('WARS AND PEACE');const wars=Object.values(c.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm));if(!wars.length)html+='<p class="paragraph">No formal claim wars.</p>';
+ for(const w of wars)html+='<div class="rule"><b>'+esc(name(w.attacker))+' vs '+esc(name(w.defender))+'</b><div class="smallnote">Goal '+esc(place(w.goal))+' · Attacker war score '+w.score+' · Battles '+w.battles+'</div>'+btn('peace',w.id,'Offer white peace','white')+(w.attacker===realm?btn('peace',w.id,'Enforce claim','enforce'):'')+'</div>';
+ html+=section('POLITICAL HISTORY')+c.history.filter(x=>x.realm===realm).slice(0,12).map(x=>'<div class="rule"><div class="smallnote">'+esc(x.message)+'</div></div>').join('');
  return html;
 }
