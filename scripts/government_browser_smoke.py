@@ -18,6 +18,12 @@ def load(page, realm):
   const g=createGame(world,realm);g.kingdom.difficulty='peaceful';g.factions[realm].treasury=3000;
   if(realm==='england')for(const h of Object.values(g.politics.holdings))if(h.realm===realm)h.loyalty=100;
   if(realm==='horde')g.institutions.realms[realm].herds=25;
+  if(realm==='france'){
+   const {governmentAction,institutionTargets}=await import('/src/government-institutions.js');
+   const province=institutionTargets(g,realm)[0],candidate=Object.values(g.politics.people).find(p=>p.realm===realm&&p.alive&&p.age>=18&&p.id!==g.politics.realms[realm].ruler&&p.skills.stewardship>=2);
+   if(!governmentAction(g,world,province,candidate?.id).ok)throw Error('Could not appoint fixture inspector');
+  }
+  if(realm==='haudenosaunee')for(const h of Object.values(g.politics.holdings))if(h.realm===realm)h.loyalty=80;
   return snapshot(g);
  }''',realm)
  page.locator('#save-file').set_input_files({'name':realm+'.json','mimeType':'application/json','buffer':save.encode()})
@@ -34,7 +40,7 @@ def save_state(page):
 try:
  with sync_playwright() as p:
   browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'])
-  for realm,summary in [('england','Estate assembly'),('ming','Provincial administration'),('horde','Clan assembly and herds'),('vijayanagara','Provincial charters')]:
+  for realm,summary in [('england','Estate assembly'),('ming','Provincial administration'),('horde','Clan assembly and herds'),('vijayanagara','Provincial charters'),('france','Royal inspectors'),('haudenosaunee','Member assembly')]:
    page=browser.new_page(viewport={'width':1440,'height':900},device_scale_factor=1)
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    load(page,realm);government(page,summary)
@@ -59,9 +65,20 @@ try:
    elif realm=='vijayanagara':
     page.locator('#regional-grant-chief').select_option(index=0)
     page.locator('[data-id="regional:grant"]').click()
-    if not page.get_by_text('Regional land grants',exact=True).is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
+    if not page.locator('#tab-content b').filter(has_text='Regional land grants').is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
     page.screenshot(path=str(OUT/'government-regional-grant.png'))
     s=save_state(page);assert len(s['institutions']['realms'][realm]['regionalPolitics']['grants'])==1
+   elif realm=='france':
+    page.locator('#crown-inspection-target').select_option(index=0)
+    page.locator('[data-id="crown:inspect"]').click()
+    if not page.locator('#tab-content b').filter(has_text='Royal inspection reports').is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
+    page.screenshot(path=str(OUT/'government-royal-inspection.png'))
+    s=save_state(page);assert s['institutions']['realms'][realm]['procedures']['report']['ends']==3
+   elif realm=='haudenosaunee':
+    page.locator('[data-id="confed:assembly"]').click()
+    if not page.locator('#tab-content b').filter(has_text='Confederate member assembly').is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
+    page.screenshot(path=str(OUT/'government-member-assembly.png'))
+    s=save_state(page);assert s['institutions']['realms'][realm]['procedures']['assembly']['ends']==3
    else:
     page.locator('[data-id="steppe:pasture"]').click()
     if not page.get_by_text('Clan pasture reserves',exact=True).is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
