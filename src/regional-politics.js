@@ -35,8 +35,7 @@ export function regionalPoliticalView(g,r,providedLand){
   return {kind:k,grants,candidates,wait,last,cost:130,canAct:!wait&&f.treasury>=130&&candidates.length>0};
  }
  if(k==='sultanate'){
-  const sponsor=s?.scholar,scholar=sponsor&&sponsor.until>g.turn&&adult(g,r,sponsor.person);
-  const faith=g.civic.realms[r].faith;
+  const sponsor=s?.scholar,faith=g.civic.realms[r].faith,person=sponsor&&adult(g,r,sponsor.person),scholar=sponsor&&sponsor.until>g.turn&&sponsor.faith===faith&&person&&(!person.civic?.faith||person.civic.faith===faith)?person:null;
   const candidates=Object.values(g.politics.people).filter(p=>adult(g,r,p.id)&&(p.skills?.learning??0)>=3&&(!p.civic?.faith||p.civic.faith===faith)).map(p=>({id:p.id,name:p.name||p.id,learning:p.skills.learning})).sort((a,b)=>b.learning-a.learning||a.id.localeCompare(b.id));
   return {kind:k,scholar:scholar?{...sponsor,name:scholar.name||scholar.id,learning:scholar.skills.learning}:null,candidates,wait,last,cost:120,canAct:!wait&&f.treasury>=120&&!scholar&&land.length>0&&candidates.length>0};
  }
@@ -70,7 +69,7 @@ export function regionalPoliticalAction(g,r,cmd,id){
   note(g,r,s,'The court commissioned '+p.name+' to advise on scholarly patronage and public legitimacy.');
  }else if(cmd==='shogunate:mediate'&&v.kind==='shogunate'){
   s.mediation={houses:v.pair.map(h=>h.house),until:g.turn+18};
-  for(const h of Object.values(g.politics.holdings)){const p=adult(g,r,h.lord);if(h.realm===r&&p&&v.pair.some(x=>x.house===(p.house||p.id)))h.loyalty=clamp(h.loyalty+10,0,100);}
+  for(const [id,h] of Object.entries(g.politics.holdings)){const p=adult(g,r,h.lord);if(h.realm===r&&owned(g,r,id)&&p&&v.pair.some(x=>x.house===(p.house||p.id)))h.loyalty=clamp(h.loyalty+10,0,100);}
   note(g,r,s,'The shogunal court negotiated an eighteen-month accord between '+v.pair.map(h=>h.house).join(' and ')+'.');
  }else return no('This action does not belong to the current government.');
  f.treasury-=v.cost;s.last=g.turn;return ok('Institutional agreement concluded.');

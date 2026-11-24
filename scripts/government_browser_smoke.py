@@ -34,7 +34,7 @@ def save_state(page):
 try:
  with sync_playwright() as p:
   browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'])
-  for realm,summary in [('england','Estate assembly'),('ming','Provincial administration'),('horde','Clan assembly and herds')]:
+  for realm,summary in [('england','Estate assembly'),('ming','Provincial administration'),('horde','Clan assembly and herds'),('vijayanagara','Provincial charters')]:
    page=browser.new_page(viewport={'width':1440,'height':900},device_scale_factor=1)
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    load(page,realm);government(page,summary)
@@ -56,6 +56,12 @@ try:
     if not page.get_by_text('Imperial civil service',exact=True).is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
     page.screenshot(path=str(OUT/'government-imperial-examination.png'))
     s=save_state(page);assert len(s['institutions']['realms'][realm]['civilService']['exams'])==1
+   elif realm=='vijayanagara':
+    page.locator('#regional-grant-chief').select_option(index=0)
+    page.locator('[data-id="regional:grant"]').click()
+    if not page.get_by_text('Regional land grants',exact=True).is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()
+    page.screenshot(path=str(OUT/'government-regional-grant.png'))
+    s=save_state(page);assert len(s['institutions']['realms'][realm]['regionalPolitics']['grants'])==1
    else:
     page.locator('[data-id="steppe:pasture"]').click()
     if not page.get_by_text('Clan pasture reserves',exact=True).is_visible():page.locator('#tab-content summary').get_by_text(summary,exact=True).click()

@@ -107,3 +107,8 @@ test('AI regional rulers negotiate with disloyal chiefs and government transitio
  const g=regionalFixture('regional');g.player='b';g.turn=12;tickInstitutions(g);assert.ok(regionalPoliticalView(g,'a').grants.length);
  g.civic.realms.a.government='feudal';initInstitutions(g);assert.equal(institutionState(g,'a').regionalPolitics,undefined);assert.equal(regionalPoliticalView(g,'a'),null);
 });
+
+test('regional agreements exclude occupied estates and changed faith invalidates a scholar immediately',()=>{
+ const g=regionalFixture('regional');g.campaignWar={occupations:{p:{by:'b'}}};assert.equal(governmentAction(g,{},'regional:grant','p').ok,false);assert.ok(governmentAction(g,{},'regional:grant','q').ok);
+ const s=regionalFixture('sultanate');s.politics.people.n.skills.learning=4;s.politics.people.n.civic={faith:'Court faith'};governmentAction(s,{},'sultanate:scholar','n');s.civic.realms.a.faith='New faith';assert.equal(regionalPoliticalView(s,'a').scholar,null);
+});
