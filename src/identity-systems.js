@@ -1,4 +1,5 @@
 import {researchPatronBonus} from './living-systems.js';
+import {faithCharterAction,faithCharterModifiers,tickFaithCharter} from './faith-institutions.js';
 // Institutions and traditions are fictional campaign abstractions, not claims
 // about the beliefs or historical capabilities of actual communities.
 import {controller} from './campaign-war.js';
@@ -35,13 +36,14 @@ export function initIdentity(g,world){if(g.identity?.version===1)return g.identi
  for(const [r,c] of Object.entries(g.civic.realms)){s.realms[r]={traditions:initialTraditions(g,r),innovations:[],research:null,lastTradition:-120,lastFaith:-120,faithAuthority:55};}
  for(const p of world.provinces)s.institutions[p.id]={level:0,faith:g.civic.provinces[p.id].faith,lastConsultation:-12};
  return s;}
-export function identityModifiers(g,r){const s=g.identity?.realms[r],out={tax:1,levy:1,trade:1,build:1,scheme:0,diplomacy:0,research:0,acceptance:0,unrest:0};if(!s)return out;for(const d of [...s.traditions.map(id=>TRADITIONS[id]),...s.innovations.map(id=>INNOVATIONS[id])])if(d)for(const k of Object.keys(out))if(typeof d[k]==='number')out[k]=['tax','levy','trade','build'].includes(k)?out[k]*d[k]:out[k]+d[k];return out;}
+export function identityModifiers(g,r){const s=g.identity?.realms[r],out={tax:1,levy:1,trade:1,build:1,scheme:0,diplomacy:0,research:0,acceptance:0,unrest:0};if(!s)return out;for(const d of [...s.traditions.map(id=>TRADITIONS[id]),...s.innovations.map(id=>INNOVATIONS[id])])if(d)for(const k of Object.keys(out))if(typeof d[k]==='number')out[k]=['tax','levy','trade','build'].includes(k)?out[k]*d[k]:out[k]+d[k];const faith=faithCharterModifiers(g,r);for(const k of Object.keys(faith))out[k]+=faith[k];return out;}
 export function researchOptions(g,r){const s=g.identity?.realms[r];return s?Object.keys(INNOVATIONS).filter(id=>!s.innovations.includes(id)&&INNOVATIONS[id].requires.every(k=>s.innovations.includes(k))):[];}
 export function localIdentities(g,r){const faith=new Set(),culture=new Set();for(const p of own(g,r)){const l=g.civic.provinces[p.id];faith.add(l.faith);culture.add(l.culture);}return {faith:[...faith],culture:[...culture]};}
 function research(g,r,id){const s=g.identity.realms[r],f=g.factions[r];if(!own(g,r).length||s.research||!researchOptions(g,r).includes(id)||f.treasury<150)return no('Research requires an available innovation, no active project and 150 gold.');f.treasury-=150;s.research={id,progress:0,started:g.turn};return ok('Research commissioned.');}
 function institution(g,r,id){const s=g.identity.institutions[id],p=g.provinces[id],f=g.factions[r];if(!s||!p||p.owner!==r||controller(g,id)!==r||s.level>=3||f.treasury<180*(s.level+1))return no('Requires controlled land, available institution level and sufficient gold.');f.treasury-=180*(s.level+1);s.level++;s.faith=g.civic.provinces[id].faith;return ok('Local institution expanded.');}
 function project(g,r,id,kind){const l=g.civic.provinces[id],p=g.provinces[id],f=g.factions[r],c=g.civic.realms[r],s=g.identity;if(!l||!p||p.owner!==r||controller(g,id)!==r||s.projects[id]||l[kind]===c[kind]||l.acceptance<65||l.localTrust<60||c.policy==='coercion'||f.treasury<180)return no('Requires a different local identity, high trust and acceptance, non-coercive policy, controlled land and 180 gold.');f.treasury-=180;s.projects[id]={province:id,realm:r,kind,target:c[kind],original:l[kind],progress:0,started:g.turn};return ok('Voluntary community dialogue begun.');}
 export function identityAction(g,world,action,id,extra){const s=initIdentity(g,world),r=g.player,state=s.realms[r],f=g.factions[r],c=g.civic.realms[r],l=g.civic.provinces[id],p=g.provinces[id];
+ if(action.startsWith('faith-'))return faithCharterAction(g,r,action,id,extra);
  if(action==='research')return research(g,r,id);
  if(action==='tradition'){if(!own(g,r).length||!TRADITIONS[id]||state.traditions.includes(id)||state.traditions.length>=4||g.turn-state.lastTradition<60||f.treasury<350||f.prestige<20)return no('Requires a new tradition, available slot (four maximum), 350 gold, 20 prestige and five years between changes.');f.treasury-=350;f.prestige-=20;state.traditions.push(id);state.lastTradition=g.turn;return ok('Tradition adopted.');}
  if(action==='institution')return institution(g,r,id);
@@ -54,6 +56,7 @@ export function tickIdentity(g,world){const s=initIdentity(g,world);if(s.lastTic
  for(const [r,state] of Object.entries(s.realms)){const f=g.factions[r],c=g.civic.realms[r],land=own(g,r);if(!land.length)continue;const mod=identityModifiers(g,r);
  let backing=0;for(const p of land){const i=s.institutions[p.id],l=g.civic.provinces[p.id];if(i.level&&i.faith===l.faith){l.localTrust=cap(l.localTrust+i.level,0,100);l.devotion=cap(l.devotion+1,0,100);if(i.faith===c.faith)backing+=i.level;}l.acceptance=cap(l.acceptance+mod.acceptance,0,100);}
  state.faithAuthority=cap(state.faithAuthority+cap((45+Math.min(40,backing*5)-state.faithAuthority)*.15,-3,3),0,100);if(state.faithAuthority>=70&&g.turn%12===0)f.legitimacy=cap(f.legitimacy+1,0,100);
+ tickFaithCharter(g,r,land);
  if(state.research){const rr=state.research,d=INNOVATIONS[rr.id];rr.progress+=5+(ruler(g,r).skills.learning||1)+mod.research+researchPatronBonus(g,r);if(rr.progress>=d.cost){state.innovations.push(rr.id);state.research=null;note(g,r,d.name+' discovered.');}}
  if(r!==g.player&&g.turn%12===0&&f.treasury>700){if(!state.research){const opts=researchOptions(g,r);if(opts.length)research(g,r,opts[0]);}const p=land.find(p=>s.institutions[p.id].level===0&&g.civic.provinces[p.id].localTrust<80);if(p&&f.treasury>700)institution(g,r,p.id);if(f.treasury>1000&&f.prestige>=20&&state.traditions.length<4&&g.turn-state.lastTradition>=60){const options=Object.keys(TRADITIONS).filter(id=>!state.traditions.includes(id));const id=options.find(id=>id==='scholarly_patronage')||options[0];if(id){f.treasury-=350;f.prestige-=20;state.traditions.push(id);state.lastTradition=g.turn;}}}
  }
