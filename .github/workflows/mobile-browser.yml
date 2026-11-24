@@ -11,16 +11,22 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: python -m pip install playwright
-      - run: python -m playwright install --with-deps chromium
+      - run: python -m playwright install --with-deps ${{ matrix.engine }}
       - run: python scripts/mobile_browser_smoke.py
+        env:
+          CROWN_BROWSER: ${{ matrix.engine }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: responsive-campaign-screenshots
+          name: campaign-screenshots-${{ matrix.engine }}
           path: qa-screenshots/

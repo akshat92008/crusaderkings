@@ -20,7 +20,7 @@ import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,mi
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
-import {titleList,claimantCandidates,isImprisoned,regionalLoyalty} from './feudal-systems.js';
+import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
 import {regionalDecision,AMBITIONS,currentChain,relationshipList,personalOpinion} from './chronicle-systems.js';
 import {temperament,strategicPlan,threatAssessment,borderRealms,militaryStrength,defenseSupport} from './strategic-ai.js';
 import {occupation,controller} from './campaign-war.js';
@@ -262,7 +262,16 @@ export function renderFeudal(g,world,esc){
  if(v.lord===r&&adults.length)html+='<select class="select" id="'+grant+'">'+adults.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>').join('')+'</select>'+btn('grant',p.id,'Grant province',grant);
  else if(v.lord!==r){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)');if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');}html+='</div>';}html+='</details>';}
  html+=section('CROWN CLAIMANTS')+'<p class="paragraph">Other eligible children inherit claims on succession. Discontented vassals may support an adult claimant when legitimacy is low.</p>';for(const c of claimantCandidates(g,realm))html+='<div class="rule"><b>'+esc(name(c.person))+'</b><div class="smallnote">Claim from '+esc(name(c.from))+' · expires in '+Math.max(0,180-g.turn+c.created)+' months</div></div>';
- html+=section('PRISONERS AND RANSOM');for(const x of Object.values(g.feudal.prisoners).filter(x=>x.status==='held'&&(x.captor===realm||x.realm===realm)))html+='<div class="rule"><b>'+esc(name(x.person))+'</b><div class="smallnote">'+esc(x.reason)+' · held by '+esc(g.factions[x.captor]?.name||x.captor)+' · '+(g.turn-x.started)+' months</div>'+(x.captor===realm?btn('release',x.person,'Release prisoner')+btn('ransom',x.person,'Ransom (100g)'):'')+'</div>';
+ html+=section('PRISONERS AND RANSOM');
+ for(const x of Object.values(g.feudal.prisoners).filter(x=>x.status==='held'&&(x.captor===realm||x.realm===realm))){
+  html+='<div class="rule"><b>'+characterLink(g.politics.people[x.person],esc)+'</b><div class="smallnote">'+esc(x.reason)+' · held by '+esc(g.factions[x.captor]?.name||x.captor)+' · '+(g.turn-x.started)+' months</div>';
+  if(x.captor===realm){
+   html+=btn('release',x.person,'Release prisoner')+btn('ransom',x.person,'Ransom (100g)');
+   const options=prisonerExchangeOptions(g,realm,x.person),field='exchange-'+x.person;
+   if(options.length)html+='<label class="smallnote" for="'+esc(field)+'">Request a prisoner in return</label><select class="select" id="'+esc(field)+'">'+options.map(o=>'<option value="'+esc(o.id)+'">'+esc(name(o.id))+' · '+(o.gold?o.gold+' gold':'even exchange')+'</option>').join('')+'</select>'+btn('exchange',x.person,'Exchange prisoners',field);
+  }
+  html+='</div>';
+ }
  return html;
 }
 

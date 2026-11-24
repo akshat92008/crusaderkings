@@ -1,4 +1,5 @@
-"""Real Chromium desktop/mobile acceptance; screenshots are test artifacts."""
+"""Desktop campaign acceptance and Chromium touch and battlefield acceptance."""
+from os import environ
 from pathlib import Path
 from functools import partial
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
@@ -10,9 +11,16 @@ server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,dire
 threading.Thread(target=server.serve_forever,daemon=True).start()
 try:
  with sync_playwright() as p:
-  browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'])
-  for name,width,height,touch in [('desktop',1440,900,False),('mobile',390,844,True),('small-phone',320,640,True)]:
-   page=browser.new_page(viewport={'width':width,'height':height},has_touch=touch,is_mobile=touch,device_scale_factor=1)
+  engine=environ.get('CROWN_BROWSER','chromium')
+  assert engine in ('chromium','firefox','webkit'), 'Unsupported CROWN_BROWSER'
+  chromium=engine=='chromium'
+  flags=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']
+  browser=getattr(p,engine).launch(headless=True,**({'args':flags} if chromium else {}))
+  viewports=[('desktop',1440,900,False)]
+  if chromium:viewports.extend([('mobile',390,844,True),('small-phone',320,640,True)])
+  for name,width,height,touch in viewports:
+   options={'has_touch':True,'is_mobile':True} if touch else {}
+   page=browser.new_page(viewport={'width':width,'height':height},device_scale_factor=1,**options)
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    page.goto('http://127.0.0.1:'+str(server.server_port),wait_until='domcontentloaded',timeout=45000)
    page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
@@ -99,7 +107,7 @@ try:
     assert page.locator('#province-drawer').is_hidden(),'Pinch must not select a province'
    page.click('#next-month');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    page.click('#save-game');assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).turn")==1
-   if name in ('desktop','mobile'):
+   if chromium and name in ('desktop','mobile'):
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert page.locator('#battle-start').is_visible()

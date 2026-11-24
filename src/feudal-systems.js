@@ -39,6 +39,38 @@ export function installClaimant(g,realm,id){const c=claimantCandidates(g,realm).
 export function capturePrisoner(g,captor,id,reason='battle'){const p=live(g,id);if(!g.feudal||!p||!g.politics.realms[captor]||p.age<18||ruler(g,p.realm)?.id===id||isImprisoned(g,id))return false;g.feudal.prisoners[id]={person:id,captor,realm:p.realm,reason,started:g.turn,status:'held'};for(const a of Object.values(g.military?.armies||{}))if(a.commander===id)a.commander=null;note(g,captor,p.name+' was imprisoned ('+reason+').');return true;}
 export function captureCommander(g,captor,army){const id=g.military?.armies[army?.id]?.commander;return id?capturePrisoner(g,captor,id,'war captive'):false;}
 function release(g,x){x.status='released';x.ended=g.turn;}
+function prisonerValue(g,p){
+ const offices=g.politics.realms[p.realm]?.council||{};
+ const estateCount=holdings(g,p.realm).filter(([,h])=>h.lord===p.id).length;
+ return 100+(Object.values(offices).includes(p.id)?35:0)+15*Math.min(3,estateCount);
+}
+export function prisonerExchangeOptions(g,realm,offeredId){
+ const held=g.feudal?.prisoners||{},offered=held[offeredId],person=live(g,offeredId);
+ if(offered?.status!=='held'||offered.captor!==realm||!person||person.realm===realm)return [];
+ const partner=person.realm;
+ if(!g.factions[partner]||!g.factions[realm])return [];
+ const given=prisonerValue(g,person);
+ return Object.values(held).filter(x=>x.status==='held'&&x.captor===partner&&live(g,x.person)?.realm===realm)
+  .map(x=>{
+   const returning=live(g,x.person);
+   return {id:x.person,partner,gold:Math.max(0,prisonerValue(g,returning)-given)};
+  }).sort((a,b)=>a.gold-b.gold||a.id.localeCompare(b.id));
+}
+function exchangePrisoners(g,realm,offeredId,requestedId){
+ const exchange=prisonerExchangeOptions(g,realm,offeredId).find(x=>x.id===requestedId);
+ if(!exchange)return no('An exchange requires a living prisoner from each realm held by the other.');
+ const payer=g.factions[realm],foreign=g.factions[exchange.partner];
+ if(payer.treasury<exchange.gold)return no('Requires '+exchange.gold+' gold to balance the exchange.');
+
+ payer.treasury-=exchange.gold;
+ foreign.treasury+=exchange.gold;
+ for(const id of [offeredId,requestedId]){
+  release(g,g.feudal.prisoners[id]);
+  g.feudal.prisoners[id].resolution='exchange';
+ }
+ note(g,realm,live(g,requestedId).name+' returned in a prisoner exchange with '+foreign.name+'.');
+ return ok('The prisoners were exchanged'+(exchange.gold?' for '+exchange.gold+' gold.':'.'));
+}
 function ransom(g,x){const p=live(g,x.person),f=g.factions[x.captor];if(!p||!f)return no('Prisoner unavailable.');const estates=holdings(g,x.realm).filter(([,h])=>h.lord===p.id),amount=100,wealth=p.wealth+estates.reduce((n,[,h])=>n+h.wealth,0);if(wealth<amount)return no('Prisoner and estates cannot afford 100 gold.');let due=amount,take=Math.min(due,p.wealth);p.wealth-=take;due-=take;for(const [,h] of estates){take=Math.min(due,h.wealth);h.wealth-=take;due-=take;}f.treasury+=amount;release(g,x);return ok('Prisoner ransomed for 100 gold.');}
 export function feudalAction(g,world,action,id,extra){const f=initFeudal(g,world),realm=g.player,nation=g.factions[realm],s=g.politics.realms[realm],r=ruler(g,realm),t=f.titles[id],p=live(g,extra);
  if(action==='grant'||action==='reclaim'){if(t?.tier!=='province'||t.realm!==realm||controller(g,t.province)!==realm)return no('Select a controlled provincial title.');const v=g.politics.holdings[t.province];
@@ -47,6 +79,7 @@ export function feudalAction(g,world,action,id,extra){const f=initFeudal(g,world
  syncTitles(g);return ok('Provincial title transferred.');}
  if(action==='regional'){if(t?.tier!=='regional'||t.realm!==realm||!p||p.realm!==realm||p.age<18||isImprisoned(g,p.id)||!t.members.some(id=>g.politics.holdings[id]?.lord===p.id)||t.holder===p.id||nation.treasury<120)return no('Choose an eligible provincial lord within the district and pay 120 gold.');nation.treasury-=120;t.holder=p.id;return ok('Regional title granted.');}
  if(action==='arrest'){const target=live(g,id),v=holdings(g,realm).filter(([,h])=>h.lord===id);if(!target||target.realm!==realm||!v.some(([,h])=>h.leverageUntil>g.turn)||nation.legitimacy<55||!capturePrisoner(g,realm,id,'proven misconduct'))return no('Arrest requires a free adult vassal, established evidence and 55 legitimacy.');nation.legitimacy-=3;return ok('Vassal imprisoned.');}
+ if(action==='exchange')return exchangePrisoners(g,realm,id,extra);
  if(action==='release'||action==='ransom'){const x=f.prisoners[id];if(!x||x.captor!==realm||x.status!=='held')return no('Select your prisoner.');if(action==='ransom')return ransom(g,x);release(g,x);for(const [,h] of holdings(g,x.realm))if(h.lord===id)h.loyalty=cap(h.loyalty+15,0,100);return ok('Prisoner released.');}
  return no('Unknown title or prisoner action.');}
 export function tickFeudal(g,world){const f=initFeudal(g,world);if(f.lastTick===g.turn)return;f.lastTick=g.turn;syncTitles(g);

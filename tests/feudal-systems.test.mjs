@@ -5,7 +5,7 @@ import {createGame,snapshot,restoreGame,concludeBattle} from '../src/simulation.
 import {politicsAction,tickPolitics} from '../src/dynastic-politics.js';
 import {councilVotes,conflictAction,tickConflict} from '../src/political-conflict.js';
 import {militaryAction} from '../src/military-systems.js';
-import {titleList,syncTitles,feudalAction,regionalLoyalty,partitionInheritance,claimantCandidates,isImprisoned,captureCommander,tickFeudal} from '../src/feudal-systems.js';
+import {titleList,syncTitles,feudalAction,regionalLoyalty,partitionInheritance,claimantCandidates,isImprisoned,captureCommander,capturePrisoner,prisonerExchangeOptions,tickFeudal} from '../src/feudal-systems.js';
 import {renderFeudal} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=(realm='ming')=>{const g=createGame(world,realm);g.factions[realm].treasury=10000;g.factions[realm].legitimacy=85;return g;};
@@ -19,3 +19,28 @@ test('a claimant faction can install its adult candidate on accepting demands',(
 test('arrest requires evidence and ransom transfers actual personal funds',()=>{const g=start(),[id,h]=holdings(g)[0],person=g.politics.people[h.lord],f=g.factions.ming;assert.equal(feudalAction(g,world,'arrest',person.id).ok,false);h.leverageUntil=24;assert.ok(feudalAction(g,world,'arrest',person.id).ok);assert.ok(isImprisoned(g,person.id));const cash=f.treasury,wealth=person.wealth;assert.ok(feudalAction(g,world,'ransom',person.id).ok);assert.equal(f.treasury,cash+100);assert.equal(person.wealth,wealth-100);assert.equal(isImprisoned(g,person.id),false);});
 test('defeated army commanders can be captured and cannot vote or command',()=>{const g=start(),a=Object.values(g.armies).find(a=>a.owner==='ming'),id=g.politics.realms.ming.council.marshal;assert.ok(militaryAction(g,world,'commander',a.id,id).ok);assert.ok(captureCommander(g,'joseon',a));assert.ok(isImprisoned(g,id));assert.equal(g.military.armies[a.id].commander,null);assert.equal(militaryAction(g,world,'commander',a.id,id).ok,false);assert.equal(councilVotes(g,'ming').some(v=>v.id===id),false);const copy=restoreGame(snapshot(g),world);assert.ok(isImprisoned(copy,id));});
 test('older saves migrate title records and UI exposes hierarchy and prisoners',()=>{const g=start();delete g.feudal;const copy=restoreGame(snapshot(g),world);assert.ok(copy.feudal.titles['k:ming']);const html=renderFeudal(copy,world,String);assert.ok(html.includes('TITLE HIERARCHY'));assert.ok(html.includes('PRISONERS AND RANSOM'));});
+
+
+test('foreign prisoner exchanges release both captives and settle unequal ranks once',()=>{
+ const g=start(),ourRealm=g.player,foreignRealm='joseon';
+ const marshal=g.politics.realms[ourRealm].council.marshal;
+ const foreigner=Object.values(g.politics.people).find(p=>p.realm===foreignRealm&&p.age>=18&&p.id!==g.politics.realms[foreignRealm].ruler&&
+  !Object.values(g.politics.realms[foreignRealm].council).includes(p.id)&&!Object.values(g.politics.holdings).some(h=>h.lord===p.id));
+ assert.ok(capturePrisoner(g,ourRealm,foreigner.id));
+ assert.ok(capturePrisoner(g,foreignRealm,marshal));
+ assert.deepEqual(prisonerExchangeOptions(g,ourRealm,foreigner.id),[{id:marshal,partner:foreignRealm,gold:35}]);
+ assert.match(renderFeudal(g,world,String),/Exchange prisoners/);
+
+ const copy=restoreGame(snapshot(g),world),f=copy.factions[ourRealm],other=copy.factions[foreignRealm];
+ f.treasury=34;
+ const before=other.treasury;
+ assert.equal(feudalAction(copy,world,'exchange',foreigner.id,marshal).ok,false);
+ assert.ok(isImprisoned(copy,marshal)&&isImprisoned(copy,foreigner.id));
+ f.treasury=100;
+ assert.ok(feudalAction(copy,world,'exchange',foreigner.id,marshal).ok);
+ assert.equal(f.treasury,65);
+ assert.equal(other.treasury,before+35);
+ assert.ok(!isImprisoned(copy,marshal)&&!isImprisoned(copy,foreigner.id));
+ assert.equal(feudalAction(copy,world,'exchange',foreigner.id,marshal).ok,false);
+ assert.equal(other.treasury,before+35);
+});

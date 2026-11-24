@@ -19,7 +19,7 @@ CROWN_ENDURANCE_MONTHS=1200 node --test tests/release-endurance.test.mjs
 
 Use `CROWN_ENDURANCE_MONTHS=3600` for 300 years.
 
-Browser QA checks desktop and 390/320px mobile views, map controls, practice battle, audio toggle and backup export/import. Results are attached to GitHub Actions. Passing source checks alone does not establish release readiness.
+Browser QA checks desktop campaign play and backup export/import in Chromium, Firefox, and Playwright WebKit. Chromium also covers 390/320px mobile views, touch orders, practice battle and its audio controls. Results are attached to GitHub Actions. Passing source checks alone does not establish release readiness.
 
 ## Manual acceptance before release
 
