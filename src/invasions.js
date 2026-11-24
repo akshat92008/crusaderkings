@@ -1,3 +1,4 @@
+import {armyReadiness,onArmyMarch,syncRegiments,applyFortDamage} from './military-systems.js';
 import {hasTruce,recordCampaignBattle,activeWar} from './political-conflict.js';
 /**
  * Enemy-initiated wars for the existing Crown of Nations campaign.
@@ -35,7 +36,7 @@ export function findInvasionOptions(g,world){
     if(troops(army)<65)continue;
     const path=trace(world,army.province,neighborId,rival,g);
     if(!path)continue;
-    const power=troops(army)*(0.8+(army.morale||75)/250+(army.experience||0)*.2);
+    const power=troops(army)*armyReadiness(g,army).power*(0.8+(army.morale||75)/250+(army.experience||0)*.2);
     const advantage=power/Math.max(1,defense),distance=path.length-1;
     candidates.push({
       by:rival,army:army.id,province:target.id,staging:neighborId,
@@ -75,7 +76,7 @@ export function progressEnemyInvasions(g,world){
   if(threat.path?.length&&enemy.province!==threat.staging){
    const next=threat.path.shift();
    if(g.provinces[next]?.owner!==threat.by)continue;
-   enemy.province=next;
+   onArmyMarch(g,enemy);enemy.province=next;
   }
   threat.eta=Math.max(0,threat.eta-1);
   if(threat.eta===0){
@@ -99,8 +100,8 @@ export function resolveInvasion(g,world,threat,result){
  const human=armiesOf(g,g.player).filter(a=>a.province===found.province);
  const playerRatio=clamp(result.attackerRemaining??.5,0,1);
  const enemyRatio=clamp(result.enemyRemaining??(result.victory?.45:.78),0,1);
- for(const a of human)trimArmy(a,playerRatio);
- trimArmy(attacker,enemyRatio);
+ for(const a of human){trimArmy(a,playerRatio);syncRegiments(g,a);}
+ onArmyMarch(g,attacker);trimArmy(attacker,enemyRatio);syncRegiments(g,attacker);applyFortDamage(g,found.province,result);
  const defended=Boolean(result.victory);
  recordCampaignBattle(g,found.by,g.player,found.province,!defended);
  if(defended){
@@ -108,7 +109,7 @@ export function resolveInvasion(g,world,threat,result){
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
  }else{
   province.owner=found.by;province.unrest=clamp(province.unrest+27,0,100);
-  if(province.buildings.fort>0)province.buildings.fort--;
+  if(!result.fortBreached&&province.buildings.fort>0)province.buildings.fort--;
   attacker.province=found.province;
   // Surviving defenders retreat to an owned neighboring province if possible.
   const local=world.provinces.find(p=>p.id===found.province);
@@ -129,7 +130,7 @@ export function autoResolveInvasion(g,world,threat){
  if(!target||!army)return {ok:false,msg:'Siege no longer active'};
  const defense=45+target.development*12+(target.buildings.fort||0)*45+
   armiesOf(g,g.player).filter(a=>a.province===threat.province).reduce((sum,a)=>sum+troops(a)*(.7+(a.experience||0)*.4),0);
- const offense=troops(army)*(.8+(army.morale||75)/280+(army.experience||0)*.2);
+ const offense=troops(army)*armyReadiness(g,army).power*(.8+(army.morale||75)/280+(army.experience||0)*.2);
  const defended=offense<=defense*1.13;
  return resolveInvasion(g,world,threat,{victory:defended,attackerRemaining:defended?.82:.32,enemyRemaining:defended?.36:.75});
 }
