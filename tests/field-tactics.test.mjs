@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {initializeFieldGroup,issueFieldOrder,formationMovePoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,stableFieldTarget,rangedWeapon,weaponReach,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
+import {initializeFieldGroup,issueFieldOrder,formationMovePoints,deploymentPoints,fieldTarget,fieldStrength,numericalPower,stepField,fieldTerrain,stableFieldTarget,rangedWeapon,weaponReach,attackAspect,coordinateFieldAI} from '../src/field-tactics.js';
 import {armyFormationSlots} from '../src/military-doctrines.js';
 function unit(id,side,type,x,z,extra={}){return initializeFieldGroup({id,side,type,x,z,order:0,troopCount:40,morale:85,damage:10,armor:1,speed:4,range:type==='archers'?14:2.5,cooldown:0,phase:0,...extra});}
 test('hold and move orders persist rather than returning to automatic pursuit',()=>{const a=unit('a','attacker','infantry',0,20),b=unit('b','defender','infantry',0,-20),s={groups:[a,b],projectiles:[]};assert.ok(issueFieldOrder(a,'hold'));for(let i=0;i<20;i++)stepField(s,.1);assert.equal(a.z,20);assert.ok(issueFieldOrder(a,'move',[10,20]));for(let i=0;i<60;i++)stepField(s,.1);assert.equal(a.fieldOrder,'hold');assert.ok(Math.abs(a.x-10)<.4);});
@@ -83,4 +83,17 @@ test('melee formations stop moving when engaging an enemy within reach',()=>{
  const a=unit('a','attacker','infantry',0,0),b=unit('b','defender','infantry',0,2);
  issueFieldOrder(a,'charge');issueFieldOrder(b,'hold');stepField({groups:[a,b]},.1);
  assert.equal(a.contact,true);assert.equal(a.moving,false);assert.equal(a.z,0);assert.ok(b.life<100);
+});
+
+test('deployment centers infantry, protects missile troops and spreads cavalry to both wings',()=>{
+ const slots=['infantry','infantry','archers','archers','cavalry','cavalry'];
+ for(const direction of [-1,1]){const d=deploymentPoints(slots,24*direction);assert.equal(d[0][0]+d[1][0],0);assert.ok(Math.abs(d[2][1])>Math.abs(d[0][1]));assert.ok(d[4][0]<-20&&d[5][0]>20);assert.ok(d.every(([x,z])=>Math.abs(x)<=64&&Math.abs(z)<=46));}
+});
+test('AI keeps a mounted reserve until infantry engage',()=>{
+ const a=unit('a','attacker','infantry',0,24),b=unit('b','defender','infantry',0,-20),c=unit('c','defender','cavalry',-25,-25),d=unit('d','defender','cavalry',25,-25);
+ const s={groups:[a,b,c,d]};coordinateFieldAI(s);assert.equal(d.fieldOrder,'hold');assert.equal(c.fieldOrder,'advance');
+ b.contact=true;coordinateFieldAI(s);assert.equal(d.fieldOrder,'advance');
+});
+test('a move order blocked by melee preserves its destination until the obstruction clears',()=>{
+ const a=unit('a','attacker','infantry',0,0),b=unit('b','defender','infantry',0,2);issueFieldOrder(a,'move',[0,20]);issueFieldOrder(b,'hold');stepField({groups:[a,b]},.1);assert.equal(a.fieldOrder,'move');assert.equal(a.anchorZ,20);
 });
