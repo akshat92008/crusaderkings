@@ -130,6 +130,43 @@ try:
     page.reload(wait_until='domcontentloaded');page.locator('#realm-search').wait_for(state='visible')
     page.locator('#save-file').set_input_files({'name':'campaign.json','mimeType':'application/json','buffer':backup})
     page.locator('#start-screen').wait_for(state='hidden');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
+   if chromium and name=='desktop':
+    allied_save=page.evaluate('''async () => {
+     const {createGame,snapshot}=await import('/src/simulation.js');
+     const world=await fetch('/data/world.json').then(r=>r.json());
+     const g=createGame(world,'ming');
+     const find=owner=>Object.values(g.armies).find(a=>a.owner===owner);
+     Object.assign(find('joseon'),{province:'p141',infantry:267,archers:92,cavalry:27});
+     find('ming').province='p137';
+     find('ashikaga').province='p142';
+     g.kingdom.difficulty='peaceful';
+     g.factions.joseon.treasury=1200;
+     g.factions.ming.treaties.joseon='alliance';
+     g.factions.joseon.treaties.ming='alliance';
+     g.factions.joseon.relations.ming=75;
+     g.conflict.wars.test={id:'test',attacker:'ashikaga',defender:'ming',goal:'p137',score:0,battles:0,started:0,status:'active'};
+     g.kingdom.threats=[{army:find('ashikaga').id,by:'ashikaga',province:'p137',staging:'p142',path:[],eta:2,status:'approaching'}];
+     return snapshot(g);
+    }''')
+    page.reload(wait_until='domcontentloaded')
+    page.locator('#realm-search').wait_for(state='visible')
+    page.locator('#save-file').set_input_files({'name':'allied-field.json','mimeType':'application/json','buffer':allied_save.encode()})
+    page.locator('#start-screen').wait_for(state='hidden')
+    page.locator('#quick-nav [data-priority-tab="search"]').click()
+    page.fill('#campaign-query','diplomacy')
+    page.locator('.finder-row[data-priority-tab="diplomacy"]').click()
+    page.get_by_text('Treaties and allied support',exact=True).click()
+    page.get_by_role('button',name='Call field contingent',exact=True).click()
+    assert page.get_by_text('Joseon Korea · 115 field troops · Arrives next month',exact=False).count()==1
+    page.click('#close-management')
+    page.click('#next-month')
+    page.click('#next-month')
+    page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
+    assert '115 ALLIED TROOPS' in page.locator('#battle-meta').inner_text()
+    page.click('#battle-retreat')
+    page.click('#battle-return')
+    assert page.locator('#battle-screen').is_hidden()
+    print('desktop PASS: call allied field contingent, march to the frontier, deploy in battle')
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    page.close()

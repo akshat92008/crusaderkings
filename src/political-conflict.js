@@ -5,7 +5,7 @@ import {campaignArmyPower,borderBattleOutcome,proportionalLoss} from './border-b
 import {armyReadiness,syncRegiments} from './military-systems.js';
 import {embarked} from './naval-systems.js';
 import {controller} from './campaign-war.js';
-import {nonAggression,aidStrength,diplomaticSupport} from './diplomacy-systems.js';
+import {nonAggression,aidStrength,diplomaticSupport,recallWarContingents} from './diplomacy-systems.js';
 import {hookStrength} from './intrigue-systems.js';
 import {independenceMembers,foundBreakaway} from './independence-systems.js';
 import {claimantCandidates,installClaimant,isImprisoned,capturePrisoner} from './feudal-systems.js';
@@ -21,7 +21,7 @@ function note(g,msg){g.log.unshift({date:g.year+' · month '+(g.month+1),text:ms
 export function initConflict(g){return g.conflict??={next:1,seed:987123,lastTick:-1,factions:{},schemes:{},claims:{},wars:{},truces:{},favors:{},council:{},history:[]};}
 function rng(c){c.seed=(Math.imul(c.seed,1664525)+1013904223)>>>0;return c.seed/4294967296;}
 const holdings=(g,realm)=>Object.entries(g.politics.holdings).filter(([id,v])=>v.realm===realm&&g.provinces[id]?.owner===realm);
-const army=(g,realm)=>Object.values(g.armies).filter(a=>a.owner===realm);
+const army=(g,realm)=>Object.values(g.armies).filter(a=>a.owner===realm&&!a.contingent);
 const pair=(a,b)=>[a,b].sort().join('|');
 const councilKey=(realm,id)=>realm+':'+id;
 function history(g,entry){const c=initConflict(g);c.history.unshift({turn:g.turn,...entry});c.history=c.history.slice(0,200);}
@@ -37,7 +37,7 @@ function claimKey(realm,id){return realm+':'+id;}
 export function availableClaims(g,realm){const c=initConflict(g);return Object.values(c.claims).filter(x=>x.realm===realm&&g.provinces[x.province]&&g.provinces[x.province].owner!==realm&&x.expires>g.turn&&validDynasticClaim(g,x));}
 export function activeWar(g,a,b){return Object.values(initConflict(g).wars).find(w=>w.status==='active'&&pair(w.attacker,w.defender)===pair(a,b));}
 export function hasTruce(g,a,b){return (initConflict(g).truces[pair(a,b)]||0)>g.turn;}
-function endWar(g,w,result){settleOccupations(g,w,result);w.status=result;w.ended=g.turn;initConflict(g).truces[pair(w.attacker,w.defender)]=g.turn+36;history(g,{kind:'war',realm:w.attacker,message:w.attacker+' vs '+w.defender+': '+result});if([w.attacker,w.defender].includes(g.player))note(g,'Peace signed: '+result+'. A three-year truce follows.');}
+function endWar(g,w,result){settleOccupations(g,w,result);w.status=result;w.ended=g.turn;recallWarContingents(g,w.id);initConflict(g).truces[pair(w.attacker,w.defender)]=g.turn+36;history(g,{kind:'war',realm:w.attacker,message:w.attacker+' vs '+w.defender+': '+result});if([w.attacker,w.defender].includes(g.player))note(g,'Peace signed: '+result+'. A three-year truce follows.');}
 export function peaceTerms(g,war,realm){
  if(war?.status!=='active'||![war.attacker,war.defender].includes(realm))return [];
  const attacking=war.attacker===realm,opponent=attacking?war.defender:war.attacker;

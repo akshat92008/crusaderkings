@@ -16,7 +16,7 @@ import {characterContext,campaignLinks,characterLink,provinceLink,sectionLink,co
 import {COURT_OFFICES,courtCandidates,courtModifiers} from './royal-court.js';
 import {currentExpandedEvents,expandedDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
-import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms} from './diplomacy-systems.js';
+import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions} from './diplomacy-systems.js';
 import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers} from './government-institutions.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
@@ -322,7 +322,7 @@ export function renderInstitutions(g,world,esc){
  return html+'</details>';
 }
 
-export function renderDiplomaticAgreements(g,other,esc){
+export function renderDiplomaticAgreements(g,other,esc,world){
  const d=g.diplomacy,r=g.player;if(!d)return '';const name=id=>g.factions[id]?.name||id;
  const btn=(type,id,label,input='')=>'<button class="rowbtn" data-action="diplomatic-agreement" data-type="'+esc(type)+'" data-id="'+esc(id)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
  let html='<details class="rule"><summary>Treaties and allied support</summary>';const links=activeMarriageLinks(g,r,other);if(links.length)html+='<p class="smallnote">Living dynastic ties: '+links.map(x=>characterLink(g.politics.people[x.a],esc)+' × '+characterLink(g.politics.people[x.b],esc)).join(', ')+'</p>';
@@ -334,7 +334,22 @@ export function renderDiplomaticAgreements(g,other,esc){
    :accessReason?'<p class="smallnote">'+esc(accessReason)+'</p>':btn('access',other,'Request military passage (90g)'))
   +'</div>';
  for(const p of Object.values(d.guarantees).filter(x=>x.protected===r||x.guarantor===r))html+='<div class="smallnote">'+esc(name(p.guarantor))+' guarantees '+esc(name(p.protected))+' · '+Math.max(0,p.until-g.turn)+' months</div>';
- for(const w of Object.values(g.conflict.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(r))){const enemy=w.attacker===r?w.defender:w.attacker,ids=aidOptions(g,r,w),field='aid-'+w.id;html+='<div class="rule"><b>War with '+esc(name(enemy))+'</b><div class="smallnote">Allied logistical support '+aidStrength(g,r,enemy)+' · abstract campaign strength, not allied field units.</div>';if(ids.length)html+='<select class="select" id="'+field+'">'+ids.map(id=>'<option value="'+esc(id)+'">'+esc(name(id))+'</option>').join('')+'</select>'+btn('aid',w.id,'Request allied aid',field);html+='</div>';}
+ for(const w of Object.values(g.conflict.wars).filter(w=>w.status==='active'&&[w.attacker,w.defender].includes(r))){
+  const enemy=w.attacker===r?w.defender:w.attacker,ids=aidOptions(g,r,w),field='aid-'+w.id;
+  html+='<div class="rule"><b>War with '+esc(name(enemy))+'</b><p class="smallnote">Logistical support '+aidStrength(g,r,enemy)+'</p>';
+  for(const aid of Object.values(d.aid).filter(a=>a.war===w.id&&a.realm===r&&a.army&&g.armies[a.army]?.contingent)){
+   const army=g.armies[aid.army],count=army.infantry+army.archers+army.cavalry;
+   html+='<p class="smallnote">'+esc(name(aid.donor))+' · '+fmt(count)+' field troops'
+    +(aid.route.length===1?' · Arrives next month':aid.route.length>1?' · '+aid.route.length+' months to arrival':' · Stationed at '+esc(army.province))+' · '+Math.max(0,aid.until-g.turn)+' months of service remaining</p>';
+  }
+  if(ids.length)html+='<select class="select" aria-label="Ally for logistical aid" id="'+field+'">'+ids.map(id=>'<option value="'+esc(id)+'">'+esc(name(id))+'</option>').join('')+'</select>'+btn('aid',w.id,'Request logistical aid',field);
+  const offers=world?fieldAidOptions(g,world,r,w):[];
+  if(offers.length){
+   const contingentField='dispatch-'+w.id;
+   html+='<label for="'+contingentField+'" class="smallnote">Ally for field contingent</label><select class="select" id="'+contingentField+'">'+offers.map(o=>'<option value="'+esc(o.donor)+'">'+esc(name(o.donor))+' · '+fmt(o.count)+' troops · '+o.route.length+(o.route.length===1?' month':' months')+'</option>').join('')+'</select>'+btn('field-aid',w.id,'Call field contingent',contingentField)+'<p class="smallnote">These troops join battles against this rival after arriving. They can march alongside your armies.</p>';
+  }else if(ids.length)html+='<p class="smallnote">A field contingent requires available allied troops and a controlled land route.</p>';
+  html+='</div>';
+ }
  return html+'</details>';
 }
 
