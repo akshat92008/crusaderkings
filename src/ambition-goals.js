@@ -330,7 +330,7 @@ const zero=new Set(['debt','wars']);
 const industries=new Set(['granary','irrigation','smithy','loom','infirmary','warehouse']);
 function live(g,r,id){const p=g.politics.people[id];return p?.alive&&p.realm===r&&p.age>=18&&!isImprisoned(g,id);}
 function snapshot(g,r,metric,base){
- const f=g.factions[r],head=g.politics.people[g.politics.realms[r]?.ruler],land=Object.values(g.provinces).filter(p=>p.owner===r&&controller(g,p.id)===r),holdings=land.map(p=>g.politics.holdings[p.id]).filter(h=>h?.realm===r&&h.lord!==head?.id),court=g.royalCourt?.realms[r],eco=g.economy?.realms[r],other=Object.keys(g.factions).filter(id=>id!==r&&active(g,id));
+ const f=g.factions[r],head=g.politics.people[g.politics.realms[r]?.ruler],land=Object.values(g.provinces).filter(p=>p.owner===r&&controller(g,p.id)===r),holdings=land.map(p=>g.politics.holdings[p.id]).filter(h=>h?.realm===r&&h.lord!==head?.id),court=g.royalCourt?.realms[r],eco=g.economy?.realms[r],other=['alliances','tradePacts','trusted'].includes(metric)?[...new Set(Object.values(g.provinces).map(p=>p.owner))].filter(id=>id!==r&&g.factions[id]):[];
  const started=base?.turn??g.turn;
  let value=0,extra={};
  if(industries.has(metric))value=sum(land,p=>g.economy?.provinces[p.id]?.industries?.[metric]);
@@ -361,7 +361,7 @@ function snapshot(g,r,metric,base){
  }
  return {value,turn:started,...extra};
 }
-export function ambitionBaseline(g,r,id){const d=ADDITIONAL_AMBITIONS[id];return d?snapshot(g,r,d.metric):null;}
+export function ambitionBaseline(g,r,id){const d=Object.hasOwn(ADDITIONAL_AMBITIONS,id)?ADDITIONAL_AMBITIONS[id]:null;return d?snapshot(g,r,d.metric):null;}
 export function additionalAmbitionAvailable(g,r,id){const d=ADDITIONAL_AMBITIONS[id];if(!d)return false;const m=d.metric,b=snapshot(g,r,m);if(zero.has(m))return b.value>0;if(capped.has(m)&&b.value>=100)return false;if(m==='unrest')return b.value>=10&&b.provinces>0;if(m==='loyalty')return b.estates>0&&b.value<100;if(m==='childSkills')return b.children.length>0;if(m==='grandeur')return b.value<=90;if(m==='offices')return b.value<=3;if(m==='artifacts')return b.value<=3;if(m==='legacies')return b.value<=10;if(m==='settlement')return Object.values(g.heritage?.struggles||{}).some(x=>x.ended===null&&Object.hasOwn(x.influence||{},r));return true;}
 export function additionalAmbitionProgress(g,r,id,base){const d=ADDITIONAL_AMBITIONS[id];if(!d||!base?.goal)return null;const b=base.goal,m=d.metric,x=snapshot(g,r,m,b);let target=b.value+d.amount,done=false,detail='';if(capped.has(m))target=Math.min(100,target);if(m==='grandeur')target=Math.max(65,target);if(zero.has(m))target=0;if(m==='unrest')target=Math.max(0,b.value-d.amount);if(activities.has(m)||['collection','settlement','disruptions'].includes(m))target=d.amount;
  done=m==='unrest'||zero.has(m)?x.value<=target:x.value>=target;
