@@ -21,6 +21,7 @@ import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifie
 import {governmentMotionView} from './government-deliberations.js';
 import {civilServiceView} from './imperial-civil-service.js';
 import {merchantElectionView,steppePastureView} from './regional-institutions.js';
+import {regionalPoliticalView} from './regional-politics.js';
 import {PLOTS,SECRETS,plotTargets,activePlots,plotOdds,agentOptions,knownSecrets,hookStrength} from './intrigue-systems.js';
 import {TRADITIONS,INNOVATIONS,identityModifiers,researchOptions,localIdentities} from './identity-systems.js';
 import {titleList,claimantCandidates,isImprisoned,regionalLoyalty,prisonerExchangeOptions} from './feudal-systems.js';
@@ -322,6 +323,25 @@ export function renderInstitutions(g,world,esc){
  for(const [id,x] of Object.entries(s.offices))html+='<div class="smallnote">'+esc(place(id))+' · '+esc(name(x.person))+'</div>';
  for(const x of [...Object.values(s.houses),...Object.values(s.retainers)])html+='<div class="smallnote">'+esc(name(x.person))+' · level '+x.level+'/3</div>';
  for(const [id,x] of Object.entries(s.tributes))html+='<div class="smallnote">'+esc(g.factions[id]?.name||id)+' · '+x.amount+'g/month · '+Math.max(0,x.until-g.turn)+' months</div>';
+ const regional=regionalPoliticalView(g,realm);
+ if(regional){const disabled=regional.canAct?'':' disabled';html+='<div class="rule">';
+ if(regional.kind==='regional'){
+ html+='<b>Regional land grants</b><p class="paragraph">Negotiate a four-year grant with an existing chief: reduced crown tax, increased levy cooperation, trust and lower unrest. Ownership and inheritance do not change.</p>';
+ for(const x of regional.grants)html+='<div class="smallnote">'+esc(place(x.id))+' · '+esc(name(x.lord))+' · '+Math.max(0,x.until-g.turn)+' months</div>';
+ if(regional.candidates.length)html+='<select class="select" id="regional-grant-chief">'+regional.candidates.map(x=>'<option value="'+esc(x.id)+'">'+esc(place(x.id))+' · '+esc(name(x.lord))+' · loyalty '+Math.round(x.loyalty)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="regional:grant" data-second="regional-grant-chief"'+disabled+'>Negotiate land grant (130g)</button>';
+ }else if(regional.kind==='sultanate'){
+ html+='<b>Scholarly commission</b><p class="paragraph">Appoint a qualified scholar for two years to support institutions and legitimacy. Costs 120g initially and 12g each quarter; existing military households remain separate.</p>';
+ if(regional.scholar)html+='<div class="smallnote">'+esc(regional.scholar.name)+' · '+Math.max(0,regional.scholar.until-g.turn)+' months</div>';
+ else if(regional.candidates.length)html+='<select class="select" id="sultanate-scholar">'+regional.candidates.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+' · learning '+x.learning+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="sultanate:scholar" data-second="sultanate-scholar"'+disabled+'>Commission scholar (120g)</button>';
+ }else{
+ html+='<b>Military house rivalries</b><p class="paragraph">Rival houses draw power from their land and funded retainers. High tension damages authority and local order. An accord improves loyalty and protects the negotiating houses for 18 months.</p><div class="smallnote">Rivalry tension '+regional.tension+'/100 · Threat threshold 75</div>';
+ for(const h of regional.rivals.slice(0,12))html+='<div class="smallnote">'+esc(h.house)+' · influence '+h.power+' · loyalty '+h.loyalty+'</div>';
+ if(regional.mediation)html+='<div class="smallnote">Accord: '+esc(regional.mediation.houses.join(' and '))+' · '+Math.max(0,regional.mediation.until-g.turn)+' months</div>';
+ html+='<button class="rowbtn" data-action="institution" data-id="shogunate:mediate"'+disabled+'>Mediate rival houses (150g)</button>';
+ }
+ if(regional.wait)html+='<div class="smallnote">Next institutional agreement in '+regional.wait+' months</div>';
+ if(regional.last)html+='<p class="smallnote">'+esc(regional.last.message)+'</p>';
+ html+='</div>';}
  const election=merchantElectionView(g,realm);
  if(election){html+='<div class="rule"><b>Merchant assembly elections</b><p class="paragraph">Invest in two different merchant houses to begin competitive elections for the assembly chair. The chair improves trade; this office does not alter crown succession.</p><div class="smallnote">Chair: '+esc(election.chair?.name||'Vacant')+' · '+(election.next===null?'Awaiting competing families':'Election in '+Math.max(0,election.next-g.turn)+' months')+'</div>';
  for(const c of election.candidates)html+='<div class="smallnote">'+esc(c.house)+' · '+esc(c.name)+' · '+c.score+' election score ('+c.base+' reputation + '+c.fund/5+' campaign) </div>';

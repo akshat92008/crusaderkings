@@ -81,3 +81,29 @@ test('steppe pasture reserves cost gold, prevent excess herd loss and expire',()
  g.factions.a.food=-10;g.turn=3;tickInstitutions(g);assert.equal(institutionState(g,'a').herds,22);
  g.turn=12;tickInstitutions(g);assert.equal(steppePastureView(g,'a').active,false);assert.equal(institutionState(g,'a').herds,14);
 });
+
+import {regionalPoliticalView} from '../src/regional-politics.js';
+function regionalFixture(mode){const g=fixture(mode);g.civic.realms.a={government:mode,faith:'Court faith',authority:70,patronage:50};g.civic.provinces={p:{localTrust:50},q:{localTrust:60}};g.identity={realms:{a:{faithAuthority:45}}};g.factions.a.legitimacy=60;g.provinces.p.unrest=20;g.provinces.q.unrest=20;g.politics.people.n.house='North';g.politics.people.m.house='South';return g;}
+test('regional land grants affect local trust and crown tradeoffs without transferring titles',()=>{
+ const g=regionalFixture('regional');assert.ok(governmentAction(g,{},'regional:grant','p').ok);assert.equal(g.factions.a.treasury,870);
+ assert.equal(g.politics.holdings.p.lord,'n');assert.equal(g.civic.provinces.p.localTrust,58);assert.equal(institutionModifiers(g,'a').tax,.94);assert.equal(institutionModifiers(g,'a').levy,1.04);
+ assert.equal(governmentAction(g,{},'regional:grant','q').ok,false);g.turn=3;tickInstitutions(g);assert.equal(g.civic.provinces.p.localTrust,60);assert.equal(g.provinces.p.unrest,18);
+ const copy=JSON.parse(JSON.stringify(g));initInstitutions(copy);assert.equal(regionalPoliticalView(copy,'a').grants.length,1);copy.politics.holdings.p.lord='m';copy.turn=4;tickInstitutions(copy);assert.equal(regionalPoliticalView(copy,'a').grants.length,0);assert.equal(institutionModifiers(copy,'a').tax,1);
+});
+test('sultanate scholarship has qualifications, a paid stipend, authority effects and faith-specific termination',()=>{
+ const g=regionalFixture('sultanate');g.politics.people.n.skills.learning=4;g.politics.people.n.civic={faith:'Court faith'};
+ assert.equal(governmentAction(g,{},'sultanate:scholar','m').ok,false);assert.ok(governmentAction(g,{},'sultanate:scholar','n').ok);assert.equal(g.factions.a.treasury,880);assert.equal(g.politics.people.n.wealth,160);
+ g.turn=3;tickInstitutions(g);assert.equal(g.factions.a.treasury,868);assert.equal(g.politics.people.n.wealth,172);assert.equal(g.identity.realms.a.faithAuthority,46);assert.equal(g.factions.a.legitimacy,61);
+ g.civic.realms.a.faith='New faith';g.turn=6;tickInstitutions(g);assert.equal(regionalPoliticalView(g,'a').scholar,null);assert.equal(g.factions.a.treasury,868);
+});
+test('shogunal rivals threaten authority and mediation improves loyalty without changing the ruler',()=>{
+ const g=regionalFixture('shogunate');g.politics.holdings.p.loyalty=10;g.politics.holdings.q.loyalty=10;
+ g.turn=6;tickInstitutions(g);assert.equal(g.civic.realms.a.authority,68);assert.equal(g.provinces.p.unrest,23);assert.ok(regionalPoliticalView(g,'a').tension>=75);
+ assert.ok(governmentAction(g,{},'shogunate:mediate').ok);assert.equal(g.politics.holdings.p.loyalty,20);assert.equal(g.factions.a.treasury,850);assert.equal(g.politics.realms.a.ruler,'r');
+ g.turn=12;tickInstitutions(g);assert.equal(g.civic.realms.a.authority,68);assert.equal(g.provinces.p.unrest,23);
+ g.turn=24;tickInstitutions(g);assert.equal(g.civic.realms.a.authority,66);assert.equal(g.provinces.p.unrest,26);
+});
+test('AI regional rulers negotiate with disloyal chiefs and government transition removes arrangements',()=>{
+ const g=regionalFixture('regional');g.player='b';g.turn=12;tickInstitutions(g);assert.ok(regionalPoliticalView(g,'a').grants.length);
+ g.civic.realms.a.government='feudal';initInstitutions(g);assert.equal(institutionState(g,'a').regionalPolitics,undefined);assert.equal(regionalPoliticalView(g,'a'),null);
+});

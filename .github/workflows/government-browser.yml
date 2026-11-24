@@ -7,6 +7,7 @@ on:
       - 'src/government-deliberations.js'
       - 'src/imperial-civil-service.js'
       - 'src/regional-institutions.js'
+      - 'src/regional-politics.js'
       - 'src/kingdom-ui.js'
       - 'scripts/government_browser_smoke.py'
       - '.github/workflows/government-browser.yml'
