@@ -79,7 +79,7 @@ function campaignRound(g,x,boost=0){const f=g.factions[x.realm],forces=army(g,x.
  if(x.score>=75||x.rebels<=10)settleFaction(g,x,'royal victory');else if(x.score<=-60||x.months>=18)settleFaction(g,x,x.score>0?'royal victory':'rebel victory');
 }
 export function conflictAction(g,world,action,id,extra){const c=initConflict(g),realm=g.player,f=g.factions[realm],x=c.factions[id];
- if(action==='council'){if(!['advisory','binding'].includes(id)||c.council[realm]===id||f.legitimacy<60||f.treasury<150)return no('Council reform requires 150 gold and 60 legitimacy.');if(id==='advisory'&&!councilPermission(g,realm,'law'))return no('The council refuses to surrender its authority.');f.treasury-=150;c.council[realm]=id;return ok('Council authority updated.');}
+ if(action==='council'){if(!['advisory','binding'].includes(id)||(c.council[realm]||'advisory')===id||f.legitimacy<60||f.treasury<150)return no('Council reform requires 150 gold and 60 legitimacy.');if(id==='advisory'&&!councilPermission(g,realm,'law'))return no('The council refuses to surrender its authority.');f.treasury-=150;c.council[realm]=id;return ok('Council authority updated.');}
  if(action==='favor'){const v=councilVotes(g,realm).find(x=>x.id===id);if(!v||v.favor||f.treasury<80)return no('Need an unfavored councillor and 80 gold.');f.treasury-=80;c.favors[councilKey(realm,id)]=g.turn+24;return ok('Councillor favor secured for two years.');}
  if(action==='scheme')return startScheme(g,realm,id,extra);
  if(action==='declare')return declare(g,realm,id);
@@ -97,7 +97,7 @@ export function tickConflict(g,world){const c=initConflict(g);if(c.lastTick===g.
  if(g.turn%3!==0)return;
  for(const [realm,s] of Object.entries(g.politics.realms)){
  const f=g.factions[realm],local=holdings(g,realm),members=local.filter(([,v])=>v.loyalty<42).map(([id])=>id);let x=Object.values(c.factions).find(x=>x.realm===realm&&['organizing','ultimatum','civil war'].includes(x.status));
- if(x?.status==='civil war'){campaignRound(g,x);continue;}
+ if(x?.status==='civil war'){x.members=x.members.filter(id=>g.provinces[id]?.owner===realm);if(!x.members.length)settleFaction(g,x,'dissolved');else campaignRound(g,x);continue;}
  if(!members.length){if(x)settleFaction(g,x,'dissolved');continue;}
  if(!x){const recent=Object.values(c.factions).some(x=>x.realm===realm&&x.ended!==undefined&&g.turn-x.ended<24);if(recent)continue;const key='f'+c.next++;const kind=local.filter(([id,v])=>members.includes(id)&&v.tax===2).length?'tax':local.filter(([id,v])=>members.includes(id)&&v.levy===2).length?'levy':'liberty';x=c.factions[key]={id:key,realm,kind,members,pressure:15,status:'organizing',started:g.turn};noteIf(g,realm,'Discontented vassals formed a '+kind+' faction.');}
  x.members=members;x.power=power(g,members);x.pressure=cap(x.pressure+Math.max(5,members.length*4),0,100);
