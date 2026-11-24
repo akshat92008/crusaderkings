@@ -381,7 +381,7 @@ function finish(g,realm,x){const a=g.heritage,s=a.realms[realm],f=g.factions[rea
  if(x.kind==='memorial'&&x.subject)s.honored.push(x.subject);
  if(x.kind==='coming_age'&&x.subject){const p=g.politics.people[x.subject];if(p?.alive&&p.realm===realm&&p.civic){p.civic.education=cap(p.civic.education+12,0,100);s.celebratedAge.push(p.id);}}
  const attended=(x.participants||[]).filter(id=>freeAdult(g,realm,id));for(const id of attended){const p=g.politics.people[id],delta=x.quality>=55?12:x.quality<30?-8:4;if(g.chronicles)changeOpinion(g,r.id,id,delta);p.memories??=[];p.memories.push('Attended '+rule.name+' in '+g.year+'.');p.memories=p.memories.slice(-40);}
- r.memories??=[];r.memories.push('Hosted '+rule.name+' in '+g.year+' ('+x.quality+'% quality).');r.memories=r.memories.slice(-40);s.activityRecords.unshift({kind:x.kind,host:r.id,destination:x.destination,participants:attended,quality:x.quality,turn:g.turn,cost:x.cost});s.activityRecords=s.activityRecords.slice(0,20);
+ r.memories??=[];r.memories.push('Hosted '+rule.name+' in '+g.year+' ('+x.quality+'% quality).');r.memories=r.memories.slice(-40);s.activityRecords.unshift({id:x.id,kind:x.kind,host:r.id,guest:x.guest,subject:x.subject,destination:x.destination,participants:attended,quality:x.quality,turn:g.turn,cost:x.cost});s.activityRecords=s.activityRecords.slice(0,20);
  if(x.kind==='wedding'&&x.marriage)s.celebrated.push(x.marriage);
  if(x.kind==='feast'||x.kind==='tour')for(const [id,h] of Object.entries(g.politics.holdings))if(h.realm===realm&&g.provinces[id]?.owner===realm)h.loyalty=cap(h.loyalty+(x.kind==='tour'?7:5),0,100);
  if(x.kind==='tournament')for(const a of Object.values(g.armies))if(a.owner===realm)a.experience=cap(a.experience+.05,0,1);
