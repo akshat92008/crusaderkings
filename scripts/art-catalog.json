@@ -1,0 +1,62 @@
+{
+  "portraits": {
+    "steppe": "Gemini_Generated_Image_46rij946rij946ri.png",
+    "children": "Gemini_Generated_Image_51jte051jte051jt.png",
+    "southeast": "Gemini_Generated_Image_6grbpz6grbpz6grb.png",
+    "ming": "Gemini_Generated_Image_81gyls81gyls81gy.png",
+    "ottoman": "Gemini_Generated_Image_bwxzgrbwxzgrbwxz.png",
+    "western": "Gemini_Generated_Image_dnem3ndnem3ndnem.png",
+    "eastafrica": "Gemini_Generated_Image_jzi0n4jzi0n4jzi0.png",
+    "mesoamerica": "Gemini_Generated_Image_k3tmwgk3tmwgk3tm.png",
+    "andean": "Gemini_Generated_Image_ld6uafld6uafld6u.png",
+    "southindia": "Gemini_Generated_Image_m00o5fm00o5fm00o.png",
+    "japan": "Gemini_Generated_Image_o4uuodo4uuodo4uu.png",
+    "persian": "Gemini_Generated_Image_plusr9plusr9plus.png",
+    "eastern": "Gemini_Generated_Image_q10kzcq10kzcq10k.png",
+    "northindia": "Gemini_Generated_Image_rnq9i2rnq9i2rnq9.png",
+    "westafrica": "Gemini_Generated_Image_uh10eduh10eduh10 (1).png",
+    "india_extra": "Gemini_Generated_Image_yw8zdryw8zdryw8z.png"
+  },
+  "events": {
+    "succession": "Gemini_Generated_Image_24ko8624ko8624ko.png",
+    "council": "Gemini_Generated_Image_4fp7gy4fp7gy4fp7.png",
+    "rebellion": "Gemini_Generated_Image_53nra653nra653nr.png",
+    "intrigue": "Gemini_Generated_Image_6iksvk6iksvk6iks.png",
+    "hunt": "Gemini_Generated_Image_8oxxjb8oxxjb8oxx.png",
+    "festival": "Gemini_Generated_Image_8tqhfw8tqhfw8tqh.png",
+    "diplomacy": "Gemini_Generated_Image_8vs3eh8vs3eh8vs3.png",
+    "tournament": "Gemini_Generated_Image_906ahc906ahc906a.png",
+    "relationships": "Gemini_Generated_Image_948rq0948rq0948r.png",
+    "trade": "Gemini_Generated_Image_9bso2a9bso2a9bso.png",
+    "religion": "Gemini_Generated_Image_c3howyc3howyc3ho.png",
+    "crisis": "Gemini_Generated_Image_eeo7treeo7treeo7.png",
+    "mourning": "Gemini_Generated_Image_f8ujrqf8ujrqf8uj.png",
+    "family": "Gemini_Generated_Image_i69dqhi69dqhi69d.png",
+    "travel": "Gemini_Generated_Image_j0erubj0erubj0er.png",
+    "learning": "Gemini_Generated_Image_o8k6bho8k6bho8k6.png",
+    "battle": "Gemini_Generated_Image_pdx7wypdx7wypdx7.png",
+    "civilwar": "Gemini_Generated_Image_rdallzrdallzrdal.png",
+    "mobilization": "Gemini_Generated_Image_tf6voktf6voktf6v.png",
+    "regional": "Gemini_Generated_Image_ymkrynymkrynymkr.png",
+    "justice": "Gemini_Generated_Image_z9t3n6z9t3n6z9t3.png"
+  },
+  "realms": {
+    "europe": "Gemini_Generated_Image_7qhm8n7qhm8n7qhm.png",
+    "africa_asia": "Gemini_Generated_Image_6xnk3t6xnk3t6xnk.png",
+    "eastern": "Gemini_Generated_Image_n9fatwn9fatwn9fa.png",
+    "americas": "Gemini_Generated_Image_3qz4ud3qz4ud3qz4 (1).png"
+  },
+  "dynasties": {
+    "europe": "Gemini_Generated_Image_ze8u1hze8u1hze8u.png",
+    "india": "Gemini_Generated_Image_k1xa7kk1xa7kk1xa (1).png",
+    "persia": "Gemini_Generated_Image_hcvyhwhcvyhwhcvy (1).png",
+    "global": "Gemini_Generated_Image_17ghur17ghur17gh.png"
+  },
+  "ui": {
+    "shields": "Gemini_Generated_Image_4dsg684dsg684dsg.png",
+    "frames": "Gemini_Generated_Image_6z172d6z172d6z17.png",
+    "ornaments": "Gemini_Generated_Image_8zkxil8zkxil8zkx.png",
+    "panels": "Gemini_Generated_Image_o6lvqco6lvqco6lv.png",
+    "buttons": "Gemini_Generated_Image_tr5poqtr5poqtr5p.png"
+  }
+}
