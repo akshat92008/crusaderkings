@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {createGame,advanceMonth,snapshot,restoreGame,empireStats} from '../src/simulation.js';
-import {politicsAction,marriageCandidates,politicalRevenue,politicalLevy} from '../src/dynastic-politics.js';
+import {politicsAction,marriageCandidates,politicalRevenue,politicalLevy,politicalDispatch} from '../src/dynastic-politics.js';
 import {renderCourt} from '../src/kingdom-ui.js';
 const world=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url)));
 const start=()=>{const g=createGame(world,'england');g.factions.england.treasury=10000;g.factions.england.legitimacy=80;return g;};
@@ -12,3 +12,5 @@ test('contracts alter revenue and levies; foreign holdings reject orders',()=>{c
 test('law changes are restricted and court renders actionable political controls',()=>{const g=start();assert.ok(politicsAction(g,world,'law','youngest').ok);assert.equal(politicsAction(g,world,'law','elective').ok,false);assert.ok(renderCourt(g,s=>String(s)).includes('VASSAL CONTRACTS'));});
 test('old saves acquire new political records',()=>{const g=start();delete g.politics;const restored=restoreGame(snapshot(g),world);assert.ok(restored.politics.realms.england);});
 test('twenty years preserve reciprocal living marriages, sovereigns and numeric economies',()=>{const g=start();for(let i=0;i<240;i++)advanceMonth(g,world);for(const r of Object.values(g.politics.realms))assert.ok(g.politics.people[r.ruler].alive);for(const c of Object.values(g.politics.people))if(c.alive&&c.spouse){assert.ok(g.politics.people[c.spouse].alive);assert.equal(g.politics.people[c.spouse].spouse,c.id);}assert.ok(Number.isFinite(empireStats(g,'england').income));assert.equal(g.year,1470);});
+
+test('contextual dispatch identifies a live character and records the selected outcome',()=>{const g=start();for(let i=0;i<6;i++)advanceMonth(g,world);const d=politicalDispatch(g);assert.ok(d);assert.ok(g.politics.people[d.id].alive);assert.ok(renderCourt(g,s=>String(s)).includes('POLITICAL DISPATCH'));const index=d.choices.findIndex(c=>c.cost<=g.factions.england.treasury);assert.ok(index>=0);assert.ok(politicsAction(g,world,'dispatch',String(index)).ok);assert.ok(g.politics.people[d.id].memories.length>0);assert.equal(politicalDispatch(g),null);});
