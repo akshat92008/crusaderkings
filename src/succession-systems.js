@@ -9,13 +9,13 @@ const opinion=(g,a,b)=>num(g.chronicles?.relationships?.[[a,b].sort().join('|')]
 // A living eligible ancestor precedes descendants; dead or ineligible ancestors
 // do not extinguish their entire branch. Foreign residents cannot take a crown yet.
 export const crownExcluded=(person,realm)=>Boolean(realm&&person?.crownExclusion===realm);
-export function hereditaryLine(g,head,law='eldest',crownRealm=null){
+export function hereditaryLine(g,head,law='eldest',crownRealm=null,branchRoot=null){
  if(!head)return [];const seen=new Set([head.id]),out=[];
  function visit(p){if(!p||seen.has(p.id))return;seen.add(p.id);if(free(g,p)&&p.realm===head.realm&&p.house===head.house&&!crownExcluded(p,crownRealm))out.push(p);const list=children(g,p).sort(byAge);if(law==='youngest')list.reverse();for(const c of list)visit(c);}
- const list=children(g,head).sort(byAge);if(law==='youngest')list.reverse();for(const c of list)visit(c);
+ const list=branchRoot?[branchRoot]:children(g,head).sort(byAge);if(law==='youngest')list.reverse();for(const c of list)visit(c);
  return out;
 }
-export function partitionRepresentatives(g,head){const seen=new Set(),out=[];for(const child of children(g,head).sort(byAge)){const rep=free(g,child)&&child.realm===head.realm&&child.house===head.house&&!crownExcluded(child,head.realm)?child:hereditaryLine(g,child,'eldest',head.realm).find(p=>p.realm===head.realm&&p.house===head.house);if(rep&&!seen.has(rep.id)){seen.add(rep.id);out.push(rep);}}return out;}
+export function partitionRepresentatives(g,head){const seen=new Set(),out=[];for(const child of children(g,head).sort(byAge)){const rep=hereditaryLine(g,head,'eldest',head.realm,child)[0];if(rep&&!seen.has(rep.id)){seen.add(rep.id);out.push(rep);}}return out;}
 export function electionView(g,realm){
  const s=g.politics?.realms?.[realm],head=g.politics?.people?.[s?.ruler];if(!head)return {candidates:[],electors:[],winner:null,nominee:null};
  const people=g.politics.people,local=p=>free(g,p)&&p.realm===realm&&p.age>=18,weights=new Map(),candidates=new Map(),council=new Set(Object.values(s.council||{}));
