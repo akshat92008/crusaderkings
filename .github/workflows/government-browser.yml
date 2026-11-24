@@ -1,0 +1,32 @@
+name: Government institutions browser QA
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/government-institutions.js'
+      - 'src/government-deliberations.js'
+      - 'src/imperial-civil-service.js'
+      - 'src/regional-institutions.js'
+      - 'src/kingdom-ui.js'
+      - 'scripts/government_browser_smoke.py'
+      - '.github/workflows/government-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  government-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/government_browser_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: government-browser-screenshots
+          path: qa-screenshots/
