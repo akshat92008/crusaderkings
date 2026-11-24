@@ -1,4 +1,5 @@
 /** Safe, copy-free royal court, trade and legacy interface views. */
+import {marriageCandidates,politicalRevenue,politicalLevy,politicalDispatch} from './dynastic-politics.js';
 import {currentRoyalEvent,currentCourt,tradeIncome,tradePactCount,objectives,campaignStanding} from './kingdom-depth.js';
 const fmt=x=>Math.round(x).toLocaleString('en-US');
 function stat(name,value){return '<label>'+name+'</label><strong>'+value+'</strong>';}
@@ -33,7 +34,7 @@ export function renderCourt(g,esc){
  if(threats.length)html+=section('FRONTIER WARNING')+threats.map(t=>
   '<div class="rule"><b>Enemy army gathering at '+esc(t.province)+'</b><p class="paragraph">'+fmt(t.eta)+' month(s) until invasion. Reinforce the garrison or recruit troops.</p></div>').join('');
  html+='<div class="smallnote">Ruler and heir names are fictional alternate-history content. Succession, decisions and events alter the simulated realm.</div>';
- return html;
+ return html+renderPolitics(g,esc);
 }
 export function renderTrade(g,world,esc){
  const f=g.factions[g.player],pacts=Object.values(g.kingdom?.tradePacts||{}).filter(p=>p.partners.includes(g.player));
@@ -66,5 +67,24 @@ export function renderLegacy(g,esc){
  if(result.ended)html+=section('CAMPAIGN ASSESSMENT')+'<div class="rule"><h3>'+
   esc(result.outcome)+'</h3><p class="paragraph">Final score: '+fmt(result.score)+'</p></div>';
  else html+='<p class="paragraph">Your legacy continues. Advance months, build the economy, develop the court, and protect your borders.</p>';
+ return html;
+}
+
+function renderPolitics(g,esc){
+ const p=g.politics;if(!p)return '';const s=p.realms[g.player],r=p.people[s.ruler],vassals=Object.entries(p.holdings).filter(([id,v])=>v.realm===g.player&&g.provinces[id]?.owner===g.player);
+ const button=(action,id,label,extra='',input='')=>'<button class="rowbtn" data-action="politics" data-type="'+esc(action)+'" data-id="'+esc(id)+'" data-extra="'+esc(extra)+'" data-input="'+esc(input)+'">'+esc(label)+'</button>';
+ const person=id=>p.people[id];const show=c=>c?esc(c.name)+' · '+c.age+'y · '+esc(c.traits.join(', '))+(c.alive?'':' · deceased'):'None';
+ let html=(s.regent?'<div class="rule"><b>Regency</b><p class="paragraph">'+show(person(s.regent))+' governs during the sovereign’s minority.</p></div>':'')+section('DYNASTY AND LIVING FAMILY')+'<div class="rule"><h3>'+esc(r.house)+'</h3><p class="paragraph">'+show(r)+'</p><div class="smallnote">Consort: '+show(person(r.spouse))+'</div><div class="smallnote">Parents: '+r.parents.map(id=>show(person(id))).join(' / ')+'</div>'+r.children.map(id=>'<div class="smallnote">Child: '+show(person(id))+' · spouse: '+show(person(person(id)?.spouse))+'</div>').join('')+'</div>';
+ const dispatch=politicalDispatch(g);if(dispatch)html+=section('POLITICAL DISPATCH')+'<div class="rule"><h3>'+esc(dispatch.title)+'</h3><p class="paragraph">'+esc(dispatch.description)+'</p>'+dispatch.choices.map((x,i)=>button('dispatch',i,x.label+(x.cost?' ('+x.cost+'g)':''))).join('')+'</div>';
+ html+=section('SUCCESSION LAW')+'<div class="rule"><b>'+esc(s.law)+'</b><p class="paragraph">Reform costs 250 gold, requires 65 legitimacy, and is limited to once per decade.</p>'+['eldest','youngest','elective'].filter(l=>l!==s.law).map(l=>button('law',l,'Adopt '+l)).join('')+'</div>';
+ html+=section('DYNASTIC MARRIAGES')+'<p class="paragraph">Eligible adults only. Weddings cost 180 gold; foreign matches also require +20 relations.</p>';
+ const matches=marriageCandidates(g,g.player);if(matches.length){const groups=Object.groupBy?Object.groupBy(matches,x=>x.a):matches.reduce((a,x)=>((a[x.a]??=[]).push(x),a),{});for(const [id,opts] of Object.entries(groups)){const field='spouse-'+id;html+='<div class="rule"><b>'+show(person(id))+'</b><select class="select" id="'+esc(field)+'">'+opts.map(x=>'<option value="'+esc(x.b)+'">'+esc(x.label)+'</option>').join('')+'</select>'+button('marry',id,'Celebrate marriage (180g)','',field)+'</div>';}}else html+='<p class="paragraph">No eligible foreign matches at present.</p>';
+ html+=section('ROYAL COUNCIL');const candidates=Object.values(p.people).filter(c=>c.alive&&c.realm===g.player&&c.age>=18&&c.id!==r.id&&!Object.values(s.council).includes(c.id));
+ for(const [role,id] of Object.entries(s.council)){const field='office-'+role;html+='<div class="rule"><b>'+esc(role)+'</b><div class="smallnote">'+show(person(id))+'</div>'+ (candidates.length?'<select class="select" id="'+field+'">'+candidates.map(c=>'<option value="'+esc(c.id)+'">'+show(c)+'</option>').join('')+'</select>'+button('appoint',role,'Appoint (80g)','',field):'')+'</div>';}
+ html+=section('VASSAL CONTRACTS')+'<p class="paragraph">Tax yield '+Math.round(politicalRevenue(g,g.player)*100)+'% · recruitment yield '+Math.round(politicalLevy(g,g.player)*100)+'%. Raising obligations reduces loyalty.</p>';
+ for(const [id,v] of vassals){html+='<div class="rule"><h3>'+esc(id.toUpperCase())+' · '+show(person(v.lord))+'</h3><div class="smallnote">Loyalty '+Math.round(v.loyalty)+'% · Wealth '+Math.round(v.wealth)+'g</div>';
+ for(const kind of ['tax','levy','autonomy'])html+='<div class="smallnote">'+kind+': '+['Low','Standard','High'][v[kind]]+'</div>'+[0,1,2].filter(n=>n!==v[kind]).map(n=>button(kind,id,'Set '+kind+' '+['low','standard','high'][n],n)).join('');
+ html+=button('gift',id,'Send gift (100g)')+button('replace',id,'Revoke and appoint (10 legitimacy)')+(v.loyalty<45?button('concede',id,'Negotiate concession (150g)'):'')+'</div>';}
+ html+=section('POLITICAL SITUATIONS');const situations=Object.values(p.situations).filter(x=>x.realm===g.player);html+=situations.length?situations.map(x=>'<div class="rule"><b>'+esc(x.phase.toUpperCase())+' · '+esc(x.province)+'</b><p class="paragraph">'+show(person(x.lord))+' opposes royal authority. Negotiate or risk unrest.</p></div>').join(''):'<p class="paragraph">No active vassal grievances.</p>';
  return html;
 }

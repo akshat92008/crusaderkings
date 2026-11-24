@@ -1,4 +1,5 @@
 /* Crown of Nations: deterministic, serializable campaign rules. No browser dependencies. */
+import {politicalRevenue,politicalLevy} from './dynastic-politics.js';
 import {initializeKingdomSystems,advanceKingdomSystems,royalDiplomacy,tradeIncome} from './kingdom-depth.js';
 import {militaryDoctrine,startingTroops} from './military-doctrines.js';
 export const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -31,7 +32,7 @@ export function empireStats(g,owner){
  const tax=[.65,1,1.5][f?.policies.tax??1];
  const trade=tradeIncome(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const taxIncome=Math.round(politicalRevenue(g,owner)*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade;
  const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0));
  const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
@@ -72,9 +73,9 @@ export function recruit(g,provinceId,type='infantry'){
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
- a[type]+=type==='cavalry'?25:50;
+ const recruited=Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)));a[type]+=recruited;
  a.doctrine=doctrine.id;
- makeLog(g,`${50*(type==='cavalry'?.5:1)} ${type} recruited in ${provinceId}.`);
+ makeLog(g,`${recruited} ${type} recruited in ${provinceId}.`);
  return {ok:true,msg:doctrine.unique+' tradition: regiment recruited'};
 }
 export function isAdjacent(world,src,dst){return !!world.provinces.find(p=>p.id===src)?.neighbors?.includes(dst);}

@@ -3,6 +3,7 @@
  * Generated rulers, court names and stories are fictional game content.
  * AI is deterministic rule-based gameplay, NOT an external language model.
  */
+import {initPolitics,tickPolitics,marryRealm} from './dynastic-politics.js';
 import {planEnemyInvasion,progressEnemyInvasions} from './invasions.js';
 export const VICTORY_YEAR=1500;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -35,12 +36,13 @@ function newCourt(f){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1)return g.kingdom;
+ if(g.kingdom?.version===1){initPolitics(g,world);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
+ initPolitics(g,world);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -66,8 +68,8 @@ export function courtDecision(g,world,action){
  if(action==='steward'&&c.steward>=5||action==='marshal'&&c.marshal>=5)return {ok:false,msg:'Court expertise already at maximum'};
  f.treasury-=cost;
  if(action==='audience'){f.stability=clamp(f.stability+6,0,100);f.legitimacy=clamp(f.legitimacy+3,0,100);for(const p of provinces(g,g.player))p.unrest=clamp(p.unrest-4,0,100);}
- if(action==='steward')c.steward++;
- if(action==='marshal'){c.marshal++;for(const a of armies(g,g.player)){a.experience=clamp(a.experience+.04,0,1);a.morale=clamp(a.morale+3,0,100);}}
+ if(action==='steward'){c.steward++;const p=g.politics,person=p.people[p.realms[g.player].council.steward];person.skills.stewardship=c.steward;}
+ if(action==='marshal'){c.marshal++;const p=g.politics,person=p.people[p.realms[g.player].council.marshal];person.skills.martial=c.marshal;for(const a of armies(g,g.player)){a.experience=clamp(a.experience+.04,0,1);a.morale=clamp(a.morale+3,0,100);}}
  if(action==='chronicle'){f.prestige+=12;f.legitimacy=clamp(f.legitimacy+2,0,100);}
  if(action==='succession'){f.legitimacy=clamp(f.legitimacy+10,0,100);f.stability=clamp(f.stability+2,0,100);}
  if(field)c[field]=g.turn;
@@ -89,16 +91,7 @@ export function royalDiplomacy(g,world,other,action){
   log(g,'Trade treaty signed between '+f.name+' and '+o.name+'.');
   return {ok:true,msg:'Merchant treaty signed; monthly trade income increased'};
  }
- if(action==='marriage'){
-  if(rel<20)return {ok:false,msg:'Relations must reach +20 for a dynastic marriage'};
-  if(f.treaties[other]==='marriage')return {ok:false,msg:'Royal houses are already related'};
-  if(f.treasury<180)return {ok:false,msg:'Need 180 gold for a royal marriage'};
-  f.treasury-=180;f.treaties[other]='marriage';o.treaties[g.player]='marriage';
-  f.relations[other]=clamp(rel+20,-100,100);o.relations[g.player]=clamp(getRelation(g,other,g.player)+20,-100,100);
-  f.legitimacy=clamp(f.legitimacy+6,0,100);f.prestige+=4;
-  log(g,'A dynastic marriage joined the houses of '+f.name+' and '+o.name+'.');
-  return {ok:true,msg:'Royal marriage agreed'};
- }
+ if(action==='marriage')return marryRealm(g,other);
  return {ok:false,msg:'Unknown diplomatic mission'};
 }
 export const EVENTS=[
@@ -288,7 +281,7 @@ export function advanceKingdomSystems(g,world){
  initializeKingdomSystems(g,world);
  tickTrade(g);
  if(g.turn%3===0)aiMonthly(g,world);
- if(g.turn%12===0)tickSuccession(g,world);
+ tickPolitics(g,world);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');
