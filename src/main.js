@@ -1,3 +1,5 @@
+import {workspaceFor,workspaceTab,realmPriorities} from './campaign-navigation.js';
+import {currentExpandedEvents} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
 import {expandedAction} from './expanded-content.js';
 import {livingAction} from './living-systems.js';
@@ -52,7 +54,7 @@ function render(){if(!game)return;const f=player(),s=empireStats(game,game.playe
  el('faction-flag').style.background=f.color;el('faction-flag').textContent='♛';
  el('world-counter').title=world.meta.caveat;el('world-counter').textContent=`${world.provinces.length} DISTRICTS · ${Object.values(game.factions).filter(q=>q.id!=='independent'&&Object.values(game.provinces).some(p=>p.owner===q.id)).length} REALMS`;
  el('latest-event').textContent=game.log[0]?.text||'Your court awaits.';
- const courtButton=document.querySelector('[data-tab="court"]');if(courtButton)courtButton.classList.toggle('pending',Boolean(currentRoyalEvent(game)));
+ const priorities=realmPriorities(game,s,Boolean(currentRoyalEvent(game)),currentExpandedEvents(game).length),strip=el('priority-strip');strip.hidden=!priorities.length;strip.innerHTML=priorities.slice(0,3).map(p=>'<button class="priority-item '+p.level+'" data-priority-tab="'+esc(p.tab)+'" title="'+esc(p.detail)+'">'+esc(p.label)+'</button>').join('')+(priorities.length>3?'<small>+'+(priorities.length-3)+' more on Realm</small>':'');
  const threat=game.kingdom?.threats?.[0],banner=el('invasion-alert');
  banner.hidden=!threat;
  if(threat){
@@ -64,10 +66,16 @@ function render(){if(!game)return;const f=player(),s=empireStats(game,game.playe
   el('invasion-auto').hidden=threat.status!=='ready';
  }
  renderTab();renderInspector();map.render();}
-function renderTab(){if(!game)return;const liveWorld=campaignWorld(game,world);for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);
+const rememberedTabs={};
+function navigateTab(next){if(!game||!document.querySelector('[data-tab="'+next+'"]'))return;tab=next;renderTab();el('tab-content').scrollTop=0;}
+function renderTab(){if(!game)return;const liveWorld=campaignWorld(game,world),workspace=workspaceFor(tab);rememberedTabs[workspace.id]=tab;
+ for(const b of document.querySelectorAll('[data-workspace]')){const active=b.dataset.workspace===workspace.id;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}
+ for(const b of document.querySelectorAll('.tab')){b.hidden=!workspace.tabs.includes(b.dataset.tab);const active=b.dataset.tab===tab;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false');}
  const f=player(),s=empireStats(game,game.player);let html='';
  if(tab==='realm'){
-  html=`<div class="label">STATE OF THE REALM</div><div class="divider"></div><div class="statlist"><label>Controlled provinces</label><strong>${fmt(s.provinces)}</strong><label>Owned land groups</label><strong>${realmGeography(world,game.player,game.provinces).components}</strong><label>Population</label><strong>${fmt(s.population)}k</strong><label>Total revenue / mo.</label><strong class="up">+${fmt(s.income)}</strong><label>Trade / mo.</label><strong class="up">+${fmt(s.trade||0)}</strong><label>Army upkeep / mo.</label><strong class="down">−${fmt(s.upkeep)}</strong><label>Net treasury / mo.</label><strong class="${s.balance>=0?'up':'down'}">${s.balance>=0?'+':''}${fmt(s.balance)}</strong><label>Food reserve</label><strong>${fmt(f.food)}</strong><label>Food change / mo.</label><strong class="${s.foodDelta>=0?'up':'down'}">${s.foodDelta>=0?'+':''}${fmt(s.foodDelta)}</strong><label>Legitimacy</label><strong>${fmt(f.legitimacy)}%</strong><label>Prestige</label><strong>${fmt(f.prestige)}</strong></div><div class="divider"></div><div class="sectiontitle">MILITARY DOCTRINE</div><div class="rule"><b>⚔ ${esc(militaryDoctrine(f).name)}</b><div class="smallnote">Specialist: ${esc(militaryDoctrine(f).unique)} · Army mix ${militaryDoctrine(f).mix.map(x=>Math.round(x*100)).join(" / ")}% · ${militaryDoctrine(f).formations.map(id=>id.replaceAll("_"," ")).join(" · ")}. These formations affect movement, range, attack and defense in real battles.</div></div><div class="sectiontitle">COURT ADVICE</div><p class="paragraph">Expand with care. Taxes and conscription increase unrest. A depleted treasury or food reserve undermines public stability. Build markets to finance your armies.</p>`;
+  const priorities=realmPriorities(game,s,Boolean(currentRoyalEvent(game)),currentExpandedEvents(game).length);
+  const guidance='<div class="realm-overview"><h3>What needs your attention?</h3>'+(priorities.length?priorities.map(p=>'<button class="priority-detail '+p.level+'" data-priority-tab="'+esc(p.tab)+'"><b>'+esc(p.label)+'</b><small>'+esc(p.detail)+'</small></button>').join(''):'<p class="paragraph">No urgent issues. Select a province to develop it, or advance a month.</p>')+'</div>';
+  html=guidance+`<div class="label">STATE OF THE REALM</div><div class="divider"></div><div class="statlist"><label>Controlled provinces</label><strong>${fmt(s.provinces)}</strong><label>Owned land groups</label><strong>${realmGeography(world,game.player,game.provinces).components}</strong><label>Population</label><strong>${fmt(s.population)}k</strong><label>Total revenue / mo.</label><strong class="up">+${fmt(s.income)}</strong><label>Trade / mo.</label><strong class="up">+${fmt(s.trade||0)}</strong><label>Army upkeep / mo.</label><strong class="down">−${fmt(s.upkeep)}</strong><label>Net treasury / mo.</label><strong class="${s.balance>=0?'up':'down'}">${s.balance>=0?'+':''}${fmt(s.balance)}</strong><label>Food reserve</label><strong>${fmt(f.food)}</strong><label>Food change / mo.</label><strong class="${s.foodDelta>=0?'up':'down'}">${s.foodDelta>=0?'+':''}${fmt(s.foodDelta)}</strong><label>Legitimacy</label><strong>${fmt(f.legitimacy)}%</strong><label>Prestige</label><strong>${fmt(f.prestige)}</strong></div><div class="divider"></div><div class="sectiontitle">MILITARY DOCTRINE</div><div class="rule"><b>⚔ ${esc(militaryDoctrine(f).name)}</b><div class="smallnote">Specialist: ${esc(militaryDoctrine(f).unique)} · Army mix ${militaryDoctrine(f).mix.map(x=>Math.round(x*100)).join(" / ")}% · ${militaryDoctrine(f).formations.map(id=>id.replaceAll("_"," ")).join(" · ")}. These formations affect movement, range, attack and defense in real battles.</div></div><div class="sectiontitle">COURT ADVICE</div><p class="paragraph">Expand with care. Taxes and conscription increase unrest. A depleted treasury or food reserve undermines public stability. Build markets to finance your armies.</p>`;
  }else if(tab==='decrees'){
   const descriptions={tax:'Taxation balances state revenue against civilian unrest.',levy:'Conscription policy affects the political burden of raising regiments.',tolerance:'Pluralism reduces unrest at the cost of central control.'};
   html=`<div class="label">ROYAL DECREES</div><p class="paragraph" style="margin-top:12px">New laws cost 80 gold to enact. Their consequences apply during monthly simulation.</p>${Object.keys(POLICY).map(key=>`<div class="rule"><div class="label">${key.toUpperCase()}</div><select class="policy-select" data-policy="${key}">${POLICY[key].map((name,i)=>`<option value="${i}" ${f.policies[key]===i?'selected':''}>${esc(name)}</option>`).join('')}</select><div class="smallnote">${descriptions[key]}</div></div>`).join('')}<div class="sectiontitle">REALM STABILITY</div><div class="statlist"><label>Current stability</label><strong>${fmt(f.stability)}%</strong><label>Royal legitimacy</label><strong>${fmt(f.legitimacy)}%</strong></div>`;
@@ -161,6 +169,7 @@ function advanceWithInvasions(){
 }
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-faction').innerHTML=world.factions.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>`<option value="${f.id}" ${f.id==='ottomans'?'selected':''}>${esc(f.name)} — ${esc(f.continent)}</option>`).join('');
+el('start-world-count').textContent=atlasWorld.factions.length+' REALMS · '+atlasWorld.provinces.length+' DISTRICTS';
 function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value),d=militaryDoctrine(f);el('start-faction-info').textContent=`${f.government} · ${f.continent} · ${d.name} · Signature: ${d.unique} · ${d.mix.map(x=>Math.round(x*100)+'%').join(' / ')} infantry / archers / cavalry`; }
 el('start-faction').addEventListener('change',renderStartFaction);renderStartFaction();
 el('start-new').addEventListener('click',()=>start(el('start-faction').value));
@@ -169,7 +178,7 @@ el('load-existing').addEventListener('click',load);
 el('save-game').addEventListener('click',save);
 el('next-month').addEventListener('click',advanceWithInvasions);
 el('auto-time').addEventListener('click',()=>{if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';message('Time paused');}else{speedInterval=setInterval(()=>{if(!game||battle)return;advanceWithInvasions();},1500);el('auto-time').textContent='Ⅱ';message('Time is running');}});
-el('focus-capital').addEventListener('click',()=>{if(game)map.focus(...player().capital,3.2);});
+el('focus-capital').addEventListener('click',()=>{if(game){const seat=capitalDistrict(world,game.player,game.provinces);if(seat){selected=seat.id;map.select(selected);map.focus(...staticById[selected].centroid,3.2);renderInspector();}}});
 el('reset-map').addEventListener('click',()=>{map.panX=0;map.panY=0;map.zoom=1.02;map.render();});
 el('old-world').addEventListener('click',()=>map.focusOldWorld());
 el('atlas-expand').addEventListener('click',()=>{
@@ -179,7 +188,9 @@ el('atlas-expand').addEventListener('click',()=>{
 });
 el('toggle-relief').addEventListener('click',()=>{map.setRelief(!map.useRelief);el('toggle-relief').textContent=map.useRelief?'◈ 3D ON':'▤ 3D OFF';el('toggle-relief').setAttribute('aria-pressed',String(map.useRelief));});
 el('map-modes').addEventListener('click',e=>{const button=e.target.closest('[data-mapmode]');if(!button)return;map.setMode(button.dataset.mapmode);el('mapmode').textContent=button.dataset.mapmode==='historical'?'1450 REFERENCE':button.dataset.mapmode.toUpperCase();for(const b of el('map-modes').querySelectorAll('[data-mapmode]')){const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}if(button.dataset.mapmode==='historical')message('Reference map only: historical coverage is incomplete. Playable provinces remain experimental.');});
-el('tabs').addEventListener('click',e=>{let t=e.target.closest('[data-tab]');if(t){tab=t.dataset.tab;renderTab();}});
+el('tabs').addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t)navigateTab(t.dataset.tab);});
+el('workspace-nav').addEventListener('click',e=>{const t=e.target.closest('[data-workspace]');if(t){const next=workspaceTab(t.dataset.workspace,rememberedTabs);if(next)navigateTab(next);}});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-priority-tab]');if(t)navigateTab(t.dataset.priorityTab);});
 el('tab-content').addEventListener('change',e=>{
  if(e.target.matches('.policy-select'))clickResult(setPolicy(game,e.target.dataset.policy,Number(e.target.value)));
  if(e.target.id==='diplomatic-select'){diplomaticTarget=e.target.value;renderTab();}
