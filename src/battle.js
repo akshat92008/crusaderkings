@@ -115,7 +115,7 @@ export class BattleGame{
  const province=game.provinces?.[descriptor.to],fortLevel=descriptor.fieldBattle?0:province?.buildings?.fort||0;
  const desertFactions=new Set(['mamluks','delhi','bahmani','gujarat','malwa','morocco','tunis','mali','songhai','arabia','timurids','persia','oman','yemen','safavids']);
  const biome=desertFactions.has(game.player)||desertFactions.has(descriptor.enemy)?'desert':'temperate';this.biome=biome;
- const config={fortLevel,biome,fieldBattle:!!descriptor.fieldBattle,seed:1450+Math.round(fortLevel*23)};
+ const config={fortLevel,biome,fieldBattle:!!descriptor.fieldBattle,seed:1450+Math.round(fortLevel*23),attackerRealm:game.player,defenderRealm:descriptor.enemy};
  const chosen=chooseBattleRenderer(canvas,{probe:c=>c.getContext('webgl2'),three:c=>new ThreeBattleScene(c,config),native:c=>new Renderer(c),software:c=>new CanvasFallback(c),replace:freshBattleCanvas,warn:e=>console.warn('Battle renderer fallback:',e)});
  canvas=chosen.canvas;this.canvas=canvas;this.ctx=chosen.renderer;this.rendererMode=chosen.mode;
  this.mobile=coarse;this.frameRemainder=0;if(descriptor.fieldBattle){const seed=[...String(descriptor.to||'practice')].reduce((n,c)=>(Math.imul(n,31)+c.charCodeAt(0))>>>0,1450);this.fieldLandscape=fieldScenery(seed,this.biome||'temperate',coarse||this.ctx instanceof CanvasFallback);}
