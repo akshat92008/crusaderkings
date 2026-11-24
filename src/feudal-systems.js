@@ -1,3 +1,4 @@
+import {amendEstateCharter,tickEstateCharters} from './estate-succession.js';
 import {partitionRepresentatives} from './succession-systems.js';
 // Crown, regional title and provincial title hierarchy, based on prototype geography.
 // Provincial holders remain authoritative in g.politics.holdings.
@@ -79,10 +80,16 @@ export function feudalAction(g,world,action,id,extra){const f=initFeudal(g,world
  syncTitles(g);return ok('Provincial title transferred.');}
  if(action==='regional'){if(t?.tier!=='regional'||t.realm!==realm||!p||p.realm!==realm||p.age<18||isImprisoned(g,p.id)||!t.members.some(id=>g.politics.holdings[id]?.lord===p.id)||t.holder===p.id||nation.treasury<120)return no('Choose an eligible provincial lord within the district and pay 120 gold.');nation.treasury-=120;t.holder=p.id;return ok('Regional title granted.');}
  if(action==='arrest'){const target=live(g,id),v=holdings(g,realm).filter(([,h])=>h.lord===id);if(!target||target.realm!==realm||!v.some(([,h])=>h.leverageUntil>g.turn)||nation.legitimacy<55||!capturePrisoner(g,realm,id,'proven misconduct'))return no('Arrest requires a free adult vassal, established evidence and 55 legitimacy.');nation.legitimacy-=3;return ok('Vassal imprisoned.');}
+ if(action==='estate-law'){
+  const result=amendEstateCharter(g,realm,t?.province,extra);
+  if(result.ok)note(g,realm,result.msg);
+  return result;
+ }
  if(action==='exchange')return exchangePrisoners(g,realm,id,extra);
  if(action==='release'||action==='ransom'){const x=f.prisoners[id];if(!x||x.captor!==realm||x.status!=='held')return no('Select your prisoner.');if(action==='ransom')return ransom(g,x);release(g,x);for(const [,h] of holdings(g,x.realm))if(h.lord===id)h.loyalty=cap(h.loyalty+15,0,100);return ok('Prisoner released.');}
  return no('Unknown title or prisoner action.');}
 export function tickFeudal(g,world){const f=initFeudal(g,world);if(f.lastTick===g.turn)return;f.lastTick=g.turn;syncTitles(g);
  for(const [id,x] of Object.entries(f.prisoners)){if(x.status==='held'){if(!live(g,id)||!holdings(g,x.captor).length){release(g,x);continue;}if(x.captor!==g.player&&g.turn-x.started>=12)ransom(g,x);if(x.status==='held'&&g.turn-x.started>=36)release(g,x);}else if(g.turn-x.ended>60)delete f.prisoners[id];}
  for(const [id,x] of Object.entries(f.claimants))if(!live(g,x.person)||g.turn-x.created>=180)delete f.claimants[id];
+ tickEstateCharters(g);
 }
