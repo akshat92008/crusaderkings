@@ -136,3 +136,115 @@
 
 /* Campaign management accessibility and navigation */
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.speed-control select{background:#182c2c;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px}.navigation-trail{display:flex;align-items:center;gap:7px;padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px}.navigation-trail span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);text-transform:capitalize}.navigation-trail button{padding:6px;border:1px solid var(--line);background:#172b2c;color:var(--ink);border-radius:4px}.first-steps summary{cursor:pointer;padding:6px 0;color:var(--goldlight)}@media(max-width:650px){.court-resource{display:none!important}.speed-control select{padding:4px}.navigation-trail button{min-height:36px}}
+
+/* Uploaded historical art: menu stays interactive and media stops off-screen. */
+#start-screen{isolation:isolate;overflow:auto;justify-content:flex-start;padding:clamp(16px,5vw,80px);background:#101517;align-items:center}.menu-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;object-position:70% center;z-index:-2;pointer-events:none}#start-screen::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(12,17,19,.98) 0%,rgba(12,17,19,.88) 35%,rgba(12,17,19,.2) 75%,rgba(12,17,19,.06));pointer-events:none}#start-screen .startcard{position:relative;max-width:480px;width:100%;margin:auto 0;text-align:left;background:rgba(14,22,24,.76);border:1px solid #8a744a;padding:clamp(18px,3vw,36px);box-shadow:0 18px 60px #0008}#start-screen .hero-crest{display:none}#start-screen .startcard h1{line-height:1.1;letter-spacing:2px}#start-screen .startselectors{max-width:none}#start-screen .divider-ornament{text-align:left}.game-art-icon{display:inline-block;width:1.45em;height:1.45em;background-size:400% 400%;background-repeat:no-repeat;border-radius:50%;clip-path:circle(44%);vertical-align:middle;flex:none;margin-right:.25em}.resource .game-art-icon{width:26px;height:26px;margin:0}.character-skills .game-art-icon{width:22px;height:22px}.trait-chip{display:inline-flex;align-items:center;gap:2px;padding:2px 4px;margin:1px 0}.trait-chip .game-art-icon{width:24px;height:24px}.rule h3 .game-art-icon{width:26px;height:26px}@media(max-width:650px){#start-screen{padding:12px;align-items:flex-start}#start-screen .startcard{margin:auto;width:100%;max-height:none}#start-screen::before{background:#0c1113bb}.menu-video{object-position:65% center}}@media(prefers-reduced-motion:reduce){.menu-video{display:none}}
+
+/* Optimized artwork from the uploaded, reviewed sheets. */
+.portrait-mark{overflow:hidden;position:relative}.portrait-photo{width:100%;height:100%;object-fit:cover;object-position:center 25%;display:block}.portrait-mark:has(.portrait-photo){background:#1a1b1c!important}.character-hero{display:flow-root;background:linear-gradient(#151b1cd9,#151b1cef),url('assets/game-art/ui/panels-00.webp') center/100% 100%}.character-hero>.portrait-mark{float:left;width:100px;height:128px;margin:0 12px 8px 0;border:2px solid #a68a51;box-shadow:0 3px 10px #0008}.dynasty-emblem{width:32px;height:32px;object-fit:contain;vertical-align:middle;margin-right:5px;border-radius:4px}.character-hero>.dynasty-emblem{float:right;width:38px;height:38px;margin:0 0 5px 6px}.realm-emblem{display:block;width:100%;height:100%;object-fit:contain}.start-emblem{float:left;width:54px;height:54px;margin:0 10px 4px 0}.start-faction-info{display:flow-root}.event-illustration{display:block;width:100%;max-height:220px;object-fit:cover;aspect-ratio:16/9;border:1px solid #87724c;border-radius:3px;margin:0 0 9px;box-shadow:0 3px 10px #0006}.sectiontitle{position:relative}.sectiontitle::after{content:"";display:inline-block;width:28px;height:12px;background:url('assets/game-art/ui/ornaments-04.webp') center/contain no-repeat;margin-left:4px;vertical-align:middle}.faction-ident .flag{overflow:hidden}
+
+.unitcard .game-art-icon{width:20px;height:20px;margin-right:4px}
+
+/* Phase 14: CK2 map modes, tooltips, quick-action popover, warnings & comparisons */
+.mapmodes{flex-wrap:wrap;max-width:calc(100% - 24px)}
+.map-legend-overlay{position:absolute;left:12px;bottom:14px;z-index:5;max-width:min(280px,calc(100% - 76px));background:#0c1d20e6;border:1px solid #9c8252aa;border-radius:4px;padding:7px 9px;font-size:10px;color:#ead9b4;pointer-events:none;box-shadow:0 4px 12px #0007}
+.map-legend-overlay b{display:block;font-size:9px;letter-spacing:1.1px;color:var(--gold);margin-bottom:4px;text-transform:uppercase}
+.map-legend-items{display:flex;flex-wrap:wrap;gap:5px 9px}
+.map-legend-item{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.map-legend-swatch{width:9px;height:9px;border-radius:2px;border:1px solid #ffffff55;flex:none}
+.hud-warning{color:#f4b07e;font-size:9px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.ui-tooltip{position:fixed;z-index:60;max-width:min(270px,calc(100vw - 16px));background:#0d1e21f2;border:1px solid #b5955d;color:#f3e5c6;padding:7px 10px;border-radius:4px;font-size:11px;line-height:1.45;pointer-events:none;box-shadow:0 8px 22px #000a}
+.quick-action-popover{position:fixed;z-index:55;min-width:190px;max-width:min(260px,calc(100vw - 16px));background:#112326fa;border:1px solid #b89861;border-radius:5px;padding:7px;box-shadow:0 10px 28px #000b;display:grid;gap:4px}
+.quick-action-popover .popover-head{font-family:Cinzel,serif;font-size:11px;color:var(--goldlight);padding:2px 4px 5px;border-bottom:1px solid var(--line)}
+.quick-action-popover button{border:1px solid #595541;background:#1e3130;color:#efe0bc;padding:7px 9px;font-size:11px;text-align:left;border-radius:3px}
+.quick-action-popover button:hover{background:#34443b;border-color:var(--gold)}
+.war-compare{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.war-compare>div{background:#122326;border:1px solid var(--line);padding:8px;border-radius:4px}
+.war-compare b{display:block;font-size:11px;color:var(--goldlight)}
+.war-compare small{font-size:10px;color:var(--muted);line-height:1.4}
+.tech-bar{height:5px;background:#1b3133;border-radius:3px;overflow:hidden;margin-top:5px}
+.tech-bar>div{height:100%;background:linear-gradient(90deg,#9b804e,#e3c382)}
+.hierarchy-tier{border-left:2px solid #8a7147;padding-left:8px;margin:6px 0}
+@media(max-width:650px){.map-legend-overlay{bottom:32px;left:8px;max-width:calc(100% - 66px);padding:5px 7px;font-size:9px}.war-compare{grid-template-columns:1fr}}
+
+/* Operation CK2: Main-screen Event Modal, Unified Audio, 2D Battle Overlay & Mobile Zero-Overlap Polish */
+.map-zoom{bottom:54px;right:14px}
+#campaign-sound[aria-pressed="false"]{opacity:.55;border-color:#7d544c}
+.event-modal{z-index:45;background:rgba(4,12,14,.78);backdrop-filter:blur(3px);padding:14px}
+.event-card{width:min(620px,100%);max-height:92dvh;overflow-y:auto;background:linear-gradient(170deg,#182a2c,#0d1b1d);border:2px solid #b59459;box-shadow:0 0 0 4px #102022,0 24px 70px #000c;border-radius:6px;padding:18px 20px;display:grid;gap:12px}
+.event-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.event-badge{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#172220;background:linear-gradient(#e7d099,#bc995b);padding:4px 8px;border-radius:3px}
+.event-date{font-family:Cinzel,serif;font-size:11px;color:#d8c196}
+.event-card h2{font-size:19px;color:#f5e4bc;line-height:1.3}
+.event-actors{display:flex;align-items:center;gap:10px;background:#122224;border:1px solid var(--line);padding:8px 10px;border-radius:4px}
+.event-actors .portrait-mark{width:46px;height:52px;flex:none}
+.event-actors strong{display:block;font-size:12px;color:var(--goldlight)}
+.event-actors small{font-size:11px;color:var(--muted)}
+.event-body{font-size:13px;line-height:1.65;color:#dfe3da}
+.event-effects{display:flex;flex-wrap:wrap;gap:6px}
+.event-effect-chip{font-size:11px;padding:4px 8px;border-radius:3px;border:1px solid var(--line);background:#152729;color:#e7d9bc}
+.event-effect-chip.pos{border-color:#538e6d;color:#9fe0b9;background:#152f27}
+.event-effect-chip.neg{border-color:#9e5951;color:#f2b4a5;background:#2f1c1d}
+.event-choices{display:grid;gap:8px;margin-top:4px}
+.event-choice-btn{width:100%;min-height:46px;text-align:left;padding:10px 13px;border:1px solid #9e814e;background:linear-gradient(95deg,#253632,#192728);color:#f3e4c3;border-radius:4px;font-size:12px;line-height:1.4;display:grid;gap:4px}
+.event-choice-btn:hover,.event-choice-btn:focus-visible{background:linear-gradient(95deg,#3b4939,#253432);border-color:#efd090}
+.event-choice-btn small{color:#a8bbb3;font-size:11px}
+.event-modal-foot{font-size:10px;color:var(--muted);text-align:right}
+.acceptance-box{margin-top:8px;padding:9px 10px;background:#102022;border:1px solid var(--line);border-radius:4px;display:grid;gap:5px}
+.acceptance-head{display:flex;justify-content:space-between;align-items:center;font-size:11px}
+.acceptance-factor{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);border-top:1px dashed rgba(255,255,255,.07);padding-top:3px}
+.dynasty-tree{display:grid;gap:8px;margin:8px 0}
+.dynasty-node{display:flex;align-items:center;gap:8px;padding:7px 9px;background:#142628;border:1px solid var(--line);border-radius:4px}
+.dynasty-node.is-ruler{border-color:var(--gold);background:#263029}
+.dynasty-node.is-heir{border-color:#6da384}
+.battle-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.battle-top{z-index:4}
+.battle-bottom{z-index:4}
+.battle-result{z-index:8}
+.battle-focus{margin-top:5px;font-size:10px;color:#f3d69b;background:#102123d4;border:1px solid #8c764c;padding:4px 8px;border-radius:3px;display:inline-block}
+#battle-rally{border-color:#d4ac64;color:#ffe6af;background:#4a3b26}
+#battle-speed{min-width:44px}
+@media(max-width:650px){
+ .topbar{padding:4px 8px;gap:4px}
+ .brandname{font-size:11px}
+ .topresources{gap:6px}
+ .resource b{font-size:11px;line-height:15px}
+ .timebar{width:100%;flex-wrap:nowrap;gap:4px}
+ .date{font-size:10px;margin-right:2px;flex-shrink:0}
+ .timebar .goldbtn{min-height:38px;font-size:10px;padding:4px 6px;white-space:nowrap}
+ .timebar .iconbtn{width:36px;height:38px;padding:4px;flex-shrink:0}
+ .speed-control select{min-height:38px;padding:3px 4px;font-size:11px}
+ .maptop{padding:4px 6px}
+ .map-home .goldbtn,.map-home .smallbtn,.map-options summary{min-height:38px;padding:5px 8px;font-size:10px}
+ .quick-nav{padding:3px 4px;gap:3px;overflow-x:auto;flex-wrap:nowrap}
+ .quick-nav>button,.quick-nav summary{min-height:38px;min-width:42px;padding:3px 5px;flex:0 0 auto;font-size:10px}
+ .quick-nav>button span{font-size:8px}
+ .mapmodes{top:8px;left:8px;max-width:calc(100% - 16px);max-height:38dvh;overflow-y:auto;gap:3px;padding:4px}
+ .mapmodebtn{min-height:34px;padding:5px 7px;font-size:9px}
+ .map-zoom{bottom:10px;right:8px}
+ .canvaswrap .mapcorner.bottomright{left:8px;right:62px;bottom:10px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:6px 8px}
+ .map-legend-overlay{bottom:44px;left:8px;max-width:calc(100% - 66px)}
+ .mapfooter{padding:3px 8px;font-size:9px}
+ .eventticker{padding:3px 8px;min-height:24px;font-size:9px}
+ .toast{top:10px;bottom:auto;max-width:calc(100vw - 20px);transform:translate(-50%,-18px);padding:10px 14px;font-size:11px}
+ .toast.visible{transform:translate(-50%,0)}
+ .leftbar,.rightbar{padding-bottom:max(14px,env(safe-area-inset-bottom))}
+ .battle-top{padding:6px 8px}
+ .battle-bottom{padding:6px 8px max(8px,env(safe-area-inset-bottom));max-height:40dvh}
+ .battle-guide{font-size:9px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .battle-commands{gap:4px;padding:5px}
+ .battle-commands label{font-size:9px}
+ .battle-commands select{flex:1 1 118px;min-width:112px;max-width:none;min-height:40px;font-size:11px;padding:5px}
+ .battle-commands #battle-start{flex:1 1 100%;min-height:42px}
+ .battle-commands button{min-height:40px;font-size:10px;padding:5px 7px}
+ .unitcard{min-width:108px;padding:7px 8px}
+}
+@media(max-width:390px){
+ .timebar{gap:2px}
+ .date{font-size:8.5px;margin-right:1px}
+ .timebar .goldbtn{font-size:8.5px;padding:3px 4px;letter-spacing:.3px;min-height:36px}
+ .timebar .goldbtn span{font-size:12px;margin-left:2px}
+ .timebar .iconbtn{width:30px;height:36px;font-size:12px}
+ .speed-control select{font-size:10px;padding:2px;min-height:36px}
+ .quick-nav>button{min-width:38px}
+}

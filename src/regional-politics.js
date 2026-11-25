@@ -11,14 +11,15 @@ const adult=(g,r,id)=>{const p=g.politics.people[id];return p?.alive&&p.age>=18&
 const supported=['regional','sultanate','shogunate'];
 function state(g,r,create=false){
  const s=g.institutions?.realms[r];if(!s||!supported.includes(type(g,r)))return null;
- if(s.regionalPolitics?.type===type(g,r))return s.regionalPolitics;
- return create?(s.regionalPolitics={type:type(g,r),grants:{},scholar:null,mediation:null,last:-120,history:[]}):null;
+ if(s.regionalPolitics?.type===type(g,r)){if(type(g,r)==='sultanate')s.regionalPolitics.decadence??=20;return s.regionalPolitics;}
+ return create?(s.regionalPolitics={type:type(g,r),grants:{},scholar:null,mediation:null,decadence:20,last:-120,history:[]}):null;
 }
 function holdings(g,r,land){
  return land.map(p=>({id:p.id,h:g.politics.holdings[p.id]})).filter(({h})=>h?.realm===r&&adult(g,r,h.lord));
 }
 function note(g,r,s,message){
  s.history.unshift({turn:g.turn,message});s.history=s.history.slice(0,24);
+ g.institutions.history??=[];
  g.institutions.history.unshift({realm:r,turn:g.turn,message});g.institutions.history=g.institutions.history.slice(0,120);
  if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}
 }
@@ -38,7 +39,8 @@ export function regionalPoliticalView(g,r,providedLand){
  if(k==='sultanate'){
   const sponsor=s?.scholar,faith=g.civic.realms[r].faith,person=sponsor&&adult(g,r,sponsor.person),scholar=sponsor&&sponsor.until>g.turn&&sponsor.faith===faith&&person&&(!person.civic?.faith||person.civic.faith===faith)?person:null;
   const candidates=Object.values(g.politics.people).filter(p=>adult(g,r,p.id)&&(p.skills?.learning??0)>=3&&(!p.civic?.faith||p.civic.faith===faith)).map(p=>({id:p.id,name:p.name||p.id,learning:p.skills.learning})).sort((a,b)=>b.learning-a.learning||a.id.localeCompare(b.id));
-  return {kind:k,scholar:scholar?{...sponsor,name:scholar.name||scholar.id,learning:scholar.skills.learning}:null,candidates,wait,last,cost:120,canAct:!wait&&f.treasury>=120&&!scholar&&land.length>0&&candidates.length>0};
+  const decadence=s?.decadence??20;
+  return {kind:k,decadence,scholar:scholar?{...sponsor,name:scholar.name||scholar.id,learning:scholar.skills.learning}:null,candidates,wait,last,cost:120,canReform:!wait&&f.treasury>=100&&decadence>10,canAct:!wait&&f.treasury>=120&&!scholar&&land.length>0&&candidates.length>0};
  }
  const houses=new Map(),retainers=g.institutions?.realms[r]?.retainers||{};
  for(const {h} of hs){const p=adult(g,r,h.lord),house=p.house||p.id;
@@ -53,11 +55,20 @@ export function regionalPoliticalView(g,r,providedLand){
 export function regionalPoliticalModifiers(g,r,land){
  const s=state(g,r),out={tax:1,levy:1,trade:1};if(!s)return out;
  if(s.type==='regional'&&land.length){const n=Object.entries(s.grants).filter(([id,x])=>validGrant(g,r,id,x)).length;out.tax-=.12*n/land.length;out.levy+=.08*n/land.length;}
+ if(s.type==='sultanate'){const d=s.decadence??20;if(d>=50){out.tax-=Math.min(.25,(d-45)*.004);out.levy-=Math.min(.20,(d-45)*.003);}else if(d<=12){out.tax+=.04;out.levy+=.04;}}
  return out;
 }
 export function regionalPoliticalAction(g,r,cmd,id){
- const v=regionalPoliticalView(g,r);if(!v||!v.canAct)return no('Political action is unavailable: check the treasury, eligible participants, cooldown and active arrangements.');
+ const v=regionalPoliticalView(g,r);if(!v)return no('Political action is unavailable.');
  const f=g.factions[r],s=state(g,r,true);
+ if(cmd==='sultanate:reform'&&v.kind==='sultanate'){
+  if(!v.canReform)return no('Requires 100 gold, decadence above 10 and cooldown elapsed.');
+  f.treasury-=100;s.decadence=clamp((s.decadence??20)-20,0,100);s.last=g.turn;
+  const head=g.politics.people[g.politics.realms[r]?.ruler];if(head)head.piety=(head.piety||0)+8;
+  for(const a of Object.values(g.armies||{}))if(a.owner===r)a.morale=clamp(a.morale+5,0,100);
+  note(g,r,s,'Dynastic household austerity reduced sultanate decadence.');return ok('Sultanate decadence reformed.');
+ }
+ if(!v.canAct)return no('Political action is unavailable: check the treasury, eligible participants, cooldown and active arrangements.');
  if(cmd==='regional:grant'&&v.kind==='regional'){
   const p=v.candidates.find(p=>p.id===id);if(!p)return no('Choose a controlled chiefdom with no current grant.');
   s.grants[id]={lord:p.lord,until:g.turn+48};const h=g.politics.holdings[id];h.loyalty=clamp(h.loyalty+12,0,100);
@@ -96,6 +107,11 @@ export function tickRegionalPolitics(g,r,land){
    }
   }
  }
+ if(s&&k==='sultanate'&&g.turn>0&&g.turn%6===0){
+  const head=g.politics.people[g.politics.realms[r]?.ruler],piety=head?.piety??30;
+  const delta=(s.scholar||piety>=45?-2:0)+(piety<25?2:1);
+  s.decadence=clamp((s.decadence??20)+delta,0,100);
+ }
  if(k==='shogunate'&&g.turn>0&&g.turn%6===0){
   const v=regionalPoliticalView(g,r,land);
   const protectedPair=v.mediation&&v.pair.every(h=>v.mediation.houses.includes(h.house));
@@ -106,7 +122,9 @@ export function tickRegionalPolitics(g,r,land){
   }
  }
  if(humanControlsRealm(g,r)||g.turn<12||g.turn%12!==0||f.treasury<800)return;
- const v=regionalPoliticalView(g,r,land);if(!v.canAct)return;
+ const v=regionalPoliticalView(g,r,land);
+ if(k==='sultanate'&&v?.canReform&&v.decadence>=45){regionalPoliticalAction(g,r,'sultanate:reform');return;}
+ if(!v.canAct)return;
  if(k==='regional'){const p=v.candidates.slice().sort((a,b)=>a.loyalty-b.loyalty||a.id.localeCompare(b.id))[0];if(p&&p.loyalty<65)regionalPoliticalAction(g,r,'regional:grant',p.id);}
  if(k==='sultanate'&&(g.civic.realms[r].patronage??50)<75)regionalPoliticalAction(g,r,'sultanate:scholar',v.candidates[0].id);
  if(k==='shogunate'&&v.tension>=60)regionalPoliticalAction(g,r,'shogunate:mediate');

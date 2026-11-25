@@ -5,6 +5,16 @@ import {CONDITIONAL_SITUATIONS,situationMeasure,respondToSituation} from './regi
 import {pilgrimageSanctuary,completeSacredJourney} from './faith-institutions.js';
 import {personalOpinion,changeOpinion} from './chronicle-systems.js';
 import {isImprisoned} from './feudal-systems.js';
+import {
+ SOCIETIES,joinSociety,advanceSocietyRank,societyMission,societyModifiers,
+ BLOODLINES,forgeBloodlineAmbition,characterBloodlines,bloodlineModifiers,
+ applyCrossSystemChoice
+} from './ck2-deep-systems.js';
+export {
+ SOCIETIES,joinSociety,advanceSocietyRank,societyMission,societyModifiers,
+ BLOODLINES,forgeBloodlineAmbition,characterBloodlines,bloodlineModifiers,
+ applyCrossSystemChoice
+};
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const ruler=(g,id)=>g.politics.people[g.politics.realms[id]?.ruler];
 const own=(g,id)=>Object.values(g.provinces).filter(p=>p.owner===id);
@@ -502,6 +512,10 @@ export function heritageAction(g,world,action,id,extra,guest){const a=initHerita
  if(action==='equip'){const x=a.artifacts[id],rule=ARTIFACTS[x?.kind];if(!x||x.realm!==realm||x.durability<=0||!rule)return no('Select an intact artifact of your realm.');s.equipped[rule.slot]=id;x.history??=[];x.history.unshift({turn:g.turn,message:'Equipped by '+ruler(g,realm).name});x.history=x.history.slice(0,20);return ok('Artifact equipped.');}
  if(action==='repair'){const x=a.artifacts[id];if(!x||x.realm!==realm||x.durability>=100||f.treasury<80)return no('Artifact repair requires 80 gold and damage.');f.treasury-=80;x.durability=cap(x.durability+35,0,100);x.history??=[];x.history.unshift({turn:g.turn,message:'Restored by '+ruler(g,realm).name});x.history=x.history.slice(0,20);return ok('Artifact restored.');}
  if(action==='legacy')return unlockLegacy(g,realm,id);
+ if(action==='join-society')return joinSociety(g,id,extra);
+ if(action==='advance-society')return advanceSocietyRank(g,id);
+ if(action==='society-mission')return societyMission(g,id,extra);
+ if(action==='forge-bloodline')return forgeBloodlineAmbition(g,id,extra);
  return no('Unknown activity or heritage decision.');}
 export function tickHeritage(g,world){const a=initHeritage(g,world);if(a.lastTick===g.turn)return;a.lastTick=g.turn;
  for(const [realm,s] of Object.entries(a.realms)){const r=ruler(g,realm),d=dynasty(g,realm),f=g.factions[realm];if(!r)continue;if(s.seenRuler!==r.id){s.seenRuler=r.id;d.renown+=5;for(const x of Object.values(a.artifacts).filter(x=>x.realm===realm)){x.owner=r.id;x.history??=[];x.history.unshift({turn:g.turn,message:'Entrusted to the new sovereign '+r.name});x.history=x.history.slice(0,20);}}

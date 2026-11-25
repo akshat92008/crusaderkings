@@ -59,8 +59,10 @@ export class ReliefMap{
    this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
    const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,geo.vertices,gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
    const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,geo.indices,gl.STATIC_DRAW);
+   this.vb=vb;this.ib=ib;
    gl.bindVertexArray(null);
-   Promise.all([this.loadTexture('assets/terrain/natural-earth-relief.webp'),this.loadTexture('assets/terrain/terrain-height.png')]).then(([color,height])=>{this.colorTexture=color;this.heightTexture=height;this.ready=true;this.invalidate?.();}).catch(e=>{this.failReason=String(e);console.warn('Campaign relief disabled:',e);this.invalidate?.();});
+   const assets=this.world?.meta?.terrainAssets||null;
+   Promise.all([this.loadTexture(assets?.color||null,false),this.loadTexture(assets?.height||null,true)]).then(([color,height])=>{if(!this.gl)return;this.colorTexture=color;this.heightTexture=height;this.ready=true;this.invalidate?.();}).catch(e=>{this.failReason=String(e);console.warn('Campaign relief disabled:',e);this.invalidate?.();});
   }catch(e){this.failReason=String(e);console.warn('Campaign 3D relief unavailable:',e);}
  }
  createProceduralTexture(heightMode){
@@ -92,11 +94,25 @@ export class ReliefMap{
   }
   return canvas;
  }
- async loadTexture(url){let image;
-  try{const response=await fetch(url);if(!response.ok)throw Error(url+': HTTP '+response.status);image=await createImageBitmap(await response.blob());}
-  catch(e){console.info('Using generated terrain texture:',url);image=await createImageBitmap(this.createProceduralTexture(url.includes('height')));}
-
-  const gl=this.gl,tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,image.width,image.height,0,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.generateMipmap(gl.TEXTURE_2D);image.close();return tex;
+ async loadTexture(url,heightMode=false){let image;
+  if(url){
+   try{const response=await fetch(url);if(!response.ok)throw Error(url+': HTTP '+response.status);image=await createImageBitmap(await response.blob());}
+   catch(e){image=await createImageBitmap(this.createProceduralTexture(heightMode||url.includes('height')));}
+  }else{
+   image=await createImageBitmap(this.createProceduralTexture(heightMode));
+  }
+  const gl=this.gl;if(!gl){image.close?.();return null;}
+  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,image.width,image.height,0,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.generateMipmap(gl.TEXTURE_2D);image.close();return tex;
+ }
+ dispose(){
+  this.ready=false;const gl=this.gl;if(!gl)return;this.gl=null;
+  if(this.colorTexture)gl.deleteTexture(this.colorTexture);
+  if(this.heightTexture)gl.deleteTexture(this.heightTexture);
+  if(this.vb)gl.deleteBuffer(this.vb);
+  if(this.ib)gl.deleteBuffer(this.ib);
+  if(this.vao)gl.deleteVertexArray(this.vao);
+  if(this.program)gl.deleteProgram(this.program);
+  try{gl.getExtension('WEBGL_lose_context')?.loseContext();}catch{}
  }
  render(w,h,dpr,zoom,panX,panY,compression){if(!this.ready||!this.gl)return false;
   const gl=this.gl,W=Math.max(1,Math.round(w*dpr)),H=Math.max(1,Math.round(h*dpr));if(this.canvas.width!==W||this.canvas.height!==H){this.canvas.width=W;this.canvas.height=H;}

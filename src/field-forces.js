@@ -1,45 +1,91 @@
 import {fieldContingentSupports} from './diplomacy-systems.js';
 // Field roster arithmetic, independent of rendering and campaign mutation.
-export const TROOP_TYPES=['infantry','archers','cavalry'];
-export function participatingArmies(g,ids,realm,province=null,enemy=null){
- return [...new Set(ids.filter(Boolean))].map(id=>g.armies[id]).filter(a=>
-  a&&(!province||a.province===province)&&!g.naval?.voyages?.[a.id]&&
-  (a.contingent?enemy&&fieldContingentSupports(g,a,realm,enemy):a.owner===realm));
+export const TROOP_TYPES = ['infantry', 'archers', 'cavalry'];
+
+export function participatingArmies(g, ids, realm, province = null, enemy = null) {
+  return [...new Set(ids.filter(Boolean))].map(id => g.armies[id]).filter(a =>
+    a && (!province || a.province === province) && !g.naval?.voyages?.[a.id] &&
+    (a.contingent ? enemy && fieldContingentSupports(g, a, realm, enemy) : a.owner === realm)
+  );
 }
-export function aggregateForce(armies,garrison={}){const primary=armies[0]||{};return {...primary,...Object.fromEntries(TROOP_TYPES.map(t=>[t,Math.max(0,garrison[t]||0)+armies.reduce((n,a)=>n+Math.max(0,a[t]||0),0)]))};}
-export function regimentTroops(army,slots,index){const t=slots[index],count=slots.filter(x=>x===t).length,rank=slots.slice(0,index).filter(x=>x===t).length,n=Math.max(0,Math.round(army[t]||0));return Math.floor(n/count)+(rank<n%count?1:0);}
-export function applyFieldLosses(army,result,side,fallback){
- applyFieldForceLosses([army],result,side,fallback);
- return army;
+
+export function aggregateForce(armies, garrison = {}) {
+  const primary = armies[0] || {};
+  return {
+    ...primary,
+    ...Object.fromEntries(TROOP_TYPES.map(t => [t, Math.max(0, garrison[t] || 0) + armies.reduce((n, a) => n + Math.max(0, a[t] || 0), 0)]))
+  };
+}
+
+export function regimentTroops(army, slots, index) {
+  const t = slots[index];
+  const count = slots.filter(x => x === t).length;
+  const rank = slots.slice(0, index).filter(x => x === t).length;
+  const n = Math.max(0, Math.round(army[t] || 0));
+  return Math.floor(n / count) + (rank < n % count ? 1 : 0);
+}
+
+/** Pack active non-zero regiments (troops > 0) cleanly with lane assignments. */
+export function packActiveRegiments(army, slots, factionDoctrine = null) {
+  const packed = [];
+  for (let i = 0; i < slots.length; i++) {
+    const troops = regimentTroops(army, slots, i);
+    if (troops <= 0) continue;
+    const type = slots[i];
+    const kind = type === 'infantry' && factionDoctrine?.id === 'pike' ? 'pikemen' : type;
+    packed.push({ type, kind, troops, sourceIndex: i });
+  }
+  const n = packed.length;
+  return packed.map((entry, idx) => ({
+    ...entry,
+    slotIndex: idx,
+    lane: n <= 1 ? 1 : n === 2 ? (idx === 0 ? 0 : 2) : Math.min(2, Math.floor((idx * 3) / n))
+  }));
+}
+
+export function applyFieldLosses(army, result, side, fallback) {
+  applyFieldForceLosses([army], result, side, fallback);
+  return army;
 }
 
 // Round once for each troop type across the participating armies, then allocate
 // integer survivors proportionally. Splitting a force into small armies cannot
 // change how many soldiers survive.
-export function applyFieldForceLosses(armies,result,side,fallback){
- const byType=result.fieldBattle&&result.roster?.[side]?.byType;
- for(const type of TROOP_TYPES){
-  const units=armies.map((army,index)=>({army,index,count:Math.max(0,army[type]||0)}));
-  const total=units.reduce((sum,unit)=>sum+unit.count,0);
-  if(!total){
-   for(const unit of units)unit.army[type]=0;
-   continue;
-  }
+export function applyFieldForceLosses(armies, result, side, fallback) {
+  const byType = result.fieldBattle && result.roster?.[side]?.byType;
+  for (const type of TROOP_TYPES) {
+    const units = armies.map((army, index) => ({ army, index, count: Math.max(0, army[type] || 0) }));
+    const total = units.reduce((sum, unit) => sum + unit.count, 0);
+    if (!total) {
+      for (const unit of units) unit.army[type] = 0;
+      continue;
+    }
 
-  const report=byType?.[type];
-  const ratio=report?.initial>0&&Number.isFinite(report.surviving)?report.surviving/report.initial:fallback;
-  const survivors=Math.round(total*Math.max(0,Math.min(1,Number.isFinite(ratio)?ratio:0)));
-  let assigned=0;
-  for(const unit of units){
-   const share=unit.count*survivors/total;
-   unit.army[type]=Math.floor(share);
-   unit.remainder=share-unit.army[type];
-   assigned+=unit.army[type];
+    const report = byType?.[type];
+    const ratio = report?.initial > 0 && Number.isFinite(report.surviving) ? report.surviving / report.initial : fallback;
+    const survivors = Math.round(total * Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0)));
+    let assigned = 0;
+    for (const unit of units) {
+      const share = unit.count * survivors / total;
+      unit.army[type] = Math.floor(share);
+      unit.remainder = share - unit.army[type];
+      assigned += unit.army[type];
+    }
+    units.sort((a, b) => b.remainder - a.remainder || String(a.army.id ?? '').localeCompare(String(b.army.id ?? '')) || a.index - b.index);
+    for (let i = 0; i < survivors - assigned; i++) units[i].army[type]++;
   }
-  units.sort((a,b)=>b.remainder-a.remainder||String(a.army.id??'').localeCompare(String(b.army.id??''))||a.index-b.index);
-  for(let i=0;i<survivors-assigned;i++)units[i].army[type]++;
- }
 }
 
 // Readiness and specialist bonuses are weighted by the soldiers who actually deploy.
-export function combinedFieldStats(armies,garrison,readiness,profile,type){const field=armies.map(a=>({n:Math.max(0,a[type]||0),r:readiness(a),p:profile(a,type)})).filter(x=>x.n>0),reserve=Math.max(0,garrison?.[type]||0),total=field.reduce((n,x)=>n+x.n,reserve),baseR={power:1,speed:1,morale:75},baseP={damage:1,armor:1,speed:1,range:1,counter:1};const mix=(key,base,kind)=>total?(reserve*base+field.reduce((n,x)=>n+x.n*(Number.isFinite(x[kind]?.[key])?x[kind][key]:base),0))/total:base;const r=Object.fromEntries(Object.entries(baseR).map(([k,v])=>[k,mix(k,v,'r')])),p=Object.fromEntries(Object.entries(baseP).map(([k,v])=>[k,mix(k,v,'p')]));p.name=field.slice().sort((a,b)=>b.n-a.n)[0]?.p?.name||type;return {readiness:r,profile:p};}
+export function combinedFieldStats(armies, garrison, readiness, profile, type) {
+  const field = armies.map(a => ({ n: Math.max(0, a[type] || 0), r: readiness(a), p: profile(a, type) })).filter(x => x.n > 0);
+  const reserve = Math.max(0, garrison?.[type] || 0);
+  const total = field.reduce((n, x) => n + x.n, reserve);
+  const baseR = { power: 1, speed: 1, morale: 75 };
+  const baseP = { damage: 1, armor: 1, speed: 1, range: 1, counter: 1 };
+  const mix = (key, base, kind) => total ? (reserve * base + field.reduce((n, x) => n + x.n * (Number.isFinite(x[kind]?.[key]) ? x[kind][key] : base), 0)) / total : base;
+  const r = Object.fromEntries(Object.entries(baseR).map(([k, v]) => [k, mix(k, v, 'r')]));
+  const p = Object.fromEntries(Object.entries(baseP).map(([k, v]) => [k, mix(k, v, 'p')]));
+  p.name = field.slice().sort((a, b) => b.n - a.n)[0]?.p?.name || type;
+  return { readiness: r, profile: p };
+}

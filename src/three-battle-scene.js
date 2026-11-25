@@ -94,7 +94,7 @@ export class ThreeBattleScene {
    const inst=new THREE.InstancedMesh(make(),new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide}),9000);
    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);inst.frustumCulled=false;inst.count=0;this.scene.add(inst);this.batches[kind]=inst;
   }
-  this.groups=new Map();this.templates={};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
+  this.groups=new Map();this.templates={};this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
   this.environment=buildMedievalBattlefield(this.scene,config);if(config.fieldBattle){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}
   this.prepareCharacters();
  }
@@ -107,6 +107,7 @@ export class ThreeBattleScene {
    ]);
    if(this.disposed)return;
    this.templates={infantry:knight,archers:rogue};
+   if(Object.values(this.regionalRealms).includes('ashikaga')){const optional=await Promise.allSettled([loader.loadAsync('assets/characters_3d/ashigaru-foot-soldier-806707.glb'),loader.loadAsync('assets/characters_3d/daimyo-lord-78364a.glb')]);if(this.disposed)return;for(const [i,key] of ['ashigaru','daimyo'].entries())if(optional[i].status==='fulfilled')this.templates[key]=optional[i].value;}
    this.modelsReady=true;this.loadingStatus='Animated KayKit infantry ready';
   }catch(err){
    this.modelsReady=false;this.loadingStatus='Using geometric soldiers: '+String(err);
@@ -115,11 +116,11 @@ export class ThreeBattleScene {
  }
  prepareSquad(g){
   if(this.groups.has(g.id)||!this.modelsReady)return;
-  const template=this.templates[g.type]||this.templates.infantry;
+  const baseTemplate=this.templates[g.type]||this.templates.infantry;
   const count=g.type==='archers'?8:g.type==='cavalry'?6:11;
   const units=[];
   for(let i=0;i<count;i++){
-   const rig=cloneSkeleton(template.scene);
+   const japanese=this.regionalRealms[g.side]==='ashikaga'&&g.type==='infantry';const regionalTemplate=japanese?((i===0&&g.id.endsWith('0')&&this.templates.daimyo)||this.templates.ashigaru):null;const template=regionalTemplate||baseTemplate;const rig=cloneSkeleton(template.scene);
    const box=new THREE.Box3().setFromObject(rig);const height=box.max.y-box.min.y||1.7;const scale=1.75/height;
    // A wrapper allows the original skeleton to keep its root animation.
    const root=new THREE.Group(),mounted=g.type==='cavalry';
@@ -133,7 +134,7 @@ export class ThreeBattleScene {
    const actions={};
    for(const [name,clip] of [['idle',idle],['walk',walk],['attack',attack]])if(clip){actions[name]=mixer.clipAction(clip);actions[name].loop=THREE.LoopRepeat;}
    const start=actions.idle||actions.walk||actions.attack;if(start)start.play();
-   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null,mount});
+   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null,mount,regionalModel:!!regionalTemplate,restYaw:rig.rotation.y,restZ:rig.position.z});
    this.mixers.push(mixer);
   }
   this.groups.set(g.id,units);

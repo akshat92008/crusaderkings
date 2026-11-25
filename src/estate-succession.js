@@ -9,6 +9,7 @@ import {personalOpinion} from './chronicle-systems.js';
 
 export const ESTATE_LAWS={
  customary:{name:'Customary inheritance',description:'The closest eligible descendant by senior branch inherits.'},
+ youngest:{name:'Youngest branch',description:'The youngest eligible descendant branch inherits; the crown receives an extinct estate.'},
  seniority:{name:'House seniority',description:'The oldest free adult of the holder’s house in this realm inherits.'},
  elective:{name:'District election',description:'The crown and landed lords in the district vote for an eligible adult.'},
  reversion:{name:'Crown reversion',description:'The estate returns to the crown when its current holder dies.'}
@@ -60,6 +61,7 @@ export function estateSuccession(g,id,law=estateLaw(g,id)){
  if(!holder)return {heir:null,ballots:[]};
  const crown=sovereign(g,h.realm);
  if(law==='reversion')return {heir:crown,ballots:[]};
+ if(law==='youngest')return {heir:hereditaryLine(g,holder,'youngest').find(p=>p.realm===h.realm)??crown,ballots:[]};
  if(law==='seniority'){
   const kin=Object.values(g.politics.people).filter(p=>p.id!==holder.id&&p.house===holder.house&&localAdult(g,p,h.realm));
   kin.sort((a,b)=>b.age-a.age||a.id.localeCompare(b.id));

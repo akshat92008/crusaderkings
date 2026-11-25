@@ -1,6 +1,14 @@
 import {humanControlsRealm} from './player-career.js';
 import {controller} from './campaign-war.js';
 import {portBlocked} from './naval-systems.js';
+import {
+ getProvinceProsperity,prosperityModifiers,buildTradePost,tradePostIncome,
+ startGreatWork,upgradeGreatWork,greatWorkModifiers
+} from './ck2-deep-systems.js';
+export {
+ getProvinceProsperity,prosperityModifiers,buildTradePost,tradePostIncome,
+ startGreatWork,upgradeGreatWork,greatWorkModifiers
+};
 // Regional goods, settlement industries, treasury credit and local crises.
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const hash=s=>{let n=2166136261;for(const c of String(s))n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;};
@@ -18,18 +26,64 @@ export const INDUSTRIES={
  warehouse:{name:'Warehouse',cost:200,desc:'Expands storage capacity for all goods.'}
 };
 export const SETTLEMENTS=['Village','Market town','City'];
+export const HOLDING_TYPES=Object.freeze(['castle','city','temple']);
+export const HOLDING_BUILDINGS=Object.freeze({
+ curtain_wall:{name:'Curtain walls',holding:'castle',cost:170,max:3,desc:'Strengthens castle garrison defense and levy readiness.',levy:.02,defense:6},
+ keep:{name:'Stone keep',holding:'castle',cost:220,max:3,desc:'Increases feudal levy output and lordly authority.',levy:.03,tax:.01},
+ stables:{name:'Lordly stables',holding:'castle',cost:190,max:3,desc:'Expands cavalry stables and military mobilization.',levy:.025},
+ guild_hall:{name:'Guild hall',holding:'city',cost:180,max:3,desc:'Boosts urban tax revenue and commercial output.',tax:.03,trade:.02},
+ trade_port:{name:'Merchant quay',holding:'city',cost:200,max:3,desc:'Expands urban trade capacity and merchant yield.',trade:.04},
+ counting_house:{name:'Counting house',holding:'city',cost:190,max:3,desc:'Improves municipal tax collection and credit.',tax:.035},
+ scriptorium:{name:'Monastic scriptorium',holding:'temple',cost:170,max:3,desc:'Accelerates scholarship and clerical revenue.',research:1,tax:.01},
+ hospitium:{name:'Hospitium infirmary',holding:'temple',cost:160,max:3,desc:'Supports epidemic recovery and local trust.',trust:1},
+ sanctuary_precinct:{name:'Sanctuary precinct',holding:'temple',cost:180,max:3,desc:'Deepens temple devotion, piety and endowments.',tax:.02,devotion:1}
+});
 export const CRISES={epidemic:{name:'Epidemic',months:8},drought:{name:'Drought',months:6},famine:{name:'Famine',months:6},fire:{name:'Settlement fire',months:4},flood:{name:'Flood',months:5}};
 const RAW=['grain','timber','ore','fiber','salt'];
+function defaultHoldings(){
+ return {
+  castle:{level:1,buildings:{curtain_wall:0,keep:0,stables:0}},
+  city:{level:1,buildings:{guild_hall:0,trade_port:0,counting_house:0}},
+  temple:{level:1,buildings:{scriptorium:0,hospitium:0,sanctuary_precinct:0}}
+ };
+}
+function ensureProvinceEco(l){
+ if(!l)return l;
+ l.holdings??=defaultHoldings();
+ for(const ht of HOLDING_TYPES){l.holdings[ht]??={level:1,buildings:{}};l.holdings[ht].buildings??={};}
+ for(const [bk,def] of Object.entries(HOLDING_BUILDINGS))l.holdings[def.holding].buildings[bk]??=0;
+ l.devastation??=0;
+ return l;
+}
 function resources(p){const n=hash(p.id);const main=p.terrain==='highlands'?'ore':p.terrain==='forest'?'timber':'grain';return [...new Set([main,RAW[n%RAW.length],RAW[(n>>>8)%RAW.length]])];}
 function note(g,realm,message){const e=g.economy;e.history.unshift({realm,turn:g.turn,message});e.history=e.history.slice(0,200);if(realm===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:message});g.log=g.log.slice(0,45);}}
 function random(e){e.seed=(Math.imul(e.seed,1664525)+1013904223)>>>0;return e.seed/4294967296;}
 const own=(g,realm)=>Object.values(g.provinces).filter(p=>p.owner===realm);
-export function initEconomy(g,world){if(g.economy?.version===1)return g.economy;const e=g.economy={version:1,next:1,seed:145099,lastTick:-1,provinces:{},realms:{},routes:{},loans:{},crises:{},history:[],prices:Object.fromEntries(Object.entries(GOODS).map(([k,v])=>[k,v.price]))};
+export function initEconomy(g,world){if(g.economy?.version===1){for(const l of Object.values(g.economy.provinces||{}))ensureProvinceEco(l);return g.economy;}const e=g.economy={version:1,next:1,seed:145099,lastTick:-1,provinces:{},realms:{},routes:{},loans:{},crises:{},history:[],prices:Object.fromEntries(Object.entries(GOODS).map(([k,v])=>[k,v.price]))};
  for(const f of world.factions)e.realms[f.id]={inflation:0,credit:70,tariff:1,lastDebase:-120,lastRelief:-120,tradeNet:0,lastPolicy:-24,merchantGuild:false};
- for(const p of world.provinces){e.provinces[p.id]={resources:resources(p),tier:p.development>=9?1:0,industries:Object.fromEntries(Object.keys(INDUSTRIES).map(k=>[k,0])),stock:Object.fromEntries(Object.keys(GOODS).map(k=>[k,k==='grain'?24:8])),shortage:0,output:{},lastRelief:-12};}
+ for(const p of world.provinces){e.provinces[p.id]=ensureProvinceEco({resources:resources(p),tier:p.development>=9?1:0,industries:Object.fromEntries(Object.keys(INDUSTRIES).map(k=>[k,0])),stock:Object.fromEntries(Object.keys(GOODS).map(k=>[k,k==='grain'?24:8])),shortage:0,output:{},lastRelief:-12,devastation:0});}
  return e;}
-function local(g,id){return g.economy?.provinces[id];}
-export function economyModifiers(g,realm){const s=g.economy?.realms[realm];if(!s)return {cost:1,tax:1,levy:1};return {cost:1+s.inflation/100,tax:1-s.inflation/250,levy:1};}
+function local(g,id){return ensureProvinceEco(g.economy?.provinces[id]);}
+export function provinceHoldingModifiers(g,id){
+ const l=local(g,id),out={tax:0,levy:0,trade:0,research:0,defense:0,trust:0,devotion:0};if(!l?.holdings)return out;
+ for(const [bk,def] of Object.entries(HOLDING_BUILDINGS)){const lvl=l.holdings[def.holding]?.buildings?.[bk]||0;if(!lvl)continue;for(const k of Object.keys(out))if(def[k])out[k]+=def[k]*lvl;}
+ return out;
+}
+export function economyModifiers(g,realm){
+ const s=g.economy?.realms[realm];if(!s)return {cost:1,tax:1,levy:1,trade:1};
+ const land=own(g,realm);
+ let hTax=0,hLevy=0,hTrade=0,devPenalty=0;
+ if(land.length){
+  for(const p of land){
+   const l=g.economy?.provinces?.[p.id];if(!l)continue;
+   const hm=provinceHoldingModifiers(g,p.id);hTax+=hm.tax;hLevy+=hm.levy;hTrade+=hm.trade;
+   devPenalty+=(l.devastation||0)/250;
+  }
+  hTax/=land.length;hLevy/=land.length;hTrade/=land.length;devPenalty/=land.length;
+ }
+ const tax=Math.max(.5,(1-s.inflation/250)*(1+hTax)*(1-devPenalty));
+ return {cost:1+s.inflation/100,tax,levy:1+hLevy,trade:1+hTrade};
+}
 export function industryCost(g,realm,id,kind){const p=local(g,id),r=INDUSTRIES[kind];return r&&p?Math.round(r.cost*(1+p.industries[kind])*economyModifiers(g,realm).cost):0;}
 function capacity(p,good){return 60+p.tier*25+p.industries.warehouse*40+(['grain','provisions'].includes(good)?p.industries.granary*40:0);}
 function add(p,good,n){p.stock[good]=cap(p.stock[good]+n,0,capacity(p,good));}
@@ -59,7 +113,8 @@ function serviceLoans(g){const e=g.economy;for(const l of Object.values(e.loans)
 function crisis(g,id,kind,severity=35){const e=g.economy,p=g.provinces[id];if(!p||!CRISES[kind]||e.crises[id])return false;e.crises[id]={province:id,kind,severity:cap(severity,5,90),started:g.turn,remaining:CRISES[kind].months,reliefTurn:-12};note(g,p.owner,CRISES[kind].name+' in '+id+'.');return true;}
 function stepCrises(g,world){const e=g.economy,active=Object.values(e.crises);
  for(const x of active){const p=g.provinces[x.province],l=local(g,x.province),f=g.factions[p.owner];if(!p||!l)continue;
- const protection=x.kind==='epidemic'?l.industries.infirmary*5:x.kind==='drought'||x.kind==='famine'?l.industries.irrigation*3+l.industries.granary*3:0;
+ const hosp=(l.holdings?.temple?.buildings?.hospitium||0)*3;
+ const protection=x.kind==='epidemic'?l.industries.infirmary*5+hosp:x.kind==='drought'||x.kind==='famine'?l.industries.irrigation*3+l.industries.granary*3:0;
  const severity=Math.max(0,x.severity-protection);p.unrest=cap(p.unrest+Math.floor(severity/24),0,100);
  if(x.kind==='epidemic'||x.kind==='famine'){p.population=cap(p.population-Math.floor(severity/35),4,800);}
  if(x.kind==='fire'&&g.turn===x.started+1&&severity>=30){const kind=Object.keys(l.industries).find(k=>l.industries[k]>0);if(kind)l.industries[kind]--;}
@@ -70,7 +125,9 @@ function stepCrises(g,world){const e=g.economy,active=Object.values(e.crises);
  }
  if(g.turn%6===0&&Object.keys(e.crises).length<12){const candidates=world.provinces.filter(p=>!e.crises[p.id]&&g.provinces[p.id]?.owner!=='independent');if(candidates.length&&random(e)<.65){const p=candidates[Math.floor(random(e)*candidates.length)],k=['epidemic','drought','fire','flood'][Math.floor(random(e)*4)];crisis(g,p.id,k,30+Math.floor(random(e)*25));}}
 }
-function produce(g,id){const p=g.provinces[id],l=local(g,id);if(!p||!l)return;const x=g.economy.crises[id];l.output={};const factor=x&&['drought','flood','epidemic'].includes(x.kind)?1-x.severity/150:1;
+function produce(g,id){const p=g.provinces[id],l=local(g,id);if(!p||!l)return;const x=g.economy.crises[id];l.output={};
+ const devFactor=1-(l.devastation||0)/200;
+ const factor=(x&&['drought','flood','epidemic'].includes(x.kind)?1-x.severity/150:1)*devFactor;
  for(const good of RAW){let qty=good==='grain'?3+p.buildings.farm*2:1; if(l.resources.includes(good))qty+=4;qty=Math.max(0,Math.floor(qty*factor));add(l,good,qty);l.output[good]=qty;}
  for(const [kind,rule] of Object.entries(INDUSTRIES)){const level=l.industries[kind];if(!level||!rule.output)continue;let n=level;if(rule.input){n=Math.min(n,Math.floor(l.stock[rule.input]/rule.use));if(rule.second)n=Math.min(n,Math.floor(l.stock[rule.second]));add(l,rule.input,-n*rule.use);if(rule.second)add(l,rule.second,-n);}
  const qty=Math.floor(n*rule.amount*factor);add(l,rule.output,qty);l.output[rule.output]=(l.output[rule.output]||0)+qty;}
@@ -78,7 +135,19 @@ function produce(g,id){const p=g.provinces[id],l=local(g,id);if(!p||!l)return;co
  for(const good of ['cloth','tools','salt'])add(l,good,-Math.min(l.stock[good],Math.max(1,l.tier)));
  if(l.shortage>=4){p.unrest=cap(p.unrest+2,0,100);if(l.shortage>=8&&!g.economy.crises[id]&&p.owner!=='independent')crisis(g,id,'famine',30);}
 }
+function stepDevastation(g){
+ const warring=new Set(Object.values(g.conflict?.wars||{}).filter(w=>w.status==='active').flatMap(w=>[w.attacker,w.defender]));
+ for(const [id,p] of Object.entries(g.provinces||{})){
+  const l=local(g,id);if(!l)continue;
+  const occupied=controller(g,id)!==p.owner;
+  const construction=g.identity?.provinceTech?.[id]?.levels?.construction||1;
+  if(occupied){l.devastation=cap((l.devastation||0)+5,0,100);}
+  else if(warring.has(p.owner)&&p.unrest>=55){l.devastation=cap((l.devastation||0)+2,0,100);}
+  else if((l.devastation||0)>0){l.devastation=cap(l.devastation-(2+Math.max(0,construction-1)),0,100);}
+ }
+}
 function setPrices(g){const e=g.economy,all=Object.values(e.provinces);for(const [k,v] of Object.entries(GOODS)){const avg=all.reduce((n,p)=>n+p.stock[k],0)/Math.max(1,all.length);e.prices[k]=Math.max(1,Math.round(v.price*cap(1.5-avg/100,.65,1.6)));}}
+export function holdingBuildingCost(g,realm,id,kind){const l=local(g,id),def=HOLDING_BUILDINGS[kind];if(!l||!def)return 0;const lvl=l.holdings?.[def.holding]?.buildings?.[kind]||0;return Math.round(def.cost*(lvl+1)*economyModifiers(g,realm).cost);}
 export function economyAction(g,world,action,id,extra,third){const e=initEconomy(g,world),realm=g.player,s=e.realms[realm],f=g.factions[realm],p=g.provinces[id],l=local(g,id);
  if(action==='route')return createRoute(g,world,realm,id,extra,third);
  if(action==='close-route'){const r=e.routes[id];if(!r||r.realm!==realm||r.status!=='active')return no('No active route.');r.status='closed';r.closed=g.turn;return ok('Trade route closed.');}
@@ -88,7 +157,24 @@ export function economyAction(g,world,action,id,extra,third){const e=initEconomy
  if(action==='stabilize'){if(f.treasury<180||s.inflation<=0)return no('Need inflation and 180 gold.');f.treasury-=180;s.inflation=cap(s.inflation-6,0,40);return ok('Currency stabilized.');}
  if(action==='guild'){if(s.merchantGuild||f.treasury<250)return no('Guild already chartered or need 250 gold.');f.treasury-=250;s.merchantGuild=true;s.credit=cap(s.credit+10,0,100);return ok('Merchant guild chartered; credit improved.');}
  if(action==='tariff'){const n=Number(id);if(![0,1,2].includes(n)||s.tariff===n||g.turn-s.lastPolicy<12)return no('Tariff policy may be changed once per year.');s.tariff=n;s.lastPolicy=g.turn;return ok('Tariff policy changed.');}
+ if(action==='trade-post')return buildTradePost(g,id,realm);
+ if(action==='great-work')return startGreatWork(g,id,extra,realm);
+ if(action==='upgrade-great-work')return upgradeGreatWork(g,id,realm);
  if(!p||p.owner!==realm||controller(g,id)!==realm||!l)return no('Select an owned settlement.');
+ if(action==='holding-building'){
+  const def=HOLDING_BUILDINGS[extra];if(!def)return no('Unknown holding building.');
+  const hb=l.holdings[def.holding],lvl=hb.buildings[extra]||0;if(lvl>=def.max)return no(def.name+' already at maximum level.');
+  const cost=holdingBuildingCost(g,realm,id,extra);if(f.treasury<cost)return no('Need '+cost+' gold.');
+  f.treasury-=cost;hb.buildings[extra]=lvl+1;hb.level=Math.max(hb.level,1+Math.floor(Object.values(hb.buildings).reduce((a,b)=>a+b,0)/3));
+  if(def.trust&&g.civic?.provinces?.[id])g.civic.provinces[id].localTrust=cap((g.civic.provinces[id].localTrust||50)+def.trust*3,0,100);
+  if(def.devotion&&g.civic?.provinces?.[id])g.civic.provinces[id].devotion=cap((g.civic.provinces[id].devotion||50)+def.devotion*4,0,100);
+  note(g,realm,def.name+' constructed in '+def.holding+' of '+id+'.');return ok(def.name+' constructed.');
+ }
+ if(action==='rebuild'){
+  if((l.devastation||0)<=0||f.treasury<100)return no('Requires devastated controlled province and 100 gold.');
+  f.treasury-=100;l.devastation=cap(l.devastation-30,0,100);p.unrest=cap(p.unrest-5,0,100);
+  note(g,realm,'Reconstruction reduced devastation in '+id+'.');return ok('Province reconstructed.');
+ }
  if(action==='industry'){const r=INDUSTRIES[extra],level=l.industries[extra];if(!r||level>=3||r.requires&&!l.resources.includes(r.requires))return no('Industry unavailable or at maximum level.');const cost=industryCost(g,realm,id,extra);if(f.treasury<cost)return no('Need '+cost+' gold.');f.treasury-=cost;l.industries[extra]++;return ok(r.name+' upgraded.');}
  if(action==='settlement'){const cost=350*(l.tier+1);if(l.tier>=2||p.development<5+l.tier*4||f.treasury<cost)return no('Settlement upgrade needs sufficient development and '+cost+' gold.');f.treasury-=cost;l.tier++;p.development=cap(p.development+1,1,20);return ok('Settlement upgraded to '+SETTLEMENTS[l.tier]+'.');}
  if(action==='relief'){const x=e.crises[id];if(!x||g.turn-x.reliefTurn<3||f.treasury<120)return no('Relief requires an active crisis, 120 gold, and a three-month interval.');f.treasury-=120;x.reliefTurn=g.turn;x.severity=cap(x.severity-18,0,90);p.unrest=cap(p.unrest-6,0,100);add(l,'grain',12);return ok('Emergency relief delivered.');}
@@ -96,12 +182,13 @@ export function economyAction(g,world,action,id,extra,third){const e=initEconomy
 }
 export function tickEconomy(g,world){const e=initEconomy(g,world);if(e.lastTick===g.turn)return;e.lastTick=g.turn;
  for(const s of Object.values(e.realms))s.tradeNet=0;
+ stepDevastation(g);
  for(const id of Object.keys(g.provinces))produce(g,id);
  setPrices(g);for(const r of Object.values(e.routes))if(r.status==='active')flow(g,world,r);serviceLoans(g);stepCrises(g,world);
  if(g.turn%12===0)for(const [realm,s] of Object.entries(e.realms)){if(g.factions[realm].treasury>=0){s.inflation=cap(s.inflation-1,0,40);s.credit=cap(s.credit+1,0,100);}}
  if(g.turn%6===0)for(const [realm,s] of Object.entries(e.realms)){if(humanControlsRealm(g,realm))continue;const f=g.factions[realm],land=own(g,realm);if(!land.length)continue;
  if(f.treasury>400){const p=land.find(p=>e.crises[p.id]&&e.crises[p.id].severity>=35);if(p){f.treasury-=120;e.crises[p.id].severity=cap(e.crises[p.id].severity-18,0,90);add(local(g,p.id),'grain',12);}}
- if(f.treasury>700){const p=land[hash(realm+g.turn)%land.length],l=local(g,p.id),kind=l.shortage>0?'irrigation':l.resources.includes('ore')?'mine':l.resources.includes('fiber')?'loom':l.resources.includes('timber')?'sawmill':'granary';const cost=industryCost(g,realm,p.id,kind);if(l.industries[kind]<2&&f.treasury>cost+300){f.treasury-=cost;l.industries[kind]++;}}
+ if(f.treasury>700){const p=land[hash(realm+g.turn)%land.length],l=local(g,p.id),kind=l.shortage>0?'irrigation':l.resources.includes('ore')?'mine':l.resources.includes('fiber')?'loom':l.resources.includes('timber')?'sawmill':'granary';const cost=industryCost(g,realm,p.id,kind);if(l.industries[kind]<2&&f.treasury>cost+300){f.treasury-=cost;l.industries[kind]++;}else{const bKey=Object.keys(HOLDING_BUILDINGS)[hash(realm+p.id+g.turn)%9],bc=holdingBuildingCost(g,realm,p.id,bKey);if((l.holdings[HOLDING_BUILDINGS[bKey].holding].buildings[bKey]||0)<2&&f.treasury>bc+350){f.treasury-=bc;l.holdings[HOLDING_BUILDINGS[bKey].holding].buildings[bKey]++;}}}
  if(f.treasury>700&&g.turn%12===0&&random(e)<.35){const from=land[0],dest=tradeDestinations(g,world,realm,from.id).find(p=>p.owner!==realm);if(dest)createRoute(g,world,realm,from.id,dest.id,local(g,from.id).resources[0]);}
  const arrears=Object.values(e.loans).find(l=>l.realm===realm&&l.status==='defaulted');if(arrears&&f.treasury>arrears.remaining+150){f.treasury-=arrears.remaining;arrears.remaining=0;arrears.status='settled';arrears.closed=g.turn;s.credit=cap(s.credit+12,0,100);}else if(f.treasury<100&&s.credit>=55&&g.turn%12===0)loan(g,realm,300);
  }

@@ -4,6 +4,20 @@ from zipfile import ZipFile
 ROOT=Path(__file__).resolve().parents[1]
 zip_path=ROOT/'dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip'
 required=[
+ 'crown-of-nations/assets/characters_3d/ashigaru-foot-soldier-806707.glb',
+ 'crown-of-nations/assets/characters_3d/daimyo-lord-78364a.glb',
+ 'crown-of-nations/assets/characters_3d/LICENSE-Polyfork.txt',
+ 'crown-of-nations/assets/game-art/manifest.json',
+ 'crown-of-nations/assets/game-art/portraits/western-00.webp',
+ 'crown-of-nations/assets/game-art/events/council-00.webp',
+ 'crown-of-nations/assets/game-art/realms/europe-00.webp',
+ 'crown-of-nations/assets/icons/Strategy_game_trait_icon_sheet_807567b6.jpg',
+ 'crown-of-nations/assets/icons/Character_trait_icon_sheet_fe2300f5.jpg',
+ 'crown-of-nations/assets/icons/Medieval_strategy_game_skill_icons_c1080878.jpg',
+ 'crown-of-nations/assets/icons/Medieval_political_office_icon_s…_7042e0b0.jpg',
+ 'crown-of-nations/assets/icons/Create_historical_strategy_game_…_7e8a58fa.jpg',
+ 'crown-of-nations/assets/icons/Medieval_strategy_game_icon_sheet_8967b69f.jpg',
+ 'crown-of-nations/assets/video/Medieval_war_table_map_animation_ac51bb4b.mp4',
  'crown-of-nations/index.html','crown-of-nations/styles.css',
  'crown-of-nations/assets/court-theme.css','crown-of-nations/assets/court-compass.svg','crown-of-nations/assets/monarch-crest.svg','crown-of-nations/src/historical-context.js','crown-of-nations/src/interface-experience.js','crown-of-nations/src/roleplay-systems.js','crown-of-nations/src/supplemental-content.js','crown-of-nations/docs/HISTORICAL_CONTEXT.md',
  'crown-of-nations/src/battle.js','crown-of-nations/src/three-battle.bundle.js',

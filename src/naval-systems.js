@@ -35,6 +35,17 @@ export function blockadeTargets(g,f){const n=g.naval,p=n?.ports[f.port];if(!p||f
 function dock(g,f){f.status='docked';f.target=null;f.remaining=0;}
 function returnPort(g,f){const origin=g.naval.ports[f.port],safe=p=>g.provinces[p.province]?.owner===f.realm&&controller(g,p.province)===f.realm&&(!g.naval.atlasPortVersion||!portBlocked(g,p.province));if(origin&&safe(origin))return f.port;return Object.values(g.naval.ports).filter(p=>safe(p)&&(!g.naval.atlasPortVersion||p.basins.some(b=>origin?.basins.includes(b)))).sort((a,b)=>g.naval.atlasPortVersion?voyageMonths(g,f.port,a.province)-voyageMonths(g,f.port,b.province)||a.province.localeCompare(b.province):0)[0]?.province;}
 function endBlockade(g,f){if(g.naval.blockades[f.target]?.fleet===f.id)delete g.naval.blockades[f.target];const port=returnPort(g,f);if(port){f.port=port;dock(g,f);}else delete g.naval.fleets[f.id];}
+export function clearWarBlockades(g,w){
+ const n=g.naval;if(!n||!w)return;
+ for(const f of Object.values(n.fleets||{})){
+  if(!['blockade','approach'].includes(f.status)||!f.target)continue;
+  const targetOwner=g.provinces?.[f.target]?.owner;
+  if(!targetOwner||war(g,f.realm,targetOwner))continue;
+  if((f.realm===w.attacker&&targetOwner===w.defender)||(f.realm===w.defender&&targetOwner===w.attacker)){
+   endBlockade(g,f);
+  }
+ }
+}
 export function embarked(g,id){return !!g.naval?.voyages[id];}
 function buildShip(g,realm,port,kind){const n=g.naval,p=n.ports[port],d=SHIPS[kind],local=g.economy?.provinces[port],faction=g.factions[realm];if(!p||!d||!local||g.provinces[port]?.owner!==realm||controller(g,port)!==realm||portBlocked(g,port))return no('Select an unblocked friendly port.');
  let f=Object.values(n.fleets).find(x=>x.realm===realm&&x.port===port&&x.status==='docked');

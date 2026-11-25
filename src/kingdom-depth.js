@@ -33,8 +33,9 @@ import {initConflict,tickConflict} from './political-conflict.js';
  * AI is deterministic rule-based gameplay, NOT an external language model.
  */
 import {startingTroops,militaryDoctrine} from './military-doctrines.js';
-import {politicalLevy,initPolitics,tickPolitics,marryRealm,removePoliticalCharacter} from './dynastic-politics.js';
+import {initPolitics,tickPolitics,marryRealm,removePoliticalCharacter,politicalLevy} from './dynastic-politics.js';
 import {planEnemyInvasion,progressEnemyInvasions} from './invasions.js';
+import {applyCrossSystemChoice} from './ck2-deep-systems.js';
 export const VICTORY_YEAR=1500;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const hash=s=>{let n=2166136261;for(const ch of String(s))n=Math.imul(n^ch.charCodeAt(0),16777619);return n>>>0;};
@@ -243,11 +244,27 @@ export function resolveRoyalEvent(g,world,index){
  f.prestige=Math.max(0,f.prestige+(item.prestige||0));
  f.tech=clamp(f.tech+(item.tech||0),1,10);
  if(item.morale)for(const a of armies(g,g.player))a.morale=clamp(a.morale+item.morale,0,100);
+ const crossSpec={};
+ if(['guilds','merchants','mint','grainmarket','irrigation'].includes(event.id)){
+  crossSpec.prosperityDelta=index===0?14:-10;
+  crossSpec.vassalOpinion=index===0?3:-3;
+ }else if(['fever','drought','river'].includes(event.id)){
+  crossSpec.piety=index===0?10:-5;
+  crossSpec.prosperityDelta=index===0?12:-14;
+  crossSpec.vassalOpinion=index===0?4:-4;
+ }else if(['pilgrims','ransom','embassy'].includes(event.id)){
+  crossSpec.piety=index===0?8:2;
+  crossSpec.factionRelation=index===0?5:-2;
+  crossSpec.moralAuthority=index===0?1:0;
+ }else{
+  crossSpec.vassalOpinion=index===0?3:(item.stability<0?-3:1);
+ }
+ const badges=applyCrossSystemChoice(g,crossSpec,{realm:g.player});
  g.kingdom.pendingEvent=null;g.kingdom.eventsResolved++;
  g.kingdom.choices.push({year:g.year,month:g.month,event:event.id,choice:index});
  g.kingdom.choices=g.kingdom.choices.slice(-48);
  log(g,event.title+': '+item.label+'.');
- return {ok:true,msg:'Court decree recorded: '+item.label};
+ return {ok:true,msg:'Court decree recorded: '+item.label,badges};
 }
 export function objectives(g){
  const f=g.factions[g.player],land=provinces(g,g.player);
@@ -318,7 +335,7 @@ export function advanceKingdomSystems(g,world){
  // Trade is already included in the campaign balance.
  tickStrategy(g,world);
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g);tickNaval(g,world);tickChronicles(g,world);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);tickLandless(g,world);tickPersonalUnions(g);reconcileCareer(g);
+ tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g,world);tickNaval(g,world);tickChronicles(g,world);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);tickLandless(g,world);tickPersonalUnions(g);reconcileCareer(g);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');

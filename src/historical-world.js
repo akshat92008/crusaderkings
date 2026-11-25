@@ -368,5 +368,165 @@ export function densifyHistoricalWorld(expanded){if(expanded.meta?.mapVersion!==
  const components=landComponents(world),byId=new Map(world.provinces.map(p=>[p.id,p])),labels={};for(const [i,ids] of components.entries())for(const id of ids){const p=byId.get(id);p.landComponent=i+1;p.landComponentSize=ids.length;}
  for(const p of world.provinces){if(p.owner==='independent')continue;const f=world.factions.find(f=>f.id===p.owner),n=(labels[p.owner]||0)+1;labels[p.owner]=n;p.name=f.name+' · District '+n;}
  for(const f of world.factions){f.startingSeat=capitalDistrict(world,f.id);f.startingGeography=realmGeography(world,f.id);}
- nameAtlasDistricts(world);world.meta={...world.meta,mapVersion:DENSE_MAP_VERSION,provinceCount:world.provinces.length,subdividedParents:parents.size,coverage:atlasCoverage(world),landConnectivity:{components:components.length,largest:components[0]?.length||0},caveat:'Reference-informed starting realms with synthetic internal gameplay subdivisions. Inherited ownership is not fresh historical evidence; boundaries and district populations are approximate.'};return world;}
+ nameAtlasDistricts(world);
+ enrichHistoricalWorld(world);
+ world.meta={...world.meta,mapVersion:DENSE_MAP_VERSION,provinceCount:world.provinces.length,subdividedParents:parents.size,coverage:atlasCoverage(world),landConnectivity:{components:components.length,largest:components[0]?.length||0},caveat:'Reference-informed starting realms with synthetic internal gameplay subdivisions. Inherited ownership is not fresh historical evidence; boundaries and district populations are approximate.'};return world;}
 export function worldForSave(raw,legacy,atlas,expanded=atlas,dense=expanded){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;if(version===EXPANDED_MAP_VERSION&&expanded.meta.mapVersion===EXPANDED_MAP_VERSION)return expanded;if(version===DENSE_MAP_VERSION&&dense.meta.mapVersion===DENSE_MAP_VERSION)return dense;throw Error('Saved map version is unavailable');}
+
+// Phase 13: 1450 Historical World metadata enrichment (deterministic, preserves geometry/neighbors/ownership).
+export const REALM_METADATA_1450={
+ england:{dynasty:'Lancaster',ruler:'Henry VI',culture:'English',faith:'Latin Christianity',empire:'Empire of Britannia',kingdom:'Kingdom of England',tradeHub:'London'},
+ france:{dynasty:'Valois',ruler:'Charles VII',culture:'French',faith:'Latin Christianity',empire:'Empire of Francia',kingdom:'Kingdom of France',tradeHub:'Paris'},
+ castile:{dynasty:'Trastamara',ruler:'Juan II',culture:'Castilian',faith:'Latin Christianity',empire:'Empire of Hispania',kingdom:'Crown of Castile',tradeHub:'Seville'},
+ portugal:{dynasty:'Aviz',ruler:'Afonso V',culture:'Portuguese',faith:'Latin Christianity',empire:'Empire of Hispania',kingdom:'Kingdom of Portugal',tradeHub:'Lisbon'},
+ aragon:{dynasty:'Trastamara',ruler:'Alfonso V',culture:'Aragonese-Catalan',faith:'Latin Christianity',empire:'Empire of Hispania',kingdom:'Crown of Aragon',tradeHub:'Barcelona'},
+ burgundy:{dynasty:'Valois-Burgundy',ruler:'Philip the Good',culture:'Burgundian',faith:'Latin Christianity',empire:'Empire of Francia',kingdom:'Duchy of Burgundy',tradeHub:'Bruges'},
+ imperial:{dynasty:'Habsburg',ruler:'Frederick III',culture:'German',faith:'Latin Christianity',empire:'Holy Roman Empire',kingdom:'Kingdom of Germany',tradeHub:'Nuremberg'},
+ poland:{dynasty:'Jagiellon',ruler:'Casimir IV',culture:'Polish',faith:'Latin Christianity',empire:'Empire of Wendia',kingdom:'Kingdom of Poland',tradeHub:'Krakow'},
+ muscovy:{dynasty:'Rurikid',ruler:'Vasily II',culture:'Muscovite',faith:'Eastern Christianity',empire:'Empire of Rus',kingdom:'Grand Duchy of Moscow',tradeHub:'Moscow'},
+ novgorod:{dynasty:'Posadnik Council',ruler:'Euthymius II',culture:'Novgorodian',faith:'Eastern Christianity',empire:'Empire of Rus',kingdom:'Novgorod Republic',tradeHub:'Novgorod'},
+ scotland:{dynasty:'Stewart',ruler:'James II',culture:'Scottish',faith:'Latin Christianity',empire:'Empire of Britannia',kingdom:'Kingdom of Scotland',tradeHub:'Edinburgh'},
+ brittany:{dynasty:'Montfort',ruler:'Francis I',culture:'Breton',faith:'Latin Christianity',empire:'Empire of Francia',kingdom:'Duchy of Brittany',tradeHub:'Nantes'},
+ kalmar:{dynasty:'Oldenburg',ruler:'Christian I',culture:'Scandinavian',faith:'Latin Christianity',empire:'Empire of Scandinavia',kingdom:'Kalmar Union',tradeHub:'Copenhagen'},
+ genoa:{dynasty:'Campofregoso',ruler:'Pietro di Campofregoso',culture:'Ligurian',faith:'Latin Christianity',empire:'Empire of Italia',kingdom:'Republic of Genoa',tradeHub:'Genoa'},
+ venice:{dynasty:'Foscari',ruler:'Francesco Foscari',culture:'Venetian',faith:'Latin Christianity',empire:'Empire of Italia',kingdom:'Republic of Venice',tradeHub:'Venice'},
+ cyprus:{dynasty:'Lusignan',ruler:'John II',culture:'Cypriot',faith:'Christian traditions',empire:'Eastern Roman Empire',kingdom:'Kingdom of Cyprus',tradeHub:'Famagusta'},
+ ottomans:{dynasty:'Osman',ruler:'Murad II',culture:'Ottoman',faith:'Sunni Islam',empire:'Ottoman Empire',kingdom:'Sultanate of Rum',tradeHub:'Edirne'},
+ mamluks:{dynasty:'Burji',ruler:'Jaqmaq al-Zahir',culture:'Mamluk-Egyptian',faith:'Sunni Islam',empire:'Arabian Empire',kingdom:'Mamluk Sultanate',tradeHub:'Cairo'},
+ timurids:{dynasty:'Timurid',ruler:'Abd al-Latif',culture:'Timurid-Persian',faith:'Sunni Islam',empire:'Persian Empire',kingdom:'Timurid Khorasan',tradeHub:'Samarkand'},
+ qara:{dynasty:'Qara Qoyunlu',ruler:'Jahan Shah',culture:'Turkmen',faith:'Islamic traditions',empire:'Persian Empire',kingdom:'Kingdom of Azerbaijan',tradeHub:'Tabriz'},
+ horde:{dynasty:'Tuqa-Timurid',ruler:'Kuchuk Muhammad',culture:'Tatar',faith:'Islamic traditions',empire:'Empire of Tartaria',kingdom:'Golden Horde',tradeHub:'Sarai'},
+ oirats:{dynasty:'Choros',ruler:'Esen Taishi',culture:'Oirat',faith:'Buddhist and local traditions',empire:'Empire of Mongolia',kingdom:'Four Oirats',tradeHub:'Karakorum'},
+ chagatai:{dynasty:'Chagatayid',ruler:'Esen Buqa II',culture:'Chagatai',faith:'Islamic and local traditions',empire:'Empire of Turan',kingdom:'Chagatai Khanate',tradeHub:'Kashgar'},
+ morocco:{dynasty:'Marinid',ruler:'Abd al-Haqq II',culture:'Maghrebi',faith:'Sunni Islam',empire:'Empire of Maghreb',kingdom:'Marinid Morocco',tradeHub:'Fez'},
+ zayyanid:{dynasty:'Zayyanid',ruler:'Abu al-Abbas Ahmad',culture:'Maghrebi',faith:'Sunni Islam',empire:'Empire of Maghreb',kingdom:'Kingdom of Tlemcen',tradeHub:'Tlemcen'},
+ ethiopia:{dynasty:'Solomonic',ruler:'Zara Yaqob',culture:'Ethiopian',faith:'Ethiopian Christianity',empire:'Empire of Abyssinia',kingdom:'Ethiopian Empire',tradeHub:'Debre Berhan'},
+ mali:{dynasty:'Keita',ruler:'Ouali II',culture:'Mande',faith:'Islamic and local traditions',empire:'Empire of Mali',kingdom:'Mali Empire',tradeHub:'Timbuktu'},
+ songhai:{dynasty:'Sonni',ruler:'Sulayman Dama',culture:'Songhai',faith:'Islamic and local traditions',empire:'Empire of Mali',kingdom:'Songhai Kingdom',tradeHub:'Gao'},
+ kongo:{dynasty:'Lukeni',ruler:'Nkuwu a Ntinu',culture:'Kongo',faith:'Kongo spiritual traditions',empire:'Empire of Kongo',kingdom:'Kingdom of Kongo',tradeHub:'Mbanza Kongo'},
+ kilwa:{dynasty:'Mahdali',ruler:'Sulaiman ibn Muhammad',culture:'Swahili',faith:'Sunni Islam',empire:'Swahili Coast',kingdom:'Kilwa Sultanate',tradeHub:'Kilwa'},
+ vijayanagara:{dynasty:'Sangama',ruler:'Mallikarjuna Raya',culture:'South Indian',faith:'Hindu traditions',empire:'Empire of Karnata',kingdom:'Vijayanagara Empire',tradeHub:'Hampi'},
+ bahmani:{dynasty:'Bahmani',ruler:'Ahmad Shah II',culture:'Deccani',faith:'Islamic traditions',empire:'Empire of Deccan',kingdom:'Bahmani Sultanate',tradeHub:'Bidar'},
+ delhi:{dynasty:'Sayyid',ruler:'Alam Shah',culture:'North Indian',faith:'Islamic traditions',empire:'Empire of Hindustan',kingdom:'Delhi Sultanate',tradeHub:'Delhi'},
+ bengal:{dynasty:'Ilyas Shahi',ruler:'Nasiruddin Mahmud Shah',culture:'Bengali',faith:'Islamic traditions',empire:'Empire of Bengal',kingdom:'Bengal Sultanate',tradeHub:'Gaur'},
+ gujarat:{dynasty:'Muzaffarid',ruler:'Qutb-ud-din Ahmad II',culture:'Gujarati',faith:'Islamic traditions',empire:'Empire of Hindustan',kingdom:'Gujarat Sultanate',tradeHub:'Ahmedabad'},
+ ming:{dynasty:'Zhu',ruler:'Jingtai Emperor',culture:'Ming Chinese',faith:'Chinese ritual traditions',empire:'Great Ming Empire',kingdom:'Central Zhili',tradeHub:'Nanjing'},
+ joseon:{dynasty:'Yi',ruler:'Munjong of Joseon',culture:'Korean',faith:'Confucian ritual traditions',empire:'Great Ming Sphere',kingdom:'Kingdom of Joseon',tradeHub:'Hanseong'},
+ ashikaga:{dynasty:'Ashikaga',ruler:'Ashikaga Yoshimasa',culture:'Japanese',faith:'Buddhist and kami traditions',empire:'Empire of Japan',kingdom:'Ashikaga Shogunate',tradeHub:'Kyoto'},
+ tibet:{dynasty:'Phagmodrupa',ruler:'Drakpa Jungne',culture:'Tibetan',faith:'Tibetan Buddhism',empire:'Empire of Tibet',kingdom:'Kingdom of U-Tsang',tradeHub:'Lhasa'},
+ ayutthaya:{dynasty:'Suphannaphum',ruler:'Borommatrailokkanat',culture:'Siamese',faith:'Theravada Buddhism',empire:'Empire of Suvarnabhumi',kingdom:'Kingdom of Ayutthaya',tradeHub:'Ayutthaya'},
+ 'dai-viet':{dynasty:'Le',ruler:'Le Nhan Tong',culture:'Vietnamese',faith:'Vietnamese ritual traditions',empire:'Empire of Dai Viet',kingdom:'Kingdom of Dai Viet',tradeHub:'Thang Long'},
+ lanxang:{dynasty:'Khun Lo',ruler:'Chakkaphat Phaen Phaeo',culture:'Lao',faith:'Theravada Buddhism',empire:'Empire of Suvarnabhumi',kingdom:'Kingdom of Lan Xang',tradeHub:'Luang Prabang'},
+ majapahit:{dynasty:'Rajasa',ruler:'Kertawijaya',culture:'Javanese',faith:'Hindu-Buddhist traditions',empire:'Empire of Nusantara',kingdom:'Majapahit Empire',tradeHub:'Trowulan'},
+ malacca:{dynasty:'Melaka',ruler:'Muzaffar Shah',culture:'Malay',faith:'Sunni Islam',empire:'Empire of Nusantara',kingdom:'Malacca Sultanate',tradeHub:'Malacca'},
+ sunda:{dynasty:'Sunda',ruler:'Dewa Niskala',culture:'Sundanese',faith:'Hindu-Buddhist and local traditions',empire:'Empire of Nusantara',kingdom:'Sunda Kingdom',tradeHub:'Pakuan'},
+ mexica:{dynasty:'Acamapichtli',ruler:'Moctezuma I',culture:'Nahua',faith:'Nahua spiritual traditions',empire:'Aztec Empire',kingdom:'Triple Alliance',tradeHub:'Tenochtitlan'},
+ maya:{dynasty:'Kowoj',ruler:'Mayapan League',culture:'Maya',faith:'Maya spiritual traditions',empire:'Maya Realm',kingdom:'Maya City-States',tradeHub:'Chichen Itza'},
+ pueblo:{dynasty:'Puebloan',ruler:'Council of Elders',culture:'Pueblo',faith:'Pueblo spiritual traditions',empire:'Pueblo Lands',kingdom:'Pueblo Communities',tradeHub:'Zuni'},
+ haudenosaunee:{dynasty:'Haudenosaunee',ruler:'Deganawida Council',culture:'Haudenosaunee',faith:'Haudenosaunee spiritual traditions',empire:'Great League',kingdom:'Haudenosaunee Confederacy',tradeHub:'Onondaga'},
+ inca:{dynasty:'Hanan Qosqo',ruler:'Pachacuti',culture:'Andean',faith:'Andean spiritual traditions',empire:'Tawantinsuyu',kingdom:'Inca Empire',tradeHub:'Cusco'},
+ muisca:{dynasty:'Zipa',ruler:'Meicuchuca',culture:'Muisca',faith:'Muisca spiritual traditions',empire:'Muisca Confederation',kingdom:'Zipa of Bacata',tradeHub:'Bacata'},
+ tupi:{dynasty:'Tupinamba',ruler:'Pajé Assembly',culture:'Tupi',faith:'Tupi spiritual traditions',empire:'Coastal Brazil',kingdom:'Tupi Polities',tradeHub:'Guanabara'},
+ mapuche:{dynasty:'Toki',ruler:'Butalmapu Council',culture:'Mapuche',faith:'Mapuche spiritual traditions',empire:'Wallmapu',kingdom:'Mapuche Polities',tradeHub:'Arauco'},
+ maori:{dynasty:'Tainui',ruler:'Ariki Rangatira',culture:'Maori',faith:'Maori spiritual traditions',empire:'Aotearoa',kingdom:'Maori Iwi',tradeHub:'Waikato'},
+ fiji:{dynasty:'Bauan',ruler:'Ratu Vunivalu',culture:'Fijian',faith:'Fijian spiritual traditions',empire:'Viti',kingdom:'Fijian Chiefdoms',tradeHub:'Bau'},
+ aboriginal:{dynasty:'Dreaming Elders',ruler:'Regional Custodians',culture:'First Nations',faith:'First Nations traditions',empire:'Terra Australis',kingdom:'Regional Country',tradeHub:'Eora'}
+};
+export const REGION_METADATA_1450={
+ 'British Isles':['Empire of Britannia','Kingdom of Britain','Celtic-English','Latin Christianity'],
+ 'Iberia':['Empire of Hispania','Kingdom of Iberia','Iberian','Latin Christianity'],
+ 'France':['Empire of Francia','Kingdom of France','French','Latin Christianity'],
+ 'Italy':['Empire of Italia','Kingdom of Italy','Italian','Latin Christianity'],
+ 'Central Europe':['Holy Roman Empire','Kingdom of Germany','German','Latin Christianity'],
+ 'Scandinavia':['Empire of Scandinavia','Kingdom of Scandinavia','Norse-Scandinavian','Latin Christianity'],
+ 'Baltic':['Empire of Wendia','Kingdom of Lithuania','Baltic','Latin Christianity'],
+ 'Balkans':['Eastern Roman Empire','Kingdom of Greece & Balkans','Balkan','Eastern Christianity'],
+ 'Eastern Europe':['Empire of Rus','Kingdom of Ruthenia','East Slavic','Eastern Christianity'],
+ 'Pontic Steppe':['Empire of Tartaria','Kingdom of Pontic Steppe','Tatar','Islamic traditions'],
+ 'Volga':['Empire of Tartaria','Kingdom of Volga-Bulgaria','Volga-Tatar','Islamic traditions'],
+ 'Anatolia':['Ottoman Empire','Sultanate of Rum','Turkish','Sunni Islam'],
+ 'Caucasus':['Persian Empire','Kingdom of Georgia','Caucasian','Eastern Christianity'],
+ 'Arabia':['Arabian Empire','Kingdom of Arabia','Arabic','Sunni Islam'],
+ 'Iranian Plateau':['Persian Empire','Kingdom of Persia','Persian','Islamic traditions'],
+ 'Central Asian Steppe':['Empire of Turan','Kingdom of Transoxiana','Turkic','Islamic traditions'],
+ 'Maghreb':['Empire of Maghreb','Kingdom of Maghreb','Maghrebi','Sunni Islam'],
+ 'Nile Valley':['Arabian Empire','Sultanate of Egypt','Egyptian','Sunni Islam'],
+ 'Red Sea hinterland':['Arabian Empire','Kingdom of Nubia','Nubian','Christian traditions'],
+ 'Horn of Africa':['Empire of Abyssinia','Kingdom of Abyssinia','Ethiopian','Ethiopian Christianity'],
+ 'Sahel':['Empire of Mali','Kingdom of Sahel','Sahelian','Islamic and local traditions'],
+ 'Sahara':['Empire of Maghreb','Kingdom of Sahara','Tuareg','Islamic traditions'],
+ 'East African coast':['Swahili Coast','Kingdom of Zanj','Swahili','Sunni Islam'],
+ 'Congo Basin':['Empire of Kongo','Kingdom of Kongo','Bantu','Kongo spiritual traditions'],
+ 'Southern Africa':['Empire of Mutapa','Kingdom of Mutapa','Shona','Southern African traditions'],
+ 'Indus region':['Empire of Hindustan','Kingdom of Sindh','Sindhi-Punjabi','Islamic traditions'],
+ 'Gangetic Plain':['Empire of Hindustan','Delhi Sultanate','Hindustani','Hindu traditions'],
+ 'Bengal Delta':['Empire of Bengal','Kingdom of Bengal','Bengali','Islamic traditions'],
+ 'Deccan':['Empire of Karnata','Kingdom of Deccan','Deccani','Hindu traditions'],
+ 'Himalayas':['Empire of Tibet','Kingdom of Himalayas','Himalayan','Tibetan Buddhism'],
+ 'North China':['Great Ming Empire','Kingdom of North China','Northern Chinese','Chinese ritual traditions'],
+ 'South China':['Great Ming Empire','Kingdom of South China','Southern Chinese','Chinese ritual traditions'],
+ 'Korean Peninsula':['Great Ming Sphere','Kingdom of Joseon','Korean','Confucian ritual traditions'],
+ 'Japanese Islands':['Empire of Japan','Shogunate of Japan','Japanese','Buddhist and kami traditions'],
+ 'Mongolian Plateau':['Empire of Mongolia','Khanate of Mongolia','Mongol','Buddhist and local traditions'],
+ 'Mainland Southeast Asia':['Empire of Suvarnabhumi','Kingdom of Siam','Southeast Asian','Theravada Buddhism'],
+ 'Malay Peninsula':['Empire of Nusantara','Sultanate of Malacca','Malay','Sunni Islam'],
+ 'Sumatra':['Empire of Nusantara','Kingdom of Sumatra','Malay','Islamic and local traditions'],
+ 'Java':['Empire of Nusantara','Kingdom of Java','Javanese','Hindu-Buddhist traditions']
+};
+export function enrichHistoricalWorld(world){
+ if(!world?.factions||!world?.provinces)return world;
+ const seats=new Set();
+ for(const f of world.factions){
+  const m=REALM_METADATA_1450[f.id];
+  if(m){
+   f.historicalDynasty=m.dynasty;f.historicalRuler=m.ruler;f.culture=m.culture;f.faith=m.faith;
+   f.deJureEmpire=m.empire;f.deJureKingdom=m.kingdom;f.tradeHub=m.tradeHub;
+  }
+  const seat=f.startingSeat?.id||capitalDistrict(world,f.id)?.id;
+  if(seat)seats.add(seat);
+ }
+ const duchyBuckets=new Map();
+ for(const p of world.provinces){
+  const m=REALM_METADATA_1450[p.owner];
+  const reg=REGION_METADATA_1450[p.regionName];
+  p.deJureEmpire=m?.empire||reg?.[0]||(p.continent+' Realm');
+  p.deJureKingdom=m?.kingdom||p.historicalPolity||reg?.[1]||(p.regionName||p.continent);
+  p.culture=p.culture||m?.culture||reg?.[2]||(p.regionName||'Local');
+  p.faith=p.faith||m?.faith||reg?.[3]||'Local traditions';
+  if(!['plains','forest','highlands','desert'].includes(p.terrain))p.terrain='plains';
+  const bucketKey=p.deJureKingdom+'|'+(p.regionName||p.continent);
+  const bucket=duchyBuckets.get(bucketKey)||[];bucket.push(p);duchyBuckets.set(bucketKey,bucket);
+  const isSeat=seats.has(p.id);
+  p.tradeCenter=Boolean(isSeat||(p.fort&&p.population>=24));
+  if(p.tradeCenter)p.tradeCenterName=isSeat&&m?.tradeHub?m.tradeHub:(p.name||'Market Hub');
+ }
+ for(const [key,list] of duchyBuckets){
+  list.sort((a,b)=>b.centroid[1]-a.centroid[1]||a.centroid[0]-b.centroid[0]||a.id.localeCompare(b.id));
+  const regionLabel=key.split('|')[1]||'Province';
+  const groupCount=Math.max(1,Math.ceil(list.length/3));
+  list.forEach((p,idx)=>{
+   const cluster=Math.min(groupCount,Math.floor(idx/3)+1);
+   p.deJureDuchy=groupCount===1?'Duchy of '+regionLabel:'Duchy of '+regionLabel+' '+['I','II','III','IV','V','VI','VII','VIII','IX','X'][cluster-1];
+  });
+ }
+ return world;
+}
+export function verifyAtlasIntegrity(world){
+ const byId=new Map((world?.provinces||[]).map(p=>[p.id,p]));
+ const errors=[];
+ for(const f of world?.factions||[]){
+  const seat=capitalDistrict(world,f.id);
+  if(!seat||byId.get(seat.id)?.owner!==f.id)errors.push('Invalid capital for '+f.id);
+ }
+ for(const p of world?.provinces||[]){
+  if(new Set(p.neighbors).size!==p.neighbors.length)errors.push('Duplicate neighbor on '+p.id);
+  for(const n of p.neighbors||[]){
+   const o=byId.get(n);
+   if(!o||n===p.id||!o.neighbors?.includes(p.id))errors.push('Invalid edge '+p.id+'-'+n);
+  }
+  const poly=p.geometry?.coordinates?.[0];
+  if(!poly||poly.length<4||area(p.geometry.coordinates)<=1e-9)errors.push('Degenerate geometry on '+p.id);
+  if(!p.deJureKingdom||!p.deJureDuchy||!p.culture||!p.faith)errors.push('Missing metadata on '+p.id);
+ }
+ return {ok:errors.length===0,errors};
+}

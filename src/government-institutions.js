@@ -31,7 +31,7 @@ export const INSTITUTION_TYPES={
 function state(g,r){const root=g.institutions??={version:1,realms:{},history:[],lastTick:-1};const type=g.civic.realms[r].government,mode=INSTITUTION_TYPES[type]?.mode||'estates';let s=root.realms[r];if(!s||s.mode!==mode){s=root.realms[r]={mode,last:-120,compacts:{},offices:{},houses:{},retainers:{},herds:0,reserves:0,tributes:{},lastCollection:-1};}if(s.deliberation&&s.deliberation.government!==type)delete s.deliberation;if(type!=='imperial')delete s.civilService;if(!['republic','city'].includes(type))delete s.election;if(type!=='steppe')delete s.pastureUntil;if(s.regionalPolitics&&s.regionalPolitics.type!==type)delete s.regionalPolitics;if(s.procedures&&s.procedures.kind!==type)delete s.procedures;if(s.localPrograms&&s.localPrograms.kind!==type)delete s.localPrograms;return s;}
 export function initInstitutions(g){g.institutions??={version:1,realms:{},history:[],lastTick:-1};for(const r of Object.keys(g.civic.realms))state(g,r);return g.institutions;}
 export function institutionState(g,r){return g.institutions?.realms[r];}
-function note(g,r,msg){const h=g.institutions.history;h.unshift({realm:r,turn:g.turn,message:msg});if(h.length>120)h.length=120;if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}}
+function note(g,r,msg){g.institutions.history??=[];const h=g.institutions.history;h.unshift({realm:r,turn:g.turn,message:msg});if(h.length>120)h.length=120;if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:msg});g.log=g.log.slice(0,45);}}
 function eligibleHouse(g,r,id){const p=adult(g,id,r);return p&&p.id!==ruler(g,r)?.id?p:null;}
 function compactValid(g,r,id,x){const h=g.politics.holdings[id];return x?.until>g.turn&&g.provinces[id]?.owner===r&&controller(g,id)===r&&h?.realm===r&&(!x.lord||x.lord===h.lord);}
 function tributeActive(g,r,id,x){return !!x&&x.until>g.turn&&!!g.factions[id]&&own(g,id).length>0&&(g.factions[id].relations[r]||0)>=0&&!Object.values(g.conflict.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)&&[w.attacker,w.defender].includes(id));}
@@ -45,9 +45,30 @@ export function institutionModifiers(g,r){const s=institutionState(g,r),out={tax
  if(s.mode==='estates')out.levy+=Math.min(.12,current.filter(p=>compactValid(g,r,p.id,s.compacts[p.id])).length/current.length*.12);
  if(s.mode==='merchants')out.trade+=Math.min(.18,Object.values(s.houses).filter(h=>eligibleHouse(g,r,h.person)).reduce((n,h)=>n+h.level*.03,0));
  if(s.mode==='retainers')out.levy+=Math.min(.18,Object.values(s.retainers).filter(h=>eligibleHouse(g,r,h.person)).reduce((n,h)=>n+h.level*.03,0));
- if(s.mode==='herds')out.levy+=Math.min(.15,s.herds*.0015);
+ if(s.mode==='herds')out.levy+=Math.min(.15,s.herds*.0015)+(s.pastureUntil>g.turn?.05:0);
+ if(g.civic?.realms?.[r]?.government==='city'&&s.guilds){const gsum=Object.values(s.guilds).reduce((n,v)=>n+Math.max(0,v-1),0);out.trade+=Math.min(.18,gsum*.04);out.tax+=Math.min(.12,gsum*.03);}
+ if(s.retinues)out.levy+=Math.min(.15,s.retinues*.02);
  out.trade+=merchantChairBonus(g,r);const policy=governmentPolicyModifiers(g,r),regional=regionalPoliticalModifiers(g,r,current);for(const k of Object.keys(out))out[k]*=policy[k]*regional[k];
  return out;}
+export function governmentMechanics(g,r){
+ const type=g.civic?.realms?.[r]?.government||'feudal',d=INSTITUTION_TYPES[type]||INSTITUTION_TYPES.feudal,s=institutionState(g,r);
+ const map={
+  feudal:{succession:'hereditary',allowedLaws:['eldest','partition','youngest','seniority','elective'],officeRule:'landed vassals & council',aiPriority:['estate compacts','vassal loyalty','levy']},
+  centralized:{succession:'hereditary',allowedLaws:['eldest','partition','youngest','seniority'],officeRule:'royal inspectors',aiPriority:['inspections','development','tax']},
+  imperial:{succession:'hereditary',allowedLaws:['eldest','seniority','elective'],officeRule:'examined civil-service governors',aiPriority:['civil exams','corruption audits','tax']},
+  republic:{succession:'elective',allowedLaws:['elective'],officeRule:'patrician merchant houses & doge election',aiPriority:['trade','merchant houses','campaigns']},
+  sultanate:{succession:'dynastic',allowedLaws:['eldest','seniority','partition'],officeRule:'household retainers & ulama',aiPriority:['decadence control','retainers','morale']},
+  steppe:{succession:'elective',allowedLaws:['elective','partition','seniority'],officeRule:'nomad clans & mobile herds',aiPriority:['pasture reserves','cavalry raids','prestige retinues']},
+  shogunate:{succession:'hereditary',allowedLaws:['eldest','partition'],officeRule:'daimyo houses & retainers',aiPriority:['mediate daimyo','retainer loyalty','levy']},
+  confederation:{succession:'elective',allowedLaws:['elective'],officeRule:'member chiefs & assemblies',aiPriority:['member relief','defense','stability']},
+  regional:{succession:'hereditary',allowedLaws:['eldest','partition','elective'],officeRule:'samanta land grants',aiPriority:['samanta grants','local trust','levy']},
+  city:{succession:'elective',allowedLaws:['elective'],officeRule:'urban craft & merchant guilds',aiPriority:['guilds','public works','trade']},
+  military:{succession:'elective',allowedLaws:['elective','seniority'],officeRule:'military households & commanders',aiPriority:['retainers','army drill','prestige retinues']},
+  tributary:{succession:'hereditary',allowedLaws:['eldest','partition','elective'],officeRule:'tribute compacts',aiPriority:['tribute collection','diplomacy','trade']},
+  kinship:{succession:'elective',allowedLaws:['elective','seniority'],officeRule:'communal elders & clan stores',aiPriority:['community stores','clan raids','prestige retinues']}
+ };
+ return {type,name:d.name,mode:d.mode,modifiers:institutionModifiers(g,r),state:s,...(map[type]||map.feudal)};
+}
 function action(g,r,id,extra){const s=state(g,r),d=INSTITUTION_TYPES[g.civic.realms[r].government],f=g.factions[r];if(!d||!own(g,r).length||f.treasury<d.cost||g.turn-s.last<6)return no('Requires controlled land, sufficient funds and six months between institutional actions.');
  const h=g.politics.holdings[id],valid=institutionTargets(g,r).includes(id);switch(s.mode){
  case 'estates':if(!valid||compactValid(g,r,id,s.compacts[id]))return no('Select an estate without an active compact.');s.compacts[id]={until:g.turn+36,lord:h.lord};h.loyalty=cap(h.loyalty+18,0,100);h.autonomy=Math.max(1,h.autonomy);break;
@@ -58,7 +79,36 @@ function action(g,r,id,extra){const s=state(g,r),d=INSTITUTION_TYPES[g.civic.rea
  case 'tribute':{const other=g.factions[id],rev=g.institutions.realms[id]?.tributes[r];if(!valid||s.tributes[id]?.until>g.turn||rev?.until>g.turn||(other.relations[r]||0)<25||Object.values(g.conflict.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)&&[w.attacker,w.defender].includes(id)))return no('Requires a willing foreign realm (+25 relations), no reciprocal compact or war.');const amount=Math.min(25,Math.max(5,own(g,id).length*3));s.tributes[id]={until:g.turn+36,amount,arrears:0,missed:0};break;}
  default:return no('Unknown institutional model.');}
  f.treasury-=d.cost;s.last=g.turn;note(g,r,d.action+' completed.');return ok(d.action+' completed.');}
-export function governmentAction(g,world,id,extra){if(id==='estate:renew')return renewEstate(g,g.player,extra);if(id==='tribute:waive')return waiveArrears(g,g.player,extra);if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);if(id==='civil:exam')return civilServiceAction(g,g.player,'exam',extra);if(id==='civil:audit')return civilServiceAction(g,g.player,'audit',extra);if(id==='merchant:campaign')return merchantCampaign(g,g.player,extra);if(id==='steppe:pasture')return reservePasture(g,g.player);if(['regional:grant','sultanate:scholar','shogunate:mediate'].includes(id))return regionalPoliticalAction(g,g.player,id,extra);if(['crown:inspect','crown:fund','crown:dismiss','confed:assembly'].includes(id))return procedureAction(g,g.player,id,extra);if(['military:commission','city:works','kinship:relief'].includes(id))return localProgramAction(g,g.player,id,extra);return action(g,g.player,id,extra);}
+export function tribalRetinue(g,r){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r],land=own(g,r);
+ if(!['steppe','kinship','military'].includes(type)||!land.length||(f.prestige||0)<25||(s.retinues||0)>=10||g.turn-(s.lastRetinue??-120)<6)return no('Requires tribal/steppe/military realm, 25 prestige, controlled land and 6-month interval.');
+ f.prestige-=25;s.retinues=(s.retinues||0)+1;s.lastRetinue=g.turn;
+ const a=Object.values(g.armies||{}).find(x=>x.owner===r);
+ if(a){if(type==='steppe')a.cavalry=(a.cavalry||0)+35,a.archers=(a.archers||0)+15;else a.infantry=(a.infantry||0)+45,a.cavalry=(a.cavalry||0)+15;a.morale=cap((a.morale||70)+5,0,100);}
+ note(g,r,'Prestige retinue was mustered by tribal elders and warriors.');return ok('Prestige retinue raised.');
+}
+export function tribalRaid(g,r,targetId){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r],target=g.factions[targetId];
+ if(!['steppe','kinship','military'].includes(type)||!target||targetId===r||!own(g,r).length||!own(g,targetId).length||g.turn-(s.lastRaid??-120)<12)return no('Requires tribal/steppe/military realm, valid target realm and yearly raid interval.');
+ const army=Object.values(g.armies||{}).find(x=>x.owner===r&&(x.infantry+x.archers+x.cavalry)>=40);
+ if(!army)return no('Requires a field army of at least 40 troops to launch a raid.');
+ s.lastRaid=g.turn;const loot=Math.min(140,Math.max(50,Math.floor((target.treasury||0)*0.12)+60));
+ const taken=Math.min(loot,Math.max(0,target.treasury||0));
+ target.treasury-=taken;f.treasury+=loot;f.prestige=(f.prestige||0)+10;
+ f.relations??={};target.relations??={};f.relations[targetId]=clamp((f.relations[targetId]||0)-15,-100,100);target.relations[r]=clamp((target.relations[r]||0)-15,-100,100);
+ const tp=own(g,targetId)[0];if(tp&&Number.isFinite(tp.unrest))tp.unrest=cap(tp.unrest+6,0,100);
+ for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===r)h.loyalty=cap((h.loyalty||50)+4,0,100);
+ note(g,r,'Tribal raiders returned from '+(target.name||targetId)+' with '+loot+' gold.');return ok('Border raid completed.');
+}
+export function cityGuildAction(g,r,guild='merchants'){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r];
+ if(type!=='city'||!['artisans','merchants','masons'].includes(guild)||!own(g,r).length||f.treasury<140)return no('Requires city-state, valid guild (artisans/merchants/masons) and 140 gold.');
+ s.guilds??={artisans:1,merchants:1,masons:1};if(s.guilds[guild]>=3)return no('Guild already at maximum charter rank.');
+ f.treasury-=140;s.guilds[guild]++;const p=own(g,r)[0];if(Number.isFinite(p?.development))p.development=cap(p.development+1,1,20);
+ note(g,r,'Urban '+guild+' guild charter expanded to rank '+s.guilds[guild]+'.');return ok('City guild expanded.');
+}
+function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
+export function governmentAction(g,world,id,extra){if(id==='estate:renew')return renewEstate(g,g.player,extra);if(id==='tribute:waive')return waiveArrears(g,g.player,extra);if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);if(id==='civil:exam')return civilServiceAction(g,g.player,'exam',extra);if(id==='civil:audit')return civilServiceAction(g,g.player,'audit',extra);if(id==='merchant:campaign')return merchantCampaign(g,g.player,extra);if(id==='steppe:pasture')return reservePasture(g,g.player);if(id==='tribal:retinue')return tribalRetinue(g,g.player);if(id==='tribal:raid')return tribalRaid(g,g.player,extra);if(id==='city:guild')return cityGuildAction(g,g.player,extra||'merchants');if(['regional:grant','sultanate:scholar','sultanate:reform','shogunate:mediate'].includes(id))return regionalPoliticalAction(g,g.player,id,extra);if(['crown:inspect','crown:fund','crown:dismiss','confed:assembly'].includes(id))return procedureAction(g,g.player,id,extra);if(['military:commission','city:works','kinship:relief'].includes(id))return localProgramAction(g,g.player,id,extra);return action(g,g.player,id,extra);}
 export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastTick===g.turn)return;root.lastTick=g.turn;for(const [r,s] of Object.entries(root.realms)){const f=g.factions[r],land=own(g,r);tickGovernmentMotions(g,r);if(!land.length)continue;tickCivilService(g,r);tickMerchantElections(g,r);tickRegionalPolitics(g,r,land);tickInstitutionProcedures(g,r,land);tickLocalPrograms(g,r,land);
  for(const [id,x] of Object.entries(s.compacts)){if(!compactValid(g,r,id,x))delete s.compacts[id];else if(!x.lord)x.lord=g.politics.holdings[id].lord;}
  for(const [id,x] of Object.entries(s.offices))if(!land.some(p=>p.id===id)||!adult(g,x.person,r))delete s.offices[id];
@@ -70,5 +120,10 @@ export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastT
  if(s.mode==='merchants')for(const h of Object.values(s.houses)){const p=eligibleHouse(g,r,h.person);if(p)p.wealth+=h.level*3;}
  if(s.mode==='retainers')for(const h of Object.values(s.retainers)){const p=eligibleHouse(g,r,h.person);if(p)for(const v of Object.values(g.politics.holdings))if(v.realm===r&&v.lord===p.id)v.loyalty=cap(v.loyalty+1,0,100);}
  }
- if(!humanControlsRealm(g,r)&&g.turn%12===0&&f.treasury>800){const renew=estateReviewView(g,r)?.find(x=>x.canRenew&&x.loyalty<75);if(renew)renewEstate(g,r,renew.id);const targets=institutionTargets(g,r);let id=targets.find(id=>s.mode==='estates'?!s.compacts[id]:s.mode==='administration'?!s.offices[id]:s.mode==='tribute'?(g.factions[id].relations[r]||0)>=25:((s.houses[id]||s.retainers[id])?.level||0)<3),extra;if(s.mode==='administration')extra=Object.values(g.politics.people).filter(p=>eligibleHouse(g,r,p.id)&&p.skills.stewardship>=2&&!Object.values(s.offices).some(o=>o.person===p.id)).sort((a,b)=>(b.skills.stewardship+examinationRank(g,r,b.id))-(a.skills.stewardship+examinationRank(g,r,a.id)))[0]?.id;if(id||['herds','reserves'].includes(s.mode))action(g,r,id,extra);}
+ if(!humanControlsRealm(g,r)&&g.turn%12===0){
+  const govType=g.civic?.realms?.[r]?.government;
+  if(['steppe','kinship','military'].includes(govType)&&(f.prestige||0)>=55&&(s.retinues||0)<5)tribalRetinue(g,r);
+  if(govType==='city'&&f.treasury>800){const gKey=['merchants','artisans','masons'].find(k=>(s.guilds?.[k]||1)<3);if(gKey)cityGuildAction(g,r,gKey);}
+  if(f.treasury>800){const renew=estateReviewView(g,r)?.find(x=>x.canRenew&&x.loyalty<75);if(renew)renewEstate(g,r,renew.id);const targets=institutionTargets(g,r);let id=targets.find(id=>s.mode==='estates'?!s.compacts[id]:s.mode==='administration'?!s.offices[id]:s.mode==='tribute'?(g.factions[id].relations[r]||0)>=25:((s.houses[id]||s.retainers[id])?.level||0)<3),extra;if(s.mode==='administration')extra=Object.values(g.politics.people).filter(p=>eligibleHouse(g,r,p.id)&&p.skills.stewardship>=2&&!Object.values(s.offices).some(o=>o.person===p.id)).sort((a,b)=>(b.skills.stewardship+examinationRank(g,r,b.id))-(a.skills.stewardship+examinationRank(g,r,a.id)))[0]?.id;if(id||['herds','reserves'].includes(s.mode))action(g,r,id,extra);}
+ }
 }}

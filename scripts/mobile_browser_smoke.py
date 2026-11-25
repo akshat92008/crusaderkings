@@ -24,6 +24,9 @@ try:
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    page.goto('http://127.0.0.1:'+str(server.server_port),wait_until='domcontentloaded',timeout=45000)
    page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
+   assert page.locator('#menu-video').count()==1
+   assert page.locator('#menu-video').evaluate('(v)=>v.muted && v.loop')
+   page.screenshot(path=str(OUT/(name+'-title.png')))
    page.fill('#realm-search','no-such-kingdom');assert page.locator('#start-new').is_disabled()
    page.fill('#realm-search','england');assert page.locator('#start-faction option').count()==1
    page.fill('#realm-search','');page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
@@ -34,6 +37,9 @@ try:
    box=page.locator('#world-map').bounding_box();assert box['height']>=height*.45,box
    page.screenshot(path=str(OUT/(name+'-map.png')))
    assert page.locator('#hud-ruler').is_visible()
+   page.locator('#hud-portrait img').wait_for(state='attached',timeout=10000)
+   page.wait_for_function("document.querySelector('#hud-portrait img').naturalWidth > 0")
+   page.wait_for_function("document.querySelector('#menu-video').paused")
    assert page.locator('#game-speed').is_visible()
    page.select_option('#game-speed','750')
    page.select_option('#game-speed','1500')
@@ -44,6 +50,7 @@ try:
    page.fill('#campaign-query','military');assert page.locator('.finder-row').count()>0
    page.fill('#campaign-query','no-such-result-xyz');assert page.locator('.finder-row').count()==0
    page.fill('#campaign-query','council');page.locator('.finder-row[data-priority-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
+   page.wait_for_function("document.querySelector('#faction-flag img')?.naturalWidth > 0")
    page.locator('[data-workspace="realm"]').click();assert page.locator('.campaign-hub').is_visible()
    assert page.locator('.first-steps').count()==1
    assert page.locator('.historical-context').count()==1
