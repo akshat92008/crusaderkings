@@ -264,7 +264,7 @@ function collectEventPrompts(){
  void liveWorld;
  return out;
 }
-function closeEventModal(){const m=el('event-modal');if(m){m.hidden=true;m.innerHTML='';}}
+function closeEventModal(){const m=el('event-modal');if(m){const wasOpen=!m.hidden;m.hidden=true;m.innerHTML='';if(wasOpen)syncAudioState();}}
 function renderEventModal(evt){
  const m=el('event-modal');if(!m||!evt){closeEventModal();return;}
  el('toast')?.classList.remove('visible');
@@ -279,7 +279,7 @@ function renderEventModal(evt){
   +'<div class="event-modal-foot">Campaign paused until resolved or deferred.</div></div>';
  m._eventKey=evt.key;
  m.hidden=false;
- browserCampaignAudio.playSfx('chime');
+ syncAudioState();browserCampaignAudio.playSfx('chime');
 }
 function maybePopupEventModal(prevKeys=new Set()){
  if(!game||battle||vassalCareer(game))return;
