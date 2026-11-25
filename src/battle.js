@@ -1,3 +1,4 @@
+import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells} from './simple-card-battle.js';
 import {chooseBattleRenderer, freshBattleCanvas, disposeNativeRenderer} from './battle-lifecycle.js';
 import {fieldFrameSteps, renderInterval} from './render-performance.js';
 import {browserFieldAudio, browserBattleMusic, browserCampaignAudio} from './field-audio.js';
@@ -412,7 +413,7 @@ function formation(id, side, type, order, start, ratio, color) {
 
 function attachTactics(group, faction, formationId) {
   const doctrine = militaryDoctrine(faction);
-  const selected = doctrine.formations.includes(formationId) ? formationId : doctrine.formations[0];
+  const selected = availableFormations(faction,group.simpleField).some(f=>f.id===formationId) ? formationId : doctrine.formations[0];
   const stats = combatStatistics(faction, group.type, selected);
   group.doctrine = doctrine.id;
   group.specialist = doctrine.unique;
@@ -602,9 +603,9 @@ export class BattleGame {
         g.profile = regimentProfile(game, a, entry.type);
         g.readiness = armyReadiness(game, a);
       }
-      if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId;}
+      if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; g.simpleField=true; if(g.specialistId==='horsebow')g.baseRange=5;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
-      attachTactics(g, playerFaction, this.simpleField ? chooseCounterFormation(playerFaction, 'infantry', g.type) : myDoctrine.formations[0]);
+      attachTactics(g, playerFaction, this.simpleField ? (cardRole(g)==='ranged'?'volley_line':cardRole(g)==='mounted'?'cavalry_wedge':g.kind==='pikemen'||g.kind==='spearmen'?'pike_square':'shield_wall') : myDoctrine.formations[0]);
       if (descriptor.fieldBattle) {
         initializeFieldGroup(g);
         g.terrainType = this.terrainType;
@@ -641,9 +642,9 @@ export class BattleGame {
         g.profile = regimentProfile(game, enemyArmy || enemies, entry.type);
         g.readiness = armyReadiness(game, enemyArmy || enemies);
       }
-      if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId;}
+      if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; g.simpleField=true; if(g.specialistId==='horsebow')g.baseRange=5;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
-      attachTactics(g, enemy, this.simpleField ? chooseCounterFormation(enemy, 'infantry', g.type) : enemyDoctrine.formations[idx % enemyDoctrine.formations.length]);
+      attachTactics(g, enemy, this.simpleField ? (cardRole(g)==='ranged'?'volley_line':cardRole(g)==='mounted'?'cavalry_wedge':g.kind==='pikemen'||g.kind==='spearmen'?'pike_square':'shield_wall') : enemyDoctrine.formations[idx % enemyDoctrine.formations.length]);
       if (descriptor.fieldBattle) {
         initializeFieldGroup(g);
         g.terrainType = this.terrainType;
@@ -655,6 +656,11 @@ export class BattleGame {
       this.groups.push(g);
     }
 
+    if(this.simpleField){
+      arrangeCardArmy(this.groups,'attacker',descriptor.defenseMode?-1:1);
+      arrangeCardArmy(this.groups,'defender',descriptor.defenseMode?1:-1);
+      this.camera.distance=105;
+    }
     this.selected = 0;
     this.selectedGroupId = this.groups[0]?.side === 'attacker' ? this.groups[0].id : null;
 
@@ -673,7 +679,7 @@ export class BattleGame {
     this._onKeyDown = e => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(doc?.activeElement?.tagName)) return;
       this.keys.add(e.key.toLowerCase());
-      if (/^Digit[1-6]$/.test(e.code)) {
+      if (/^Digit[1-9]$/.test(e.code)) {
         const idx = Number(e.code.slice(-1)) - 1;
         if (this.groups[idx]?.side === 'attacker') {
           this.selectGroup(idx);
@@ -694,6 +700,7 @@ export class BattleGame {
     this._onDown = e => {
       if (e.button === 2) {
         e.preventDefault();
+        if(this.simpleField&&!this.deployment)return;
         const target = this.rayGround(e.offsetX, e.offsetY);
         const group = this.selectedGroup();
         if (target && group?.side === 'attacker' && !group.routed) {
@@ -759,7 +766,7 @@ export class BattleGame {
       this.music?.sync(!doc?.hidden && !this.paused && !this.done && !this.deployment && !this.renderLost);
     };
     this._onRallyBtn = () => { this.rallyHorn('attacker'); };
-    this._onSpeedBtn = () => { this.setBattleSpeed(this.battleSpeed >= 2 ? 1 : 2); };
+    this._onSpeedBtn = () => { this.setBattleSpeed(this.simpleField?(this.battleSpeed===1?2:this.battleSpeed===2?4:1):this.battleSpeed >= 2 ? 1 : 2); };
 
     win?.addEventListener?.('keydown', this._onKeyDown);
     win?.addEventListener?.('keyup', this._onKeyUp);
@@ -805,7 +812,7 @@ export class BattleGame {
   }
 
   setBattleSpeed(speed) {
-    this.battleSpeed = Number(speed) >= 2 ? 2 : 1;
+    this.battleSpeed = this.simpleField&&Number(speed)>=4?4:Number(speed)>=2?2:1;
     const doc = globalThis.document;
     const btn = this._speedEl || doc?.getElementById?.('battle-speed');
     if (btn) {
@@ -826,13 +833,17 @@ export class BattleGame {
     return res;
   }
 
+  arrangeCards(preset='balanced') {
+    if(!this.simpleField||!this.deployment||this.done)return false;
+    const ok=arrangeCardArmy(this.groups,'attacker',this.descriptor.defenseMode?-1:1,preset);
+    this.report();return ok;
+  }
   placeRegiment(group, x, z) {
     if (!this.deployment || !group || group.side !== 'attacker' || group.routed) return false;
     const home = this.descriptor.defenseMode ? -1 : 1;
-    if (!Number.isFinite(x) || !Number.isFinite(z) || z * home < 9) return false;
-    group.x = clamp(x, -58, 58);
-    group.z = home * clamp(z * home, 9, 40);
-    group.lane = group.x < -12 ? 0 : group.x > 12 ? 2 : 1;
+    const cell=freeDeploymentCell(this.groups,group,x,z,home);
+    if(!cell)return false;
+    moveCard(group,cell);
     issueFieldOrder(group, 'advance');
     group.deploymentRevision = (group.deploymentRevision || 0) + 1;
     this.report();
@@ -840,6 +851,8 @@ export class BattleGame {
   }
   handleCanvasTap(x, y) {
     if (this.done) return null;
+    if(this.simpleField&&this.deployment){const p=this.rayGround(x,y),g=this.selectedGroup();if(p&&this.placeRegiment(g,p[0],p[2]))return {action:'move',group:g,point:[g.x,g.z]};return null;}
+    if(this.simpleField&&!this.deployment)return null;
 
     if (this.tapMove) {
       const p = this.rayGround(x, y);
@@ -1070,7 +1083,7 @@ export class BattleGame {
 
   setFormation(index, id) {
     const g = this.groups?.[index];
-    if (!g || g.side !== 'attacker' || g.routed || !availableFormations(this.game.factions[this.game.player]).some(f => f.id === id)) return false;
+    if (!g || g.side !== 'attacker' || g.routed || !availableFormations(this.game.factions[this.game.player],this.simpleField).some(f => f.id === id) || (this.simpleField&&!this.deployment)) return false;
     attachTactics(g, this.game.factions[this.game.player], id);
     if (g.type === 'infantry') g.kind = g.specialistId === 'pikes' || id === 'pike_square' ? 'pikemen' : g.specialistId === 'spearmen' ? 'spearmen' : 'infantry';
     if (this.deployment) g.deploymentRevision = (g.deploymentRevision || 0) + 1;
@@ -1082,6 +1095,7 @@ export class BattleGame {
     if (!this.deployment || ![0, 1, 2].includes(lane)) return false;
     const g = this.groups?.[index];
     if (!g || g.side !== 'attacker' || g.routed) return false;
+    if(this.simpleField)return this.placeRegiment(g,(lane-1)*36,g.z);
     const sameLaneOffset = this.simpleField ? ((g.slot ?? index) % 4 - 1.5) * 4.5 : ((g.slot ?? index) % 2 - 0.5) * 4.5;
     g.lane = lane;
     g.x = (lane - 1) * 24 + sameLaneOffset;
@@ -1097,7 +1111,7 @@ export class BattleGame {
   }
 
   command(index, order, point, all = false) {
-    if (!this.descriptor?.fieldBattle || this.done) return false;
+    if (!this.descriptor?.fieldBattle || this.done || this.simpleField) return false;
     const groups = all ? this.groups.filter(g => g.side === 'attacker') : [this.groups[index]];
     let changed = false;
     for (const g of groups) {
@@ -1152,6 +1166,7 @@ export class BattleGame {
         }
         stepField(this, sdt);
         this.audio?.update(this.groups, this.elapsed, this.camera);
+        if(this.simpleField){const outcome=cardBattleOutcome(this.groups,this.elapsed,!!this.descriptor.defenseMode);if(outcome){this.finishReason=outcome.reason;this.finish(outcome.victory,outcome.attacker,outcome.defender);return;}continue;}
         const strength = side => this.simpleField
           ? this.groups.filter(g => g.side === side && !g.routed).reduce((n,g)=>n+g.troopCount*Math.max(0,g.life)/100,0)
           : fieldStrength(this.groups, side);
@@ -1450,6 +1465,13 @@ export class BattleGame {
 
     const terrain = this.descriptor?.fieldBattle ? this.terrainType : null;
     const sel = this.selectedGroup();
+    if(this.simpleField&&this.deployment){
+      const home=this.descriptor.defenseMode?-1:1;
+      for(const cell of deploymentCells(home)){
+        const p=this.project([cell.x,terrainHeight(cell.x,cell.z,this.terrainType)+.2,cell.z]);
+        if(!p)continue;ctx.beginPath();ctx.arc(p[0],p[1],4,0,TAU);ctx.fillStyle='rgba(146,213,239,.7)';ctx.fill();
+      }
+    }
 
     // Selected regiment movement vector & focus target crosshair
     if (sel && !sel.routed && sel.life > 0) {
@@ -1627,11 +1649,14 @@ export class BattleGame {
       roster,
       fieldBattle: !!this.descriptor?.fieldBattle,
       fortBreached: !!this.siege && siegeBreached(this.siege),
+      reason: this.finishReason || null,
       seconds: Math.round(this.elapsed)
     });
   }
 
   retreat() {
+    if(this.simpleField&&this.deployment)return;
+    this.finishReason='withdrawal';
     this.finish(false, this.groups.filter(g => g.side === 'attacker' && !g.routed).reduce((s, g) => s + g.life, 0));
   }
 

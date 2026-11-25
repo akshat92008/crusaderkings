@@ -248,3 +248,13 @@
  .speed-control select{font-size:10px;padding:2px;min-height:36px}
  .quick-nav>button{min-width:38px}
 }
+
+/* Banner Lines regiment deck */
+.battle-units{justify-content:flex-start;overflow-x:auto;overscroll-behavior-x:contain;scroll-padding:8px;padding:4px 2px 9px;scrollbar-width:thin}
+.battle-units .unitcard{flex:0 0 142px;min-height:66px;border-radius:6px}
+.battle-units .unitcard.active{outline:2px solid #e9c77d;outline-offset:-2px}
+#battle-presets{display:flex;gap:4px;flex-wrap:wrap}
+.battle-commands{justify-content:center}
+#battle-guide{white-space:normal;line-height:1.4}
+#battle-canvas{touch-action:none}
+@media(max-width:650px){.battle-units .unitcard{flex-basis:126px}.battle-commands{justify-content:flex-start}.battle-guide{white-space:normal}.battle-bottom{max-height:38dvh}}

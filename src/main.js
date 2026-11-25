@@ -291,7 +291,7 @@ function maybePopupEventModal(prevKeys=new Set()){
 function start(id){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);browserCampaignAudio.unlock();browserCampaignAudio.playSfx('seal');render();save(false);syncAudioState();}
 function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pressed',String(battleSound));b.textContent=battleSound?'Sound on':'Sound off';}
 function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;desc.simpleField=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
- el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='tactical';if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
+ el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='overview';if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
  el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
  if(desc.alliedTroops)el('battle-meta').textContent+=' · '+fmt(desc.alliedTroops)+' ALLIED TROOPS';
@@ -304,10 +304,11 @@ function onBattleStatus(status){
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
  const focusEl=el('battle-focus');if(focusEl){focusEl.hidden=!unit;if(unit){const flags=(unit.statusFlags||[]).join(' · ');focusEl.textContent=(unit.profile?.name||unit.type).toUpperCase()+' · '+(status.terrain||unit.terrainName||'field')+(flags?' · '+flags:'')+(unit.focusTargetId?' · LOCKED TARGET':'');}}
  const cards=el('battle-units'),markup=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>' +artIcon('government',g.type==='cavalry'?'light cavalry':g.type)+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+' · '+fmt(Math.round(g.troopCount*g.life/100))+'/'+fmt(g.troopCount)+'</b><small>'+(g.routed?'ROUTED':status.deployment?'READY · '+['LEFT','CENTRE','RIGHT'][g.lane??1]+' · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase():Math.round(g.life)+'% STRENGTH · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');if(cards.dataset.markup!==markup){const left=cards.scrollLeft,focus=document.activeElement?.dataset?.unit;cards.innerHTML=markup;cards.dataset.markup=markup;cards.scrollLeft=left;if(focus!==undefined)cards.querySelector('[data-unit="'+focus+'"]')?.focus({preventScroll:true});}
- const choices=availableFormations(game.factions[game.player]);
+ const choices=availableFormations(game.factions[game.player],true);
  const formations=el('battle-formation');const choiceKey=choices.map(o=>o.id).join(',');if(formations.dataset.choices!==choiceKey){formations.dataset.choices=choiceKey;formations.innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' ('+Math.round(o.damage*100)+'/'+Math.round(o.defense*100)+')</option>').join('');}
  if(unit&&document.activeElement!==formations)formations.value=unit.formationId;el('battle-order').title=unit?(unit.terrainName||'Open field')+' · Enemy posture: '+(status.enemyPosture||'Deploying'):'Regiment order';const order=el('battle-order');if(unit&&document.activeElement!==order&&unit.fieldOrder!=='move'&&[...order.options].some(o=>o.value===unit.fieldOrder))order.value=unit.fieldOrder;
  const fort=el('battle-fort-status');if(fort){fort.hidden=!status.siege;fort.textContent=status.siege?status.siege.structures.map(q=>q.name+' '+Math.round(q.hp/q.max*100)+'%').join(' · '):'';}
+ el('battle-presets').hidden=!status.deployment;formations.hidden=!status.deployment;el('battle-formation-label').hidden=!status.deployment;el('battle-retreat').hidden=status.deployment;el('battle-pause').hidden=status.deployment;el('battle-speed').hidden=status.deployment;el('battle-rally').hidden=true;el('battle-guide').textContent=status.deployment?'Choose a card and tap a blue deployment point, or select an army layout.':'Regiments fight automatically · Pause or speed up whenever needed.';
  el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;el('battle-cancel').hidden=!status.deployment||!!battleDescriptor?.defenseMode;const comparison=el('battle-comparison');comparison.hidden=!status.deployment;if(status.deployment){const c=battleComparison(status.groups),line=(s,name)=>'<div><b>'+name+' · '+fmt(s.troops)+'</b><small>Inf '+fmt(s.mix.infantry)+' / Arch '+fmt(s.mix.archers)+' / Cav '+fmt(s.mix.cavalry)+' · Morale '+fmt(s.morale)+'% · Readiness '+fmt(s.power*100)+'%</small></div>';comparison.innerHTML=line(c.attacker,'Your force')+line(c.defender,'Enemy force')+'<small>Numerical ratio '+(c.ratio===null?'No opposing soldiers':c.ratio.toFixed(1)+':1')+' · Terrain, tactics and readiness affect outcomes.</small>';}
 }
 function onBattleFinished(result){
@@ -318,7 +319,7 @@ function onBattleFinished(result){
    defense?(win?'Your army held the field.':'Your defensive position has been overrun.'):
    win?(activeWar(game,game.player,battleDescriptor.enemy)?'The province will be occupied pending peace.':'The enemy province will be taken.'):'Your army has retreated.';
  const roster=result.roster,report=roster?'<div class="battle-report"><div><b>YOUR FIELD FORCE</b><small>Deployed '+fmt(roster.attacker.initial)+' · Surviving '+fmt(roster.attacker.surviving)+' · Losses '+fmt(roster.attacker.losses)+' · Routed survivors '+fmt(roster.attacker.routed)+'</small></div><div><b>ENEMY FIELD FORCE</b><small>Deployed '+fmt(roster.defender.initial)+' · Surviving '+fmt(roster.defender.surviving)+' · Losses '+fmt(roster.defender.losses)+' · Routed survivors '+fmt(roster.defender.routed)+'</small></div><small>Battlefield estimates include participating garrisons; campaign outcomes may differ.</small></div>':'';
- el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p>'+report+'<button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
+ el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.'+(result.reason?' · '+esc(result.reason):'')+'</p>'+report+'<button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
  el('battle-return').onclick=()=>{
   if(!battle)return;el('battle-return').disabled=true;
   if(!practice){
@@ -417,7 +418,7 @@ el('tab-content').addEventListener('change',e=>{if(e.target.id==='people-scope'|
  if(!vassalCareer(game)&&e.target.matches('.policy-select'))clickResult(setPolicy(game,e.target.dataset.policy,Number(e.target.value)));
  if(e.target.id==='diplomatic-select'){diplomaticTarget=e.target.value;renderTab();}
 });
-document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selected=Number(unit.dataset.unit);battle.report();return;}
+document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selectGroup(Number(unit.dataset.unit));return;}
  const btn=e.target.closest('[data-action]');if(!btn||!game||battle)return;const action=btn.dataset.action,type=btn.dataset.type;
  if(action==='player-life'){clickResult(playerLifeAction(game,btn.dataset.id,type,btn.dataset.extra));return;}
  if(action==='personal-life'){clickResult(resolvePersonalDilemma(game,btn.dataset.id,type));return;}
@@ -519,6 +520,7 @@ el('battle-cancel').addEventListener('click',()=>{if(!battle?.deployment||battle
 el('battle-formation').addEventListener('change',e=>{
  if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
 });
+el('battle-presets').addEventListener('click',e=>{const b=e.target.closest('[data-preset]');if(b&&battle)battle.arrangeCards(b.dataset.preset);});
 el('battle-order').addEventListener('change',e=>battle?.command(battle.selected,e.target.value));
 el('battle-all-order').addEventListener('click',()=>battle?.command(battle.selected,el('battle-order').value,null,true));
 el('battle-lanes').addEventListener('click',e=>{
