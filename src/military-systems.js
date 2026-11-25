@@ -19,6 +19,11 @@ export const REGIMENTS={
  pikes:{name:'Pike infantry',type:'infantry',cost:90,damage:1.04,armor:1.18,speed:.91,range:1,counter:1.8},
  guard:{name:'Armored household guard',type:'infantry',cost:120,damage:1.16,armor:1.25,speed:.88,range:1,counter:1.05},
  skirmishers:{name:'Light infantry',type:'infantry',cost:75,damage:1.10,armor:.90,speed:1.23,range:1,counter:1},
+ swordsmen:{name:'Swordsmen',type:'infantry',cost:85,damage:1.12,armor:1.02,speed:1.04,range:1,counter:1},
+ spearmen:{name:'Spearmen',type:'infantry',cost:85,damage:1.02,armor:1.05,speed:.98,range:1,counter:1.45},
+ shieldmen:{name:'Shield infantry',type:'infantry',cost:105,damage:.94,armor:1.32,speed:.88,range:1,counter:1.10},
+ bowmen:{name:'Foot bowmen',type:'archers',cost:85,damage:1.08,armor:.95,speed:1,range:1.08,counter:1},
+ scouts:{name:'Light cavalry scouts',type:'cavalry',cost:95,damage:1.02,armor:.88,speed:1.25,range:1,counter:1},
  longbow:{name:'Longbow regiment',type:'archers',cost:120,damage:1.18,armor:.92,speed:.94,range:1.25,counter:1},
  crossbow:{name:'Crossbow regiment',type:'archers',cost:110,damage:1.24,armor:1.05,speed:.92,range:1.05,counter:1},
  handgun:{name:'Handgun regiment',type:'archers',cost:145,damage:1.40,armor:.98,speed:.90,range:.83,counter:1},
@@ -74,7 +79,7 @@ export const COMMANDER_TRAITS={
 
 const specialties={longbow:['longbow','pikes'],chivalry:['guard','lancers'],pike:['pikes','crossbow'],gunpowder:['handgun','crossbow'],steppe:['horsebow','lancers'],janissary:['guard','handgun'],elephant:['elephants','guard'],samurai:['guard','skirmishers'],archery:['longbow','skirmishers'],river:['skirmishers','crossbow'],highland:['pikes','guard'],woodland:['skirmishers','longbow'],maritime:['crossbow','guard'],warrior:['guard','skirmishers'],generic:['pikes','skirmishers']};
 
-export function regimentOptions(g,realm){return [...new Set(['skirmishers',...(specialties[militaryDoctrine(g.factions[realm]).id]||[])])];}
+export function regimentOptions(g,realm){return [...new Set(['skirmishers','swordsmen','spearmen','shieldmen','bowmen','scouts',...(specialties[militaryDoctrine(g.factions[realm]).id]||[])])];}
 
 function note(g,realm,msg){
  const m=g.military;

@@ -435,6 +435,7 @@ export class BattleGame {
 
     this.canvas = canvas;
     this.descriptor = descriptor;
+    this.simpleField = !!descriptor.simpleField && !!descriptor.fieldBattle;
     this.game = game;
     this.onFinish = onFinish;
     this.onStatus = onStatus;
@@ -563,8 +564,9 @@ export class BattleGame {
     this.siege = descriptor.fieldBattle ? null : createSiegeState(game?.provinces?.[descriptor.to]?.buildings?.fort || 0, !!descriptor.defenseMode);
     this.groups = [];
 
-    const mySlots = armyFormationSlots(playerFaction, a, 6);
-    const enemySlots = armyFormationSlots(enemy, enemies, 6);
+    const slotCount = force => this.simpleField ? Math.min(12, Math.max(3, Math.ceil((force.infantry + force.archers + force.cavalry) / 100))) : 6;
+    const mySlots = armyFormationSlots(playerFaction, a, slotCount(a));
+    const enemySlots = armyFormationSlots(enemy, enemies, slotCount(enemies));
     const myDoctrine = militaryDoctrine(playerFaction);
     const enemyDoctrine = militaryDoctrine(enemy);
 
@@ -573,8 +575,9 @@ export class BattleGame {
 
     for (const entry of packedAttacker) {
       const idx = entry.slotIndex;
-      const position = descriptor.defenseMode ? -26 : 24;
-      const startX = (idx - (packedAttacker.length - 1) / 2) * 10;
+      const home = descriptor.defenseMode ? -1 : 1;
+      const position = this.simpleField ? home * (entry.type === 'archers' ? 34 : entry.type === 'cavalry' ? 25 : 19) : descriptor.defenseMode ? -26 : 24;
+      const startX = this.simpleField ? (idx - (packedAttacker.length - 1) / 2) * 8 : (idx - (packedAttacker.length - 1) / 2) * 10;
       const g = formation('p' + idx, 'attacker', entry.type, idx, [0, 0], entry.troops, '#4b98b3');
       g.x = startX;
       g.targetX = startX;
@@ -595,8 +598,8 @@ export class BattleGame {
         g.profile = regimentProfile(game, a, entry.type);
         g.readiness = armyReadiness(game, a);
       }
-      g.morale = g.readiness.morale;
-      attachTactics(g, playerFaction, myDoctrine.formations[0]);
+      g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
+      attachTactics(g, playerFaction, this.simpleField ? chooseCounterFormation(playerFaction, 'infantry', g.type) : myDoctrine.formations[0]);
       if (descriptor.fieldBattle) {
         initializeFieldGroup(g);
         g.terrainType = this.terrainType;
@@ -610,8 +613,9 @@ export class BattleGame {
 
     for (const entry of packedDefender) {
       const idx = entry.slotIndex;
-      const position = descriptor.defenseMode ? 24 : -24;
-      const startX = (idx - (packedDefender.length - 1) / 2) * 10;
+      const home = descriptor.defenseMode ? 1 : -1;
+      const position = this.simpleField ? home * (entry.type === 'archers' ? 34 : entry.type === 'cavalry' ? 25 : 19) : descriptor.defenseMode ? 24 : -24;
+      const startX = this.simpleField ? (idx - (packedDefender.length - 1) / 2) * 8 : (idx - (packedDefender.length - 1) / 2) * 10;
       const g = formation('e' + idx, 'defender', entry.type, idx, [0, 0], entry.troops, enemy?.color || '#b86855');
       g.x = startX;
       g.targetX = startX;
@@ -632,8 +636,8 @@ export class BattleGame {
         g.profile = regimentProfile(game, enemyArmy || enemies, entry.type);
         g.readiness = armyReadiness(game, enemyArmy || enemies);
       }
-      g.morale = g.readiness.morale;
-      attachTactics(g, enemy, enemyDoctrine.formations[idx % enemyDoctrine.formations.length]);
+      g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
+      attachTactics(g, enemy, this.simpleField ? chooseCounterFormation(enemy, 'infantry', g.type) : enemyDoctrine.formations[idx % enemyDoctrine.formations.length]);
       if (descriptor.fieldBattle) {
         initializeFieldGroup(g);
         g.terrainType = this.terrainType;
@@ -687,6 +691,10 @@ export class BattleGame {
         const target = this.rayGround(e.offsetX, e.offsetY);
         const group = this.selectedGroup();
         if (target && group?.side === 'attacker' && !group.routed) {
+          if (this.simpleField && this.deployment) {
+            this.placeRegiment(group, target[0], target[2]);
+            return;
+          }
           if (this.descriptor.fieldBattle) {
             if (issueGroupMoveOrder(group, target[0], target[2])) {
               this.audio?.play('order');
@@ -812,6 +820,18 @@ export class BattleGame {
     return res;
   }
 
+  placeRegiment(group, x, z) {
+    if (!this.deployment || !group || group.side !== 'attacker' || group.routed) return false;
+    const home = this.descriptor.defenseMode ? -1 : 1;
+    if (!Number.isFinite(x) || !Number.isFinite(z) || z * home < 9) return false;
+    group.x = clamp(x, -58, 58);
+    group.z = home * clamp(z * home, 9, 40);
+    group.lane = group.x < -12 ? 0 : group.x > 12 ? 2 : 1;
+    issueFieldOrder(group, 'advance');
+    group.deploymentRevision = (group.deploymentRevision || 0) + 1;
+    this.report();
+    return true;
+  }
   handleCanvasTap(x, y) {
     if (this.done) return null;
 
@@ -820,7 +840,9 @@ export class BattleGame {
       this.tapMove = false;
       const sel = this.selectedGroup();
       if (p && sel && sel.side === 'attacker' && !sel.routed) {
-        if (this.descriptor?.fieldBattle) {
+        if (this.simpleField && this.deployment) {
+          if (!this.placeRegiment(sel, p[0], p[2])) return null;
+        } else if (this.descriptor?.fieldBattle) {
           issueGroupMoveOrder(sel, p[0], p[2]);
         } else {
           sel.targetX = clamp(p[0], -64, 64);
@@ -875,6 +897,7 @@ export class BattleGame {
       }
     }
     if (bestEnemy) {
+      if (this.simpleField && this.deployment) return null;
       if (this.descriptor?.fieldBattle) {
         issueGroupTargetOrder(sel, bestEnemy);
       } else {
@@ -892,7 +915,9 @@ export class BattleGame {
     // 3. Tap empty battlefield ground -> direct move order
     const groundPt = this.rayGround(x, y);
     if (groundPt) {
-      if (this.descriptor?.fieldBattle) {
+      if (this.simpleField && this.deployment) {
+        if (!this.placeRegiment(sel, groundPt[0], groundPt[2])) return null;
+      } else if (this.descriptor?.fieldBattle) {
         issueGroupMoveOrder(sel, groundPt[0], groundPt[2]);
       } else {
         sel.targetX = clamp(groundPt[0], -64, 64);
@@ -1051,7 +1076,7 @@ export class BattleGame {
     if (!this.deployment || ![0, 1, 2].includes(lane)) return false;
     const g = this.groups?.[index];
     if (!g || g.side !== 'attacker' || g.routed) return false;
-    const sameLaneOffset = ((g.slot ?? index) % 2 - 0.5) * 4.5;
+    const sameLaneOffset = this.simpleField ? ((g.slot ?? index) % 4 - 1.5) * 4.5 : ((g.slot ?? index) % 2 - 0.5) * 4.5;
     g.lane = lane;
     g.x = (lane - 1) * 24 + sameLaneOffset;
     g.orderX = g.x;
@@ -1081,6 +1106,7 @@ export class BattleGame {
 
   startAssault() {
     if (!this.deployment || this.renderLost) return false;
+    if (this.simpleField) for (const g of this.groups) if (!g.routed) issueFieldOrder(g, 'advance');
     this.deployment = false;
     this.paused = false;
     this.frameRemainder = 0;
@@ -1107,10 +1133,11 @@ export class BattleGame {
       this.elapsed += sdt;
       if (this.descriptor?.fieldBattle) {
         if (this.nextFieldPlan === undefined || this.elapsed >= this.nextFieldPlan) {
-          coordinateFieldAI(this);
+          if (this.simpleField) this.enemyPosture = 'Advancing';
+          else coordinateFieldAI(this);
           this.nextFieldPlan = this.elapsed + 4;
         }
-        if (this.elapsed % 6 < sdt) {
+        if (!this.simpleField && this.elapsed % 6 < sdt) {
           const enemyFaction = this.game?.factions?.[this.descriptor?.enemy];
           for (const g of this.groups.filter(g => g.side === 'defender' && !g.routed)) {
             const e = fieldTarget(g, this.groups.filter(o => o.side === 'attacker' && !o.routed));
@@ -1119,8 +1146,11 @@ export class BattleGame {
         }
         stepField(this, sdt);
         this.audio?.update(this.groups, this.elapsed, this.camera);
-        const l = fieldStrength(this.groups, 'attacker');
-        const r = fieldStrength(this.groups, 'defender');
+        const strength = side => this.simpleField
+          ? this.groups.filter(g => g.side === side && !g.routed).reduce((n,g)=>n+g.troopCount*Math.max(0,g.life)/100,0)
+          : fieldStrength(this.groups, side);
+        const l = strength('attacker');
+        const r = strength('defender');
         if (l <= 0 || r <= 0 || this.elapsed >= 220) {
           this.finish(l > 0 && (r <= 0 || l > r), l, r);
           return;

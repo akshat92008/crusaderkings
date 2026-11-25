@@ -279,14 +279,18 @@ function renderEventModal(evt){
 function maybePopupEventModal(prevKeys=new Set()){
  if(!game||battle||vassalCareer(game))return;
  const active=collectEventPrompts();
- const fresh=active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&(game.turn>=2||e.kind==='royal'));
+ if(!el('event-modal').hidden)return;
+ const urgent=active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&e.badge==='Succession');
+ const fresh=urgent||((game.turn-(game.kingdom.lastEventPopupTurn??-6)>=6)&&active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&game.turn>=2));
  if(!fresh)return;
  if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}
+ game.kingdom.lastEventPopupTurn=game.turn;
  renderEventModal(fresh);
+ save(false);
 }
 function start(id){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);browserCampaignAudio.unlock();browserCampaignAudio.playSfx('seal');render();save(false);syncAudioState();}
 function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pressed',String(battleSound));b.textContent=battleSound?'Sound on':'Sound off';}
-function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
+function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;desc.simpleField=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
  el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='tactical';if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
  el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
@@ -299,7 +303,7 @@ function onBattleStatus(status){
  const rBtn=el('battle-rally');if(rBtn){const cd=Math.ceil(status.rallyCooldown||0);rBtn.disabled=!!status.deployment||cd>0;rBtn.textContent=cd>0?'⚑ '+cd+'s':'⚑ RALLY';}
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
  const focusEl=el('battle-focus');if(focusEl){focusEl.hidden=!unit;if(unit){const flags=(unit.statusFlags||[]).join(' · ');focusEl.textContent=(unit.profile?.name||unit.type).toUpperCase()+' · '+(status.terrain||unit.terrainName||'field')+(flags?' · '+flags:'')+(unit.focusTargetId?' · LOCKED TARGET':'');}}
- const cards=el('battle-units'),markup=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>' +artIcon('government',g.type==='cavalry'?'light cavalry':g.type)+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+' · '+fmt(Math.round(g.troopCount*g.life/100))+'/'+fmt(g.troopCount)+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% HP · '+Math.round(g.morale)+'% MORALE · '+Math.round(g.fatigue||0)+'% FATIGUE · '+Math.round(g.cohesion??100)+'% COHESION · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');if(cards.dataset.markup!==markup){const left=cards.scrollLeft,focus=document.activeElement?.dataset?.unit;cards.innerHTML=markup;cards.dataset.markup=markup;cards.scrollLeft=left;if(focus!==undefined)cards.querySelector('[data-unit="'+focus+'"]')?.focus({preventScroll:true});}
+ const cards=el('battle-units'),markup=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>' +artIcon('government',g.type==='cavalry'?'light cavalry':g.type)+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+' · '+fmt(Math.round(g.troopCount*g.life/100))+'/'+fmt(g.troopCount)+'</b><small>'+(g.routed?'ROUTED':status.deployment?'READY · '+['LEFT','CENTRE','RIGHT'][g.lane??1]+' · '+(g.formationId||'line').replaceAll('_',' ').toUpperCase():Math.round(g.life)+'% STRENGTH · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');if(cards.dataset.markup!==markup){const left=cards.scrollLeft,focus=document.activeElement?.dataset?.unit;cards.innerHTML=markup;cards.dataset.markup=markup;cards.scrollLeft=left;if(focus!==undefined)cards.querySelector('[data-unit="'+focus+'"]')?.focus({preventScroll:true});}
  const choices=availableFormations(game.factions[game.player]);
  const formations=el('battle-formation');const choiceKey=choices.map(o=>o.id).join(',');if(formations.dataset.choices!==choiceKey){formations.dataset.choices=choiceKey;formations.innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' ('+Math.round(o.damage*100)+'/'+Math.round(o.defense*100)+')</option>').join('');}
  if(unit&&document.activeElement!==formations)formations.value=unit.formationId;el('battle-order').title=unit?(unit.terrainName||'Open field')+' · Enemy posture: '+(status.enemyPosture||'Deploying'):'Regiment order';const order=el('battle-order');if(unit&&document.activeElement!==order&&unit.fieldOrder!=='move'&&[...order.options].some(o=>o.value===unit.fieldOrder))order.value=unit.fieldOrder;
@@ -481,7 +485,7 @@ document.addEventListener('click',e=>{
    browserCampaignAudio.playSfx('seal');
    const follow=collectEventPrompts().find(x=>!deferredModalEvents.has(x.key)&&x.key.startsWith('expanded:')&&game.turn>=0);
    clickResult(r);
-   if(follow&&follow.key!==el('event-modal')._eventKey&&kind==='expanded')renderEventModal(follow);
+   // Follow-ups remain accessible in the court.
   }else clickResult(r);
  }
 });

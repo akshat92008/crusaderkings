@@ -87,7 +87,7 @@ export function findInvasionOptions(g,world){
 }
 
 export function planEnemyInvasion(g,world){
- if(g.kingdom.threats.length||g.kingdom.difficulty==='peaceful')return null;
+ if(g.kingdom.threats.length||g.kingdom.difficulty==='peaceful'||g.turn<(g.kingdom.nextInvasionTurn??0))return null;
  const choices=findInvasionOptions(g,world);
  if(!choices.length)return null;
  const difficulty=g.kingdom.difficulty;
@@ -196,6 +196,7 @@ export function resolveInvasion(g,world,threat,result){
  }
  recordCampaignBattle(g,found.by,g.player,found.province,!defended);recordStrategicBattle(g,found.by,g.player,!defended,1-enemyRatio);recordStrategicBattle(g,g.player,found.by,defended,1-playerRatio);
  g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);
+ g.kingdom.nextInvasionTurn=g.turn+6;
  const msg=defended?'Your defenders repelled '+g.factions[found.by].name+' at '+found.province:
   g.factions[found.by].name+' captured '+found.province+' after a successful assault';
  return {ok:true,defended,msg};

@@ -412,12 +412,19 @@ export function coordinateFieldAI(state) {
   return posture;
 }
 
-function targetPosition(g, e, enemies) {
+function targetPosition(g, e, enemies, simpleField = false) {
   const order = g.fieldOrder || 'advance';
   if (['hold', 'move', 'fallback'].includes(order)) {
     return { point: [g.anchorX ?? g.x, g.anchorZ ?? g.z], skirmishing: false };
   }
 
+  // Card battles advance to weapon range and engage, without automatic kiting.
+  if (simpleField) {
+    const d = dist(g, e);
+    const preferred = g.type === 'archers' ? g.range * 0.80 : Math.min(1.5, g.range * 0.65);
+    if (d <= preferred) return {point: [g.x, g.z], skirmishing: false};
+    return {point: [e.x - (e.x-g.x)/d*preferred, e.z - (e.z-g.z)/d*preferred], skirmishing: false};
+  }
   // Ranged groups automatically kite when enemy melee closes within < 14 units (unless holding).
   if (g.type === 'archers' && order !== 'charge') {
     const meleeThreats = enemies
@@ -548,7 +555,7 @@ export function stepField(state, dt) {
     }
 
     const order = g.fieldOrder || 'advance';
-    const plan = targetPosition(g, e, enemies);
+    const plan = targetPosition(g, e, enemies, state.simpleField);
     g.skirmishing = plan.skirmishing;
     const target = [cap(plan.point[0], -64, 64), cap(plan.point[1], -46, 46)];
     const dx = target[0] - g.x;
@@ -651,7 +658,7 @@ export function stepField(state, dt) {
     g.attackSerial = (g.attackSerial || 0) + 1;
 
     const power = numericalPower(g, e);
-    const overwhelm = power >= 3 ? Math.min(2.2, 1 + (power - 3) * 0.12) : power <= 0.34 ? Math.max(0.45, power * 1.35) : 1;
+    const overwhelm = state.simpleField ? 1 : power >= 3 ? Math.min(2.2, 1 + (power - 3) * 0.12) : power <= 0.34 ? Math.max(0.45, power * 1.35) : 1;
     const aspect = attackAspect(g, e);
     const flank = aspect === 'rear' ? 1.40 : aspect === 'flank' ? 1.22 : 1;
 
@@ -683,7 +690,7 @@ export function stepField(state, dt) {
     if (bracedAgainstCav) {
       const recoilScale = (isPikeSpecialist ? 0.56 : e.formationId === 'shield_wall' ? 0.38 : 0.28) *
         (1 + (g.chargeMomentum || 0) * 0.65) * (aggressive ? 1.35 : 1);
-      const recoil = (e.damage || 10) * recoilScale * numericalPower(e, g);
+      const recoil = (e.damage || 10) * recoilScale * numericalPower(e, g) * (state.simpleField ? 0.5 : 1);
       hits.push({
         g: e,
         e: g,
@@ -726,9 +733,12 @@ export function stepField(state, dt) {
     const rallyGuard = (e.rallyBuffTimer || 0) > 0 ? 0.6 : 1;
     const flankMoraleMult = aspect === 'rear' ? 1.55 : aspect === 'flank' ? 1.28 : 1;
     const loss = impacts.get(e) || { life: 0, cohesion: 0, morale: 0 };
-    loss.life += damage * 0.19 * Math.max(1, activeTroops(e)) / Math.max(1, e.troopCount || 0);
+    const lifeLoss = damage * 0.19 * Math.max(1, activeTroops(e)) / Math.max(1, e.troopCount || 0);
+    loss.life += lifeLoss;
     loss.cohesion += damage * 0.15 * (aspect === 'rear' ? 1.8 : aspect === 'flank' ? 1.4 : 1) * (e.formationId === 'shield_wall' && aspect === 'front' ? 0.72 : 1);
-    loss.morale += (Math.min(45, damage * 0.31) * flankMoraleMult + moraleShock) * rallyGuard / (1 + eAura * 0.04);
+    loss.morale += (state.simpleField
+      ? (lifeLoss * 0.65 * flankMoraleMult + Math.min(lifeLoss, moraleShock * 0.12))
+      : (Math.min(45, damage * 0.31) * flankMoraleMult + moraleShock)) * rallyGuard / (1 + eAura * 0.04);
     impacts.set(e, loss);
   }
 
@@ -741,7 +751,7 @@ export function stepField(state, dt) {
 
   const routed = [];
   for (const g of live) {
-    if (g.life < 8 || g.morale <= 14) {
+    if (state.simpleField ? (g.life <= 0.5 || (g.life <= 45 && g.morale <= 12)) : (g.life < 8 || g.morale <= 14)) {
       g.routed = true;
       g.routAge = 0;
       g.attackPulse = 0;
@@ -762,7 +772,7 @@ export function stepField(state, dt) {
   for (const g of routed) {
     for (const ally of live) {
       if (!ally.routed && ally.side === g.side && dist(ally, g) < 14) {
-        ally.morale = cap(ally.morale - 7 * Math.min(1, (g.troopCount || 0) / Math.max(1, ally.troopCount || 0)), 0, 100);
+        ally.morale = cap(ally.morale - (state.simpleField ? 2 : 7) * Math.min(1, (g.troopCount || 0) / Math.max(1, ally.troopCount || 0)), 0, 100);
       }
     }
   }
