@@ -5,6 +5,8 @@ import {startPersonalScheme} from './intrigue-systems.js';
 import {personalMarriage} from './dynastic-politics.js';
 import {requestVassalPetition} from './vassal-courts.js';
 import {characterHealth} from './living-systems.js';
+import {ACTIVE_FACTION_STATUSES,createFaction,joinFaction} from './political-conflict.js';
+import {claimantCandidates,addClaim} from './feudal-systems.js';
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),num=n=>Number.isFinite(n)?n:0;
 const live=(g,id)=>g.politics?.people?.[id],free=(g,p)=>p?.alive&&p.age>=18&&g.feudal?.prisoners?.[p.id]?.status!=='held';
 const pair=(a,b)=>[a,b].sort().join('|'),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
@@ -56,12 +58,13 @@ export function ensureCharacterSchema(g,p,landedSet=null,commanderSet=null){
  p.role=deriveSocialRole(g,p,landedSet,commanderSet);
  return p;
 }
-export function recordGrievance(g,personId,againstId,reason,severity=25){
+export function recordGrievance(g,personId,againstId,reason,severity=25,opts={}){
  const p=live(g,personId),q=live(g,againstId);if(!p||!q||p.id===q.id)return false;
  ensureCharacterSchema(g,p);
+ const permanent=Boolean(opts.permanent||severity>=55||['executed kin','assassinated kin','revoked title'].includes(reason));
  const existing=p.grievances.find(x=>x.against===againstId&&x.reason===reason);
- if(existing){existing.severity=cap(existing.severity+severity,0,100);existing.turn=g.turn;}
- else{p.grievances.unshift({against:againstId,reason,severity:cap(severity,0,100),turn:g.turn});p.grievances=p.grievances.slice(0,20);}
+ if(existing){existing.severity=cap(existing.severity+severity,0,100);existing.turn=g.turn;if(permanent)existing.permanent=true;}
+ else{p.grievances.unshift({against:againstId,reason,severity:cap(severity,0,100),turn:g.turn,permanent});p.grievances=p.grievances.slice(0,20);}
  bond(g,p,q,-Math.round(severity/2),severity);
  return true;
 }
@@ -89,7 +92,7 @@ export function syncCharacterRelationships(g){
   ensureCharacterSchema(g,p,landedSet,commanderSet);
   p.friends=[];p.rivals=[];p.mentors=[];p.wards=[];
   p.lovers=(p.lovers||[]).filter(id=>live(g,id)?.alive);
-  p.grievances=(p.grievances||[]).filter(x=>live(g,x.against)?.alive&&g.turn-x.turn<=120);
+  p.grievances=(p.grievances||[]).filter(x=>live(g,x.against)?.alive&&(x.permanent||g.turn-x.turn<=120));
  }
  for(const rel of Object.values(g.chronicles?.relationships||{})){
   const a=live(g,rel.a),b=live(g,rel.b);if(!a?.alive||!b?.alive)continue;
@@ -138,7 +141,60 @@ export function personalDilemmas(g,id){return Object.values(g.agency?.dilemmas||
 function dilemma(g,p,q,kind){const root=initAgency(g),recipient=live(g,g.politics.realms[p.realm]?.ruler);if(!recipient?.alive||!free(g,recipient)||!controlled(g,recipient)||personalDilemmas(g,recipient.id).length>=3||Object.values(root.dilemmas).some(x=>x.status==='pending'&&x.actor===p.id))return false;const id='life'+root.next++;root.dilemmas[id]={id,recipient:recipient.id,realm:p.realm,actor:p.id,target:q.id,kind,started:g.turn,deadline:g.turn+9,status:'pending'};note(g,p,p.name+' asked '+recipient.name+' to settle a '+kind+'.','petition',q.id);g.log?.unshift({date:g.year+' · month '+(g.month+1),text:p.name+' requests a personal decision; inspect your character.'});if(g.log)g.log=g.log.slice(0,45);return true;}
 export function resolvePersonalDilemma(g,id,choice){const x=initAgency(g).dilemmas[id],p=x&&live(g,x.actor),q=x&&live(g,x.target),r=x&&live(g,x.recipient);if(!x||x.status!=='pending'||x.deadline<g.turn||!free(g,r)||!controlled(g,r)||!free(g,p)||!free(g,q)||p.realm!==x.realm||q.realm!==x.realm||r.realm!==x.realm||r.id!==g.politics.realms[x.realm]?.ruler)return no('Personal decision is no longer available.');if(!['mediate','support','decline'].includes(choice))return no('Unknown decision.');if(choice==='mediate'){if(num(r.wealth)<40)return no('Requires 40 personal gold.');r.wealth-=40;p.wealth=num(p.wealth)+20;q.wealth=num(q.wealth)+20;relation(g,p,q,25);relation(g,r,p,10);relation(g,r,q,10);stress(p,-12);stress(q,-12);}else if(choice==='support'){if(num(r.wealth)<60)return no('Requires 60 personal gold.');r.wealth-=60;p.wealth=num(p.wealth)+60;relation(g,r,p,20);relation(g,r,q,-16);relation(g,p,q,-10);stress(q,10);}else{relation(g,r,p,-12);stress(p,8);}x.status=choice;x.ended=g.turn;note(g,p,r.name+' resolved the '+x.kind+': '+choice+'.','resolution',q.id);return ok('Personal decision resolved.');}
 export function recordLifeEvent(g,p,kind,target,text){if(!p?.id)return;note(g,p,text,kind,target?.id||target||null);}
-export function rememberBereavement(g,p){const family=new Set([p.spouse,...(p.parents||[]),...(p.children||[])].filter(Boolean));for(const id of family){const q=live(g,id);if(!q?.alive)continue;stress(q,has(q,'reserved')?14:20);note(g,q,q.name+' mourned the death of '+p.name+'.','bereavement',p.id);}}
+export function rememberBereavement(g,p,extraIds=[]){
+ if(!p?.id||p._bereavedTurn===g.turn)return;
+ p._bereavedTurn=g.turn;
+ const parents=new Set(p.parents||[]);
+ const siblings=parents.size?Object.values(g.politics?.people||{}).filter(x=>x?.alive&&x.id!==p.id&&(x.parents||[]).some(pid=>parents.has(pid))).map(x=>x.id):[];
+ const family=new Set([p.spouse,...(p.spouses||[]),...(p.parents||[]),...(p.children||[]),...siblings,...(extraIds||[])].filter(Boolean));
+ family.delete(p.id);
+ for(const id of family){const q=live(g,id);if(!q?.alive)continue;stress(q,has(q,'reserved')?14:20);note(g,q,q.name+' mourned the death of '+p.name+'.','bereavement',p.id);}
+}
+
+const OPPOSITE_TRAITS={brave:'cautious',cautious:'brave',ambitious:'content',content:'ambitious',just:'arbitrary',arbitrary:'just',zealous:'cynical',cynical:'zealous',diligent:'indolent',indolent:'diligent',generous:'greedy',greedy:'generous',gregarious:'reserved',reserved:'gregarious',honest:'deceitful',deceitful:'honest',patient:'wrathful',wrathful:'patient'};
+export function evolveCharacterTraits(g,p,milestone=null){
+ if(!p?.alive)return [];
+ p.traits??=[];
+ const added=[];
+ const grant=trait=>{
+  if(p.traits.includes(trait))return false;
+  const opp=OPPOSITE_TRAITS[trait];
+  if(opp&&p.traits.includes(opp))p.traits=p.traits.filter(t=>t!==opp);
+  else if(p.traits.length>=5)return false;
+  p.traits.push(trait);
+  added.push(trait);
+  p.memories??=[];p.memories.push(p.name+' developed the '+trait+' trait in '+g.year+'.');
+  return true;
+ };
+ if(milestone==='victory'){if(!grant('brave'))grant('strategist');}
+ else if(milestone==='schism')grant('zealous');
+ else if(milestone==='petition')grant('just');
+ else if(milestone==='vendetta'){if(!grant('wrathful'))grant('ambitious');}
+ else if(milestone==='stewardship')grant('diligent');
+ else{
+  if((p.grievances||[]).some(gr=>gr.severity>=55))grant(hash(p.id+g.turn)%2===0?'wrathful':'ambitious');
+  else if((p.civic?.stress||0)>=80)grant('cynical');
+ }
+ return added;
+}
+
+export function factionCandidates(g,realm){
+ const s=g.politics?.realms?.[realm],headId=s?.ruler;
+ const people=Object.values(g.politics?.people||{}).filter(p=>free(g,p)&&p.realm===realm&&p.id!==headId);
+ const out=[];
+ for(const p of people){
+  const est=Object.entries(g.politics?.holdings||{}).filter(([,h])=>h.realm===realm&&h.lord===p.id);
+  const severe=(p.grievances||[]).filter(gr=>gr.severity>=45&&gr.against===headId);
+  const op=headId?personalOpinion(g,p.id,headId):0;
+  if(!severe.length&&(op>-35||!est.length))continue;
+  const minLoy=est.length?Math.min(...est.map(([,h])=>h.loyalty??50)):50;
+  if(severe.length||minLoy<45){
+   const score=(severe[0]?.severity||0)+(100-minLoy)*0.6+Math.max(0,-op)*0.5;
+   out.push({person:p.id,name:p.name||p.id,holdings:est.map(([id])=>id),severeGrievance:severe[0]||null,minLoyalty:minLoy,opinion:op,score:Math.round(score),preferredKind:claimantCandidates(g,realm).length?'claimant':'liberty'});
+  }
+ }
+ return out.sort((a,b)=>b.score-a.score||a.person.localeCompare(b.person));
+}
 function reactToImprisonment(g,p){
  const pris=g.feudal?.prisoners?.[p.id];
  if(!pris||pris.status!=='held'||controlled(g,p))return;
@@ -155,7 +211,58 @@ function advancePersonal(g,p,peers,rows,council,head){
  if(st>=60&&num(p.wealth)>=30){p.wealth-=30;stress(p,-22);note(g,p,p.name+' withdrew from court to recover from stress.','recovery');return true;}
  if(health>=65)return false;
  const r=p.realm,headOpinion=head?.id===p.id?0:personalOpinion(g,p.id,head?.id);
- // Persistent grudges and severe grievances turn into meaningful political opposition.
+ // Persistent grudges and severe grievances escalate from saving wealth and court solidarity to faction conspiracy.
+ const severeGrievance=(p.grievances||[]).find(gr=>gr.severity>=45&&live(g,gr.against)?.alive&&live(g,gr.against)?.realm===r);
+ if(severeGrievance){
+  const targetEnemy=live(g,severeGrievance.against);
+  evolveCharacterTraits(g,p,'vendetta');
+  // Forge solidarity with other dissatisfied nobles across the court/realm.
+  const allies=peers.filter(q=>q.id!==severeGrievance.against&&canInteract(g,p,q)&&((q.grievances||[]).some(gr=>gr.against===severeGrievance.against)||personalOpinion(g,q.id,severeGrievance.against)<=-15||localEstate(g,rows,q).some(([,h])=>h.loyalty<55)));
+  const ally=allies[0];
+  if(ally){
+   relation(g,p,ally,18);
+   if(!p.spouse&&!ally.spouse&&p.sex!==ally.sex&&p.age>=20&&ally.age>=20&&p.house!==ally.house&&hash(p.id+ally.id)%2===0){
+    personalMarriage(g,p.id,ally.id);
+   }
+  }
+  // If the crown itself is the target of a severe grievance, push or join a claimant/liberty faction!
+  if(head&&severeGrievance.against===head.id&&estate.length){
+   loyalty(rows,p,-14);
+   const realmStab=num(g.factions?.[r]?.stability??60);
+   if(realmStab<75||g.turn-(severeGrievance.turn??g.turn)>=3||severeGrievance.severity>=55){
+    const existing=Object.values(g.conflict?.factions||{}).find(fx=>fx.realm===r&&ACTIVE_FACTION_STATUSES.includes(fx.status)&&['claimant','liberty','noble'].includes(fx.kind));
+    if(existing){
+     for(const [pid] of estate)joinFaction(g,existing.id,pid);
+     existing.pressure=cap((existing.pressure||15)+15,0,100);
+     existing.discontent=existing.pressure;
+     note(g,p,p.name+' joined the '+existing.kind+' faction over '+severeGrievance.reason+'.','faction',head.id);
+     return true;
+    }
+    let claimants=claimantCandidates(g,r);
+    if(!claimants.length&&severeGrievance.severity>=55&&targetEnemy){
+     const pretender=peers.find(q=>q.id!==head.id&&q.age>=18&&q.house===head.house&&!controlled(g,q))||p;
+     if(pretender&&pretender.id!==head.id){
+      addClaim(g,pretender.id,r,{titleId:'k:'+r,strength:'weak',from:head.id,heritable:false});
+      claimants=claimantCandidates(g,r);
+     }
+    }
+    const claimantId=claimants[0]?.person||null;
+    const kind=claimantId?'claimant':'liberty';
+    const members=[...estate.map(([pid])=>pid),...(ally?localEstate(g,rows,ally).map(([pid])=>pid):[])];
+    const fx=createFaction(g,null,r,kind,members,{leader:p.id,claimant:claimantId,pressure:35});
+    if(fx){
+     note(g,p,p.name+' launched a '+kind+' faction against '+head.name+' ('+severeGrievance.reason+').','faction',head.id);
+     return true;
+    }
+   }
+  }
+  // Save personal wealth rather than spending frivolously while nursing a vendetta; undermine when flush.
+  if(num(p.wealth)>=90&&startPersonalScheme(g,p.id,severeGrievance.against,'undermine').ok){
+   note(g,p,p.name+' plotted against '+targetEnemy.name+' over '+severeGrievance.reason+'.','grievance',severeGrievance.against);
+   return true;
+  }
+  return false;
+ }
  const deepGrievance=(p.grievances||[]).find(gr=>gr.severity>=30&&live(g,gr.against)?.alive&&live(g,gr.against)?.realm===r);
  if(deepGrievance&&num(p.wealth)>=70&&startPersonalScheme(g,p.id,deepGrievance.against,'undermine').ok){
   note(g,p,p.name+' plotted against '+live(g,deepGrievance.against).name+' over '+deepGrievance.reason+'.','grievance',deepGrievance.against);
@@ -217,7 +324,7 @@ export function tickAgency(g){const root=initAgency(g);if(root.lastTick===g.turn
  for(const [id,h] of Object.entries(g.politics.holdings)){if(g.provinces[id]?.owner!==h.realm)continue;if(!rows.has(h.lord))rows.set(h.lord,[]);rows.get(h.lord).push([id,h]);}
  for(const [r,people] of groups){const s=g.politics.realms[r];if(!s||!land.has(r))continue;const head=live(g,s.ruler),council=new Set(Object.values(s.council||{}));people.sort((a,b)=>a.id.localeCompare(b.id));
  for(const p of people){const x=record(g,p.id),estate=localEstate(g,rows,p);if(g.turn%12===0&&x.lastIncome!==g.turn){for(const [,h] of estate){const draw=Math.min(25,Math.floor(Math.max(0,num(h.wealth))*.12));h.wealth-=draw;p.wealth=num(p.wealth)+draw;}x.lastIncome=g.turn;const standing=(council.has(p.id)?3:0)+(estate.length?2:0)+(p.id===s.ruler?2:0);x.influence=cap(x.influence+standing-(standing?0:2),0,100);p.influence=x.influence;p.prestige=num(p.prestige)+(council.has(p.id)?2:0)+(estate.length?2:0)+(p.id===s.ruler?4:0);p.piety=num(p.piety)+(p.role==='clergy'?3:p.traits?.includes('zealous')?2:0);}
- reviewChosenGoal(g,p);if(g.turn%3===0&&p.id!==head?.id){const pressure=(num(g.factions[r]?.stability)<40?3:0)+(estate.some(([,h])=>h.loyalty<35)?3:0)+(num(g.living?.health?.[p.id]?.severity)>=50?3:0);stress(p,pressure||-2);}
+ reviewChosenGoal(g,p);if(g.turn%12===0)evolveCharacterTraits(g,p);if(g.turn%3===0&&p.id!==head?.id){const pressure=(num(g.factions[r]?.stability)<40?3:0)+(estate.some(([,h])=>h.loyalty<35)?3:0)+(num(g.living?.health?.[p.id]?.severity)>=50?3:0);stress(p,pressure||-2);}
  }
  // Staggered monthly modulo cohorts without artificial 6-character realm bottleneck.
  const ready=people.filter(p=>!controlled(g,p)&&g.turn-record(g,p.id).lastAction>=6&&hash(p.id)%6===g.turn%6).sort((a,b)=>record(g,a.id).lastAction-record(g,b.id).lastAction||a.id.localeCompare(b.id));

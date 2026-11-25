@@ -1,4 +1,3 @@
-import {SoundtrackPlayer,soundtrackPaths,campaignMusicKey} from './soundtrack.js';
 // Original procedural sound effects, battle music fallback, and unified campaign audio.
 const limits = { steel: 0.15, arrow: 0.20, hoof: 0.28, rout: 0.8, horn: 1.1, rally: 1.1, wind: 2.2, order: 0.15, victory: 1, defeat: 1 };
 const sfxLimits = { click: 0.05, coin: 0.08, seal: 0.12, horn: 0.5, chime: 0.15, alert: 0.25, march: 0.18, succession: 0.8, rally: 0.6 };
@@ -25,7 +24,7 @@ export function fieldAudioEvents(groups, seen, elapsed, ambientDue = 0) {
   for (const g of groups) {
     const old = seen.get(g.id) || { attack: 0, routed: false };
     if ((g.attackSerial || 0) > old.attack) {
-      events.push({ kind: g.type === 'archers' || g.specialistId==='horsebow' ? 'arrow' : g.type === 'cavalry' ? 'hoof' : 'steel', x: g.x, z: g.z });
+      events.push({ kind: g.type === 'archers' ? 'arrow' : g.type === 'cavalry' ? 'hoof' : 'steel', x: g.x, z: g.z });
     }
     if (g.routed && !old.routed && g.life > 0) {
       events.push({ kind: 'rout', x: g.x, z: g.z });
@@ -448,7 +447,6 @@ export class CampaignAudio {
     this.step = 0;
     this.closed = false;
     this.linked = new Set();
-    this.realm=null;this.scoreOverride=null;this.score=opts.mediaFactory?new SoundtrackPlayer(opts.mediaFactory,{volume:.32,onUnavailable:()=>this._startProceduralBgm(),onPlaying:()=>this._stopProceduralBgm()}):null;
   }
 
   link(...targets) {
@@ -514,11 +512,8 @@ export class CampaignAudio {
     return this.setMuted(!this.muted);
   }
 
-  setRealm(realm){if(this.realm===realm)return;this.realm=realm;if(this.ctx&&!this.muted&&this.mode==='peace')this._startBgm();}
-  setScoreOverride(key){if(this.scoreOverride===key)return;this.scoreOverride=key;if(this.ctx&&!this.muted&&this.mode!=='silent')this._startBgm();}
   setMode(mode) {
     if (!VALID_MODES.has(mode)) return false;
-    if(this.score&&this.mode===mode){if(this.ctx&&!this.muted&&mode!=='silent')this._startBgm();return true;}
     if (mode !== 'silent') this.prevMode = mode;
     this.mode = mode;
     if (this.closed) return false;
@@ -540,10 +535,6 @@ export class CampaignAudio {
   }
 
   _stopBgm() {
-    this.score?.pause();this._stopProceduralBgm();
-  }
-
-  _stopProceduralBgm() {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
@@ -555,12 +546,6 @@ export class CampaignAudio {
   }
 
   _startBgm() {
-    if (!this.ctx || this.closed || this.muted || this.mode === 'silent') return;
-    if(this.score){const key=this.scoreOverride||campaignMusicKey(this.mode,this.realm);if(this.score.select(key,soundtrackPaths(key)))this._stopProceduralBgm();if(this.score.resume())return;}
-    this._startProceduralBgm();
-  }
-
-  _startProceduralBgm() {
     if (!this.ctx || this.closed || this.muted || this.mode === 'silent') return;
     if (this.timer) return;
     const cfg = MODE_SCALES[this.mode] || MODE_SCALES.peace;
@@ -760,7 +745,7 @@ export class CampaignAudio {
   close() {
     if (this.closed) return;
     this.closed = true;
-    this._stopBgm();this.score?.close();
+    this._stopBgm();
     for (const v of this.voices) {
       try { v.stop?.(); } catch {}
     }
@@ -775,8 +760,7 @@ export class CampaignAudio {
   }
 }
 
-const mediaFactory=src=>typeof Audio==='function'?new Audio(src):null;
-export const browserCampaignAudio = new CampaignAudio(defaultAudioCtxFactory,{mediaFactory});
+export const browserCampaignAudio = new CampaignAudio(defaultAudioCtxFactory);
 
 export function browserFieldAudio(enabled = true) {
   const effective = enabled && !browserCampaignAudio.isMuted();
@@ -785,15 +769,13 @@ export function browserFieldAudio(enabled = true) {
   return audio;
 }
 
-let nextBattleTrack=0;
-class ScoreBattleMusic extends BattleMusic {
-  constructor(enabled){super(()=>null,enabled,defaultAudioCtxFactory);const tracks=soundtrackPaths('war');if(nextBattleTrack++%2)tracks.reverse();this.score=new SoundtrackPlayer(mediaFactory,{volume:.38,onUnavailable:()=>this._startFallback(),onPlaying:()=>this._stopFallback()});this.score.select('battle',[...tracks,'assets/audio/war%20theme.ogg']);}
-  sync(active,enabled=this.enabled){this.active=!!active;this.enabled=!!enabled;if(this.closed)return false;if(!this.active||!this.enabled){this.score.pause();this._stopFallback();return false;}return this.score.resume()||this._startFallback();}
-  close(){this.score.close();super.close();}
-}
 export function browserBattleMusic(enabled = true) {
   const effective = enabled && !browserCampaignAudio.isMuted();
-  const music = new ScoreBattleMusic(effective);
+  const music = new BattleMusic(
+    () => (typeof Audio === 'function' ? new Audio('assets/audio/war%20theme.ogg') : null),
+    effective,
+    defaultAudioCtxFactory
+  );
   browserCampaignAudio.link(music);
   return music;
 }

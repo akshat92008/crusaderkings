@@ -87,12 +87,15 @@ export function findInvasionOptions(g,world){
 }
 
 export function planEnemyInvasion(g,world){
- if(g.kingdom.threats.length||g.kingdom.difficulty==='peaceful'||g.turn<(g.kingdom.nextInvasionTurn??0))return null;
+ if(g.kingdom.threats.length||g.kingdom.difficulty==='peaceful')return null;
+ if((g.kingdom.nextInvasionTurn||0)>g.turn)return null;
+ const cooldowns=g.kingdom.rivalInvasionCooldowns||{};
  const choices=findInvasionOptions(g,world);
  if(!choices.length)return null;
  const difficulty=g.kingdom.difficulty;
  // Strategic AI avoids suicidal wars while still allowing bold gambles by aggressive personalities.
  const viable=choices.filter(c=>{
+  if((cooldowns[c.by]||0)>g.turn)return false;
   const minAdv=Math.max(.35,(difficulty==='hard'?.47:.66)+(raidThreshold(g,c.by,g.player)-.48)*.5);
   if(c.advantage<minAdv)return false;
   if(difficulty!=='hard'){
@@ -197,6 +200,8 @@ export function resolveInvasion(g,world,threat,result){
  recordCampaignBattle(g,found.by,g.player,found.province,!defended);recordStrategicBattle(g,found.by,g.player,!defended,1-enemyRatio);recordStrategicBattle(g,g.player,found.by,defended,1-playerRatio);
  g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);
  g.kingdom.nextInvasionTurn=g.turn+6;
+ g.kingdom.rivalInvasionCooldowns??={};
+ g.kingdom.rivalInvasionCooldowns[found.by]=g.turn+12;
  const msg=defended?'Your defenders repelled '+g.factions[found.by].name+' at '+found.province:
   g.factions[found.by].name+' captured '+found.province+' after a successful assault';
  return {ok:true,defended,msg};

@@ -448,6 +448,55 @@ export const EMERGENT_DECISIONS=[
  {id:'emergent_frontier_colonization',category:'Realm',title:'Sponsor Frontier Forest Clearing',cost:130,cooldown:60,desc:'Provide seed grain and axes to settle wild borderlands with free yeomen.',effects:{development:1,tax:6,unrest:-4}}
 ];
 
+export const REACTIVE_EMERGENT_EVENTS=[
+ E('em_kin_vendetta','Vendetta','Whispered Vows of Kin Vendetta','Aggrieved noble kinsfolk assemble by torchlight, swearing retribution against the crown over harsh justice.','kinVendetta',[
+  C('Offer formal honors and blood-price compensation',110,{stability:6,legitimacy:4,loyalty:10}),
+  C('Expand household guards and reject their demands',40,{securityMonths:12,prestige:6})
+ ]),
+ E('em_plague_gates','Pestilence','The Pestilence at the Gates','Quarantine lanterns flicker across stricken parishes as magistrates plead for isolation or aid.','plagueGates',[
+  C('Quarantine districts and endow emergency infirmaries',120,{stability:5,health:-12,trust:6}),
+  C('Seal the royal court gates and restrict court travel',40,{legitimacy:-2,health:-18})
+ ]),
+ E('em_war_exhaustion_petition','Warfare','Petition of the Exhausted Estates','Depleted levies and rising tax arrears drive estates to beg for respite from prolonged campaigning.','warExhaustion',[
+  C('Remit emergency war taxes to pacify the countryside',100,{stability:8,legitimacy:4,loyalty:8}),
+  C('Invoke martial duty and tighten campaign discipline',0,{prestige:8,stress:6,morale:6})
+ ]),
+ E('em_merchant_monopoly','Government','Charter Dispute in the Signoria','Syndicate patricians lobby the Doge’s council for exclusive sea-lane privileges along major ports.','merchantMonopoly',[
+  C('Confirm the maritime guild monopoly charter',90,{trade:10,prestige:6}),
+  C('Keep harbor tolls open to competing houses',0,{gold:120,stability:-3})
+ ]),
+ E('em_horde_kurultai','Government','Great Kurultai of the Steppe Banners','Steppe noyons converge with remounted herds, demanding a raiding banner or richer pastures.','hordeKurultai',[
+  C('Host the kurultai feast and equip steppe cavalry',80,{prestige:12,morale:8}),
+  C('Exact customary pasture tribute from rival clans',0,{gold:110,stability:-4})
+ ]),
+ E('em_imperial_censor','Government','Censorate Memorial on Provincial Graft','Censors present sealed ledgers accusing circuit governors of skimming imperial grain and silver.','imperialCensor',[
+  C('Empower the censors to purge corrupt offices',80,{legitimacy:10,stability:4}),
+  C('Accept quiet restitution directly into the treasury',0,{gold:130,legitimacy:-4})
+ ])
+];
+
+const findEmergentDef=id=>EMERGENT_EVENTS.find(e=>e.id===id)||REACTIVE_EMERGENT_EVENTS.find(e=>e.id===id)||null;
+
+export function reactiveEmergentCandidates(g,r){
+ const f=g.factions?.[r];
+ if(!f)return [];
+ const rs=g.emergent?.realms?.[r];
+ const recent=rs?.recentReactive||{};
+ const eligible=ev=>(g.turn-(recent[ev.id]??-120))>=24;
+ const out=[];
+ const hasVendetta=Object.values(g.politics?.people||{}).some(p=>p?.alive&&p.realm===r&&(p.grievances||[]).some(gr=>gr.severity>=45));
+ if(hasVendetta)out.push(REACTIVE_EMERGENT_EVENTS[0]);
+ const hasEpidemic=Object.values(g.economy?.crises||{}).some(c=>c?.kind==='epidemic'&&g.provinces?.[c.province]?.owner===r)||Object.keys(g.heritage?.epidemics||{}).some(pid=>g.provinces?.[pid]?.owner===r);
+ if(hasEpidemic)out.push(REACTIVE_EMERGENT_EVENTS[1]);
+ const longWar=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)&&(g.turn-(w.started||0))>=18);
+ if(longWar)out.push(REACTIVE_EMERGENT_EVENTS[2]);
+ const gov=g.civic?.realms?.[r]?.government;
+ if(['republic','city'].includes(gov))out.push(REACTIVE_EMERGENT_EVENTS[3]);
+ else if(gov==='steppe')out.push(REACTIVE_EMERGENT_EVENTS[4]);
+ else if(['imperial','centralized'].includes(gov))out.push(REACTIVE_EMERGENT_EVENTS[5]);
+ return out.filter(eligible);
+}
+
 export function allEmergentEventCount(){return EMERGENT_EVENTS.length;}
 export function allEmergentDecisionCount(){return EMERGENT_DECISIONS.length;}
 
@@ -464,7 +513,7 @@ export function currentEmergentEvent(g,r=g.player){
  const s=initEmergent(g);
  const active=s.realms[r]?.active;
  if(!active||g.turn>=active.expires)return null;
- const def=EMERGENT_EVENTS.find(e=>e.id===active.id);
+ const def=findEmergentDef(active.id);
  if(!def)return null;
  return {...def,...active};
 }
@@ -500,6 +549,15 @@ function applyEmergentEffects(g,r,effects){
   else if(k==='securityMonths'&&g.intrigue?.security){
    g.intrigue.security[r]={level:2,until:g.turn+v};
   }
+  else if(k==='loyalty'){
+   const rId=g.politics?.realms?.[r]?.ruler;
+   for(const [pid,h] of Object.entries(g.politics?.holdings||{})){
+    if(h.realm===r&&h.lord!==rId&&g.provinces?.[pid]?.owner===r)h.loyalty=cap((h.loyalty||50)+v,0,100);
+   }
+  }
+  else if(k==='morale'){
+   for(const a of Object.values(g.armies||{}))if(a.owner===r)a.morale=cap((a.morale||75)+v,0,100);
+  }
  }
 }
 
@@ -521,7 +579,7 @@ export function emergentAction(g,world,action,id,extra){
   applyEmergentEffects(g,r,choice.effects);
   let follow=null;
   if(choice.next){
-   const nextDef=EMERGENT_EVENTS.find(e=>e.id===choice.next);
+   const nextDef=findEmergentDef(choice.next);
    if(nextDef){
     follow={id:nextDef.id,started:g.turn,availableAt:g.turn+3,expires:g.turn+12};
    }
@@ -567,7 +625,7 @@ export function tickEmergent(g,world){
     rs.active=null;
     rs.lastEvent=g.turn;
    }else if(!humanControlsRealm(g,r)&&g.turn>=(rs.active.availableAt??rs.active.started)){
-    const ev=EMERGENT_EVENTS.find(e=>e.id===rs.active.id);
+    const ev=findEmergentDef(rs.active.id);
     if(ev){
      const affordable=ev.choices.map((c,i)=>({i,c})).filter(x=>(f.treasury||0)>=x.c.cost);
      const pick=affordable.length?affordable[0]:{i:1,c:ev.choices[1]};
@@ -575,7 +633,7 @@ export function tickEmergent(g,world){
      applyEmergentEffects(g,r,pick.c.effects);
      let follow=null;
      if(pick.c.next){
-      const nextDef=EMERGENT_EVENTS.find(e=>e.id===pick.c.next);
+      const nextDef=findEmergentDef(pick.c.next);
       if(nextDef)follow={id:nextDef.id,started:g.turn,availableAt:g.turn+3,expires:g.turn+12};
      }
      rs.active=follow;
@@ -583,10 +641,16 @@ export function tickEmergent(g,world){
     }
    }
   }else if(g.turn-rs.lastEvent>=12){
-   // Pick a root event that hasn't run recently
-   const roots=EMERGENT_EVENTS.filter(e=>e.trigger!=='followup');
-   const idx=Math.floor(rand(s)*roots.length);
-   const root=roots[idx];
+   const reactive=reactiveEmergentCandidates(g,r);
+   let root=null;
+   if(reactive.length){
+    root=reactive[Math.floor(rand(s)*reactive.length)];
+    rs.recentReactive??={};
+    rs.recentReactive[root.id]=g.turn;
+   }else{
+    const roots=EMERGENT_EVENTS.filter(e=>e.trigger!=='followup');
+    root=roots[Math.floor(rand(s)*roots.length)];
+   }
    if(root){
     rs.active={id:root.id,started:g.turn,availableAt:g.turn,expires:g.turn+9};
     rs.lastEvent=g.turn;

@@ -1,6 +1,3 @@
-import {fieldActiveCount} from './simple-card-battle.js';
-import {regimentCardIcon} from './banner-renderer.js';
-import {cardFormationChoices,cardRoleHint} from './simple-card-battle.js';
 import {resolvePersonalDilemma,personalDilemmas,playerLifeAction} from './character-agency.js';
 import {personalUnion,unionPartners,unionTerms} from './personal-unions.js';
 import {CAREER_TABS,campaignTab,careerPriorities,renderCareerCharacter,renderCareerProvince,renderCareerLinks} from './campaign-access.js';
@@ -14,7 +11,7 @@ import {campaignOutliner,renderCampaignOutliner,renderPinButton,toggleCampaignPi
 import {characterLink,contextualButton,realmWarContext,sectionLink} from './campaign-context.js';
 import {marriageCandidates} from './dynastic-politics.js';
 import {freshBattleCanvas} from './battle-lifecycle.js';
-import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistBrowserCampaign,readBrowserCampaign} from './portable-save.js';
+import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistCampaign} from './portable-save.js';
 import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
 import {currentExpandedEvents,currentEmergentEvent,expandedAction} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
@@ -70,9 +67,9 @@ const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok){message(r?.msg||'Action unavailable');browserCampaignAudio.playSfx('alert');}else{message(r.msg);browserCampaignAudio.playSfx('seal');render();save(false);}}
-async function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{await persistBrowserCampaign(snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();syncAudioState();if(!openIncomingBattle())message('Saved campaign restored.');}
-async function load(){try{const raw=await readBrowserCampaign();if(!raw)throw Error('No saved campaign found.');await loadRaw(raw);}catch(e){message('Unable to load save: '+e.message);}}
-async function save(notify=true){if(!game||battle)return false;try{await persistBrowserCampaign(snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){message('Save failed: '+e.message+'. Export a backup to keep your campaign.');return false;}}
+function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{persistCampaign(localStorage,snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();syncAudioState();if(!openIncomingBattle())message('Saved campaign restored.');}
+function load(){try{loadRaw(localStorage.getItem(SAVE_KEY));}catch(e){message('Unable to load save: '+e.message);}}
+function save(notify=true){if(!game||battle)return false;try{persistCampaign(localStorage,snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){if(notify!==false)message('Save failed: '+e.message);return false;}}
 const activeObjectUrls=new Set();
 function revokeObjectUrls(){for(const u of activeObjectUrls){try{URL.revokeObjectURL(u);}catch{}}activeObjectUrls.clear();}
 function exportSave(){if(!game||battle)return;const blob=new Blob([snapshot(game)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');activeObjectUrls.add(url);a.href=url;a.download=saveFilename(game);document.body.append(a);a.click();a.remove();setTimeout(()=>{if(activeObjectUrls.delete(url))try{URL.revokeObjectURL(url);}catch{}},1000);message('Campaign backup exported.');}
@@ -216,12 +213,10 @@ function syncCampaignSoundButton(){const btn=el('campaign-sound');if(btn){btn.se
 function syncAudioState(){
  syncCampaignSoundButton();
  if(!campaignSound){browserCampaignAudio.setMode('silent');return;}
- if(!game){browserCampaignAudio.setScoreOverride(null);browserCampaignAudio.setMode('menu');return;}
+ if(!game){browserCampaignAudio.setMode('menu');return;}
  if(battle){browserCampaignAudio.setMode('silent');return;}
- const f=player();browserCampaignAudio.setRealm(game.player);
- const modal=el('event-modal');const title=modal&&!modal.hidden?modal.textContent||'':'';
- browserCampaignAudio.setScoreOverride(/succession|heir|coronation|monarch.*death/i.test(title)?'succession':/intrigue|scheme|assassin|conspiracy/i.test(title)?'intrigue':null);
- if(f?.atWarWith?.length||game.kingdom?.threats?.some(t=>['ready','approaching'].includes(t.status)))browserCampaignAudio.setMode('war');
+ const f=player();
+ if(f?.atWarWith?.length||game.kingdom?.threats?.length)browserCampaignAudio.setMode('war');
  else if((f?.stability??100)<40||Object.values(game.conflict?.factions||{}).some(x=>x.realm===game.player&&x.status==='civil war'))browserCampaignAudio.setMode('crisis');
  else browserCampaignAudio.setMode('peace');
 }
@@ -264,7 +259,7 @@ function collectEventPrompts(){
  void liveWorld;
  return out;
 }
-function closeEventModal(){const m=el('event-modal');if(m){const wasOpen=!m.hidden;m.hidden=true;m.innerHTML='';if(wasOpen)syncAudioState();}}
+function closeEventModal(){const m=el('event-modal');if(m){m.hidden=true;m.innerHTML='';}}
 function renderEventModal(evt){
  const m=el('event-modal');if(!m||!evt){closeEventModal();return;}
  el('toast')?.classList.remove('visible');
@@ -279,57 +274,49 @@ function renderEventModal(evt){
   +'<div class="event-modal-foot">Campaign paused until resolved or deferred.</div></div>';
  m._eventKey=evt.key;
  m.hidden=false;
- syncAudioState();browserCampaignAudio.playSfx('chime');
+ browserCampaignAudio.playSfx('chime');
 }
 function maybePopupEventModal(prevKeys=new Set()){
  if(!game||battle||vassalCareer(game))return;
  const active=collectEventPrompts();
- if(!el('event-modal').hidden)return;
- const urgent=active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&e.badge==='Succession');
- const fresh=urgent||((game.turn-(game.kingdom.lastEventPopupTurn??-6)>=6)&&active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&game.turn>=2));
+ const fresh=active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&(game.turn>=2||e.kind==='royal'));
  if(!fresh)return;
  if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}
- game.kingdom.lastEventPopupTurn=game.turn;
  renderEventModal(fresh);
- save(false);
 }
 function start(id){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);browserCampaignAudio.unlock();browserCampaignAudio.playSfx('seal');render();save(false);syncAudioState();}
 function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pressed',String(battleSound));b.textContent=battleSound?'Sound on':'Sound off';}
-function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;desc.simpleField=true;desc.bannerView=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
- el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='overview';el('battle-camera').hidden=true;el('battle-zoom-in').hidden=true;el('battle-zoom-out').hidden=true;if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
+function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
+ el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='tactical';if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
  el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
  if(desc.alliedTroops)el('battle-meta').textContent+=' · '+fmt(desc.alliedTroops)+' ALLIED TROOPS';
- el('battle-units').dataset.deckKey='';battleDescriptor=desc;try{battle=new BattleGame(freshBattleCanvas(el('battle-canvas')),desc,game,onBattleFinished,onBattleStatus,{overlayCanvas:el('battle-overlay')});document.body.style.overflow='hidden';syncAudioState();return true;}catch(e){battleDescriptor=null;el('battle-screen').hidden=true;syncAudioState();message(`Battle couldn't start: ${e.message}`);return false;}}
+ battleDescriptor=desc;try{battle=new BattleGame(freshBattleCanvas(el('battle-canvas')),desc,game,onBattleFinished,onBattleStatus,{overlayCanvas:el('battle-overlay')});document.body.style.overflow='hidden';syncAudioState();return true;}catch(e){battleDescriptor=null;el('battle-screen').hidden=true;syncAudioState();message(`Battle couldn't start: ${e.message}`);return false;}}
 function onBattleStatus(status){
- const roster=status.roster;if(roster){const a=roster.attacker,b=roster.defender;el('battle-strength').textContent=status.deployment?'All soldiers accounted for · choose your formation':status.reserveCount?status.reserveCount+' regiment(s) in reserve':'Soldiers in action · routed survivors are counted in the final report';}
- el('battle-move-tap').setAttribute('aria-pressed',String(!!status.tapMove));el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';el('battle-pause').disabled=!!status.renderLost;el('battle-start').disabled=!!status.renderLost;el('battle-strength').dataset.renderer=status.rendererMode||'';if(status.renderLost)el('battle-strength').textContent='Graphics context lost. Use Cancel deployment or retreat to return to campaign.';
+ const roster=status.roster;if(roster){const a=roster.attacker,b=roster.defender;el('battle-strength').textContent='YOUR FORCE '+fmt(a.surviving)+' / '+fmt(a.initial)+' · ENEMY '+fmt(b.surviving)+' / '+fmt(b.initial)+(status.enemyPosture?' · '+status.enemyPosture.toUpperCase():'');}
+ el('battle-move-tap').setAttribute('aria-pressed',String(!!status.tapMove));el('battle-pause').textContent=status.paused?'▶ RESUME':'Ⅱ PAUSE';el('battle-pause').disabled=!!status.renderLost;el('battle-start').disabled=!!status.renderLost;el('battle-strength').dataset.renderer=status.rendererMode||'';if(status.renderLost)el('battle-strength').textContent='Graphics context lost. Retreat to return to campaign.';
  const spd=el('battle-speed');if(spd)spd.textContent=(status.battleSpeed||1)+'×';
  const rBtn=el('battle-rally');if(rBtn){const cd=Math.ceil(status.rallyCooldown||0);rBtn.disabled=!!status.deployment||cd>0;rBtn.textContent=cd>0?'⚑ '+cd+'s':'⚑ RALLY';}
  const ours=status.groups.filter(g=>g.side==='attacker'),unit=ours[status.selected];
- const focusEl=el('battle-focus');if(focusEl){focusEl.hidden=!unit;if(unit){const flags=(unit.statusFlags||[]).join(' · ');focusEl.textContent=(unit.profile?.name||unit.type).toUpperCase()+' · '+cardRoleHint(unit)+(flags?' · '+flags:'');}}
- const cards=el('battle-units'),deckKey=ours.map(g=>g.id+':'+g.troopCount+':'+g.specialistId).join('|');
- if(cards.dataset.deckKey!==deckKey||!cards.children.length){cards.dataset.deckKey=deckKey;cards.innerHTML=ours.map((g,i)=>'<button class="unitcard" data-unit="'+i+'"><span class="regiment-icon">'+regimentCardIcon(g)+'</span><span class="regiment-count"></span><b>'+esc(g.profile?.name||g.type)+'</b><small class="regiment-status"></small><span class="unithealth"><span></span></span></button>').join('');}
- for(let i=0;i<ours.length;i++){const g=ours[i],b=cards.children[i];b.classList.toggle('active',i===status.selected);b.classList.toggle('reserve',!!g.reserve);b.disabled=!!g.routed||(!status.deployment&&!g.reserve);b.setAttribute('aria-pressed',String(i===status.selected));b.querySelector('.regiment-count').textContent=fmt(Math.round(g.troopCount*g.life/100));b.querySelector('.regiment-status').textContent=g.routed?'Routed':g.reserve?'Reserve · tap to deploy':status.deployment?(g.formationId||'line').replaceAll('_',' '):'Fighting';b.querySelector('.unithealth span').style.width=Math.max(0,g.life)+'%';}
- const reserves=el('battle-reserve');reserves.hidden=!status.deployment;reserves.disabled=!unit||!!unit.routed||(!unit.reserve&&status.reserveCount>=Math.min(3,ours.length-1));reserves.textContent=unit?.reserve?'Return to line':'Hold in reserve';
- const timer=el('battle-timer');timer.textContent=status.deployment?'DEPLOY YOUR ARMY':Math.max(0,100-Math.floor(status.elapsed))+'s LEFT';
- if(roster){for(const [side,r] of [['your',roster.attacker],['enemy',roster.defender]]){const active=status.deployment?r.initial:fieldActiveCount(status.groups,side==='your'?'attacker':'defender');el('battle-'+side+'-count').textContent=fmt(active)+' / '+fmt(r.initial);el('battle-'+side+'-bar').style.width=(r.initial?Math.round(active/r.initial*100):0)+'%';}}
- const choices=unit?cardFormationChoices(unit,availableFormations(game.factions[game.player],true)):[];
- const formations=el('battle-formation');const choiceKey=choices.map(o=>o.id).join(',');if(formations.dataset.choices!==choiceKey){formations.dataset.choices=choiceKey;formations.innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+'</option>').join('');}
+ const focusEl=el('battle-focus');if(focusEl){focusEl.hidden=!unit;if(unit){const flags=(unit.statusFlags||[]).join(' · ');focusEl.textContent=(unit.profile?.name||unit.type).toUpperCase()+' · '+(status.terrain||unit.terrainName||'field')+(flags?' · '+flags:'')+(unit.focusTargetId?' · LOCKED TARGET':'');}}
+ const cards=el('battle-units'),markup=ours.map((g,i)=>'<button class="unitcard '+(i===status.selected?'active':'')+'" data-unit="'+i+'"><b>' +artIcon('government',g.type==='cavalry'?'light cavalry':g.type)+(i+1)+'. '+esc((g.profile?.name||g.type).toUpperCase())+' · '+fmt(Math.round(g.troopCount*g.life/100))+'/'+fmt(g.troopCount)+'</b><small>'+(g.routed?'ROUTED':Math.round(g.life)+'% HP · '+Math.round(g.morale)+'% MORALE · '+Math.round(g.fatigue||0)+'% FATIGUE · '+Math.round(g.cohesion??100)+'% COHESION · '+(g.fieldOrder||'advance').toUpperCase())+'</small><div class="unithealth"><div style="width:'+Math.max(0,g.life)+'%"></div></div></button>').join('');if(cards.dataset.markup!==markup){const left=cards.scrollLeft,focus=document.activeElement?.dataset?.unit;cards.innerHTML=markup;cards.dataset.markup=markup;cards.scrollLeft=left;if(focus!==undefined)cards.querySelector('[data-unit="'+focus+'"]')?.focus({preventScroll:true});}
+ const choices=availableFormations(game.factions[game.player]);
+ const formations=el('battle-formation');const choiceKey=choices.map(o=>o.id).join(',');if(formations.dataset.choices!==choiceKey){formations.dataset.choices=choiceKey;formations.innerHTML=choices.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' ('+Math.round(o.damage*100)+'/'+Math.round(o.defense*100)+')</option>').join('');}
  if(unit&&document.activeElement!==formations)formations.value=unit.formationId;el('battle-order').title=unit?(unit.terrainName||'Open field')+' · Enemy posture: '+(status.enemyPosture||'Deploying'):'Regiment order';const order=el('battle-order');if(unit&&document.activeElement!==order&&unit.fieldOrder!=='move'&&[...order.options].some(o=>o.value===unit.fieldOrder))order.value=unit.fieldOrder;
  const fort=el('battle-fort-status');if(fort){fort.hidden=!status.siege;fort.textContent=status.siege?status.siege.structures.map(q=>q.name+' '+Math.round(q.hp/q.max*100)+'%').join(' · '):'';}
- el('battle-presets').hidden=!status.deployment;formations.hidden=!status.deployment;el('battle-formation-label').hidden=!status.deployment;el('battle-retreat').hidden=status.deployment;el('battle-pause').hidden=status.deployment;el('battle-speed').hidden=status.deployment;el('battle-rally').hidden=true;el('battle-guide').textContent=status.deployment?'Pick a card, tap the field to place it. Hold up to 3 cards in reserve.':status.reserveCount?'Tap a reserve card, then your deployment zone. Reserves join automatically after 12s.':'Your army fights automatically.';
- el('battle-lanes').hidden=true;el('battle-start').hidden=!status.deployment;el('battle-cancel').hidden=!status.deployment||!!battleDescriptor?.defenseMode&&!status.renderLost;const comparison=el('battle-comparison');comparison.hidden=true;if(status.deployment){const c=battleComparison(status.groups),line=(s,name)=>'<div><b>'+name+' · '+fmt(s.troops)+'</b><small>Inf '+fmt(s.mix.infantry)+' / Arch '+fmt(s.mix.archers)+' / Cav '+fmt(s.mix.cavalry)+' · Morale '+fmt(s.morale)+'% · Readiness '+fmt(s.power*100)+'%</small></div>';comparison.innerHTML=line(c.attacker,'Your force')+line(c.defender,'Enemy force')+'<small>Numerical ratio '+(c.ratio===null?'No opposing soldiers':c.ratio.toFixed(1)+':1')+' · Troop counters, formations and readiness affect outcomes.</small>';}
+ el('battle-lanes').hidden=!status.deployment;el('battle-start').hidden=!status.deployment;el('battle-cancel').hidden=!status.deployment||!!battleDescriptor?.defenseMode;const comparison=el('battle-comparison');comparison.hidden=!status.deployment;if(status.deployment){const c=battleComparison(status.groups),line=(s,name)=>'<div><b>'+name+' · '+fmt(s.troops)+'</b><small>Inf '+fmt(s.mix.infantry)+' / Arch '+fmt(s.mix.archers)+' / Cav '+fmt(s.mix.cavalry)+' · Morale '+fmt(s.morale)+'% · Readiness '+fmt(s.power*100)+'%</small></div>';comparison.innerHTML=line(c.attacker,'Your force')+line(c.defender,'Enemy force')+'<small>Numerical ratio '+(c.ratio===null?'No opposing soldiers':c.ratio.toFixed(1)+':1')+' · Terrain, tactics and readiness affect outcomes.</small>';}
 }
 function onBattleFinished(result){
  const defense=!!battleDescriptor?.defenseMode,practice=!!battleDescriptor?.showcase,win=result.victory;
  el('battle-result').hidden=false;
- const title=result.reason==='deadlock'?'STALEMATE · '+(win?'DEFENDERS HOLD':'ATTACKERS WITHDRAW'):defense?(win?'THE INVADERS WERE REPELLED':'THE DEFENDERS WERE DEFEATED'):(win?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS');
+ const title=defense?(win?'THE INVADERS WERE REPELLED':'THE DEFENDERS WERE DEFEATED'):(win?'GLORIOUS VICTORY':'THE ARMY WITHDRAWS');
  const explanation=practice?'Practice battle; your campaign will not be changed.':
    defense?(win?'Your army held the field.':'Your defensive position has been overrun.'):
    win?(activeWar(game,game.player,battleDescriptor.enemy)?'The province will be occupied pending peace.':'The enemy province will be taken.'):'Your army has retreated.';
+ const ts=result.tacticalStats||{},statParts=[ts.cavalryCharges&&'Cavalry charges '+ts.cavalryCharges,ts.bracedCounters&&'Braced counters '+ts.bracedCounters,ts.flankStrikes&&'Flank strikes '+ts.flankStrikes,ts.encirclements&&'Encirclements '+ts.encirclements,ts.volleyHits&&'Volley hits '+ts.volleyHits,ts.highGroundShots&&'High-ground shots '+ts.highGroundShots,ts.ralliesUsed&&'Rallies '+ts.ralliesUsed].filter(Boolean);
+ const reasons=Array.isArray(result.summaryReasons)&&result.summaryReasons.length?'<div class="rule"><b>WHY THIS BATTLE ENDED THIS WAY</b>'+result.summaryReasons.map(r=>'<p class="smallnote">• '+esc(r)+'</p>').join('')+(statParts.length?'<p class="smallnote">'+esc(statParts.join(' · '))+'</p>':'')+'</div>':'';
  const roster=result.roster,report=roster?'<div class="battle-report"><div><b>YOUR FIELD FORCE</b><small>Deployed '+fmt(roster.attacker.initial)+' · Surviving '+fmt(roster.attacker.surviving)+' · Losses '+fmt(roster.attacker.losses)+' · Routed survivors '+fmt(roster.attacker.routed)+'</small></div><div><b>ENEMY FIELD FORCE</b><small>Deployed '+fmt(roster.defender.initial)+' · Surviving '+fmt(roster.defender.surviving)+' · Losses '+fmt(roster.defender.losses)+' · Routed survivors '+fmt(roster.defender.routed)+'</small></div><small>Battlefield estimates include participating garrisons; campaign outcomes may differ.</small></div>':'';
- el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.'+(result.reason?' · '+esc(result.reason):'')+'</p>'+report+'<button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
+ el('battle-result').innerHTML='<div class="resultcard"><div class="small-ornament">THE CHRONICLERS REPORT</div><div class="hero-crest">'+(win?'♛':'⚔')+'</div><h2>'+title+'</h2><p>'+explanation+' Remaining strength: '+Math.round(result.attackerRemaining*100)+'%. Battle duration: '+result.seconds+' seconds.</p>'+reasons+report+'<button id="battle-return" class="goldbtn primary">RETURN TO CAMPAIGN ›</button></div>';
  el('battle-return').onclick=()=>{
   if(!battle)return;el('battle-return').disabled=true;
   if(!practice){
@@ -369,10 +356,10 @@ function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('sta
 function filterStartRealms(preferred=el('start-faction').value){const list=searchRealms(atlasWorld.factions,el('realm-search').value);el('start-faction').innerHTML=list.map(f=>`<option value="${esc(f.id)}">${esc(f.name)} — ${esc(f.continent)}</option>`).join('');if(list.some(f=>f.id===preferred))el('start-faction').value=preferred;renderStartFaction();}
 el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-faction').addEventListener('change',renderStartFaction);filterStartRealms('ottomans');
 el('start-new').addEventListener('click',()=>{if(atlasWorld.factions.some(f=>f.id===el('start-faction').value))start(el('start-faction').value);});
-readBrowserCampaign().then(raw=>{if(raw)el('load-existing').hidden=false;}).catch(()=>{});
+try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
 el('load-existing').addEventListener('click',load);
 el('import-save').addEventListener('click',()=>el('save-file').click());
-el('save-file').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{if(f.size>MAX_SAVE_BYTES)throw Error('Save exceeds 20 MB.');await loadRaw(await f.text(),true);}catch(err){el('import-status').textContent='Could not import: '+err.message;message('Could not import: '+err.message);}});
+el('save-file').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{if(f.size>MAX_SAVE_BYTES)throw Error('Save exceeds 20 MB.');loadRaw(await f.text(),true);}catch(err){el('import-status').textContent='Could not import: '+err.message;message('Could not import: '+err.message);}});
 el('export-save').addEventListener('click',exportSave);
 el('save-game').addEventListener('click',save);
 function restorePage(entry){tab=entry.tab;if(entry.character&&game?.politics?.people?.[entry.character])openCharacter(entry.character,false);else navigateTab(entry.tab,entry.section,false);}
@@ -428,7 +415,7 @@ el('tab-content').addEventListener('change',e=>{if(e.target.id==='people-scope'|
  if(!vassalCareer(game)&&e.target.matches('.policy-select'))clickResult(setPolicy(game,e.target.dataset.policy,Number(e.target.value)));
  if(e.target.id==='diplomatic-select'){diplomaticTarget=e.target.value;renderTab();}
 });
-document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selectGroup(Number(unit.dataset.unit));return;}
+document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]');if(unit&&battle){battle.selected=Number(unit.dataset.unit);battle.report();return;}
  const btn=e.target.closest('[data-action]');if(!btn||!game||battle)return;const action=btn.dataset.action,type=btn.dataset.type;
  if(action==='player-life'){clickResult(playerLifeAction(game,btn.dataset.id,type,btn.dataset.extra));return;}
  if(action==='personal-life'){clickResult(resolvePersonalDilemma(game,btn.dataset.id,type));return;}
@@ -496,7 +483,7 @@ document.addEventListener('click',e=>{
    browserCampaignAudio.playSfx('seal');
    const follow=collectEventPrompts().find(x=>!deferredModalEvents.has(x.key)&&x.key.startsWith('expanded:')&&game.turn>=0);
    clickResult(r);
-   // Follow-ups remain accessible in the court.
+   if(follow&&follow.key!==el('event-modal')._eventKey&&kind==='expanded')renderEventModal(follow);
   }else clickResult(r);
  }
 });
@@ -526,12 +513,10 @@ el('battle-sound').addEventListener('click',()=>{battleSound=!battleSound;campai
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
 el('battle-start').addEventListener('click',()=>battle?.startAssault());
-el('battle-cancel').addEventListener('click',()=>{if(!battle?.deployment||battleDescriptor?.defenseMode&&!battle.renderLost)return;battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();syncAudioState();message('Deployment cancelled. No casualties or territory changes.');});
+el('battle-cancel').addEventListener('click',()=>{if(!battle?.deployment||battleDescriptor?.defenseMode)return;battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();syncAudioState();message('Deployment cancelled. No casualties or territory changes.');});
 el('battle-formation').addEventListener('change',e=>{
  if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
 });
-el('battle-reserve').addEventListener('click',()=>battle?.toggleReserve());
-el('battle-presets').addEventListener('click',e=>{const b=e.target.closest('[data-preset]');if(b&&battle)battle.arrangeCards(b.dataset.preset);});
 el('battle-order').addEventListener('change',e=>battle?.command(battle.selected,e.target.value));
 el('battle-all-order').addEventListener('click',()=>battle?.command(battle.selected,el('battle-order').value,null,true));
 el('battle-lanes').addEventListener('click',e=>{

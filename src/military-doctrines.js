@@ -89,4 +89,4 @@ export function chooseCounterFormation(faction,enemyType,ownType){
  const prefer=enemyType==='cavalry'?'pike_square':ownType==='archers'?'volley_line':ownType==='cavalry'?'cavalry_wedge':'shield_wall';
  return d.formations.includes(prefer)?prefer:d.formations.includes('shield_wall')?'shield_wall':d.formations[0];
 }
-export function availableFormations(faction, simple=false){const ids=militaryDoctrine(faction).formations;return [...new Set(simple?[...ids,'shield_wall','pike_square','volley_line','cavalry_wedge','skirmish','flank']:ids)].map(id=>({id,...FORMATIONS[id]}));}
+export function availableFormations(faction){return militaryDoctrine(faction).formations.map(id=>({id,...FORMATIONS[id]}));}

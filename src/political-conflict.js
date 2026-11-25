@@ -11,7 +11,7 @@ import {hookStrength} from './intrigue-systems.js';
 import {independenceMembers,foundBreakaway} from './independence-systems.js';
 import {claimantCandidates,installClaimant,isImprisoned,capturePrisoner} from './feudal-systems.js';
 import {personalOpinion} from './chronicle-systems.js';
-import {strategicPlan,militaryStrength,defenseSupport} from './strategic-ai.js';
+import {strategicPlan,militaryStrength,defenseSupport,evaluateWarViability} from './strategic-ai.js';
 import {civicModifiers} from './civic-systems.js';
 import {startingTroops,militaryDoctrine} from './military-doctrines.js';
 import {hasActiveFavor,oweFavor,callInFavor} from './ck2-deep-systems.js';
@@ -55,16 +55,41 @@ export function councilVotes(g,realm,proposal='law'){
  const c=initConflict(g),s=g.politics.realms[realm],f=g.factions[realm];if(!s||!f)return [];
  return Object.entries(s.council).filter(([,id])=>g.politics.people[id]?.alive&&!isImprisoned(g,id)).map(([role,id])=>{
   const person=g.politics.people[id],favor=(c.favors[councilKey(realm,id)]||0)>g.turn||Boolean(hasActiveFavor(g,s.ruler,id));
-  const score=18+(f.legitimacy-50)*.7+(f.stability-50)*.3+(person.traits.includes('ambitious')?-20:0)+(person.traits.includes('content')?15:0)+(person.traits.includes('just')&&proposal==='revoke'?-28:0)+(person.traits.includes('cautious')&&proposal==='war'?-25:0)+(role==='marshal'&&proposal==='war'?22:0)+(favor?55:0)+personalOpinion(g,s.ruler,id)*.35+hookStrength(g,realm,id)*18;
-  return {role,id,yes:favor||score>=25,score:Math.round(score),favor};
+  const hook=hookStrength(g,realm,id),op=personalOpinion(g,s.ruler,id);
+  const score=18+(f.legitimacy-50)*.7+(f.stability-50)*.3+(person.traits.includes('ambitious')?-20:0)+(person.traits.includes('content')?15:0)+(person.traits.includes('just')&&proposal==='revoke'?-28:0)+(person.traits.includes('cautious')&&proposal==='war'?-25:0)+(role==='marshal'&&proposal==='war'?22:0)+(favor?55:0)+op*.35+hook*18;
+  const reasons=[];
+  if(favor)reasons.push('Active favor secured (+55)');
+  if(hook>0)reasons.push('Hook leverage (+'+Math.round(hook*18)+')');
+  if(person.traits.includes('ambitious'))reasons.push('Ambitious (-20)');
+  if(person.traits.includes('content'))reasons.push('Content (+15)');
+  if(person.traits.includes('just')&&proposal==='revoke')reasons.push('Just opposes revocation (-28)');
+  if(person.traits.includes('cautious')&&proposal==='war')reasons.push('Cautious opposes war (-25)');
+  if(role==='marshal'&&proposal==='war')reasons.push('Marshal backs war (+22)');
+  if(f.legitimacy<40)reasons.push('Low legitimacy ('+Math.round((f.legitimacy-50)*.7)+')');
+  if(op<=-15)reasons.push('Hostile opinion ('+Math.round(op*.35)+')');
+  return {role,id,name:person.name||id,yes:favor||score>=25,score:Math.round(score),favor,hook,reasons};
  });
 }
+export function councilVoteBreakdown(g,realm,proposal='law'){
+ const c=initConflict(g),regencyAllowed=regencyPermission(g,realm,proposal);
+ const binding=c.council[realm]==='binding';
+ const votes=councilVotes(g,realm,proposal);
+ const yesCount=votes.filter(x=>x.yes).length;
+ const noCount=votes.length-yesCount;
+ const needed=votes.length?Math.floor(votes.length/2)+1:0;
+ const permitted=regencyAllowed&&(!binding||yesCount>votes.length/2);
+ const blockingReasons=[];
+ if(!regencyAllowed)blockingReasons.push('Regent withholds consent for '+proposal+'.');
+ if(binding&&yesCount<needed){
+  blockingReasons.push('Binding council blocked '+proposal+': '+yesCount+'/'+needed+' votes. Buy or call in a favor to win over a councillor.');
+  for(const v of votes.filter(x=>!x.yes)){
+   blockingReasons.push(v.name+' ('+v.role+', '+v.score+'): '+(v.reasons.join('; ')||'insufficient support'));
+  }
+ }
+ return {permitted,binding,regencyAllowed,yesCount,noCount,needed,votes,blockingReasons};
+}
 export function councilPermission(g,realm,proposal){
- const c=initConflict(g);
- if(!regencyPermission(g,realm,proposal))return false;
- if(c.council[realm]!=='binding')return true;
- const v=councilVotes(g,realm,proposal);
- return v.filter(x=>x.yes).length>v.length/2;
+ return councilVoteBreakdown(g,realm,proposal).permitted;
 }
 function power(g,ids){
  let total=0;
@@ -89,13 +114,39 @@ export function hasTruce(g,a,b){
  return (initConflict(g).truces[pair(a,b)]||0)>g.turn;
 }
 
-function endWar(g,w,result){
+export function endWar(g,w,result){
  settleOccupations(g,w,result);
  w.status=result;w.ended=g.turn;
  recallWarContingents(g,w.id);
  initConflict(g).truces[pair(w.attacker,w.defender)]=g.turn+36;
+ if(g.kingdom){
+  const between=t=>(t.by===w.attacker&&(g.player===w.defender||g.provinces?.[t.province]?.owner===w.defender))||(t.by===w.defender&&(g.player===w.attacker||g.provinces?.[t.province]?.owner===w.attacker));
+  if(Array.isArray(g.kingdom.threats))g.kingdom.threats=g.kingdom.threats.filter(t=>!between(t));
+  g.kingdom.nextInvasionTurn=Math.max(g.kingdom.nextInvasionTurn||0,g.turn+6);
+ }
  history(g,{kind:'war',realm:w.attacker,message:w.attacker+' vs '+w.defender+': '+result});
  if([w.attacker,w.defender].includes(g.player))note(g,'Peace signed: '+result+'. A three-year truce follows.');
+}
+
+export function warExhaustion(g,realm,w=null){
+ const f=g.factions?.[realm];
+ if(!f)return 0;
+ const myArmies=Object.values(g.armies||{}).filter(a=>a.owner===realm&&!a.contingent);
+ const avgFatigue=myArmies.length?myArmies.reduce((n,a)=>n+(g.military?.armies?.[a.id]?.fatigue||0),0)/myArmies.length:40;
+ const owned=Object.values(g.provinces||{}).filter(p=>p.owner===realm);
+ const occupiedShare=owned.length?owned.filter(p=>controller(g,p.id)!==realm).length/owned.length:0;
+ const duration=w?Math.max(0,(g.turn||0)-(w.started||0)):0;
+ return cap(Math.round(avgFatigue*.45+occupiedShare*45+(f.treasury<60?18:0)+(f.stability<35?16:0)+(f.food<0?15:0)+Math.min(25,duration*.6)),0,100);
+}
+
+export function aiPeaceAcceptance(g,w,realm){
+ if(!w||w.status!=='active'||![w.attacker,w.defender].includes(realm))return {accept:false,result:null,exhaustion:0,reason:'Inactive war'};
+ const attacking=w.attacker===realm,score=attacking?w.score:-w.score,duration=Math.max(0,(g.turn||0)-(w.started||0));
+ const exh=warExhaustion(g,realm,w),hasGoal=occupiedGoal(g,w);
+ if(score<=-45)return {accept:true,result:attacking?'attacker defeated':(hasGoal?'claim enforced':'white peace'),exhaustion:exh,reason:'Defeated in the field'};
+ if(duration>=24&&exh>=50)return {accept:true,result:score<=-25?(attacking?'attacker defeated':(hasGoal?'claim enforced':'white peace')):'white peace',exhaustion:exh,reason:'Prolonged war exhaustion'};
+ if(duration>=36)return {accept:true,result:'white peace',exhaustion:exh,reason:'Protracted stalemate'};
+ return {accept:false,result:null,exhaustion:exh,reason:'Ongoing hostilities'};
 }
 
 export function peaceTerms(g,war,realm){
@@ -502,8 +553,24 @@ export function tickConflict(g,world){
  for(const s of Object.values(c.schemes))if(s.status==='active'&&g.turn>=s.due)finishScheme(g,s);
  for(const w of Object.values(c.wars)){
   if(w.status==='active'&&!w.civilWar){
-   if(occupiedGoal(g,w)){w.score=cap(w.score+2,-100,100);if(w.score>=100)endWar(g,w,'claim enforced');}
-   else if(g.turn-w.started>=48)endWar(g,w,'white peace');
+   if(occupiedGoal(g,w)){w.score=cap(w.score+2,-100,100);if(w.score>=100){endWar(g,w,'claim enforced');continue;}}
+   const attAi=!humanControlsRealm(g,w.attacker),defAi=!humanControlsRealm(g,w.defender),duration=Math.max(0,g.turn-(w.started||0));
+   if(attAi&&defAi){
+    const attP=aiPeaceAcceptance(g,w,w.attacker),defP=aiPeaceAcceptance(g,w,w.defender);
+    if(w.score<=-45)endWar(g,w,'attacker defeated');
+    else if(w.score>=65&&occupiedGoal(g,w))endWar(g,w,'claim enforced');
+    else if(attP.accept||defP.accept){
+     const res=w.score>=45&&occupiedGoal(g,w)?'claim enforced':w.score<=-25?'attacker defeated':'white peace';
+     endWar(g,w,res);
+    }
+   }else if(attAi){
+    const attP=aiPeaceAcceptance(g,w,w.attacker);
+    if(w.score<=-45)endWar(g,w,'attacker defeated');
+    else if(duration>=24&&attP.accept&&w.score<=0)endWar(g,w,attP.result);
+    else if(duration>=48)endWar(g,w,'white peace');
+   }else if(g.turn-w.started>=48){
+    endWar(g,w,'white peace');
+   }
   }
  }
 
@@ -598,18 +665,19 @@ export function tickConflict(g,world){
   }
  }
 
- // AI prepares claims on neighboring realms and may declare wars it can afford.
+ // AI prepares claims on neighboring realms and may declare wars it can afford and sustain.
  if(g.turn%12===0){
   for(const [realm,s] of Object.entries(g.politics.realms)){
    if(humanControlsRealm(g,realm))continue;
    const f=g.factions[realm],r=g.politics.people[s.ruler],plan=strategicPlan(g,realm);
-   if(!f||!r||(plan?.goal!=='conquer'&&!r.traits.includes('ambitious'))||f.treasury<400||plan?.goal==='recover')continue;
+   const alreadyAtWar=Object.values(c.wars).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm));
+   if(!f||!r||(plan?.goal!=='conquer'&&!r.traits.includes('ambitious'))||f.treasury<420||f.stability<38||alreadyAtWar||plan?.goal==='recover')continue;
    const targets=[...new Set(holdings(g,realm).flatMap(([id])=>world.provinces.find(p=>p.id===id)?.neighbors||[]))].filter(id=>{
     const o=g.provinces[id]?.owner;
-    return o&&o!==realm&&g.politics.realms[o]&&f.treaties[o]!=='alliance'&&!nonAggression(g,realm,o)&&!hasTruce(g,realm,o);
+    return o&&o!==realm&&g.politics.realms[o]&&!(humanControlsRealm(g,o)&&g.kingdom?.difficulty==='peaceful')&&f.treaties[o]!=='alliance'&&!nonAggression(g,realm,o)&&!hasTruce(g,realm,o);
    });
    targets.sort((a,b)=>Number(g.provinces[b].owner===plan?.target)-Number(g.provinces[a].owner===plan?.target)||a.localeCompare(b));
-   const claim=availableClaims(g,realm).find(x=>targets.includes(x.province)&&!activeWar(g,realm,g.provinces[x.province].owner)&&militaryStrength(g,realm)>=.65*(militaryStrength(g,g.provinces[x.province].owner)+defenseSupport(g,g.provinces[x.province].owner,realm)));
+   const claim=availableClaims(g,realm).find(x=>targets.includes(x.province)&&!activeWar(g,realm,g.provinces[x.province].owner)&&evaluateWarViability(g,world,realm,g.provinces[x.province].owner).viable);
    if(claim){declare(g,realm,claim.province);continue;}
    if(targets.length&&rng(c)<.4)startScheme(g,realm,'fabricate',targets[0]);
   }

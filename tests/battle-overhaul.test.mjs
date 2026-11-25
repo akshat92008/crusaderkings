@@ -4,6 +4,8 @@ import {
   terrainHeight,
   terrainForestCovers,
   fieldTerrain,
+  fieldStrength,
+  coordinateFieldAI,
   initializeFieldGroup,
   issueFieldOrder,
   issueGroupMoveOrder,
@@ -515,4 +517,385 @@ test('CampaignAudio headless safety, mute coordination, modes, SFX, and BattleMu
   fieldAudio.close();
   assert.equal(mock.stats().closed, 1);
   assert.equal(fallbackMock.stats().closed, 1);
+});
+
+test('6,000 soldiers vs 300 soldiers yields overwhelming victory in both stepField and BattleGame', () => {
+  // 1. stepField simulation
+  const groups = [];
+  for (let i = 0; i < 6; i++) {
+    const type = ['infantry', 'infantry', 'infantry', 'archers', 'archers', 'cavalry'][i];
+    groups.push(makeUnit('a' + i, 'attacker', type, (i - 2.5) * 7, 24, { order: i, troopCount: 1000 }));
+    groups.push(makeUnit('d' + i, 'defender', type, (i - 2.5) * 7, -24, { order: i, troopCount: 50 }));
+  }
+  const simState = { groups, projectiles: [], fieldSeed: 1450 };
+  for (let i = 0; i < 4000 && !simState.combatEnded; i++) {
+    if (i % 120 === 0) coordinateFieldAI(simState);
+    stepField(simState, 1 / 30);
+  }
+  assert.equal(simState.combatEnded, true);
+  assert.ok(fieldStrength(groups, 'attacker') > 4500);
+  assert.equal(fieldStrength(groups, 'defender'), 0);
+
+  // 2. Full BattleGame simulation
+  const canvas = makeMock2dCanvas(900, 600);
+  const overlay = makeMock2dCanvas(900, 600);
+  const mockGame = {
+    player: 'england',
+    factions: {
+      england: { id: 'england', name: 'England', color: '#4b98b3', doctrineProfile: 'longbow' },
+      france: { id: 'france', name: 'France', color: '#b86855', doctrineProfile: 'chivalry' }
+    },
+    provinces: { normandy: { id: 'normandy', terrain: 'plains', buildings: { fort: 0 } } },
+    world: { provinces: [{ id: 'normandy', terrain: 'plains' }] },
+    armies: {
+      big: { id: 'big', owner: 'england', province: 'calais', infantry: 3600, archers: 1600, cavalry: 800, morale: 90 },
+      small: { id: 'small', owner: 'france', province: 'normandy', infantry: 180, archers: 80, cavalry: 40, morale: 80 }
+    }
+  };
+
+  let finishCalls = 0;
+  let finishResult = null;
+  const battle = new BattleGame(
+    canvas,
+    {
+      attacker: 'big',
+      playerArmies: ['big'],
+      enemyArmy: 'small',
+      enemyArmies: ['small'],
+      enemy: 'france',
+      to: 'normandy',
+      from: 'calais',
+      fieldBattle: true,
+      interactive: true,
+      soundEnabled: false
+    },
+    mockGame,
+    r => { finishCalls++; finishResult = r; },
+    null,
+    { overlayCanvas: overlay }
+  );
+
+  battle.startAssault();
+  for (let i = 0; i < 3600 && !battle.done; i++) {
+    battle.update(0.05);
+  }
+  assert.equal(battle.done, true, 'BattleGame 6000 vs 300 should conclude cleanly');
+  assert.equal(finishCalls, 1);
+  assert.equal(finishResult.victory, true);
+  assert.ok(finishResult.attackerRemaining > 0.85, `Expected overwhelming survivors, got ${finishResult.attackerRemaining}`);
+  assert.ok(Array.isArray(finishResult.summaryReasons) && finishResult.summaryReasons.length >= 1 && finishResult.summaryReasons.length <= 4);
+  assert.ok(finishResult.summaryReasons.some(r => /overwhelming/i.test(r)), `Expected overwhelming numbers reason in ${JSON.stringify(finishResult.summaryReasons)}`);
+  battle.stop();
+});
+
+test('cavalry charge vs braced spearmen yields strong spear defensive counter-shock and telemetry', () => {
+  const cav = makeUnit('cav', 'attacker', 'cavalry', 0, 2.2, {
+    troopCount: 60, damage: 18, speed: 8.5, chargeMomentum: 0.95
+  });
+  const spears = makeUnit('sp', 'defender', 'infantry', 0, 0, {
+    kind: 'spearmen', formationId: 'pike_square', troopCount: 60, damage: 13, cavalryCounter: 1.55
+  });
+  issueFieldOrder(cav, 'charge');
+  issueFieldOrder(spears, 'hold');
+
+  const state = { groups: [cav, spears], projectiles: [], fieldSeed: 202 };
+  for (let i = 0; i < 20; i++) stepField(state, 0.1);
+
+  assert.equal(cav.chargeMomentum, 0, 'Braced spearmen must strip cavalry charge momentum');
+  assert.ok(cav.bracedCounter > 0, 'Braced spearmen must inflict defensive counter-shock');
+  assert.ok(spears.life > cav.life, `Braced spearmen (${spears.life}) should suffer far fewer losses than charging cavalry (${cav.life})`);
+  assert.ok(spears.statusFlags.includes('BRACED'));
+  assert.ok(state.tacticalStats.bracedCounters >= 1, 'bracedCounters telemetry must be recorded');
+});
+
+test('archers vs unshielded advancing infantry inflict significant pre-melee casualties and high-ground telemetry', () => {
+  const archers = makeUnit('arc', 'attacker', 'archers', 18, -8, {
+    troopCount: 100, damage: 13, range: 15, speed: 3.8
+  });
+  const infantry = makeUnit('inf', 'defender', 'infantry', 18, 13, {
+    troopCount: 100, damage: 11, armor: 1, speed: 3.2, formationId: 'line'
+  });
+  issueFieldOrder(archers, 'hold');
+  issueFieldOrder(infantry, 'advance');
+
+  const state = { groups: [archers, infantry], projectiles: [], terrain: 'hills', fieldSeed: 303 };
+  // Step until infantry is about to enter melee range (< 3 units)
+  for (let i = 0; i < 80; i++) {
+    const d = Math.hypot(archers.x - infantry.x, archers.z - infantry.z);
+    if (d <= 2.8) break;
+    stepField(state, 0.1);
+  }
+
+  assert.ok(infantry.life < 86, `Expected significant pre-melee archer casualties (life=${infantry.life})`);
+  assert.equal(archers.life, 100, 'Archers should remain untouched before melee closes');
+  assert.ok(state.tacticalStats.volleyHits >= 3, 'volleyHits telemetry must record ranged hits');
+  assert.ok(state.tacticalStats.highGroundShots >= 3, 'highGroundShots telemetry must record elevated volleys');
+});
+
+test('flank attack inflicts extra morale damage, FLANKED status, and flankStrikes telemetry', () => {
+  // Defender is pinned by a distant frontal enemy so it faces +Z while cavalry charges its flank
+  const pinA = makeUnit('pinA', 'attacker', 'infantry', 0, 20, { troopCount: 40 });
+  pinA.cooldown = 99;
+  issueFieldOrder(pinA, 'hold');
+  const flanker = makeUnit('flk', 'attacker', 'cavalry', 2.0, 0, {
+    troopCount: 50, damage: 15, speed: 7.5, chargeMomentum: 0.7
+  });
+  const defender = makeUnit('def', 'defender', 'infantry', 0, 0, {
+    troopCount: 50, morale: 85
+  });
+  defender.cooldown = 99;
+  issueFieldOrder(flanker, 'charge');
+  issueGroupTargetOrder(defender, pinA);
+  issueGroupTargetOrder(flanker, defender);
+
+  const pinB = makeUnit('pinB', 'attacker', 'infantry', 0, 20, { troopCount: 40 });
+  pinB.cooldown = 99;
+  issueFieldOrder(pinB, 'hold');
+  const frontalAtk = makeUnit('frt', 'attacker', 'cavalry', 0, 2.0, {
+    troopCount: 50, damage: 15, speed: 7.5, chargeMomentum: 0.7
+  });
+  const frontalDef = makeUnit('fdef', 'defender', 'infantry', 0, 0, {
+    troopCount: 50, morale: 85
+  });
+  frontalDef.cooldown = 99;
+  issueFieldOrder(frontalAtk, 'charge');
+  issueGroupTargetOrder(frontalDef, pinB);
+  issueGroupTargetOrder(frontalAtk, frontalDef);
+
+  const flankState = { groups: [pinA, flanker, defender], projectiles: [], fieldSeed: 404 };
+  const frontState = { groups: [pinB, frontalAtk, frontalDef], projectiles: [], fieldSeed: 404 };
+  stepField(flankState, 0.1);
+  stepField(frontState, 0.1);
+
+  assert.equal(defender.flanked, true);
+  assert.ok(defender.statusFlags.includes('FLANKED'));
+  assert.ok(defender.morale < frontalDef.morale, `Flank morale (${defender.morale}) must be lower than frontal morale (${frontalDef.morale})`);
+  assert.ok(flankState.tacticalStats.flankStrikes >= 1);
+  assert.ok(flankState.tacticalStats.cavalryCharges >= 1);
+});
+
+test('surrounded / encircled regiment triggers ENCIRCLED, extra morale/defense penalty, morale collapse, and overlay pill', () => {
+  // 1. Out-of-range enemies (> 14u) do NOT trigger encirclement
+  const farTarget = makeUnit('ft', 'defender', 'infantry', 0, 0, { troopCount: 60, morale: 85 });
+  const farFront = makeUnit('ff', 'attacker', 'infantry', 0, 2, { troopCount: 30 });
+  const farRear = makeUnit('fr', 'attacker', 'infantry', 0, -16, { troopCount: 30 });
+  issueFieldOrder(farTarget, 'hold');
+  issueFieldOrder(farFront, 'hold');
+  issueFieldOrder(farRear, 'hold');
+  stepField({ groups: [farTarget, farFront, farRear], projectiles: [], fieldSeed: 505 }, 0.1);
+  assert.equal(farTarget.encircled, false);
+  assert.ok(!farTarget.statusFlags.includes('ENCIRCLED'));
+
+  // 2. Single-sector enemies (both in front) do NOT trigger encirclement
+  const frontOnlyDef = makeUnit('fod', 'defender', 'infantry', 0, 0, { troopCount: 60, morale: 85 });
+  const frontA = makeUnit('fa', 'attacker', 'infantry', -0.8, 2, { troopCount: 30, damage: 12 });
+  const frontB = makeUnit('fb', 'attacker', 'infantry', 0.8, 2, { troopCount: 30, damage: 12 });
+  frontOnlyDef.cooldown = 99;
+  issueFieldOrder(frontOnlyDef, 'hold');
+  issueFieldOrder(frontA, 'hold');
+  issueFieldOrder(frontB, 'hold');
+  const singleSectorState = { groups: [frontOnlyDef, frontA, frontB], projectiles: [], fieldSeed: 505 };
+  stepField(singleSectorState, 0.1);
+  assert.equal(frontOnlyDef.encircled, false);
+
+  // 3. Two distinct sectors within <= 14u triggers ENCIRCLED, extra defense & morale loss, and collapses morale
+  const encircledDef = makeUnit('ed', 'defender', 'infantry', 0, 0, { troopCount: 60, morale: 85 });
+  const encFront = makeUnit('ef', 'attacker', 'infantry', 0, 2, { troopCount: 30, damage: 12 });
+  const encRear = makeUnit('er', 'attacker', 'infantry', 0, -2, { troopCount: 30, damage: 12 });
+  encircledDef.cooldown = 99;
+  issueFieldOrder(encircledDef, 'hold');
+  issueFieldOrder(encFront, 'hold');
+  issueFieldOrder(encRear, 'hold');
+  const encState = { groups: [encircledDef, encFront, encRear], projectiles: [], fieldSeed: 505 };
+  stepField(encState, 0.1);
+
+  assert.equal(encircledDef.encircled, true);
+  assert.ok(encircledDef.statusFlags.includes('ENCIRCLED'));
+  assert.equal(encState.tacticalStats.encirclements, 1);
+  assert.ok(encircledDef.life < frontOnlyDef.life, `Encircled defense penalty should cause heavier losses (${encircledDef.life} vs ${frontOnlyDef.life})`);
+  assert.ok(encircledDef.morale < frontOnlyDef.morale, `Encircled morale (${encircledDef.morale}) must drop faster than single-sector (${frontOnlyDef.morale})`);
+
+  // Continuing engagement collapses morale into rout
+  for (let i = 0; i < 120 && !encircledDef.routed; i++) stepField(encState, 0.1);
+  assert.equal(encircledDef.routed, true, 'Encircled regiment must suffer morale collapse and rout');
+
+  // 4. Verify 2D #battle-overlay renders ENCIRCLED status pill
+  const canvas = makeMock2dCanvas(900, 600);
+  const overlay = makeMock2dCanvas(900, 600);
+  const battle = new BattleGame(
+    canvas,
+    {
+      attacker: 'a1',
+      playerArmies: ['a1'],
+      enemyArmy: 'e1',
+      enemyArmies: ['e1'],
+      fieldBattle: true,
+      interactive: false,
+      soundEnabled: false,
+      enemy: 'france',
+      to: 'normandy',
+      from: 'calais'
+    },
+    {
+      player: 'england',
+      factions: {
+        england: { id: 'england', name: 'England', color: '#4b98b3' },
+        france: { id: 'france', name: 'France', color: '#b86855' }
+      },
+      provinces: { normandy: { id: 'normandy', terrain: 'plains', buildings: { fort: 0 } } },
+      armies: {
+        a1: { id: 'a1', owner: 'england', province: 'calais', infantry: 40, archers: 0, cavalry: 0, morale: 85 },
+        e1: { id: 'e1', owner: 'france', province: 'normandy', infantry: 40, archers: 0, cavalry: 0, morale: 85 }
+      }
+    },
+    () => {},
+    null,
+    { overlayCanvas: overlay }
+  );
+  const targetGroup = battle.groups.find(g => g.side === 'defender');
+  targetGroup.encircled = true;
+  targetGroup.statusFlags = ['ENCIRCLED', 'FLANKED'];
+  battle.renderOverlay(overlay);
+  assert.ok(
+    overlay.ops.some(op => op[0] === 'fillText' && String(op[1]).includes('ENCIRCLED')),
+    '2D battle overlay must render ENCIRCLED pill when a regiment is surrounded'
+  );
+  battle.stop();
+});
+
+test('exhausted vs fresh army duel gives clear victory and lower losses to fresh army, plus speed and charge scaling', () => {
+  // 1. Exhausted cavalry moves slower and loses charge retention vs fresh cavalry
+  const freshCav = makeUnit('fc', 'attacker', 'cavalry', -5, 25, { speed: 8, fatigue: 0, stamina: 100 });
+  const tiredCav = makeUnit('tc', 'attacker', 'cavalry', 5, 25, { speed: 8, stamina: 20 });
+  const dummy = makeUnit('dm', 'defender', 'infantry', 0, -30, { troopCount: 40 });
+  issueFieldOrder(freshCav, 'charge');
+  issueFieldOrder(tiredCav, 'charge');
+  issueFieldOrder(dummy, 'hold');
+  const cavState = { groups: [freshCav, tiredCav, dummy], projectiles: [], fieldSeed: 606 };
+  for (let i = 0; i < 20; i++) stepField(cavState, 0.1);
+  assert.ok(freshCav.z < tiredCav.z, `Fresh cavalry (${freshCav.z}) must advance faster than exhausted cavalry (${tiredCav.z})`);
+  assert.ok(freshCav.chargeMomentum > tiredCav.chargeMomentum, `Fresh cavalry charge (${freshCav.chargeMomentum}) must exceed exhausted charge (${tiredCav.chargeMomentum})`);
+  assert.equal(tiredCav.exhausted, true);
+  assert.equal(freshCav.exhausted, false);
+
+  // 2. Equal-numbers infantry duel: fresh vs exhausted (fatigue >= 65)
+  const freshInf = makeUnit('fi', 'attacker', 'infantry', 0, 1.5, { troopCount: 100, damage: 12, morale: 85, fatigue: 0, stamina: 100 });
+  const tiredInf = makeUnit('ti', 'defender', 'infantry', 0, -1.5, { troopCount: 100, damage: 12, morale: 85, fatigue: 80, stamina: 20 });
+  issueFieldOrder(freshInf, 'advance');
+  issueFieldOrder(tiredInf, 'advance');
+  const duelState = { groups: [freshInf, tiredInf], projectiles: [], fieldSeed: 707 };
+  for (let i = 0; i < 500 && !duelState.combatEnded; i++) stepField(duelState, 0.1);
+
+  assert.equal(duelState.combatEnded, true);
+  assert.equal(tiredInf.routed, true, 'Exhausted army should break in an equal-numbers duel');
+  assert.equal(freshInf.routed, false, 'Fresh army should hold the field');
+  assert.ok(freshInf.life > 45, `Fresh army should finish with solid remaining strength (life=${freshInf.life})`);
+});
+
+test('routed troops withdraw cohesively toward their deployment baseline without spinning or attacking, and combat ends cleanly', () => {
+  // Two co-located routing attackers starting deep across the centerline + one routing defender
+  const rAtk1 = makeUnit('ra1', 'attacker', 'infantry', 0, -15, { routed: true, morale: 5, speed: 5 });
+  const rAtk2 = makeUnit('ra2', 'attacker', 'infantry', 0.2, -15, { routed: true, morale: 5, speed: 5 });
+  const rDef = makeUnit('rd1', 'defender', 'infantry', 10, 15, { routed: true, morale: 5, speed: 5 });
+  const liveDef = makeUnit('ld', 'defender', 'infantry', 0, -14, { troopCount: 50, morale: 90, life: 100 });
+  issueFieldOrder(liveDef, 'hold');
+
+  const state = { groups: [rAtk1, rAtk2, rDef, liveDef], projectiles: [], fieldSeed: 808 };
+  for (let i = 0; i < 40; i++) {
+    const prevZ1 = rAtk1.z;
+    const prevZDef = rDef.z;
+    stepField(state, 0.1);
+    assert.ok(rAtk1.z >= prevZ1, 'Routed attacker must monotonically move toward +46 without random reversal');
+    assert.ok(rDef.z <= prevZDef, 'Routed defender must monotonically move toward -46 without random reversal');
+    assert.equal(rAtk1.facingX, 0);
+    assert.equal(rAtk1.facingZ, 1);
+    assert.equal(rDef.facingX, 0);
+    assert.equal(rDef.facingZ, -1);
+    assert.equal(rAtk1.status, 'routing');
+  }
+  assert.ok(Math.abs(rAtk1.x - rAtk2.x) >= 1.5, `Co-located routed allies should maintain lateral spacing (${rAtk1.x} vs ${rAtk2.x})`);
+  assert.equal(liveDef.life, 100, 'Routed troops must never deal attack damage while fleeing');
+  assert.equal(state.combatEnded, true, 'Combat must be marked ended when all attackers are routed');
+
+  // Verify BattleGame stops cleanly without deadlock when all enemies are destroyed or routed
+  const b = Object.create(BattleGame.prototype);
+  let finishes = 0;
+  let result = null;
+  Object.assign(b, {
+    descriptor: { fieldBattle: true },
+    groups: [
+      makeUnit('att', 'attacker', 'infantry', 0, 10, { troopCount: 50, life: 100, morale: 90 }),
+      makeUnit('defDead', 'defender', 'infantry', 0, -10, { troopCount: 50, life: 0, morale: 50, routed: false }),
+      makeUnit('defRout', 'defender', 'archers', 5, -15, { troopCount: 50, life: 60, morale: 10, routed: true })
+    ],
+    keys: new Set(),
+    camera: { target: [0, 0, 0] },
+    projectiles: [],
+    effects: [],
+    elapsed: 0,
+    battleSpeed: 1,
+    report: () => {},
+    onFinish: r => { finishes++; result = r; },
+    done: false
+  });
+  b.update(0.05);
+  assert.equal(b.done, true);
+  assert.equal(finishes, 1);
+  assert.equal(result.victory, true);
+});
+
+test('BattleGame.finish() is strictly idempotent and populates summaryReasons and tacticalStats', () => {
+  const canvas = makeMock2dCanvas(900, 600);
+  let calls = 0;
+  const results = [];
+  const battle = new BattleGame(
+    canvas,
+    { fieldBattle: true, interactive: false, soundEnabled: false, enemy: 'france', to: 'normandy' },
+    {
+      player: 'england',
+      factions: {
+        england: { id: 'england', name: 'England', color: '#4b98b3', doctrineProfile: 'longbow' },
+        france: { id: 'france', name: 'France', color: '#b86855', doctrineProfile: 'chivalry' }
+      },
+      provinces: { normandy: { id: 'normandy', terrain: 'hills', buildings: { fort: 0 } } }
+    },
+    r => { calls++; results.push(r); }
+  );
+
+  // Seed deterministic tactical events
+  battle.tacticalStats = {
+    cavalryCharges: 3,
+    bracedCounters: 0,
+    flankStrikes: 4,
+    encirclements: 1,
+    volleyHits: 8,
+    highGroundShots: 5,
+    ralliesUsed: 1
+  };
+  battle.tacticalBySide = {
+    attacker: { ...battle.tacticalStats },
+    defender: { cavalryCharges: 0, bracedCounters: 0, flankStrikes: 0, encirclements: 0, volleyHits: 0, highGroundShots: 0, ralliesUsed: 0 }
+  };
+
+  battle.finish(true, 100, 0);
+  battle.finish(false, 0, 100);
+  battle.retreat();
+  battle.update(0.1);
+
+  assert.equal(battle.done, true);
+  assert.equal(calls, 1, 'BattleGame.finish() must invoke onFinish exactly once');
+  const res = results[0];
+  assert.equal(res.victory, true);
+  assert.ok(Array.isArray(res.summaryReasons) && res.summaryReasons.length >= 1 && res.summaryReasons.length <= 4);
+  assert.ok(res.summaryReasons.some(s => /encirclement/i.test(s)));
+  assert.deepEqual(res.tacticalStats, {
+    cavalryCharges: 3,
+    bracedCounters: 0,
+    flankStrikes: 4,
+    encirclements: 1,
+    volleyHits: 8,
+    highGroundShots: 5,
+    ralliesUsed: 1
+  });
+  battle.stop();
 });

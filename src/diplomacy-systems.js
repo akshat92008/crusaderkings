@@ -616,21 +616,21 @@ export function tickDiplomacy(g,world){
    }
    continue;
   }
-  if(f.treasury<450||g.turn%12!==0)continue;
   const plan=g.strategy?.plans[r];
   const neighbors=[...(neighborsByRealm.get(r)||[])].filter(id=>!humanControlsRealm(g,id)&&!war(g,r,id));
+  // Reactive defensive coalition formation against high-threat expanding realms.
+  for(const n of neighbors){
+   if(diplomaticThreat(g,n)>=30&&!allied(g,r,n)&&!nonAggression(g,r,n)&&relation(g,r,n)<15){
+    joinCoalition(g,r,n);
+   }
+  }
+  if(f.treasury<450||g.turn%12!==0)continue;
   if(['recover','defend','diplomacy'].includes(plan?.goal)){
    const id=neighbors.find(id=>relation(g,id,r)>=15&&!nonAggression(g,r,id)&&!allied(g,r,id));
    if(id)sign(g,r,id);
   }else if(plan?.goal==='prosper'){
    const id=neighbors.find(id=>relation(g,id,r)>=35&&relation(g,r,id)>=35&&!d.guarantees[r+':'+id]);
    if(id)guarantee(g,r,id);
-  }
-  // Coalition response against high-threat aggressors.
-  for(const n of neighbors){
-   if(diplomaticThreat(g,n)>=35&&!allied(g,r,n)&&!nonAggression(g,r,n)&&relation(g,r,n)<10){
-    joinCoalition(g,r,n);
-   }
   }
  }
 }

@@ -48,8 +48,7 @@ test('royal marriage creates a mutual court tie and is not an ordinary military 
 });
 test('royal narrative event offers two meaningful choices and saves the decision',()=>{
  const g=createGame(world);g.factions.ottomans.treasury=12000;
- for(let i=0;i<17;i++)advanceMonth(g,world);
- assert.equal(currentRoyalEvent(g),null);advanceMonth(g,world);
+ for(let i=0;i<9;i++)advanceMonth(g,world);
  const e=currentRoyalEvent(g);assert.ok(e?.title);assert.equal(e.choices.length,2);
  assert.ok(resolveRoyalEvent(g,world,0).ok);
  assert.equal(currentRoyalEvent(g),null);

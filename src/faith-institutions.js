@@ -7,12 +7,16 @@ import {isImprisoned} from './feudal-systems.js';
 import {
  getMoralAuthority,adjustMoralAuthority,promoteCardinal,
  appointAntipope,deposeAntipope,antipopeAction,
- declareCrusade,pledgeCrusade,crusadeSummary
+ declareCrusade,pledgeCrusade,crusadeSummary,
+ coronateRuler,canonizeAncestor,selectReligiousSchool,
+ selectedReligiousSchool,RELIGIOUS_SCHOOLS
 } from './ck2-deep-systems.js';
 export {
  getMoralAuthority,adjustMoralAuthority,promoteCardinal,
  appointAntipope,deposeAntipope,antipopeAction,
- declareCrusade,pledgeCrusade,crusadeSummary
+ declareCrusade,pledgeCrusade,crusadeSummary,
+ coronateRuler,canonizeAncestor,selectReligiousSchool,
+ selectedReligiousSchool,RELIGIOUS_SCHOOLS
 };
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const own=(g,r,id)=>g.provinces[id]?.owner===r&&controller(g,id)===r;
@@ -148,7 +152,9 @@ export function faithSystemView(g,r){
  const clerics=land.map(p=>({province:p.id,...(g.identity?.clergyAppointments?.[p.id]||{})})).filter(x=>x.person);
  const alliances=Object.values(g.identity?.faithAlliances||{}).filter(a=>a.partners.includes(r)&&a.until>g.turn);
  const sites=land.filter(p=>g.identity?.institutions?.[p.id]?.sanctuary||SACRED_SITES[p.id]).map(p=>({id:p.id,name:SACRED_SITES[p.id]?.name||('Sanctuary of '+p.id)}));
- return {faith:c.faith,family:faithFamily(g,c.faith),system:sys.system,state:sys,heresies,clerics,alliances,sites,crusade:g.identity?.crusade||null,jihad:g.identity?.jihad||null,moralAuthority:getMoralAuthority(g,c.faith),cardinals:g.deepSystems?.cardinals||null,antipope:g.deepSystems?.antipopes?.[r]||null,crusadeSummary:crusadeSummary(g)};
+ const family=faithFamily(g,c.faith);
+ const availableSchools=Object.values(RELIGIOUS_SCHOOLS).filter(sc=>sc.system===sys.system||sc.families.includes(family)||sys.system==='traditional'||(sys.system==='orthodox'&&sc.system==='catholic'));
+ return {faith:c.faith,family,system:sys.system,state:sys,heresies,clerics,alliances,sites,crusade:g.identity?.crusade||null,jihad:g.identity?.jihad||null,moralAuthority:getMoralAuthority(g,c.faith),cardinals:g.deepSystems?.cardinals||null,antipope:g.deepSystems?.antipopes?.[r]||null,crusadeSummary:crusadeSummary(g),religiousSchool:selectedReligiousSchool(g,r),availableSchools,coronation:g.deepSystems?.coronations?.[r]||null,canonizedAncestors:Object.values(g.deepSystems?.canonized||{}).filter(x=>x.realm===r)};
 }
 export function faithCharterModifiers(g,r){
  const s=state(g,r),out={research:0,acceptance:0,unrest:0};if(!s||!advisor(g,r))return out;
@@ -162,6 +168,8 @@ export function faithSystemModifiers(g,r){
  else if(sys.system==='islamic'){if(sys.jizyaActive)out.tax+=.08;if(g.identity?.jihad?.caller===r||g.identity?.jihad?.participants?.includes(r)){out.levy+=.12;out.morale+=10;}}
  else if(sys.system==='dharmic'){if(sys.dharma>=70)out.tax+=.04;if(sys.merit>=50)out.levy+=.04;}
  else if(sys.system==='traditional'){if(sys.harmony>=70)out.levy+=.05;}
+ const school=selectedReligiousSchool(g,r);
+ if(school){out.tax+=school.tax||0;out.levy+=school.levy||0;out.morale+=school.morale||0;}
  return out;
 }
 function validName(g,name){return /^[\p{L}\p{N}][\p{L}\p{N} .'-]{2,47}$/u.test(name)&&!Object.hasOwn(g.identity.faithDefinitions||{},name)&&!Object.values(g.civic.realms).some(c=>c.faith===name)&&!Object.values(g.civic.provinces).some(c=>c.faith===name)&&!['__proto__','constructor','prototype'].includes(name);}
@@ -343,6 +351,9 @@ function runSystemAction(g,r,action,id,extra,v,c,i,f,s){
  if(action==='faith-antipope-action')return antipopeAction(g,id,extra,r);
  if(action==='faith-declare-crusade')return declareCrusade(g,id,r);
  if(action==='faith-pledge-crusade')return pledgeCrusade(g,r);
+ if(action==='faith-coronate')return coronateRuler(g,r,id||'royal');
+ if(action==='faith-canonize')return canonizeAncestor(g,r,id||null);
+ if(action==='faith-school')return selectReligiousSchool(g,r,id);
  if(action==='faith-pilgrimage'){
   const site=pilgrimageSanctuary(g,r,id,true);if(!site||f.treasury<100)return no('Requires a recognized sanctuary and 100 gold.');
   f.treasury-=100;addPiety(head,15);f.prestige=(f.prestige||0)+8;if(head.civic)head.civic.stress=clamp((head.civic.stress||0)-12,0,100);

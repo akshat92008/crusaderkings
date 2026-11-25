@@ -228,6 +228,14 @@ export function ensureDeepSystems(g) {
  d.prosperity ??= {};
  d.tradePosts ??= {};
  d.greatWorks ??= {};
+ d.deJureDrift ??= {};
+ d.deJureOverrides ??= {};
+ d.deJureHistory ??= [];
+ d.courtIsolation ??= {};
+ d.religiousSchools ??= {};
+ d.coronations ??= {};
+ d.canonized ??= {};
+ d.governanceStrain ??= {};
  d.followups ??= [];
  d.history ??= [];
  g.independentPolities ??= {};
@@ -3014,6 +3022,38 @@ export function tickDeepSystems(g, world = null) {
  }
 
  // 7. Annual cleanup of expired favors
+ // 7. Annual cleanup of expired favors & monthly deep realm simulations (drift, epidemics, scale)
+ tickDeJureDrift(g, world, { fromTick: true });
+ spreadEpidemics(g, world);
+
+ for (const realm of Object.keys(g.politics?.realms || {})) {
+  const strain = governanceStrain(g, realm);
+  d.governanceStrain[realm] = strain;
+  if (quarterly && strain.active) {
+   const f = g.factions?.[realm];
+   const penalty = Math.max(1, Math.floor(strain.loyaltyPenalty / 4));
+   const rId = getRulerId(g, realm);
+   for (const [id, h] of Object.entries(g.politics?.holdings || {})) {
+    if (h.realm === realm && h.lord !== rId && g.provinces?.[id]?.owner === realm) {
+     h.loyalty = clamp((h.loyalty || 50) - penalty, 0, 100);
+    }
+   }
+   if (f && strain.excess >= 3) {
+    const drain = Math.min(Math.max(0, f.treasury || 0), Math.round(strain.provinceCount * strain.taxPenalty * 2));
+    if (drain > 0) f.treasury -= drain;
+   }
+  }
+  const school = selectedReligiousSchool(g, realm);
+  if (school && fPietyEligible(g, realm)) {
+   const r = getRuler(g, realm);
+   if (r) r.piety = num(r.piety) + (school.pietyMonthly || 0);
+   if (g.factions?.[realm]) g.factions[realm].piety = num(g.factions[realm].piety) + (school.pietyMonthly || 0);
+   if (quarterly && school.research && g.identity?.realms?.[realm]?.research) {
+    g.identity.realms[realm].research.progress += school.research;
+   }
+  }
+ }
+
  if (annual) {
   for (const [id, fav] of Object.entries(d.favors)) {
    if (fav.used && (g.turn || 0) - (fav.usedTurn || 0) > 24) delete d.favors[id];
@@ -3022,6 +3062,379 @@ export function tickDeepSystems(g, world = null) {
  }
 
  return d;
+}
+
+function fPietyEligible(g, realm) {
+ return Boolean(g.factions?.[realm] && getRuler(g, realm)?.alive);
+}
+
+// ============================================================================
+// 8. DE JURE DRIFT, EMPIRE SCALE FRICTION, EPIDEMIC SPREAD & RELIGION DEPTH
+// ============================================================================
+
+export function tickDeJureDrift(g, world = null, opts = {}) {
+ const d = ensureDeepSystems(g);
+ if (!d || !g.provinces) return [];
+ if (opts.fromTick && d.lastDeJureTick === g.turn) return [];
+ d.lastDeJureTick = g.turn || 0;
+ const step = Math.max(1, num(opts.months || 1));
+ const drifted = [];
+
+ for (const [pid, prov] of Object.entries(g.provinces)) {
+  const owner = prov?.owner;
+  if (!owner || owner === 'independent' || !g.politics?.realms?.[owner]) {
+   delete d.deJureDrift[pid];
+   continue;
+  }
+  if (getController(g, pid) !== owner) {
+   delete d.deJureDrift[pid];
+   continue;
+  }
+  const cTitle = g.feudal?.titles?.['c:' + pid];
+  const currentDeJure = d.deJureOverrides[pid] || g.feudal?.countyDeJure?.[pid] || cTitle?.deJureRealm || null;
+  if (!currentDeJure || currentDeJure === owner) {
+   delete d.deJureDrift[pid];
+   continue;
+  }
+  const rec = d.deJureDrift[pid];
+  if (!rec || rec.realm !== owner) {
+   d.deJureDrift[pid] = { realm: owner, months: step, fromRealm: currentDeJure };
+  } else {
+   rec.months += step;
+  }
+  if (d.deJureDrift[pid].months >= 60) {
+   d.deJureOverrides[pid] = owner;
+   if (g.feudal) {
+    g.feudal.countyDeJure ??= {};
+    g.feudal.countyDeJure[pid] = owner;
+    if (cTitle) {
+     cTitle.deJureRealm = owner;
+     cTitle.deJureParent = 'k:' + owner;
+    }
+    for (const kind of ['castle', 'city', 'temple']) {
+     const bt = g.feudal.titles?.['b:' + pid + ':' + kind];
+     if (bt) bt.deJureRealm = owner;
+    }
+    for (const dist of Object.values(g.feudal.districts || {})) {
+     if (dist.members?.includes(pid) && dist.members.every(mid => (d.deJureOverrides[mid] || dist.deJureRealm) === owner)) {
+      dist.deJureRealm = owner;
+     }
+    }
+   }
+   d.deJureHistory.unshift({ province: pid, from: currentDeJure, to: owner, turn: g.turn || 0, year: g.year || 1450 });
+   if (d.deJureHistory.length > 100) d.deJureHistory.length = 100;
+   addLog(g, owner, `De Jure Drift: ${prov.name || pid} integrated into the de jure realm of ${g.factions?.[owner]?.name || owner}.`);
+   drifted.push({ province: pid, from: currentDeJure, to: owner });
+   delete d.deJureDrift[pid];
+  }
+ }
+ return drifted;
+}
+
+export function governanceStrain(g, realm) {
+ ensureDeepSystems(g);
+ if (!realm || realm === 'independent' || !g.politics?.realms?.[realm]) {
+  return { active: false, vassalCount: 0, limit: 20, excess: 0, delegatedCount: 0, provinceCount: 0, taxPenalty: 0, taxMultiplier: 1, loyaltyPenalty: 0, severity: 0 };
+ }
+ const rId = getRulerId(g, realm);
+ const ruler = getRuler(g, realm);
+ const gov = g.civic?.realms?.[realm]?.government;
+ const empireRank = gov === 'imperial' || Boolean(g.feudal?.titles?.['e:' + realm]) ? 5 : 4;
+ const limit = (gov === 'imperial' ? 8 : 6) + empireRank * 4 + Math.floor(num(ruler?.skills?.diplomacy) / 2) * 2;
+ const directVassals = new Set();
+ let delegatedCount = 0;
+ const titles = g.feudal?.titles || {};
+ const hasFeudalTitles = Object.keys(titles).some(k => titles[k]?.realm === realm);
+ if (hasFeudalTitles) {
+  for (const t of Object.values(titles)) {
+   if (t.realm !== realm || !t.holder || t.holder === rId) continue;
+   if (['duchy', 'kingdom', 'regional', 'crown'].includes(t.feudalTier || t.tier)) {
+    if (!t.deFactoLiege || t.deFactoLiege === rId) directVassals.add(t.holder);
+    else delegatedCount++;
+   } else if ((t.feudalTier || t.tier) === 'county' || t.tier === 'province') {
+    if (!t.deFactoLiege || t.deFactoLiege === rId) directVassals.add(t.holder);
+    else delegatedCount++;
+   }
+  }
+ } else {
+  for (const [id, h] of Object.entries(g.politics?.holdings || {})) {
+   if (h.realm === realm && h.lord && h.lord !== rId && g.provinces?.[id]?.owner === realm) {
+    directVassals.add(h.lord);
+   }
+  }
+ }
+ const provinceCount = ownedProvinces(g, realm).length;
+ const excess = Math.max(0, directVassals.size - limit);
+ const taxPenalty = excess > 0 ? clamp(Number((excess * 0.025).toFixed(3)), 0, 0.45) : 0;
+ const loyaltyPenalty = excess > 0 ? Math.min(18, Math.ceil(excess * 0.75)) : 0;
+ return {
+  active: excess > 0,
+  vassalCount: directVassals.size,
+  limit,
+  excess,
+  delegatedCount,
+  provinceCount,
+  taxPenalty,
+  taxMultiplier: Number((1 - taxPenalty).toFixed(3)),
+  loyaltyPenalty,
+  severity: clamp(excess * 5, 0, 100)
+ };
+}
+
+export function isCourtIsolated(g, realm) {
+ return Boolean(g?.heritage?.isolated?.[realm] ?? g?.deepSystems?.courtIsolation?.[realm]);
+}
+
+export function toggleCourtIsolation(g, realm = g.player) {
+ const d = ensureDeepSystems(g);
+ if (!realm || !g.factions?.[realm] || realm === 'independent') return no('Invalid realm.');
+ const next = !isCourtIsolated(g, realm);
+ g.heritage ??= {};
+ g.heritage.isolated ??= {};
+ g.heritage.isolated[realm] = next;
+ d.courtIsolation[realm] = next;
+ if (next) {
+  g.factions[realm].prestige = Math.max(0, (g.factions[realm].prestige || 0) - 4);
+  const rId = getRulerId(g, realm);
+  for (const [pid, h] of Object.entries(g.politics?.holdings || {})) {
+   if (h.realm === realm && h.lord !== rId && g.provinces?.[pid]?.owner === realm) {
+    h.loyalty = clamp((h.loyalty || 50) - 5, 0, 100);
+   }
+  }
+  addLog(g, realm, `${g.factions[realm].name} closed the royal court gates to slow pestilence.`);
+  return ok('Court isolated; the gates are shut against pestilence.', { isolated: true });
+ }
+ addLog(g, realm, `${g.factions[realm].name} reopened the royal court gates.`);
+ return ok('Court isolation ended.', { isolated: false });
+}
+
+export function spreadEpidemics(g, world = null) {
+ const d = ensureDeepSystems(g);
+ if (!d || !g.provinces) return { active: 0, spread: [], infected: [] };
+ if (!g.economy?.crises && !Object.keys(g.heritage?.epidemics || {}).length) {
+  return { active: 0, spread: [], infected: [] };
+ }
+ g.economy ??= { provinces: {}, crises: {} };
+ g.economy.crises ??= {};
+ g.heritage ??= {};
+ g.heritage.epidemics ??= {};
+
+ // Normalize externally seeded g.heritage.epidemics into g.economy.crises
+ for (const [pid, epi] of Object.entries(g.heritage.epidemics)) {
+  if (epi && !g.economy.crises[pid] && g.provinces[pid]) {
+   g.economy.crises[pid] = {
+    province: pid,
+    kind: 'epidemic',
+    severity: clamp(num(epi.severity || 55), 10, 90),
+    started: epi.started ?? g.turn ?? 0,
+    remaining: epi.remaining ?? 8,
+    reliefTurn: -12
+   };
+  }
+ }
+
+ const activeCrises = Object.values(g.economy.crises).filter(x => x && x.kind === 'epidemic' && g.provinces[x.province]);
+ const activeSet = new Set(activeCrises.map(x => x.province));
+ for (const pid of Object.keys(g.heritage.epidemics)) {
+  if (!activeSet.has(pid)) delete g.heritage.epidemics[pid];
+ }
+
+ const byProv = new Map((world?.provinces || []).map(p => [p.id, p]));
+ const ports = g.naval?.ports || {};
+ const spread = [];
+ const infected = [];
+
+ const protectionAt = pid => {
+  const eco = g.economy?.provinces?.[pid];
+  const inf = num(eco?.industries?.infirmary);
+  const hosp = num(eco?.holdings?.temple?.buildings?.hospitium);
+  const owner = g.provinces?.[pid]?.owner;
+  const iso = owner && owner !== 'independent' && isCourtIsolated(g, owner) ? 35 : 0;
+  return inf * 8 + hosp * 7 + iso;
+ };
+
+ for (const epi of activeCrises) {
+  const pid = epi.province;
+  const prov = g.provinces[pid];
+  g.heritage.epidemics[pid] = { province: pid, name: epi.name || 'Pestilence', severity: epi.severity, turn: g.turn || 0 };
+  adjustProvinceProsperity(g, pid, -6);
+
+  const owner = prov.owner;
+  const ownerIsolated = owner && owner !== 'independent' && isCourtIsolated(g, owner);
+  if (owner && owner !== 'independent' && !ownerIsolated && g.politics?.people) {
+   const eco = g.economy?.provinces?.[pid];
+   const localProt = num(eco?.industries?.infirmary) * 5 + num(eco?.holdings?.temple?.buildings?.hospitium) * 5;
+   const hasPhysician = Boolean(g.royalCourt?.realms?.[owner]?.offices?.physician);
+   const risk = clamp(Math.round((epi.severity - localProt - (hasPhysician ? 14 : 0)) * 0.35), 2, 35);
+   const courtiers = Object.values(g.politics.people).filter(p => p?.alive && p.realm === owner).sort((a, b) => a.id.localeCompare(b.id));
+   for (const c of courtiers) {
+    if (g.living?.health?.[c.id]?.severity) continue;
+    const rollVal = hashStr(`epi_court:${pid}:${c.id}:${g.turn || 0}`) % 100;
+    if (rollVal < risk) {
+     g.living ??= { version: 1, health: {}, history: [] };
+     g.living.health ??= {};
+     g.living.health[c.id] = { condition: 'epidemic illness', chronic: false, injury: false, severity: 30 + (rollVal % 20), started: g.turn || 0 };
+     infected.push(c.id);
+    }
+   }
+  }
+
+  // Spread across land borders and connected sea port hubs
+  const landNeighbors = byProv.get(pid)?.neighbors || [];
+  const srcPort = ports[pid];
+  const seaNeighbors = srcPort?.basins?.length
+   ? Object.values(ports).filter(pt => pt.province !== pid && pt.basins?.some(b => srcPort.basins.includes(b))).map(pt => pt.province)
+   : [];
+  const targets = [...new Set([...landNeighbors, ...seaNeighbors])];
+
+  for (const tid of targets) {
+   if (g.economy.crises[tid] || !g.provinces[tid]) continue;
+   const isSea = seaNeighbors.includes(tid) && !landNeighbors.includes(tid);
+   if (isSea && epi.severity < 45) continue;
+   const targetOwner = g.provinces[tid].owner;
+   const targetIso = targetOwner && targetOwner !== 'independent' && isCourtIsolated(g, targetOwner);
+   const rawChance = epi.severity - protectionAt(tid) - (isSea ? 18 : 8) - (ownerIsolated ? 25 : 0);
+   const chance = clamp(rawChance, targetIso ? 1 : 0, 75);
+   if (chance <= 0) continue;
+   const rollVal = hashStr(`epi_spread:${pid}:${tid}:${g.turn || 0}`) % 100;
+   if (rollVal < chance) {
+    const newSev = clamp(Math.max(25, Math.round(epi.severity * 0.72)), 20, 90);
+    g.economy.crises[tid] = { province: tid, kind: 'epidemic', severity: newSev, started: g.turn || 0, remaining: 8, reliefTurn: -12 };
+    g.heritage.epidemics[tid] = { province: tid, name: epi.name || 'Pestilence', severity: newSev, turn: g.turn || 0 };
+    spread.push({ from: pid, to: tid, sea: isSea, severity: newSev });
+    if (targetOwner && targetOwner !== 'independent') {
+     addLog(g, targetOwner, `Epidemic spread to ${g.provinces[tid].name || tid}${isSea ? ' via sea trade' : ''}.`);
+    }
+   }
+  }
+ }
+ return { active: activeCrises.length, spread, infected };
+}
+
+export const RELIGIOUS_SCHOOLS = Object.freeze({
+ ashari: { id: 'ashari', name: "Ash'ari Theology", system: 'islamic', families: ['Islam'], tax: 0, levy: 0.04, morale: 6, research: 1, pietyMonthly: 0.25, desc: 'Orthodox synthesis strengthening clerical authority and martial morale.' },
+ mutazili: { id: 'mutazili', name: "Mu'tazili Rationalism", system: 'islamic', families: ['Islam'], tax: 0.06, levy: 0, morale: 0, research: 4, pietyMonthly: 0.1, desc: 'Rationalist scholarship boosting tax efficiency and research.' },
+ thomistic: { id: 'thomistic', name: 'Thomistic Scholasticism', system: 'catholic', families: ['Christianity'], tax: 0.05, levy: 0, morale: 2, research: 3, pietyMonthly: 0.2, desc: 'Scholastic theology elevating administration and scholarship.' },
+ franciscan: { id: 'franciscan', name: 'Franciscan Devotion', system: 'catholic', families: ['Christianity'], tax: 0, levy: 0.04, morale: 5, research: 1, pietyMonthly: 0.35, desc: 'Mendicant humility raising piety, trust, and army morale.' },
+ theravada: { id: 'theravada', name: 'Theravada Sangha', system: 'dharmic', families: ['Buddhism', 'Hindu traditions'], tax: 0.03, levy: 0.02, morale: 4, research: 2, pietyMonthly: 0.3, desc: 'Monastic discipline sustaining realm harmony and scholarship.' },
+ mahayana: { id: 'mahayana', name: 'Mahayana Bodhisattva', system: 'dharmic', families: ['Buddhism', 'Hindu traditions', 'East Asian ritual traditions'], tax: 0.05, levy: 0.03, morale: 3, research: 3, pietyMonthly: 0.25, desc: 'Universal merit elevating civic culture and trade.' },
+ advaita: { id: 'advaita', name: 'Advaita Vedanta', system: 'dharmic', families: ['Hindu traditions'], tax: 0.04, levy: 0, morale: 2, research: 4, pietyMonthly: 0.25, desc: 'Non-dual philosophy accelerating learning and patronage.' },
+ bhakti: { id: 'bhakti', name: 'Bhakti Devotion', system: 'dharmic', families: ['Hindu traditions', 'Buddhism'], tax: 0.02, levy: 0.06, morale: 6, research: 1, pietyMonthly: 0.3, desc: 'Popular devotional movement strengthening levies and morale.' }
+});
+
+export function selectedReligiousSchool(g, realm) {
+ const rec = g?.deepSystems?.religiousSchools?.[realm];
+ return rec ? (RELIGIOUS_SCHOOLS[rec.id] || rec) : null;
+}
+
+export function selectReligiousSchool(g, realm = g.player, schoolId) {
+ const d = ensureDeepSystems(g);
+ const f = g.factions?.[realm];
+ const def = RELIGIOUS_SCHOOLS[schoolId];
+ if (!f || !def) return no('Select a valid religious school.');
+ const faith = getRealmFaith(g, realm);
+ const sys = resolveFaithSystem(g, faith);
+ const fam = resolveFaithFamily(g, faith);
+ const compatible = sys === def.system || (fam && def.families.includes(fam)) || sys === 'traditional' || (sys === 'orthodox' && def.system === 'catholic');
+ if (!compatible) return no(`${def.name} is not compatible with ${faith || 'the realm faith'}.`);
+ const cur = d.religiousSchools[realm];
+ if (cur?.id === schoolId) return no(`${def.name} is already adopted.`);
+ if (cur && (g.turn || 0) - (cur.selectedTurn ?? -120) < 12) return no('Religious school may only be changed once per year.');
+ if ((f.treasury || 0) < 80) return no('Adopting a religious school requires 80 gold.');
+ f.treasury -= 80;
+ d.religiousSchools[realm] = { id: schoolId, name: def.name, system: def.system, selectedTurn: g.turn || 0, faith };
+ const fs = g.identity?.realms?.[realm]?.faithSystem;
+ if (fs) fs.school = schoolId;
+ addLog(g, realm, `${f.name} adopted the ${def.name} theological school.`);
+ return ok(`Adopted ${def.name}.`, { school: def });
+}
+
+export function coronateRuler(g, realm = g.player, tier = 'royal') {
+ const d = ensureDeepSystems(g);
+ const f = g.factions?.[realm];
+ const r = getRuler(g, realm);
+ if (!f || !r?.alive) return no('Requires a living ruler.');
+ if (d.coronations[realm]?.rulerId === r.id || g.heritage?.realms?.[realm]?.lastCoronation === r.id) {
+  return no(`${r.name} has already been crowned.`);
+ }
+ const tiers = {
+  modest: { cost: 70, legitimacy: 8, prestige: 8, piety: 5, clericalOpinion: 6, loyalty: 4 },
+  royal: { cost: 140, legitimacy: 14, prestige: 15, piety: 10, clericalOpinion: 12, loyalty: 8 },
+  papal: { cost: 220, legitimacy: 18, prestige: 20, piety: 18, clericalOpinion: 18, loyalty: 10 },
+  imperial: { cost: 280, legitimacy: 22, prestige: 25, piety: 15, clericalOpinion: 16, loyalty: 12 }
+ };
+ const cfg = tiers[tier] || tiers.royal;
+ if ((f.treasury || 0) < cfg.cost) return no(`Coronation (${tier}) requires ${cfg.cost} gold.`);
+ f.treasury -= cfg.cost;
+ f.legitimacy = clamp((f.legitimacy || 50) + cfg.legitimacy, 0, 100);
+ f.prestige = (f.prestige || 0) + cfg.prestige;
+ r.prestige = num(r.prestige) + cfg.prestige;
+ r.piety = num(r.piety) + cfg.piety;
+ f.piety = num(f.piety) + cfg.piety;
+ const fs = g.identity?.realms?.[realm]?.faithSystem;
+ if (fs && fs.system === 'catholic') fs.papalFavor = clamp((fs.papalFavor || 55) + (tier === 'papal' ? 14 : 6), 0, 100);
+ const scholarId = g.politics?.realms?.[realm]?.council?.scholar;
+ if (scholarId && g.politics?.people?.[scholarId]?.alive) adjustPersonalOpinion(g, r.id, scholarId, cfg.clericalOpinion);
+ for (const [pid, h] of Object.entries(g.politics?.holdings || {})) {
+  if (h.realm === realm && h.lord !== r.id && g.provinces?.[pid]?.owner === realm) {
+   h.loyalty = clamp((h.loyalty || 50) + cfg.loyalty, 0, 100);
+  }
+ }
+ d.coronations[realm] = { rulerId: r.id, tier, turn: g.turn || 0, year: g.year || 1450 };
+ if (g.heritage?.realms?.[realm]) g.heritage.realms[realm].lastCoronation = r.id;
+ r.memories ??= [];
+ r.memories.push(`Crowned in a ${tier} coronation ceremony in ${g.year || 1450}.`);
+ addLog(g, realm, `${r.name} received a ${tier} coronation, strengthening legitimacy and clerical support.`);
+ return ok(`${r.name} crowned (${tier}).`, { coronation: d.coronations[realm], legitimacy: f.legitimacy });
+}
+
+export function canonizeAncestor(g, realm = g.player, personId = null) {
+ const d = ensureDeepSystems(g);
+ const f = g.factions?.[realm];
+ const r = getRuler(g, realm);
+ if (!f || !r?.alive) return no('Requires a living ruler.');
+ const candidates = Object.values(g.politics?.people || {}).filter(
+  p => p && !p.alive && !d.canonized[p.id] && (p.realm === realm || p.house === r.house)
+ );
+ const target = personId ? candidates.find(p => p.id === personId) : candidates.sort((a, b) => num(b.piety) - num(a.piety) || a.id.localeCompare(b.id))[0];
+ if (!target) return no('Select an eligible deceased pious ancestor or dynast.');
+ const bestPiety = Math.max(num(target.piety), num(r.piety), num(f.piety));
+ if (bestPiety < 40) return no('Requires at least 40 piety in the ancestor or dynasty.');
+ const cost = num(target.piety) >= 80 ? 100 : 160;
+ if ((f.treasury || 0) < cost) return no(`Canonization requires ${cost} gold.`);
+ f.treasury -= cost;
+
+ const blId = `saint_${target.id}_${g.turn || 0}`;
+ const bl = {
+  id: blId,
+  name: `Saintly Blood of ${target.name}`,
+  kind: 'saint',
+  historical: false,
+  founderId: target.id,
+  founderName: target.name,
+  dynasty: target.house || r.house,
+  createdTurn: g.turn || 0,
+  prestigeMonthly: BLOODLINES.saint.prestigeMonthly,
+  pietyMonthly: BLOODLINES.saint.pietyMonthly,
+  vassalOpinion: BLOODLINES.saint.vassalOpinion,
+  levyMod: BLOODLINES.saint.levyMod,
+  taxMod: BLOODLINES.saint.taxMod
+ };
+ d.bloodlines.definitions[blId] = bl;
+ assignBloodlineToPersonAndDescendants(g, target, blId);
+ assignBloodlineToPersonAndDescendants(g, r, blId);
+
+ f.piety = num(f.piety) + 25;
+ r.piety = num(r.piety) + 20;
+ f.prestige = (f.prestige || 0) + 25;
+ f.legitimacy = clamp((f.legitimacy || 50) + 10, 0, 100);
+ adjustMoralAuthority(g, getRealmFaith(g, realm), 4, `Canonization of ${target.name}`);
+
+ d.canonized[target.id] = { id: target.id, name: target.name, house: target.house, realm, bloodlineId: blId, turn: g.turn || 0, year: g.year || 1450 };
+ target.memories ??= [];
+ target.memories.push(`Venerated and canonized in ${g.year || 1450}.`);
+ addLog(g, realm, `${target.name} was formally canonized, founding a blessed dynastic bloodline!`);
+ return ok(`${target.name} canonized; saintly bloodline established.`, { canonization: d.canonized[target.id], bloodline: bl });
 }
 
 export function deepSystemsView(g, realm = g.player) {
@@ -3043,6 +3456,12 @@ export function deepSystemsView(g, realm = g.player) {
   sieges: Object.values(d.sieges || {}).filter(s => s.status === 'active'),
   tradePosts: Object.values(d.tradePosts || {}).filter(tp => tp.owner === realm),
   greatWorks: Object.values(d.greatWorks || {}).filter(gw => gw.realm === realm),
-  prosperity: prosperityModifiers(g, realm)
+  prosperity: prosperityModifiers(g, realm),
+  governanceStrain: governanceStrain(g, realm),
+  isolated: isCourtIsolated(g, realm),
+  religiousSchool: selectedReligiousSchool(g, realm),
+  coronation: d.coronations?.[realm] || null,
+  canonized: Object.values(d.canonized || {}).filter(c => c.realm === realm),
+  deJureDrift: Object.entries(d.deJureDrift || {}).filter(([, rec]) => rec.realm === realm).map(([province, rec]) => ({ province, ...rec }))
  };
 }

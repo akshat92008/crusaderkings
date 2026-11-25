@@ -48,6 +48,12 @@ export function institutionModifiers(g,r){const s=institutionState(g,r),out={tax
  if(s.mode==='herds')out.levy+=Math.min(.15,s.herds*.0015)+(s.pastureUntil>g.turn?.05:0);
  if(g.civic?.realms?.[r]?.government==='city'&&s.guilds){const gsum=Object.values(s.guilds).reduce((n,v)=>n+Math.max(0,v-1),0);out.trade+=Math.min(.18,gsum*.04);out.tax+=Math.min(.12,gsum*.03);}
  if(s.retinues)out.levy+=Math.min(.15,s.retinues*.02);
+ if((s.monopolyUntil||0)>g.turn)out.trade+=.16;
+ if((s.cavalrySurgeUntil||0)>g.turn)out.levy+=.14;
+ if((s.purgeUntil||0)>g.turn)out.tax+=.12;
+ if((s.hostageOrderUntil||0)>g.turn)out.levy+=.10;
+ if((s.decadencePledgeUntil||0)>g.turn){out.levy+=.08;out.tax+=.06;}
+ if((s.samantaCharterUntil||0)>g.turn){out.levy+=.08;out.trade+=.05;}
  out.trade+=merchantChairBonus(g,r);const policy=governmentPolicyModifiers(g,r),regional=regionalPoliticalModifiers(g,r,current);for(const k of Object.keys(out))out[k]*=policy[k]*regional[k];
  return out;}
 export function governmentMechanics(g,r){
@@ -108,7 +114,68 @@ export function cityGuildAction(g,r,guild='merchants'){
  note(g,r,'Urban '+guild+' guild charter expanded to rank '+s.guilds[guild]+'.');return ok('City guild expanded.');
 }
 function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
-export function governmentAction(g,world,id,extra){if(id==='estate:renew')return renewEstate(g,g.player,extra);if(id==='tribute:waive')return waiveArrears(g,g.player,extra);if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);if(id==='civil:exam')return civilServiceAction(g,g.player,'exam',extra);if(id==='civil:audit')return civilServiceAction(g,g.player,'audit',extra);if(id==='merchant:campaign')return merchantCampaign(g,g.player,extra);if(id==='steppe:pasture')return reservePasture(g,g.player);if(id==='tribal:retinue')return tribalRetinue(g,g.player);if(id==='tribal:raid')return tribalRaid(g,g.player,extra);if(id==='city:guild')return cityGuildAction(g,g.player,extra||'merchants');if(['regional:grant','sultanate:scholar','sultanate:reform','shogunate:mediate'].includes(id))return regionalPoliticalAction(g,g.player,id,extra);if(['crown:inspect','crown:fund','crown:dismiss','confed:assembly'].includes(id))return procedureAction(g,g.player,id,extra);if(['military:commission','city:works','kinship:relief'].includes(id))return localProgramAction(g,g.player,id,extra);return action(g,g.player,id,extra);}
+function republicMonopoly(g,r){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r];
+ if(!['republic','city'].includes(type)||!own(g,r).length||f.treasury<140||(s.monopolyUntil||0)>g.turn)return no('Requires a merchant republic/city, controlled land, 140 gold, and no active monopoly charter.');
+ f.treasury-=140;s.monopolyUntil=g.turn+24;f.prestige=(f.prestige||0)+12;
+ note(g,r,'Exclusive maritime trade monopoly chartered for two years.');
+ return ok('Republic trade monopoly activated (+16% trade for 24 months).');
+}
+function steppeCavalrySurge(g,r){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r];
+ if(type!=='steppe'||!own(g,r).length||(s.cavalrySurgeUntil||0)>g.turn||(f.prestige<20&&f.treasury<100))return no('Requires a steppe horde, 20 prestige or 100 gold, and cooldown elapsed.');
+ if(f.prestige>=20)f.prestige-=20;else f.treasury-=100;
+ s.cavalrySurgeUntil=g.turn+18;
+ const a=Object.values(g.armies||{}).find(x=>x.owner===r&&!x.contingent);
+ if(a){a.cavalry=(a.cavalry||0)+50;a.archers=(a.archers||0)+15;a.morale=cap((a.morale||75)+10,0,100);}
+ note(g,r,'Nomadic clans answered the kurultai with a heavy cavalry surge.');
+ return ok('Steppe cavalry surge raised (+50 cavalry, +14% levy capacity).');
+}
+function imperialCensorPurge(g,r){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r];
+ if(!['imperial','centralized'].includes(type)||!own(g,r).length||f.treasury<90||(s.purgeUntil||0)>g.turn)return no('Requires an imperial/centralized court, 90 gold, and no active censorate purge.');
+ f.treasury-=90;s.purgeUntil=g.turn+24;
+ if(s.civilService?.corruption!==undefined)s.civilService.corruption=Math.max(0,s.civilService.corruption-30);
+ for(const p of own(g,r))p.unrest=cap((p.unrest||0)-5,0,100);
+ const rId=ruler(g,r)?.id;
+ for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===r&&h.lord!==rId)h.loyalty=cap((h.loyalty||50)-4,0,100);
+ f.legitimacy=cap((f.legitimacy||50)+5,0,100);
+ note(g,r,'Imperial censors purged corrupt provincial officials.');
+ return ok('Imperial anti-corruption purge completed (+12% tax).');
+}
+function shogunateHostageAccord(g,r){
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r];
+ if(type!=='shogunate'||!own(g,r).length||f.treasury<110||(s.hostageOrderUntil||0)>g.turn)return no('Requires shogunate government, 110 gold, and inactive hostage accord.');
+ f.treasury-=110;s.hostageOrderUntil=g.turn+24;
+ const rId=ruler(g,r)?.id;
+ for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===r&&h.lord!==rId)h.loyalty=cap((h.loyalty||50)+12,0,100);
+ note(g,r,'Daimyo heirs attended court as honorable pledges, securing clan compliance.');
+ return ok('Daimyo hostage accord enacted (+12 vassal loyalty, +10% levy).');
+}
+function sultanateDecadenceControl(g,r){
+ const res=regionalPoliticalAction(g,r,'sultanate:reform');
+ if(res.ok){
+  const s=state(g,r);if(s)s.decadencePledgeUntil=g.turn+18;
+  return ok('Sultanate decadence restrained and household discipline restored.');
+ }
+ const type=g.civic?.realms?.[r]?.government,s=state(g,r),f=g.factions[r];
+ if(type!=='sultanate'||f.treasury<100||(s.decadencePledgeUntil||0)>g.turn)return res;
+ f.treasury-=100;s.decadencePledgeUntil=g.turn+18;
+ if(s.regionalPolitics)s.regionalPolitics.decadence=cap((s.regionalPolitics.decadence??20)-15,0,100);
+ f.legitimacy=cap((f.legitimacy||50)+4,0,100);
+ note(g,r,'Dynastic austerity decrees curbed court decadence.');
+ return ok('Sultanate decadence discipline enforced.');
+}
+function regionalSamantaGrant(g,r,id){
+ const res=regionalPoliticalAction(g,r,'regional:grant',id);
+ if(res.ok){
+  const s=state(g,r);
+  if(s)s.samantaCharterUntil=g.turn+24;
+  return ok('Samanta land charter enacted (+levy & trade honors).');
+ }
+ return res;
+}
+export function governmentAction(g,world,id,extra){if(id==='estate:renew')return renewEstate(g,g.player,extra);if(id==='tribute:waive')return waiveArrears(g,g.player,extra);if(id==='motion:propose')return governmentMotionAction(g,g.player,'propose');if(id==='motion:lobby')return governmentMotionAction(g,g.player,'lobby',extra);if(id==='civil:exam')return civilServiceAction(g,g.player,'exam',extra);if(id==='civil:audit')return civilServiceAction(g,g.player,'audit',extra);if(id==='merchant:campaign')return merchantCampaign(g,g.player,extra);if(id==='steppe:pasture')return reservePasture(g,g.player);if(id==='steppe:cavalry'||id==='steppe:kurultai')return steppeCavalrySurge(g,g.player);if(id==='republic:monopoly')return republicMonopoly(g,g.player);if(id==='imperial:purge')return imperialCensorPurge(g,g.player);if(id==='shogunate:hostage')return shogunateHostageAccord(g,g.player);if(id==='sultanate:decadence')return sultanateDecadenceControl(g,g.player);if(id==='tribal:retinue')return tribalRetinue(g,g.player);if(id==='tribal:raid')return tribalRaid(g,g.player,extra);if(id==='city:guild')return cityGuildAction(g,g.player,extra||'merchants');if(id==='regional:samanta')return regionalSamantaGrant(g,g.player,extra);if(['regional:grant','sultanate:scholar','sultanate:reform','shogunate:mediate'].includes(id))return regionalPoliticalAction(g,g.player,id,extra);if(['crown:inspect','crown:fund','crown:dismiss','confed:assembly'].includes(id))return procedureAction(g,g.player,id,extra);if(['military:commission','city:works','kinship:relief'].includes(id))return localProgramAction(g,g.player,id,extra);return action(g,g.player,id,extra);}
 export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastTick===g.turn)return;root.lastTick=g.turn;for(const [r,s] of Object.entries(root.realms)){const f=g.factions[r],land=own(g,r);tickGovernmentMotions(g,r);if(!land.length)continue;tickCivilService(g,r);tickMerchantElections(g,r);tickRegionalPolitics(g,r,land);tickInstitutionProcedures(g,r,land);tickLocalPrograms(g,r,land);
  for(const [id,x] of Object.entries(s.compacts)){if(!compactValid(g,r,id,x))delete s.compacts[id];else if(!x.lord)x.lord=g.politics.holdings[id].lord;}
  for(const [id,x] of Object.entries(s.offices))if(!land.some(p=>p.id===id)||!adult(g,x.person,r))delete s.offices[id];
@@ -123,6 +190,10 @@ export function tickInstitutions(g){const root=initInstitutions(g);if(root.lastT
  if(!humanControlsRealm(g,r)&&g.turn%12===0){
   const govType=g.civic?.realms?.[r]?.government;
   if(['steppe','kinship','military'].includes(govType)&&(f.prestige||0)>=55&&(s.retinues||0)<5)tribalRetinue(g,r);
+  if(govType==='republic'&&f.treasury>750&&(s.monopolyUntil||0)<=g.turn)republicMonopoly(g,r);
+  if(govType==='steppe'&&f.treasury>500&&(s.cavalrySurgeUntil||0)<=g.turn)steppeCavalrySurge(g,r);
+  if(govType==='imperial'&&f.treasury>750&&(s.purgeUntil||0)<=g.turn)imperialCensorPurge(g,r);
+  if(govType==='shogunate'&&f.treasury>700&&(s.hostageOrderUntil||0)<=g.turn)shogunateHostageAccord(g,r);
   if(govType==='city'&&f.treasury>800){const gKey=['merchants','artisans','masons'].find(k=>(s.guilds?.[k]||1)<3);if(gKey)cityGuildAction(g,r,gKey);}
   if(f.treasury>800){const renew=estateReviewView(g,r)?.find(x=>x.canRenew&&x.loyalty<75);if(renew)renewEstate(g,r,renew.id);const targets=institutionTargets(g,r);let id=targets.find(id=>s.mode==='estates'?!s.compacts[id]:s.mode==='administration'?!s.offices[id]:s.mode==='tribute'?(g.factions[id].relations[r]||0)>=25:((s.houses[id]||s.retainers[id])?.level||0)<3),extra;if(s.mode==='administration')extra=Object.values(g.politics.people).filter(p=>eligibleHouse(g,r,p.id)&&p.skills.stewardship>=2&&!Object.values(s.offices).some(o=>o.person===p.id)).sort((a,b)=>(b.skills.stewardship+examinationRank(g,r,b.id))-(a.skills.stewardship+examinationRank(g,r,a.id)))[0]?.id;if(id||['herds','reserves'].includes(s.mode))action(g,r,id,extra);}
  }

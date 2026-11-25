@@ -8,12 +8,12 @@ import {isImprisoned} from './feudal-systems.js';
 import {
  SOCIETIES,joinSociety,advanceSocietyRank,societyMission,societyModifiers,
  BLOODLINES,forgeBloodlineAmbition,characterBloodlines,bloodlineModifiers,
- applyCrossSystemChoice
+ applyCrossSystemChoice,toggleCourtIsolation,isCourtIsolated
 } from './ck2-deep-systems.js';
 export {
  SOCIETIES,joinSociety,advanceSocietyRank,societyMission,societyModifiers,
  BLOODLINES,forgeBloodlineAmbition,characterBloodlines,bloodlineModifiers,
- applyCrossSystemChoice
+ applyCrossSystemChoice,toggleCourtIsolation,isCourtIsolated
 };
 const cap=(x,a,b)=>Math.max(a,Math.min(b,x)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
 const ruler=(g,id)=>g.politics.people[g.politics.realms[id]?.ruler];
@@ -337,7 +337,7 @@ function record(g,realm,message){const a=g.heritage;a.history.unshift({realm,tur
 function random(a){a.seed=(Math.imul(a.seed,1664525)+1013904223)>>>0;return a.seed/4294967296;}
 function dynasty(g,realm){const house=ruler(g,realm)?.house||realm,key=realm+'|'+house;return g.heritage.dynasties[key]??={realm,house,renown:0,legacies:[],achievements:[]};}
 function newStruggle(s){return {id:s.id,phase:s.conditional?'dormant':'competition',tension:s.conditional?0:35,cooperation:s.conditional?0:30,cycle:1,influence:Object.fromEntries(s.members.map(id=>[id,0])),last:{},ended:null,outcome:null,history:[],catalysts:[],healthyReviews:0};}
-export function initHeritage(g,world){if(g.heritage?.version===1){for(const item of Object.values(g.heritage.artifacts||{})){item.owner??=ruler(g,item.realm)?.id||null;item.origin??=item.realm;item.culture??=g.civic?.realms[item.realm]?.culture||'Local traditions';item.history??=[{turn:0,message:'Treasury artifact recorded'}];}for(const s of Object.values(g.heritage.realms)){s.plans??=null;s.activityRecords??=[];s.interruptedActivities??=[];s.honored??=[];s.celebratedAge??=[];}for(const s of STRUGGLES){const x=g.heritage.struggles[s.id]??=newStruggle(s);x.history??=[];x.catalysts??=[];x.outcome??=null;x.healthyReviews??=0;for(const id of s.members)x.influence[id]??=0;}return g.heritage;}const a=g.heritage={version:1,next:1,seed:145067,lastTick:-1,activities:{},realms:{},dynasties:{},struggles:{},artifacts:{},history:[]};
+export function initHeritage(g,world){if(g.heritage?.version===1){g.heritage.isolated??={};g.heritage.epidemics??={};for(const item of Object.values(g.heritage.artifacts||{})){item.owner??=ruler(g,item.realm)?.id||null;item.origin??=item.realm;item.culture??=g.civic?.realms[item.realm]?.culture||'Local traditions';item.history??=[{turn:0,message:'Treasury artifact recorded'}];}for(const s of Object.values(g.heritage.realms)){s.plans??=null;s.activityRecords??=[];s.interruptedActivities??=[];s.honored??=[];s.celebratedAge??=[];}for(const s of STRUGGLES){const x=g.heritage.struggles[s.id]??=newStruggle(s);x.history??=[];x.catalysts??=[];x.outcome??=null;x.healthyReviews??=0;for(const id of s.members)x.influence[id]??=0;}return g.heritage;}const prevIso=g.heritage?.isolated||{},prevEpi=g.heritage?.epidemics||{};const a=g.heritage={version:1,next:1,seed:145067,lastTick:-1,activities:{},realms:{},dynasties:{},struggles:{},artifacts:{},isolated:{...prevIso},epidemics:{...prevEpi},history:[]};
  for(const f of world.factions){a.realms[f.id]={last:{},completed:0,lastCoronation:null,celebrated:[],equipped:{},plans:null,activityRecords:[],interruptedActivities:[],honored:[],celebratedAge:[],seenRuler:ruler(g,f.id)?.id};dynasty(g,f.id);}
  for(const s of STRUGGLES)a.struggles[s.id]=newStruggle(s);
  return a;}
@@ -516,6 +516,7 @@ export function heritageAction(g,world,action,id,extra,guest){const a=initHerita
  if(action==='advance-society')return advanceSocietyRank(g,id);
  if(action==='society-mission')return societyMission(g,id,extra);
  if(action==='forge-bloodline')return forgeBloodlineAmbition(g,id,extra);
+ if(action==='toggle-isolation')return toggleCourtIsolation(g,id||realm);
  return no('Unknown activity or heritage decision.');}
 export function tickHeritage(g,world){const a=initHeritage(g,world);if(a.lastTick===g.turn)return;a.lastTick=g.turn;
  for(const [realm,s] of Object.entries(a.realms)){const r=ruler(g,realm),d=dynasty(g,realm),f=g.factions[realm];if(!r)continue;if(s.seenRuler!==r.id){s.seenRuler=r.id;d.renown+=5;for(const x of Object.values(a.artifacts).filter(x=>x.realm===realm)){x.owner=r.id;x.history??=[];x.history.unshift({turn:g.turn,message:'Entrusted to the new sovereign '+r.name});x.history=x.history.slice(0,20);}}

@@ -1,17 +1,10 @@
-"""Desktop campaign and Banner Lines browser acceptance; Chromium also tests touch."""
+"""Desktop campaign acceptance and Chromium touch and battlefield acceptance."""
 from os import environ
 from pathlib import Path
 from functools import partial
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 import threading
-from time import monotonic, sleep
 from playwright.sync_api import sync_playwright
-def wait_for_save(page, predicate, arg=None, timeout=30):
- deadline=monotonic()+timeout
- while monotonic()<deadline:
-  if page.evaluate(predicate,arg):return
-  sleep(.2)
- raise AssertionError('Campaign save did not reach the expected state')
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots';OUT.mkdir(exist_ok=True)
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
@@ -106,7 +99,7 @@ try:
     lord.get_by_text('Estate succession',exact=True).click()
     lord.locator('[id^="estate-law-province-"]').select_option('reversion')
     lord.get_by_role('button',name='Amend succession (75g)',exact=True).click()
-    wait_for_save(page,"async id=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).politics.holdings[id].successionLaw==='reversion'}",arg=province)
+    page.wait_for_function("id=>JSON.parse(localStorage.getItem('crown-of-nations.save')).politics.holdings[id].successionLaw==='reversion'",arg=province)
    page.locator('[data-action="pin"][data-type="province"]').click()
    assert page.locator('[data-action="pin"][data-type="province"]').get_attribute('aria-pressed')=='true'
    assert page.locator('[data-section="recruit"]').is_visible()
@@ -135,37 +128,23 @@ try:
     cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
     assert page.locator('#province-drawer').is_hidden(),'Pinch must not select a province'
    page.click('#next-month');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
-   page.click('#save-game');wait_for_save(page,"async()=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).turn===1}")
-   if name in ('desktop','mobile'):
+   page.click('#save-game');assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).turn")==1
+   if chromium and name in ('desktop','mobile'):
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert page.locator('#battle-start').is_visible()
-    assert page.locator('#battle-timer').inner_text()=='DEPLOY YOUR ARMY'
-    assert page.locator('#battle-your-bar').is_visible() and page.locator('#battle-enemy-bar').is_visible()
-    assert page.locator('#battle-strength').get_attribute('data-renderer')=='banner'
-    assert page.locator('#battle-move-tap').is_hidden() and page.locator('#battle-camera').is_hidden()
-    assert page.locator('#battle-units .unitcard').count()>=2
-    page.locator('#battle-presets [data-preset="flanks"]').click()
-    page.locator('#battle-units .unitcard').nth(1).click()
-    page.click('#battle-reserve');assert page.locator('#battle-units .unitcard.reserve').count()==1
+    assert page.locator('#battle-comparison').is_visible()
     page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='false'
     page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='true'
     page.wait_for_timeout(500);page.screenshot(path=str(OUT/(name+'-battle-deployment.png')),timeout=45000)
     page.click('#battle-start');page.wait_for_timeout(700)
-    page.locator('#battle-units .unitcard.reserve').click()
-    # Real pointer deployment using the same responsive coordinate contract, not a hidden RTS button.
-    point=page.evaluate("""async()=>{const {bannerViewport,bannerProject}=await import('/src/banner-renderer.js');const c=document.querySelector('#battle-canvas'),r=c.getBoundingClientRect(),t=document.querySelector('.battle-top').getBoundingClientRect(),d=document.querySelector('.battle-bottom').getBoundingClientRect();const v=bannerViewport(c.clientWidth,c.clientHeight,Math.min(c.clientHeight*.32,Math.max(0,t.bottom-r.top))+8,Math.min(c.clientHeight*.42,Math.max(0,r.bottom-d.top))+5,1);const [x,y]=bannerProject(v,0,25);return [r.left+x,r.top+y];}""")
-    if touch:page.touchscreen.tap(*point)
-    else:page.mouse.click(*point)
-    page.wait_for_function("document.querySelectorAll('#battle-units .unitcard.reserve').length===0",timeout=5000)
-    page.click('#battle-pause');assert 'RESUME' in page.locator('#battle-pause').inner_text()
-    page.click('#battle-pause');page.click('#battle-speed');assert page.locator('#battle-speed').inner_text()=='2×'
-    page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
+    page.click('#battle-zoom-in');page.click('#battle-zoom-out');page.click('#battle-move-tap');assert page.locator('#battle-move-tap').get_attribute('aria-pressed')=='true'
+    page.click('#battle-move-tap');page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
     page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
-    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer')=='banner'
-    page.click('#battle-cancel');assert page.locator('#battle-screen').is_hidden()
-    print(name,'PASS: practice battle deployment, reserve placement, pause, speed, retreat, repeat battle and cancel')
+    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','native','software')
+    page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
+    print(name,'PASS: practice battle deployment, running battle, touch orders, repeat battle and return')
    if name=='desktop':
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     with page.expect_download() as info: page.click('#export-save')
@@ -208,7 +187,7 @@ try:
     page.click('#next-month')
     page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert '115 ALLIED TROOPS' in page.locator('#battle-meta').inner_text()
-    page.click('#battle-start');page.click('#battle-retreat')
+    page.click('#battle-retreat')
     page.click('#battle-return')
     assert page.locator('#battle-screen').is_hidden()
     print('desktop PASS: call allied field contingent, march to the frontier, deploy in battle')
@@ -223,7 +202,7 @@ try:
     person=page.locator('#career-person').input_value()
     page.get_by_role('button',name='Begin vassal career',exact=True).click()
     assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
-    wait_for_save(page,"async person=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).playerCareer?.person===person}",arg=person)
+    assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).playerCareer.person")==person
     page.locator('#tabs [data-tab="characters"]').click()
     assert page.locator('#people-query').is_visible()
     page.locator('.directory-list [data-character]').first.click()
@@ -246,11 +225,10 @@ try:
     page.click('#close-province')
     page.click('#next-month')
     page.click('#save-game')
-    wait_for_save(page,"async()=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).playerCareer?.mode==='vassal'}")
+    assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).playerCareer.mode")=='vassal'
     page.reload(wait_until='domcontentloaded')
     page.locator('#load-existing').wait_for(state='visible')
     page.click('#load-existing')
-    page.locator('#start-screen').wait_for(state='hidden',timeout=45000)
     page.click('#open-management')
     assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
     page.screenshot(path=str(OUT/'desktop-vassal-career.png'))
@@ -258,13 +236,6 @@ try:
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    page.close()
-  # Exercise an actual browser IndexedDB write/read under forced localStorage quota failure.
-  storage_page=browser.new_page()
-  storage_page.goto('http://127.0.0.1:'+str(server.server_port)+'/LICENSE')
-  assert storage_page.evaluate("""async()=>{const {persistBrowserCampaign,readBrowserCampaign}=await import('/src/portable-save.js');const storage={setItem(){throw new DOMException('quota','QuotaExceededError')},removeItem(){},getItem(){return null}};const raw=JSON.stringify({test:'quota-fallback',turn:42});return await persistBrowserCampaign(raw,storage)==='indexeddb'&&await readBrowserCampaign(storage)===raw}""")
-  storage_page.reload()
-  assert storage_page.evaluate("""async()=>{const {readBrowserCampaign}=await import('/src/portable-save.js');return JSON.parse(await readBrowserCampaign()).turn===42}""")
-  storage_page.close()
   browser.close()
 finally:
  server.shutdown()

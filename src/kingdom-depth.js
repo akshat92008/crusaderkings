@@ -343,7 +343,7 @@ export function advanceKingdomSystems(g,world){
   const threat=planEnemyInvasion(g,world);
   if(threat)log(g,'INVASION WARNING: '+g.factions[threat.by].name+' has mobilized against '+threat.province+'. Approximately '+threat.eta+' months to prepare.');
  }
- if(g.turn%18===0&&!g.kingdom.pendingEvent){
+ if(g.turn%9===0&&!g.kingdom.pendingEvent){
   const event=choose(EVENTS,hash(g.seed+g.turn+g.kingdom.eventsResolved));
   g.kingdom.pendingEvent={id:event.id,created:g.turn};
   log(g,'COURT EVENT: '+event.title+'. Open the Royal Court to decide.');

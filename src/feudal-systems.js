@@ -3,6 +3,9 @@ import {amendEstateCharter,tickEstateCharters,estateLaw} from './estate-successi
 import {partitionRepresentatives} from './succession-systems.js';
 import {councilPermission,triggerTitleRevolt} from './political-conflict.js';
 import {regencyView} from './regency-systems.js';
+import {removePoliticalCharacter} from './dynastic-politics.js';
+import {recordGrievance,rememberBereavement} from './character-agency.js';
+import {changeOpinion} from './chronicle-systems.js';
 // 5-tier landed title hierarchy (empire, kingdom, duchy, county, barony) with de jure / de facto separation.
 // Provincial holders remain authoritative in g.politics.holdings.
 import {controller} from './campaign-war.js';
@@ -63,6 +66,7 @@ function ensureFeudalFields(f){
  f.destroyedTitles??={};
  f.vassalTransfers??={};
  f.titleLaws??={};
+ f.countyDeJure??={};
  f.tyranny??={};
  f.lastTick??=-1;
  return f;
@@ -226,9 +230,10 @@ export function syncTitles(g){
     const defaultLiege=h.lord===realms[realm].ruler?next[crownId].deFactoLiege:(!destroyed&&next[id].holder!==h.lord&&next[id].holder!==realms[realm].ruler?next[id].holder:realms[realm].ruler);
     const transferred=f.vassalTransfers[cId];
     const validLiege=transferred&&transferred!==h.lord&&live(g,transferred)?.realm===realm&&(rankByPerson.get(transferred)||0)>2?transferred:defaultLiege;
+    const countyDeJure=f.countyDeJure?.[p]||g.deepSystems?.deJureOverrides?.[p]||d.deJureRealm;
     next[cId]={
      id:cId,tier:'province',feudalTier:'county',rank:2,
-     realm,deJureRealm:d.deJureRealm,deJureParent:d.id,
+     realm,deJureRealm:countyDeJure,deJureParent:countyDeJure===d.deJureRealm?d.id:'k:'+countyDeJure,
      deFactoLiege:validLiege,holder:h.lord,parent:parentId,name:p,province:p,
      successionLaw:cLaws.successionLaw||null,genderLaw:cLaws.genderLaw||null,faithLaw:cLaws.faithLaw||null
     };
@@ -244,7 +249,7 @@ export function syncTitles(g){
      const bLiege=bTransfer&&bTransfer!==bRec.holder&&live(g,bTransfer)?.realm===realm&&(rankByPerson.get(bTransfer)||0)>1?bTransfer:(bRec.holder===h.lord?validLiege:h.lord);
      next[bId]={
       id:bId,tier:'barony',feudalTier:'barony',rank:1,baronyType:kind,
-      realm,deJureRealm:d.deJureRealm,deJureParent:cId,
+      realm,deJureRealm:countyDeJure,deJureParent:cId,
       deFactoLiege:bLiege,holder:bRec.holder,parent:cId,name:p+' '+kind,province:p,
       successionLaw:bLaws.successionLaw||null,genderLaw:bLaws.genderLaw||null,faithLaw:bLaws.faithLaw||null
      };
@@ -443,6 +448,75 @@ function ransom(g,x){
  for(const [,h] of estates){take=Math.min(due,h.wealth);h.wealth-=take;due-=take;}
  f.treasury+=amount;release(g,x);
  return ok('Prisoner ransomed for 100 gold.');
+}
+
+function closeKinIds(g,person){
+ if(!person)return [];
+ const out=new Set([person.spouse,...(person.spouses||[]),...(person.children||[]),...(person.parents||[]),...(person.siblings||[])].filter(Boolean));
+ const parents=new Set(person.parents||[]);
+ if(parents.size){
+  for(const other of Object.values(g.politics?.people||{})){
+   if(other?.id!==person.id&&other?.alive&&(other.parents||[]).some(pid=>parents.has(pid)))out.add(other.id);
+  }
+ }
+ out.delete(person.id);
+ return [...out].filter(id=>live(g,id));
+}
+
+export function executePrisoner(g,world,realm,prisonerId,opts={}){
+ const f=initFeudal(g,world),x=f.prisoners[prisonerId];
+ if(!x||x.captor!==realm||x.status!=='held')return no('Select a held prisoner in your dungeon.');
+ const victim=g.politics?.people?.[prisonerId];
+ if(!victim?.alive){
+  x.status='executed';x.ended=g.turn;x.resolution='executed';
+  return no('Prisoner is already deceased.');
+ }
+ const r=ruler(g,realm),nation=g.factions?.[realm];
+ const justified=Boolean(opts.justified||victim.traitorUntil>g.turn||x.reason==='civil war rebellion');
+ const kinIds=closeKinIds(g,victim).filter(id=>id!==r?.id);
+ const adultHeirIds=kinIds.filter(id=>(victim.children||[]).includes(id)&&live(g,id)?.age>=16);
+
+ x.status='executed';x.ended=g.turn;x.resolution='executed';x.executedBy=r?.id||realm;
+ victim.deathReason='executed';victim.executedBy=r?.id||realm;
+ const remover=opts.removeCharacter||removePoliticalCharacter;
+ if(typeof remover==='function')remover(g,world,prisonerId);
+ victim.alive=false;victim.deathYear??=g.year;
+ rememberBereavement(g,victim,kinIds);
+
+ if(!justified){
+  f.tyranny[realm]=(f.tyranny[realm]||0)+15;
+  if(nation){
+   nation.legitimacy=cap((nation.legitimacy||50)-10,0,100);
+   nation.prestige=Math.max(0,(nation.prestige||0)-5);
+  }
+  for(const [,vh] of holdings(g,realm)){
+   if(vh.lord!==r?.id&&!kinIds.includes(vh.lord))vh.loyalty=cap(vh.loyalty-12,0,100);
+  }
+ }
+
+ const revengeVowed=[];
+ for(const kid of kinIds){
+  const kp=live(g,kid);
+  if(!kp)continue;
+  if(r?.id){
+   recordGrievance(g,kid,r.id,'executed kin',60,{permanent:true});
+   if(g.chronicles)changeOpinion(g,kid,r.id,-55);
+  }
+  for(const [,vh] of Object.entries(g.politics?.holdings||{})){
+   if(vh.lord===kid)vh.loyalty=cap((vh.loyalty||50)-30,0,100);
+  }
+  kp.memories??=[];kp.memories.push((r?.name||realm)+' executed '+victim.name+' in '+g.year+'.');
+  if(adultHeirIds.includes(kid)||kp.realm===realm)revengeVowed.push(kp.name||kid);
+ }
+
+ const warn=revengeVowed.length?' Kin vowed vengeance ('+revengeVowed.slice(0,2).join(', ')+').':'';
+ note(g,realm,(r?.name||realm)+' executed prisoner '+victim.name+(justified?' (justified).':' (tyrannical).')+warn);
+ if(revengeVowed.length&&realm===g.player){
+  g.log?.unshift({date:(g.year||1450)+' · month '+((g.month||0)+1),text:'Warning: '+revengeVowed[0]+' vowed vengeance over the execution of '+victim.name+'!'});
+  if(g.log?.length>45)g.log.length=45;
+ }
+ syncTitles(g);
+ return ok('Executed '+victim.name+'.'+warn,{executed:victim.id,tyranny:justified?0:15,bereaved:kinIds,revengeVowed});
 }
 
 // Title management actions: createTitle, usurpTitle, destroyTitle, revokeTitle, transferVassal.
@@ -669,6 +743,7 @@ export function feudalAction(g,world,action,id,extra){
   if(result.ok)note(g,realm,result.msg);
   return result;
  }
+ if(action==='execute')return executePrisoner(g,world,realm,id,typeof extra==='object'&&extra?extra:{});
  if(action==='exchange')return exchangePrisoners(g,realm,id,extra);
  if(action==='release'||action==='ransom'){
   const x=f.prisoners[id];

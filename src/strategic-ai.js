@@ -143,13 +143,23 @@ export function defenseSupport(g,defender,aggressor){
 
 export function evaluateWarViability(g,world,attacker,defender){
  const prof=personalityProfile(g,attacker);
- if(!g.factions[attacker]||!g.factions[defender]||attacker===defender)return {viable:false,ratio:0,reason:'Invalid target'};
+ const f=g.factions?.[attacker];
+ if(!f||!g.factions[defender]||attacker===defender)return {viable:false,ratio:0,reason:'Invalid target'};
  if(alliance(g,attacker,defender)||nonAggression(g,attacker,defender)||truce(g,attacker,defender)||hasHostageBar(g,attacker,defender)){
   return {viable:false,ratio:0,reason:'Treaty, truce, or hostage bars war'};
  }
+ const alreadyAtWar=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(attacker)&&![w.attacker,w.defender].includes(defender));
+ if(alreadyAtWar)return {viable:false,ratio:0,reason:'Already committed to another war'};
+ const minReserve=prof.id==='cautious'?200:100;
+ if((f.treasury??500)<minReserve||(f.food??50)<0||(f.stability??60)<30){
+  return {viable:false,ratio:0,reason:'Insufficient reserves or domestic instability'};
+ }
  const ownPower=militaryStrength(g,attacker)+aidStrength(g,attacker,defender);
  const coal=coalitionAgainst(g,attacker);
- const coalitionPower=(coal&&coal.members.includes(defender))?coal.members.reduce((n,id)=>n+militaryStrength(g,id)*.35,0):0;
+ const coalitionMembers=coal?.members||[];
+ const coalitionPower=coalitionMembers.includes(defender)
+  ?coalitionMembers.reduce((n,id)=>n+militaryStrength(g,id)*.45,0)
+  :(diplomaticThreat(g,attacker)>=40&&coalitionMembers.length?coalitionMembers.reduce((n,id)=>n+militaryStrength(g,id)*.20,0):0);
  const defPower=militaryStrength(g,defender)+defenseSupport(g,defender,attacker)+coalitionPower;
  const ratio=ownPower/Math.max(1,defPower);
  const losses=battleLesson(g,attacker,defender)?.streak||0;
@@ -415,14 +425,18 @@ function applyAiPersonalityDecisions(g,world,realm,plan){
   if(v){spend(100);v[1].loyalty=cap(v[1].loyalty+15,0,100);}
  }
 
- // 3. Defensive pacts and coalition alignment against threats.
+ // 3. Defensive pacts and reactive coalition alignment against high-threat realms.
+ if(g.turn%6===0){
+  const threats=borderRealms(g,world,realm).filter(id=>id!==realm&&!humanControlsRealm(g,id)&&!war(g,realm,id)&&!alliance(g,realm,id)&&!nonAggression(g,realm,id)&&(diplomaticThreat(g,id)>=30||(threatAssessment(g,world,realm,id)>=78&&militaryStrength(g,id)>=militaryStrength(g,realm)*1.4)));
+  for(const target of threats)joinCoalition(g,realm,target);
+ }
  if(g.turn%12===0&&plan.goal==='defend'&&plan.target&&canSpend(100)){
   const partner=borderRealms(g,world,realm).filter(id=>id!==plan.target&&!humanControlsRealm(g,id)&&relation(g,id,realm)>=0&&threatAssessment(g,world,id,plan.target)>=50&&!war(g,id,realm)&&!war(g,id,plan.target)).sort((a,b)=>militaryStrength(g,b)-militaryStrength(g,a))[0];
   if(partner){
    const key=pair(realm,partner)+'|'+plan.target;
    if(!g.strategy.pacts[key]){spend(100);g.strategy.pacts[key]={id:key,target:plan.target,members:[realm,partner],expires:g.turn+60};}
   }
-  if(diplomaticThreat(g,plan.target)>=35&&!humanControlsRealm(g,plan.target)){
+  if(diplomaticThreat(g,plan.target)>=30&&!humanControlsRealm(g,plan.target)){
    joinCoalition(g,realm,plan.target);
   }
  }
@@ -438,14 +452,20 @@ function applyAiPersonalityDecisions(g,world,realm,plan){
   if(evaluateWarViability(g,world,realm,plan.target).ratio>=1.8)demandTribute(g,realm,plan.target);
  }
 
- // 6. Controlled AI war declaration when an offensive objective has a valid CB and passes threat avoidance.
+ // 6. Controlled AI war declaration with reserve coverage, CB, and coalition deterrence check.
  if(g.turn%12===0&&plan.goal==='conquer'&&plan.target&&!humanControlsRealm(g,plan.target)&&!war(g,realm,plan.target)){
-  const v=evaluateWarViability(g,world,realm,plan.target);
-  if(v.viable){
-   const cbs=availableCasusBelli(g,world,realm,plan.target);
-   const preferred=cbs.find(c=>tPreferredCb(prof.id,c.cb))||cbs[0];
-   if(preferred&&(f.prestige||0)>=preferred.prestigeCost){
-    declareCasusBelliWar(g,world,realm,plan.target,preferred.cb,preferred.target);
+  const reserveFloor=prof.id==='cautious'?420:280;
+  const activeOther=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm));
+  const coal=coalitionAgainst(g,realm);
+  const deterredByCoalition=coal&&coal.members.length>=2&&diplomaticThreat(g,realm)>=45;
+  if(!activeOther&&!deterredByCoalition&&f.treasury>=reserveFloor&&f.stability>=38&&f.food>=0){
+   const v=evaluateWarViability(g,world,realm,plan.target);
+   if(v.viable){
+    const cbs=availableCasusBelli(g,world,realm,plan.target);
+    const preferred=cbs.find(c=>tPreferredCb(prof.id,c.cb))||cbs[0];
+    if(preferred&&(f.prestige||0)>=preferred.prestigeCost){
+     declareCasusBelliWar(g,world,realm,plan.target,preferred.cb,preferred.target);
+    }
    }
   }
  }
