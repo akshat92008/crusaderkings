@@ -5,6 +5,7 @@ from functools import partial
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 import threading
 from time import monotonic, sleep
+from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
 def wait_for_save(page, predicate, arg=None, timeout=30):
  deadline=monotonic()+timeout
@@ -12,6 +13,18 @@ def wait_for_save(page, predicate, arg=None, timeout=30):
   if page.evaluate(predicate,arg):return
   sleep(.2)
  raise AssertionError('Campaign save did not reach the expected state')
+def import_backup(page, data, filename):
+ # Use the real import button and a disk-backed file: transferring a large
+ # campaign as an inline buffer can stall Chromium's automation transport.
+ page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
+ with TemporaryDirectory(prefix='crown-qa-save-') as tmp:
+  path=Path(tmp)/filename
+  path.write_bytes(data)
+  with page.expect_file_chooser(timeout=45000) as chooser:
+   page.locator('#import-save').click()
+  chooser.value.set_files(str(path),timeout=90000)
+  try:page.locator('#start-screen').wait_for(state='hidden',timeout=90000)
+  except Exception as e:raise AssertionError('Backup import failed ('+str(len(data))+' bytes): '+page.locator('#import-status').inner_text()) from e
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots';OUT.mkdir(exist_ok=True)
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
@@ -174,9 +187,7 @@ try:
     with page.expect_download() as info: page.click('#export-save')
     backup=info.value.path().read_bytes();assert b'"player":"england"' in backup
     page.reload(wait_until='domcontentloaded');page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
-    page.locator('#save-file').set_input_files({'name':'campaign.json','mimeType':'application/json','buffer':backup})
-    try:page.locator('#start-screen').wait_for(state='hidden',timeout=45000)
-    except Exception as e:raise AssertionError('Backup import failed: '+page.locator('#import-status').inner_text()+'; browser errors: '+str(errors)) from e
+    import_backup(page,backup,'campaign.json')
     assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    if chromium and name=='desktop':
     allied_save=page.evaluate('''async () => {
@@ -198,8 +209,7 @@ try:
     }''')
     page.reload(wait_until='domcontentloaded')
     page.locator('#realm-search').wait_for(state='visible')
-    page.locator('#save-file').set_input_files({'name':'allied-field.json','mimeType':'application/json','buffer':allied_save.encode()})
-    page.locator('#start-screen').wait_for(state='hidden')
+    import_backup(page,allied_save.encode(),'allied-field.json')
     page.locator('#quick-nav [data-priority-tab="search"]').click()
     page.fill('#campaign-query','diplomacy')
     page.locator('.finder-row[data-priority-tab="diplomacy"]').click()
@@ -218,8 +228,7 @@ try:
    if name=='desktop':
     page.reload(wait_until='domcontentloaded')
     page.locator('#realm-search').wait_for(state='visible')
-    page.locator('#save-file').set_input_files({'name':'career-base.json','mimeType':'application/json','buffer':backup})
-    page.locator('#start-screen').wait_for(state='hidden')
+    import_backup(page,backup,'career-base.json')
     page.click('#open-management')
     page.get_by_text('Play as a landed vassal',exact=True).click()
     page.locator('#career-person').wait_for(state='visible')
@@ -263,10 +272,13 @@ try:
    page.close()
   # Exercise an actual browser IndexedDB write/read under forced localStorage quota failure.
   storage_page=browser.new_page()
-  storage_page.goto('http://127.0.0.1:'+str(server.server_port)+'/LICENSE')
+  storage_url='http://127.0.0.1:'+str(server.server_port)+'/qa-storage.html'
+  storage_page.route(storage_url,lambda route:route.fulfill(status=200,content_type='text/html; charset=utf-8',body='<!doctype html><title>Isolated campaign storage QA</title>'))
+  storage_page.goto(storage_url,wait_until='domcontentloaded')
   assert storage_page.evaluate("""async()=>{const {persistBrowserCampaign,readBrowserCampaign}=await import('/src/portable-save.js');const storage={setItem(){throw new DOMException('quota','QuotaExceededError')},removeItem(){},getItem(){return null}};const raw=JSON.stringify({test:'quota-fallback',turn:42});return await persistBrowserCampaign(raw,storage)==='indexeddb'&&await readBrowserCampaign(storage)===raw}""")
   storage_page.reload()
   assert storage_page.evaluate("""async()=>{const {readBrowserCampaign}=await import('/src/portable-save.js');return JSON.parse(await readBrowserCampaign()).turn===42}""")
+  print(engine,'PASS: real IndexedDB fallback and persistence after reload')
   storage_page.close()
   browser.close()
 finally:
