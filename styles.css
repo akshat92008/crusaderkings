@@ -293,3 +293,6 @@
 .battle-units .unitcard:disabled{opacity:.65;cursor:default}
 .battle-guide{font:500 11px system-ui;text-align:center;color:#f4e5ca;margin:0 0 4px}
 @media(max-width:650px){.battle-screen .battle-top{padding:7px 8px;gap:5px}.battle-top h2{font-size:13px}.banner-score{gap:5px;margin:4px 0}.banner-force{font-size:9px}.banner-force b{font-size:12px}#battle-timer{font-size:9px}#battle-focus{font-size:9px}.battle-bottom{padding:5px 6px max(6px,env(safe-area-inset-bottom));max-height:none}.battle-units .unitcard{flex-basis:98px;min-height:79px}.battle-commands{gap:4px;justify-content:flex-start}.battle-commands button,.battle-commands select{min-height:36px;font-size:10px}.battle-commands #battle-start{flex:1 1 100%;min-height:40px}.battle-guide{font-size:10px}.battle-buttons{max-width:108px}}
+
+#menu-sound{display:block;margin:6px auto 10px;color:#f5d49a;text-decoration:underline;cursor:pointer}
+html[data-music-state='playing'] #menu-sound{opacity:.78}
