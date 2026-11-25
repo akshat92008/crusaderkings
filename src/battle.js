@@ -4,13 +4,13 @@ import {browserFieldAudio, browserBattleMusic, browserCampaignAudio} from './fie
 import {regimentPalette, projectileTrail, disposeFieldMaterials, unitBadgeLabel} from './field-visuals.js';
 import {fieldScenery, suppressFortScenery, battleContactShadow, terrainVisualProps, terrainGroundGrid} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
-import {participatingArmies, aggregateForce, combinedFieldStats, packActiveRegiments} from './field-forces.js';
+import {participatingArmies, aggregateForce, combinedFieldStats, packActiveRegiments, packSpecialistRegiments} from './field-forces.js';
 import {formationOffsets, soldierWorldPose, visualMode, visibleSoldierCount, updateFieldCharacters, cameraDestination, blendCamera, battleRoster, battleImpactParticles} from './battle-presentation.js';
 import {
   FIELD_ORDERS, initializeFieldGroup, issueFieldOrder, fieldTarget, fieldStrength, stepField, coordinateFieldAI,
   terrainHeight, terrainForestCovers, issueGroupMoveOrder, issueGroupTargetOrder, triggerRallyHorn, fieldTerrain
 } from './field-tactics.js';
-import {armyReadiness, regimentProfile, createSiegeState, siegeTarget, siegeDamage, siegeBreached} from './military-systems.js';
+import {REGIMENTS, armyReadiness, regimentProfile, createSiegeState, siegeTarget, siegeDamage, siegeBreached} from './military-systems.js';
 import {BattleModelArt} from './glb-art.js';
 import {armyFormationSlots, militaryDoctrine, startingTroops, combatStatistics, chooseCounterFormation, availableFormations} from './military-doctrines.js';
 import {ThreeBattleScene as BundledBattleScene} from './three-battle.bundle.js';
@@ -570,14 +570,18 @@ export class BattleGame {
     const myDoctrine = militaryDoctrine(playerFaction);
     const enemyDoctrine = militaryDoctrine(enemy);
 
-    const packedAttacker = packActiveRegiments(a, mySlots, myDoctrine);
-    const packedDefender = packActiveRegiments(enemies, enemySlots, enemyDoctrine);
+    const packedAttacker = this.simpleField
+      ? packSpecialistRegiments(a, alliedFieldArmies, game.military?.armies, REGIMENTS, slotCount(a))
+      : packActiveRegiments(a, mySlots, myDoctrine);
+    const packedDefender = this.simpleField
+      ? packSpecialistRegiments(enemies, hostileFieldArmies, game.military?.armies, REGIMENTS, slotCount(enemies))
+      : packActiveRegiments(enemies, enemySlots, enemyDoctrine);
 
     for (const entry of packedAttacker) {
       const idx = entry.slotIndex;
       const home = descriptor.defenseMode ? -1 : 1;
       const position = this.simpleField ? home * (entry.type === 'archers' ? 34 : entry.type === 'cavalry' ? 25 : 19) : descriptor.defenseMode ? -26 : 24;
-      const startX = this.simpleField ? (idx - (packedAttacker.length - 1) / 2) * 8 : (idx - (packedAttacker.length - 1) / 2) * 10;
+      const startX = this.simpleField ? (idx - (packedAttacker.length - 1) / 2) * Math.min(8,112/Math.max(1,packedAttacker.length-1)) : (idx - (packedAttacker.length - 1) / 2) * 10;
       const g = formation('p' + idx, 'attacker', entry.type, idx, [0, 0], entry.troops, '#4b98b3');
       g.x = startX;
       g.targetX = startX;
@@ -598,6 +602,7 @@ export class BattleGame {
         g.profile = regimentProfile(game, a, entry.type);
         g.readiness = armyReadiness(game, a);
       }
+      if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
       attachTactics(g, playerFaction, this.simpleField ? chooseCounterFormation(playerFaction, 'infantry', g.type) : myDoctrine.formations[0]);
       if (descriptor.fieldBattle) {
@@ -615,7 +620,7 @@ export class BattleGame {
       const idx = entry.slotIndex;
       const home = descriptor.defenseMode ? 1 : -1;
       const position = this.simpleField ? home * (entry.type === 'archers' ? 34 : entry.type === 'cavalry' ? 25 : 19) : descriptor.defenseMode ? 24 : -24;
-      const startX = this.simpleField ? (idx - (packedDefender.length - 1) / 2) * 8 : (idx - (packedDefender.length - 1) / 2) * 10;
+      const startX = this.simpleField ? (idx - (packedDefender.length - 1) / 2) * Math.min(8,112/Math.max(1,packedDefender.length-1)) : (idx - (packedDefender.length - 1) / 2) * 10;
       const g = formation('e' + idx, 'defender', entry.type, idx, [0, 0], entry.troops, enemy?.color || '#b86855');
       g.x = startX;
       g.targetX = startX;
@@ -636,6 +641,7 @@ export class BattleGame {
         g.profile = regimentProfile(game, enemyArmy || enemies, entry.type);
         g.readiness = armyReadiness(game, enemyArmy || enemies);
       }
+      if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
       attachTactics(g, enemy, this.simpleField ? chooseCounterFormation(enemy, 'infantry', g.type) : enemyDoctrine.formations[idx % enemyDoctrine.formations.length]);
       if (descriptor.fieldBattle) {
@@ -1066,7 +1072,7 @@ export class BattleGame {
     const g = this.groups?.[index];
     if (!g || g.side !== 'attacker' || g.routed || !availableFormations(this.game.factions[this.game.player]).some(f => f.id === id)) return false;
     attachTactics(g, this.game.factions[this.game.player], id);
-    if (g.type === 'infantry') g.kind = id === 'pike_square' ? 'pikemen' : 'infantry';
+    if (g.type === 'infantry') g.kind = g.specialistId === 'pikes' || id === 'pike_square' ? 'pikemen' : g.specialistId === 'spearmen' ? 'spearmen' : 'infantry';
     if (this.deployment) g.deploymentRevision = (g.deploymentRevision || 0) + 1;
     this.report();
     return true;

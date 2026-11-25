@@ -17,3 +17,13 @@ test('card battle: 6000 equal-quality infantry decisively defeat 300',()=>{
  for(let i=0;i<1000&&!b.routed;i++)stepField(s,.05);
  assert.ok(b.routed);assert.ok(!a.routed);assert.ok(a.life>90);
 });
+
+import {packSpecialistRegiments} from '../src/field-forces.js';
+test('specialist cards preserve the exact campaign roster and do not create soldiers',()=>{
+ const a={id:'a',infantry:120,archers:50,cavalry:30},defs={pikes:{type:'infantry',name:'Pikes',damage:1,armor:1,speed:1,range:1,counter:2},bowmen:{type:'archers',name:'Bowmen',damage:1,armor:1,speed:1,range:1,counter:1}};
+ const cards=packSpecialistRegiments(a,[a],{a:{regiments:{pikes:60,bowmen:25}}},defs,12);
+ assert.equal(cards.length,12);
+ for(const type of ['infantry','archers','cavalry'])assert.equal(cards.filter(c=>c.type===type).reduce((n,c)=>n+c.troops,0),a[type]);
+ assert.equal(cards.filter(c=>c.specialistId==='pikes').reduce((n,c)=>n+c.troops,0),60);
+ assert.ok(cards.some(c=>c.profile.name==='Bowmen'));
+});

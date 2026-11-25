@@ -127,7 +127,7 @@ function initArmy(g,a){
    counts:Object.fromEntries(types.map(t=>[t,a[t]||0])),
    sources:defaultSources(g,a)
   };
-  for(const id of regimentOptions(g,a.owner).slice(1)){
+  for(const id of (specialties[militaryDoctrine(g.factions[a.owner]).id]||[])){
    const def=REGIMENTS[id];
    r.regiments[id]=Math.floor((a[def.type]||0)*.30);
   }

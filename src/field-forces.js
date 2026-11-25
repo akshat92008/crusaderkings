@@ -89,3 +89,37 @@ export function combinedFieldStats(armies, garrison, readiness, profile, type) {
   p.name = field.slice().sort((a, b) => b.n - a.n)[0]?.p?.name || type;
   return { readiness: r, profile: p };
 }
+
+// Construct actual specialist cards from the campaign roster. Cap each army's
+// specialists by its authoritative troop count, and keep ordinary levies separate.
+export function packSpecialistRegiments(force, armies, records, definitions, targetSlots=12) {
+  const pools = [];
+  for (const type of TROOP_TYPES) {
+    let remaining = Math.max(0,Math.round(force[type]||0));
+    const counts = new Map();
+    for (const a of armies) {
+      let available = Math.max(0,Math.round(a[type]||0));
+      for (const [id,raw] of Object.entries(records?.[a.id]?.regiments||{}).sort(([a],[b])=>a.localeCompare(b))) {
+        if(definitions[id]?.type!==type)continue;
+        const count=Math.min(available,Math.max(0,Math.floor(Number(raw)||0)),remaining);
+        if(!count)continue;
+        counts.set(id,(counts.get(id)||0)+count);available-=count;remaining-=count;
+      }
+    }
+    for (const [id,troops] of counts) {
+      const d=definitions[id];
+      const kind=id==='pikes'?'pikemen':id==='spearmen'?'spearmen':type;
+      pools.push({type,kind,troops,specialistId:id,profile:{name:d.name,damage:d.damage,armor:d.armor,speed:d.speed,range:d.range,counter:d.counter}});
+    }
+    if(remaining) pools.push({type,kind:type,troops:remaining,profile:{name:{infantry:'Levy infantry',archers:'Levy archers',cavalry:'Levy cavalry'}[type],damage:1,armor:1,speed:1,range:1,counter:1}});
+  }
+  while(pools.length<targetSlots){
+    let idx=-1;
+    for(let i=0;i<pools.length;i++)if(pools[i].troops>1&&(idx<0||pools[i].troops>pools[idx].troops))idx=i;
+    if(idx<0)break;
+    const card=pools[idx],split=Math.floor(card.troops/2);
+    card.troops-=split;
+    pools.splice(idx+1,0,{...card,troops:split});
+  }
+  return pools.map((card,slotIndex)=>({...card,slotIndex,lane:pools.length===1?1:Math.min(2,Math.floor(slotIndex*3/pools.length))}));
+}
