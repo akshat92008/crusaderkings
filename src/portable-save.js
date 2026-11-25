@@ -10,3 +10,47 @@ export function validatePortableSave(raw){if(typeof raw!=='string'||!raw.length|
  return g;}
 export function saveFilename(g){return 'crown-of-nations-'+String(g.player).replace(/[^a-z0-9_-]/gi,'-')+'-'+g.year+'-'+String(g.month+1).padStart(2,'0')+'.json';}
 export function persistCampaign(storage,raw){storage.setItem(SAVE_KEY,raw);}
+
+/** Browser storage: retain the established localStorage schema when it fits,
+ * otherwise use an atomic IndexedDB record (WebKit has a smaller quota).
+ * All browser saves are serialized to prevent stale autosaves winning races.
+ */
+const DB_NAME='crown-of-nations.campaigns',STORE='saves';
+function openSaveDB(factory){
+ return new Promise((resolve,reject)=>{
+  if(!factory){reject(Error('IndexedDB unavailable'));return;}
+  const req=factory.open(DB_NAME,1);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))req.result.createObjectStore(STORE);};
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||Error('Cannot open save database'));req.onblocked=()=>reject(Error('Save database blocked'));
+ });
+}
+async function dbSave(factory,raw,remove=false){
+ const db=await openSaveDB(factory);
+ try{await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
+  if(remove)store.delete(SAVE_KEY);else store.put(raw,SAVE_KEY);
+  tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('Save write failed'));tx.onabort=()=>reject(tx.error||Error('Save write aborted'));
+ });}finally{db.close();}
+}
+async function dbRead(factory){
+ const db=await openSaveDB(factory);
+ try{return await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(SAVE_KEY);req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>reject(req.error||Error('Save read failed'));});}finally{db.close();}
+}
+function browserStorage(){try{return globalThis.localStorage;}catch{return null;}}
+let saveQueue=Promise.resolve();
+export function persistBrowserCampaign(raw,storage=browserStorage(),factory=globalThis.indexedDB){
+ const job=saveQueue.catch(()=>{}).then(async()=>{
+  // Prefer the database once a large save has used it; a smaller later save
+  // must not be shadowed by that record. Keep the old save until the new one commits.
+  let existing=null;
+  if(factory)try{existing=await dbRead(factory);}catch{}
+  if(existing!==null){await dbSave(factory,raw);try{storage?.removeItem(SAVE_KEY);}catch{}return 'indexeddb';}
+  if(storage)try{persistCampaign(storage,raw);return 'localStorage';}catch{}
+  await dbSave(factory,raw);try{storage?.removeItem(SAVE_KEY);}catch{}return 'indexeddb';
+ });
+ saveQueue=job;return job;
+}
+export async function readBrowserCampaign(storage=browserStorage(),factory=globalThis.indexedDB){
+ await saveQueue.catch(()=>{});
+ if(factory)try{const raw=await dbRead(factory);if(typeof raw==='string')return raw;}catch{}
+ try{return storage?.getItem(SAVE_KEY)??null;}catch{return null;}
+}

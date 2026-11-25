@@ -14,7 +14,7 @@ import {campaignOutliner,renderCampaignOutliner,renderPinButton,toggleCampaignPi
 import {characterLink,contextualButton,realmWarContext,sectionLink} from './campaign-context.js';
 import {marriageCandidates} from './dynastic-politics.js';
 import {freshBattleCanvas} from './battle-lifecycle.js';
-import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistCampaign} from './portable-save.js';
+import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistBrowserCampaign,readBrowserCampaign} from './portable-save.js';
 import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
 import {currentExpandedEvents,currentEmergentEvent,expandedAction} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
@@ -70,9 +70,9 @@ const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok){message(r?.msg||'Action unavailable');browserCampaignAudio.playSfx('alert');}else{message(r.msg);browserCampaignAudio.playSfx('seal');render();save(false);}}
-function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{persistCampaign(localStorage,snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();syncAudioState();if(!openIncomingBattle())message('Saved campaign restored.');}
-function load(){try{loadRaw(localStorage.getItem(SAVE_KEY));}catch(e){message('Unable to load save: '+e.message);}}
-function save(notify=true){if(!game||battle)return false;try{persistCampaign(localStorage,snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){if(notify!==false)message('Save failed: '+e.message);return false;}}
+async function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{await persistBrowserCampaign(snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();syncAudioState();if(!openIncomingBattle())message('Saved campaign restored.');}
+async function load(){try{const raw=await readBrowserCampaign();if(!raw)throw Error('No saved campaign found.');await loadRaw(raw);}catch(e){message('Unable to load save: '+e.message);}}
+async function save(notify=true){if(!game||battle)return false;try{await persistBrowserCampaign(snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){message('Save failed: '+e.message+'. Export a backup to keep your campaign.');return false;}}
 const activeObjectUrls=new Set();
 function revokeObjectUrls(){for(const u of activeObjectUrls){try{URL.revokeObjectURL(u);}catch{}}activeObjectUrls.clear();}
 function exportSave(){if(!game||battle)return;const blob=new Blob([snapshot(game)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');activeObjectUrls.add(url);a.href=url;a.download=saveFilename(game);document.body.append(a);a.click();a.remove();setTimeout(()=>{if(activeObjectUrls.delete(url))try{URL.revokeObjectURL(url);}catch{}},1000);message('Campaign backup exported.');}
@@ -367,10 +367,10 @@ function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('sta
 function filterStartRealms(preferred=el('start-faction').value){const list=searchRealms(atlasWorld.factions,el('realm-search').value);el('start-faction').innerHTML=list.map(f=>`<option value="${esc(f.id)}">${esc(f.name)} — ${esc(f.continent)}</option>`).join('');if(list.some(f=>f.id===preferred))el('start-faction').value=preferred;renderStartFaction();}
 el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-faction').addEventListener('change',renderStartFaction);filterStartRealms('ottomans');
 el('start-new').addEventListener('click',()=>{if(atlasWorld.factions.some(f=>f.id===el('start-faction').value))start(el('start-faction').value);});
-try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
+readBrowserCampaign().then(raw=>{if(raw)el('load-existing').hidden=false;}).catch(()=>{});
 el('load-existing').addEventListener('click',load);
 el('import-save').addEventListener('click',()=>el('save-file').click());
-el('save-file').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{if(f.size>MAX_SAVE_BYTES)throw Error('Save exceeds 20 MB.');loadRaw(await f.text(),true);}catch(err){el('import-status').textContent='Could not import: '+err.message;message('Could not import: '+err.message);}});
+el('save-file').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{if(f.size>MAX_SAVE_BYTES)throw Error('Save exceeds 20 MB.');await loadRaw(await f.text(),true);}catch(err){el('import-status').textContent='Could not import: '+err.message;message('Could not import: '+err.message);}});
 el('export-save').addEventListener('click',exportSave);
 el('save-game').addEventListener('click',save);
 function restorePage(entry){tab=entry.tab;if(entry.character&&game?.politics?.people?.[entry.character])openCharacter(entry.character,false);else navigateTab(entry.tab,entry.section,false);}
