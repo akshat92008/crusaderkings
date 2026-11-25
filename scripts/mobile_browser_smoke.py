@@ -4,7 +4,14 @@ from pathlib import Path
 from functools import partial
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 import threading
+from time import monotonic, sleep
 from playwright.sync_api import sync_playwright
+def wait_for_save(page, predicate, arg=None, timeout=30):
+ deadline=monotonic()+timeout
+ while monotonic()<deadline:
+  if page.evaluate(predicate,arg):return
+  sleep(.2)
+ raise AssertionError('Campaign save did not reach the expected state')
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots';OUT.mkdir(exist_ok=True)
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
@@ -99,7 +106,7 @@ try:
     lord.get_by_text('Estate succession',exact=True).click()
     lord.locator('[id^="estate-law-province-"]').select_option('reversion')
     lord.get_by_role('button',name='Amend succession (75g)',exact=True).click()
-    page.wait_for_function("async id=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).politics.holdings[id].successionLaw==='reversion'}",arg=province)
+    wait_for_save(page,"async id=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).politics.holdings[id].successionLaw==='reversion'}",arg=province)
    page.locator('[data-action="pin"][data-type="province"]').click()
    assert page.locator('[data-action="pin"][data-type="province"]').get_attribute('aria-pressed')=='true'
    assert page.locator('[data-section="recruit"]').is_visible()
@@ -128,7 +135,7 @@ try:
     cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
     assert page.locator('#province-drawer').is_hidden(),'Pinch must not select a province'
    page.click('#next-month');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
-   page.click('#save-game');page.wait_for_function("async()=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).turn===1}")
+   page.click('#save-game');wait_for_save(page,"async()=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).turn===1}")
    if name in ('desktop','mobile'):
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
@@ -216,7 +223,7 @@ try:
     person=page.locator('#career-person').input_value()
     page.get_by_role('button',name='Begin vassal career',exact=True).click()
     assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
-    page.wait_for_function("async person=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).playerCareer?.person===person}",arg=person)
+    wait_for_save(page,"async person=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).playerCareer?.person===person}",arg=person)
     page.locator('#tabs [data-tab="characters"]').click()
     assert page.locator('#people-query').is_visible()
     page.locator('.directory-list [data-character]').first.click()
@@ -239,10 +246,11 @@ try:
     page.click('#close-province')
     page.click('#next-month')
     page.click('#save-game')
-    page.wait_for_function("async()=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).playerCareer?.mode==='vassal'}")
+    wait_for_save(page,"async()=>{const raw=await (await import('/src/portable-save.js')).readBrowserCampaign();return raw&&JSON.parse(raw).playerCareer?.mode==='vassal'}")
     page.reload(wait_until='domcontentloaded')
     page.locator('#load-existing').wait_for(state='visible')
     page.click('#load-existing')
+    page.locator('#start-screen').wait_for(state='hidden',timeout=45000)
     page.click('#open-management')
     assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
     page.screenshot(path=str(OUT/'desktop-vassal-career.png'))
@@ -250,6 +258,13 @@ try:
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    page.close()
+  # Exercise an actual browser IndexedDB write/read under forced localStorage quota failure.
+  storage_page=browser.new_page()
+  storage_page.goto('http://127.0.0.1:'+str(server.server_port)+'/LICENSE')
+  assert storage_page.evaluate("""async()=>{const {persistBrowserCampaign,readBrowserCampaign}=await import('/src/portable-save.js');const storage={setItem(){throw new DOMException('quota','QuotaExceededError')},removeItem(){},getItem(){return null}};const raw=JSON.stringify({test:'quota-fallback',turn:42});return await persistBrowserCampaign(raw,storage)==='indexeddb'&&await readBrowserCampaign(storage)===raw}""")
+  storage_page.reload()
+  assert storage_page.evaluate("""async()=>{const {readBrowserCampaign}=await import('/src/portable-save.js');return JSON.parse(await readBrowserCampaign()).turn===42}""")
+  storage_page.close()
   browser.close()
 finally:
  server.shutdown()
