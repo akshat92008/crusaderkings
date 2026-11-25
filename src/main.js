@@ -229,6 +229,9 @@ syncAudioState();
 const unlockAudioOnce=()=>{browserCampaignAudio.unlock();syncAudioState();};
 window.addEventListener('pointerdown',unlockAudioOnce,{once:true});
 window.addEventListener('keydown',unlockAudioOnce,{once:true});
+// Safari may reject playback during initial page load; a later user gesture retries it.
+const retryScore=()=>{const s=browserCampaignAudio.score;if(campaignSound&&s?.active&&s.media?.paused&&!s.playPending&&!s.exhausted)browserCampaignAudio.unlock();};
+window.addEventListener('pointerdown',retryScore);window.addEventListener('keydown',retryScore);
 const deferredModalEvents=new Set();
 function effectChips(obj,cost=0){
  const chips=[];

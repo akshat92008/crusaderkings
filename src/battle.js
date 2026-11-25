@@ -699,6 +699,7 @@ export class BattleGame {
     };
     this._onContext = e => e.preventDefault();
     this._onDown = e => {
+      this.audio?.unlock();
       if (e.button === 2) {
         e.preventDefault();
         if(this.simpleField&&!this.deployment)return;

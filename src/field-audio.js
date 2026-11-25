@@ -1,3 +1,4 @@
+import {SampleBank} from './sample-audio.js';
 import {SoundtrackPlayer,soundtrackPaths,campaignMusicKey} from './soundtrack.js';
 // Original procedural sound effects, battle music fallback, and unified campaign audio.
 const limits = { steel: 0.15, arrow: 0.20, hoof: 0.28, rout: 0.8, horn: 1.1, rally: 1.1, wind: 2.2, order: 0.15, victory: 1, defeat: 1 };
@@ -42,8 +43,9 @@ export function fieldAudioEvents(groups, seen, elapsed, ambientDue = 0) {
 }
 
 export class FieldAudio {
-  constructor(factory, enabled = true) {
+  constructor(factory, enabled = true, opts = {}) {
     this.factory = factory;
+    this.sampleLoader=opts.sampleLoader;this.samples=null;
     this.enabled = enabled;
     this.seen = new Map();
     this.next = new Map();
@@ -62,6 +64,7 @@ export class FieldAudio {
         this.master.gain.value = 0.18;
         this.master.connect(this.ctx.destination);
         this.noise = makeNoiseBuffer(this.ctx, 2);
+        if(this.sampleLoader&&this.ctx.decodeAudioData){this.samples=new SampleBank(this.ctx,this.sampleLoader===true?undefined:this.sampleLoader);void this.samples.warm(['steel','hoof','order','victory','defeat']);}
       }
       this.ctx.resume?.()?.catch?.(() => {});
       return true;
@@ -90,6 +93,7 @@ export class FieldAudio {
     const now = c.currentTime;
     if (now < (this.next.get(kind) || 0)) return false;
     this.next.set(kind, now + (limits[kind] || 0.2));
+    if(this.samples?.play(kind,node=>this.connect(node,pan),(source,nodes)=>this.track(source,nodes)))return true;
     try {
       const tone = (freq, end, dur, volume, type = 'sine', delay = 0) => {
         if (this.voices.size >= 12) return;
@@ -210,7 +214,7 @@ export class FieldAudio {
   close() {
     if (this.closed) return;
     this.closed = true;
-    this.silence();
+    this.silence();this.samples?.close();
     try {
       this.master?.disconnect();
       this.ctx?.close?.()?.catch?.(() => {});
@@ -448,6 +452,7 @@ export class CampaignAudio {
     this.step = 0;
     this.closed = false;
     this.linked = new Set();
+    this.sampleLoader=opts.sampleLoader;this.samples=null;
     this.realm=null;this.scoreOverride=null;this.score=opts.mediaFactory?new SoundtrackPlayer(opts.mediaFactory,{volume:.32,onUnavailable:()=>this._startProceduralBgm(),onPlaying:()=>this._stopProceduralBgm()}):null;
   }
 
@@ -478,6 +483,7 @@ export class CampaignAudio {
         this.sfxGain.connect(this.master);
         this.master.connect(this.ctx.destination);
         this.noise = makeNoiseBuffer(this.ctx, 1.5);
+        if(this.sampleLoader&&this.ctx.decodeAudioData){this.samples=new SampleBank(this.ctx,this.sampleLoader===true?undefined:this.sampleLoader);void this.samples.warm(['click','seal']);}
       }
       this.ctx.resume?.()?.catch?.(() => {});
       if (!this.muted && this.mode !== 'silent') this._startBgm();
@@ -518,7 +524,7 @@ export class CampaignAudio {
   setScoreOverride(key){if(this.scoreOverride===key)return;this.scoreOverride=key;if(this.ctx&&!this.muted&&this.mode!=='silent')this._startBgm();}
   setMode(mode) {
     if (!VALID_MODES.has(mode)) return false;
-    if(this.score&&this.mode===mode){if(this.ctx&&!this.muted&&mode!=='silent')this._startBgm();return true;}
+    if(this.score&&this.mode===mode){if(mode==='silent'||this.muted)this._stopBgm();else if(this.ctx)this._startBgm();return true;}
     if (mode !== 'silent') this.prevMode = mode;
     this.mode = mode;
     if (this.closed) return false;
@@ -666,6 +672,7 @@ export class CampaignAudio {
     const now = c.currentTime || 0;
     if (now < (this.nextSfx.get(kind) || 0)) return false;
     this.nextSfx.set(kind, now + sfxLimits[kind]);
+    if(this.samples?.play(kind,node=>{node.connect(this.sfxGain);return null;},(source,nodes)=>this._track(source,nodes)))return true;
 
     const tone = (freq, end, dur, vol, type = 'sine', delay = 0) => {
       if (this.voices.size >= 16) return;
@@ -760,7 +767,7 @@ export class CampaignAudio {
   close() {
     if (this.closed) return;
     this.closed = true;
-    this._stopBgm();this.score?.close();
+    this._stopBgm();this.score?.close();this.samples?.close();
     for (const v of this.voices) {
       try { v.stop?.(); } catch {}
     }
@@ -776,11 +783,11 @@ export class CampaignAudio {
 }
 
 const mediaFactory=src=>typeof Audio==='function'?new Audio(src):null;
-export const browserCampaignAudio = new CampaignAudio(defaultAudioCtxFactory,{mediaFactory});
+export const browserCampaignAudio = new CampaignAudio(defaultAudioCtxFactory,{mediaFactory,sampleLoader:true});
 
 export function browserFieldAudio(enabled = true) {
   const effective = enabled && !browserCampaignAudio.isMuted();
-  const audio = new FieldAudio(defaultAudioCtxFactory, effective);
+  const audio = new FieldAudio(defaultAudioCtxFactory, effective,{sampleLoader:true});
   browserCampaignAudio.link(audio);
   return audio;
 }
