@@ -1,4 +1,4 @@
-import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells} from './simple-card-battle.js';
+import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells,cardFormationChoices} from './simple-card-battle.js';
 import {chooseBattleRenderer, freshBattleCanvas, disposeNativeRenderer} from './battle-lifecycle.js';
 import {fieldFrameSteps, renderInterval} from './render-performance.js';
 import {browserFieldAudio, browserBattleMusic, browserCampaignAudio} from './field-audio.js';
@@ -817,7 +817,7 @@ export class BattleGame {
     const btn = this._speedEl || doc?.getElementById?.('battle-speed');
     if (btn) {
       btn.textContent = `${this.battleSpeed}×`;
-      btn.setAttribute?.('aria-pressed', String(this.battleSpeed === 2));
+      btn.setAttribute?.('aria-pressed', String(this.battleSpeed > 1));
     }
     this.report();
     return this.battleSpeed;
@@ -1083,7 +1083,7 @@ export class BattleGame {
 
   setFormation(index, id) {
     const g = this.groups?.[index];
-    if (!g || g.side !== 'attacker' || g.routed || !availableFormations(this.game.factions[this.game.player],this.simpleField).some(f => f.id === id) || (this.simpleField&&!this.deployment)) return false;
+    if (!g || g.side !== 'attacker' || g.routed || !(this.simpleField?cardFormationChoices(g,availableFormations(this.game.factions[this.game.player],true)):availableFormations(this.game.factions[this.game.player])).some(f => f.id === id) || (this.simpleField&&!this.deployment)) return false;
     attachTactics(g, this.game.factions[this.game.player], id);
     if (g.type === 'infantry') g.kind = g.specialistId === 'pikes' || id === 'pike_square' ? 'pikemen' : g.specialistId === 'spearmen' ? 'spearmen' : 'infantry';
     if (this.deployment) g.deploymentRevision = (g.deploymentRevision || 0) + 1;
@@ -1126,7 +1126,7 @@ export class BattleGame {
 
   startAssault() {
     if (!this.deployment || this.renderLost) return false;
-    if (this.simpleField) for (const g of this.groups) if (!g.routed) issueFieldOrder(g, 'advance');
+    if (this.simpleField) for (const g of this.groups) if (!g.routed) {issueFieldOrder(g, 'advance');g.cardTargetId=null;}
     this.deployment = false;
     this.paused = false;
     this.frameRemainder = 0;

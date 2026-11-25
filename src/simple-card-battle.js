@@ -4,6 +4,14 @@ const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const byId=(a,b)=>String(a.id).localeCompare(String(b.id));
 export const CARD_BATTLE_LIMIT=100;
 export const cardRole=g=>g.specialistId==='horsebow'||g.type==='archers'?'ranged':g.type==='cavalry'?'mounted':'foot';
+export function cardFormationChoices(group,choices){
+ const role=cardRole(group),allowed=role==='ranged'?['volley_line','longbow_line','skirmish','ambush']:role==='mounted'?['cavalry_wedge','flank','encirclement','elephant_push','skirmish']:['shield_wall','pike_square','flank','ambush','skirmish'];
+ return choices.filter(f=>allowed.includes(f.id));
+}
+export function cardRoleHint(g){
+ const role=cardRole(g);
+ return role==='ranged'?'Ranged support · strong against foot troops':role==='mounted'?'Fast flankers · strong against ranged troops':g.kind==='pikemen'||g.kind==='spearmen'||g.formationId==='pike_square'?'Anti-cavalry · holds the front':'Frontline · holds the field';
+}
 export function deploymentCells(home){
  const cells=[];for(const z of [14,25,36])for(let x=-54;x<=54;x+=12)cells.push({x,z:z*home});return cells;
 }
@@ -48,7 +56,7 @@ export function cardCounter(g,e){
  if(a==='foot'&&b==='mounted'&&(g.kind==='pikemen'||g.kind==='spearmen'||g.formationId==='pike_square'))return 1.45;
  return 1;
 }
-export function stepCardBattle(state,dt){
+export function stepCardBattle(state,dt,terrainInfo=null){
  if(!Number.isFinite(dt)||dt<=0)return;
  state.fieldTime=(state.fieldTime||0)+dt;
  state.effects=(state.effects||[]).filter(e=>(e.age+=dt)<e.duration);
@@ -64,7 +72,9 @@ export function stepCardBattle(state,dt){
   const best=enemies.slice().sort((a,b)=>score(a)-score(b)||byId(a,b))[0],old=enemies.find(e=>e.id===g.cardTargetId);
   const e=old&&score(old)<=score(best)+6?old:best;g.cardTargetId=e.id;
   const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz),role=cardRole(g);
-  const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9);
+  const terrain=terrainInfo?.(g),enemyTerrain=terrainInfo?.(e);
+  g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
+  const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1);
   const step=Math.min(Math.max(0,d-reach*.88),speed*dt);
   g.moving=step>0.01;g.vx=d?dx/d*step/dt:0;g.vz=d?dz/d*step/dt:0;
   if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
@@ -75,7 +85,9 @@ export function stepCardBattle(state,dt){
   g.cooldown=role==='ranged'?1.15:.85;g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
   const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65),protection=clamp(e.armor||1,.75,1.65);
   const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
-  const loss=soldiers(g)*rate*quality*cardCounter(g,e)/protection;
+  const cover=role==='ranged'?clamp(enemyTerrain?.rangedMitigation??1,.8,1):1;
+  const highGround=(terrain?.height??0)-(enemyTerrain?.height??0)>.75?1.1:1;
+  const loss=soldiers(g)*rate*quality*cardCounter(g,e)*cover*highGround/protection;
   hits.set(e,(hits.get(e)||0)+loss);
   if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
   else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});

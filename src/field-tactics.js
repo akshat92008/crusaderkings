@@ -502,7 +502,7 @@ function computeStatusFlags(g, terrainInfo) {
 }
 
 export function stepField(state, dt) {
-  if (state.simpleField) return stepCardBattle(state, dt);
+  if (state.simpleField) return stepCardBattle(state, dt, g=>fieldTerrain(g,state.terrainType||'plains'));
   const terrainType = typeof state.terrain === 'string' ? state.terrain : state.terrainType || 'plains';
   state.fieldTime = (state.fieldTime || 0) + dt;
   state.effects ??= [];
