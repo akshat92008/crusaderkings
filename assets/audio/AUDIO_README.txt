@@ -1,0 +1,1 @@
+Extract assets/ into repository root. 11 usable supplied tracks converted to normalized MP3; silent Middle Eastern source excluded. Six selected Kenney samples extracted from supplied archives. Retain original source licenses and verify music redistribution permissions before public release. The repository patch uses these exact paths.
