@@ -31,6 +31,9 @@ try:
    assert page.locator('#menu-video').count()==1
    assert page.locator('#menu-video').evaluate('(v)=>v.muted && v.loop')
    page.screenshot(path=str(OUT/(name+'-title.png')))
+   page.click('#menu-sound')
+   page.wait_for_function("document.documentElement.dataset.musicState==='playing'",timeout=20000)
+   assert page.evaluate("document.documentElement.dataset.musicError===''"), 'Main theme did not start after explicit gesture'
    page.fill('#realm-search','no-such-kingdom');assert page.locator('#start-new').is_disabled()
    page.fill('#realm-search','england');assert page.locator('#start-faction option').count()==1
    page.fill('#realm-search','');page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
@@ -133,22 +136,41 @@ try:
     assert page.locator('#province-drawer').is_hidden(),'Pinch must not select a province'
    page.click('#next-month');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    page.click('#save-game');assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).turn")==1
-   if chromium and name in ('desktop','mobile'):
-    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
-    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
+   if chromium and name in ('desktop','mobile','small-phone'):
+    if touch:page.click('#mobile-battle-shortcut')
+    else:
+     if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options summary').click()
+     page.click('#battle-showcase')
+    page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert page.locator('#battle-start').is_visible()
-    assert page.locator('#battle-comparison').is_visible()
+    if touch:assert page.locator('#battle-start').bounding_box()['height']>=44
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+1')
+    assert page.locator('#battle-timer').inner_text()=='DEPLOY YOUR ARMY'
+    assert page.locator('#battle-your-bar').is_visible() and page.locator('#battle-enemy-bar').is_visible()
+    assert page.locator('#battle-strength').get_attribute('data-renderer')=='banner'
+    assert page.locator('#battle-move-tap').is_hidden() and page.locator('#battle-camera').is_hidden()
+    assert page.locator('#battle-units .unitcard').count()>=2
+    page.locator('#battle-presets [data-preset="flanks"]').click()
+    page.locator('#battle-units .unitcard').nth(1).click()
+    page.click('#battle-reserve');assert page.locator('#battle-units .unitcard.reserve').count()==1
     page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='false'
     page.click('#battle-sound');assert page.locator('#battle-sound').get_attribute('aria-pressed')=='true'
     page.wait_for_timeout(500);page.screenshot(path=str(OUT/(name+'-battle-deployment.png')),timeout=45000)
     page.click('#battle-start');page.wait_for_timeout(700)
-    page.click('#battle-zoom-in');page.click('#battle-zoom-out');page.click('#battle-move-tap');assert page.locator('#battle-move-tap').get_attribute('aria-pressed')=='true'
-    page.click('#battle-move-tap');page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
+    page.locator('#battle-units .unitcard.reserve').click()
+    # Real pointer deployment using the same responsive coordinate contract, not a hidden RTS button.
+    point=page.evaluate("""async()=>{const {bannerViewport,bannerProject}=await import('/src/banner-renderer.js');const c=document.querySelector('#battle-canvas'),r=c.getBoundingClientRect(),t=document.querySelector('.battle-top').getBoundingClientRect(),d=document.querySelector('.battle-bottom').getBoundingClientRect();const v=bannerViewport(c.clientWidth,c.clientHeight,Math.min(c.clientHeight*.32,Math.max(0,t.bottom-r.top))+8,Math.min(c.clientHeight*.42,Math.max(0,r.bottom-d.top))+5,1);const [x,y]=bannerProject(v,0,25);return [r.left+x,r.top+y];}""")
+    if touch:page.touchscreen.tap(*point)
+    else:page.mouse.click(*point)
+    page.wait_for_function("document.querySelectorAll('#battle-units .unitcard.reserve').length===0",timeout=5000)
+    page.click('#battle-pause');assert 'RESUME' in page.locator('#battle-pause').inner_text()
+    page.click('#battle-pause');page.click('#battle-speed');assert page.locator('#battle-speed').inner_text()=='2×'
+    page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
     page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
-    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','native','software')
-    page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
-    print(name,'PASS: practice battle deployment, running battle, touch orders, repeat battle and return')
+    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer')=='banner'
+    page.click('#battle-cancel');assert page.locator('#battle-screen').is_hidden()
+    print(name,'PASS: practice battle deployment, reserve placement, pause, speed, retreat, repeat battle and cancel')
    if name=='desktop':
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
     with page.expect_download() as info: page.click('#export-save')
@@ -191,7 +213,7 @@ try:
     page.click('#next-month')
     page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert '115 ALLIED TROOPS' in page.locator('#battle-meta').inner_text()
-    page.click('#battle-retreat')
+    page.click('#battle-start');page.click('#battle-retreat')
     page.click('#battle-return')
     assert page.locator('#battle-screen').is_hidden()
     print('desktop PASS: call allied field contingent, march to the frontier, deploy in battle')

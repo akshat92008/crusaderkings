@@ -36,12 +36,12 @@ try:
   page.click('#battle-showcase')
   assert page.locator('#battle-screen').is_visible()
   assert page.locator('#battle-start').is_visible()
-  assert page.locator('#battle-lanes').is_visible()
+  assert page.locator('#battle-presets').is_visible()
   assert page.locator('#battle-formation option').count()>=3
   form_val=page.locator('#battle-formation option').nth(1).get_attribute('value')
   page.select_option('#battle-formation',form_val)
   assert page.locator('#battle-units .unitcard.active').count()>=1
-  page.locator('#battle-lanes [data-lane="0"]').click()
+  page.locator('#battle-presets [data-preset="flanks"]').click()
   page.click('#battle-start')
   assert page.locator('#battle-start').is_hidden()
   page.wait_for_timeout(1200)

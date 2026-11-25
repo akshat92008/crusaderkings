@@ -1,3 +1,4 @@
+import {stepCardBattle} from './simple-card-battle.js';
 // Deterministic open-field regiment tactics, terrain contours, and direct orders.
 const cap = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -568,6 +569,7 @@ function computeStatusFlags(g, terrainInfo) {
 }
 
 export function stepField(state, dt) {
+  if (state.simpleField) return stepCardBattle(state, dt, g=>fieldTerrain(g,state.terrainType||'plains'));
   const terrainType = typeof state.terrain === 'string' ? state.terrain : state.terrainType || 'plains';
   state.fieldTime = (state.fieldTime || 0) + dt;
   state.effects ??= [];
