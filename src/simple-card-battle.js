@@ -53,6 +53,7 @@ export function arrangeCardArmy(groups,side,home,preset='balanced'){
  }return placed.length===cards.length;
 }
 const soldiers=g=>g.routed?0:Math.max(0,g.troopCount*clamp(g.life/100,0,1));
+export function fieldActiveCount(groups,side){return Math.round(groups.filter(g=>g.side===side&&!g.reserve&&!g.routed).reduce((n,g)=>n+soldiers(g),0));}
 export function cardBattleOutcome(groups,elapsed,defenseMode=false){
  const strength=side=>groups.filter(g=>g.side===side).reduce((n,g)=>n+soldiers(g),0);
  const a=strength('attacker'),b=strength('defender');
@@ -74,16 +75,16 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  state.effects=(state.effects||[]).filter(e=>(e.age+=dt)<e.duration);
  state.projectiles=(state.projectiles||[]).filter(p=>(p.t+=dt*2.3)<=1);
  const groups=state.groups.slice().sort(byId),live=groups.filter(g=>!g.reserve&&!g.routed&&g.life>0&&g.troopCount>0);
- const snapshot=new Map(live.map(g=>[g.id,{x:g.x,z:g.z,life:g.life}])),hits=new Map();
+ const snapshot=new Map(live.map(g=>[g.id,{x:g.x,z:g.z,life:g.life}])),hits=new Map(),targetLoad=new Map();
  for(const g of groups){
   g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.hitFlash=Math.max(0,(g.hitFlash||0)-dt);g.deployFlash=Math.max(0,(g.deployFlash||0)-dt);g.skirmishing=false;
   if(g.reserve){g.moving=false;g.status='reserve';continue;}
   if(g.routed){g.routAge=(g.routAge||0)+dt;g.moving=true;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;const home=g.homeDirection||1;g.z=clamp(g.z+home*dt*5,-46,46);continue;}
   const enemies=live.filter(e=>e.side!==g.side),pos=snapshot.get(g.id);
   if(!pos||!enemies.length){g.moving=false;continue;}
-  const score=e=>distance(pos,snapshot.get(e.id))+(g.lane!==e.lane?3:0)+(cardRole(g)==='mounted'&&cardRole(e)==='ranged'?-6:0);
+  const score=e=>distance(pos,snapshot.get(e.id))+(g.lane!==e.lane?3:0)+(cardRole(g)==='mounted'&&cardRole(e)==='ranged'?-6:0)+Math.min(10,Math.max(0,(targetLoad.get(e.id)||0)/Math.max(1,soldiers(e))-1)*4);
   const best=enemies.slice().sort((a,b)=>score(a)-score(b)||byId(a,b))[0],old=enemies.find(e=>e.id===g.cardTargetId);
-  const e=old&&score(old)<=score(best)+6?old:best;g.cardTargetId=e.id;
+  const e=old&&score(old)<=score(best)+4?old:best;g.cardTargetId=e.id;targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
   const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz),role=cardRole(g);
   const terrain=terrainInfo?.(g),enemyTerrain=terrainInfo?.(e);
   g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
@@ -92,6 +93,8 @@ export function stepCardBattle(state,dt,terrainInfo=null){
   g.moving=step>0.01;g.vx=d?dx/d*step/dt:0;g.vz=d?dz/d*step/dt:0;
   if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
   if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,-46,46);}
+  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
+  for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,-46,46);}
   g.targetX=target.x;g.targetZ=target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
   g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.moving?'moving':'engaging';g.statusFlags=[];
   if(d>reach||g.cooldown>1e-8)continue;

@@ -5,7 +5,7 @@ const hash=s=>[...String(s)].reduce((n,c)=>(Math.imul(n,31)+c.charCodeAt(0))>>>0
 export function bannerViewport(w,h,top,bottom,home=1){
  const usable=Math.max(40,h-top-bottom);
  const s=Math.min(Math.max(40,w-24)/138,usable/78);
- return {w,h,home,s,sy:s*.72,cx:w/2,cy:top+usable/2};
+ return {w,h,home,s,sy:Math.min(usable/102,s*(w<h*.85?1.34:.72)),cx:w/2,cy:top+usable/2};
 }
 export const bannerProject=(v,x,z,y=0)=>[v.cx+x*v.s,v.cy+z*v.home*v.sy-y*v.s];
 export const bannerUnproject=(v,x,y)=>[(x-v.cx)/v.s,0,(y-v.cy)/v.sy*v.home];
@@ -101,6 +101,7 @@ export class BannerRenderer{
   for(const g of groups){
    const [x,y]=P(g.x,g.z),col=colors[g.side],s=cap(v.s*.55,.48,1.4),count=Math.max(1,Math.min(12,Math.ceil(Math.sqrt(g.troopCount)*.75*g.life/100)));
    const cols=g.formationId==='pike_square'?Math.ceil(Math.sqrt(count)):g.formationId==='volley_line'||g.formationId==='longbow_line'?6:4;
+   if(g.deployFlash>0){c.strokeStyle='#e8f7ff';c.lineWidth=2;c.beginPath();c.ellipse(x,y,Math.max(8,v.s*5*(1-g.deployFlash/1.4)),Math.max(4,v.sy*4*(1-g.deployFlash/1.4)),0,0,TAU);c.stroke();}
    if(g===selected){ellipse(c,x,y,Math.max(13,v.s*4.2),Math.max(6,v.sy*3),'#ffe1a54a');c.strokeStyle='#ffe0a3';c.lineWidth=2;c.beginPath();c.ellipse(x,y,Math.max(13,v.s*4.2),Math.max(6,v.sy*3),0,0,TAU);c.stroke();}
    for(let i=0;i<count;i++){
     const row=Math.floor(i/cols),n=Math.min(cols,count-row*cols),xx=(i%cols-(n-1)/2)*2.3,zz=(row-(Math.ceil(count/cols)-1)/2)*2.4;
