@@ -216,10 +216,12 @@ function syncCampaignSoundButton(){const btn=el('campaign-sound');if(btn){btn.se
 function syncAudioState(){
  syncCampaignSoundButton();
  if(!campaignSound){browserCampaignAudio.setMode('silent');return;}
- if(!game){browserCampaignAudio.setMode('menu');return;}
+ if(!game){browserCampaignAudio.setScoreOverride(null);browserCampaignAudio.setMode('menu');return;}
  if(battle){browserCampaignAudio.setMode('silent');return;}
- const f=player();
- if(f?.atWarWith?.length||game.kingdom?.threats?.length)browserCampaignAudio.setMode('war');
+ const f=player();browserCampaignAudio.setRealm(game.player);
+ const modal=el('event-modal');const title=modal&&!modal.hidden?modal.textContent||'':'';
+ browserCampaignAudio.setScoreOverride(/succession|heir|coronation|monarch.*death/i.test(title)?'succession':/intrigue|scheme|assassin|conspiracy/i.test(title)?'intrigue':null);
+ if(f?.atWarWith?.length||game.kingdom?.threats?.some(t=>['ready','approaching'].includes(t.status)))browserCampaignAudio.setMode('war');
  else if((f?.stability??100)<40||Object.values(game.conflict?.factions||{}).some(x=>x.realm===game.player&&x.status==='civil war'))browserCampaignAudio.setMode('crisis');
  else browserCampaignAudio.setMode('peace');
 }
