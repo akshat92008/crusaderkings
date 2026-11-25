@@ -1,1 +1,3 @@
 Extract assets/ into repository root. 11 usable supplied tracks converted to normalized MP3; silent Middle Eastern source excluded. Six selected Kenney samples extracted from supplied archives. Retain original source licenses and verify music redistribution permissions before public release. The repository patch uses these exact paths.
+
+Runtime integration: all eleven normalized music MP3s are routed by region and event/war state in src/soundtrack.js. Six extracted MP3 effects are decoded on demand by src/sample-audio.js and played by src/field-audio.js. Original ZIP/7z archives and the duplicate unnormalized main theme are kept as source material, not requested by the game. Legacy war theme is a battle music fallback. No extra download is needed at runtime.

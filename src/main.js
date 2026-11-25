@@ -208,24 +208,26 @@ function renderInspector(){if(!game)return;if(vassalCareer(game)){el('province-p
  text+=`<details class="province-section" data-section="details"><summary>Province details</summary>${local?'<div class="rule"><b>'+esc(local.culture)+'</b><p class="paragraph">'+esc(local.faith)+' · '+fmt(local.acceptance)+'% acceptance</p></div>':''}<div class="sectiontitle">ADJACENT PROVINCES</div><p class="paragraph">${p.neighbors.length} connected land provinces. ${p.neighbors.filter(n=>game.provinces[n].owner!==state.owner).length} under foreign control.${p.landComponentSize===1?' No land route: use an available naval route where possible.':p.landComponentSize?' Land network: '+p.landComponentSize+' districts.':''}</p><div class="divider"></div><p class="paragraph">${p.ownershipSource?`Starting ownership: ${esc(p.ownershipSource)}.${p.historicalPolity?' Reference polity: '+esc(p.historicalPolity)+'.':''}${p.referenceInherited?' Inherited from the parent gameplay district.':''}${Number.isFinite(p.referenceSamples)&&p.referenceSamples>0&&p.historicalPolity?' Sample agreement: '+p.referenceMatches+'/'+p.referenceSamples+' points.':''} `:''}${p.nameSource?' Geographic name, not a historical county title.':''} Gameplay districts are approximate, not verified historical counties.</p></details></div>`;
  const panel=el('province-panel'),sameProvince=panel.dataset.province===selected,hadCommand=!!panel.querySelector('[data-section="command"]'),open=sameProvince?[...panel.querySelectorAll('details[open]')].map(d=>d.dataset.section):[];panel.dataset.province=selected;panel.innerHTML=text;for(const d of panel.querySelectorAll('details'))d.open=open.includes(d.dataset.section)||d.dataset.section==='command'&&(!sameProvince||!hadCommand);
 }
-let battleSound=true;try{battleSound=localStorage.getItem('crown-of-nations.battle-sound')!=='off';}catch{}
-let campaignSound=battleSound;try{if(localStorage.getItem('crown-of-nations.campaign-sound')==='off')campaignSound=false;}catch{}
+let campaignSound=true;try{const saved=localStorage.getItem('crown-of-nations.audio-enabled.v2');if(saved!==null)campaignSound=saved!=='off';}catch{}
+let battleSound=campaignSound;
 browserCampaignAudio.setMuted(!campaignSound);
-function syncCampaignSoundButton(){const btn=el('campaign-sound');if(btn){btn.setAttribute('aria-pressed',String(campaignSound));btn.textContent=campaignSound?'♫':'🔇';}}
+function syncCampaignSoundButton(){const btn=el('campaign-sound');if(btn){btn.setAttribute('aria-pressed',String(campaignSound));btn.textContent=campaignSound?'♫':'🔇';}const menu=el('menu-sound');if(menu){menu.textContent=campaignSound?'Enable / retry music':'Enable music';menu.setAttribute('aria-pressed',String(campaignSound));}}
 function syncAudioState(){
  syncCampaignSoundButton();
  if(!campaignSound){browserCampaignAudio.setMode('silent');return;}
- if(!game){browserCampaignAudio.setMode('menu');return;}
+ if(!game){browserCampaignAudio.setContext('menu');return;}
  if(battle){browserCampaignAudio.setMode('silent');return;}
  const f=player();
- if(f?.atWarWith?.length||game.kingdom?.threats?.length)browserCampaignAudio.setMode('war');
- else if((f?.stability??100)<40||Object.values(game.conflict?.factions||{}).some(x=>x.realm===game.player&&x.status==='civil war'))browserCampaignAudio.setMode('crisis');
- else browserCampaignAudio.setMode('peace');
+ const modal=el('event-modal');const title=modal&&!modal.hidden?modal.textContent||'':'';
+ const override=/succession|heir|coronation|monarch.*death/i.test(title)?'succession':/intrigue|scheme|assassin|conspiracy/i.test(title)?'intrigue':null;
+ const mode=f?.atWarWith?.length||game.kingdom?.threats?.some(t=>['ready','approaching'].includes(t.status))?'war':(f?.stability??100)<40||Object.values(game.conflict?.factions||{}).some(x=>x.realm===game.player&&x.status==='civil war')?'crisis':'peace';
+ browserCampaignAudio.setContext(mode,game.player,override);
 }
 syncAudioState();
-const unlockAudioOnce=()=>{browserCampaignAudio.unlock();syncAudioState();};
-window.addEventListener('pointerdown',unlockAudioOnce,{once:true});
-window.addEventListener('keydown',unlockAudioOnce,{once:true});
+const retryScore=()=>{if(!campaignSound)return;const s=browserCampaignAudio.score;if(!browserCampaignAudio.unlocked||s?.state==='blocked'||(!battle&&s?.active&&s.media?.paused&&!s.playPending&&!s.exhausted)){syncAudioState();browserCampaignAudio.unlock();}if(battle&&!battle.deployment&&!battle.paused&&!battle.done&&battle.music?.score?.state==='blocked')battle.music.sync(true,true);};
+window.addEventListener('click',retryScore,{capture:true});window.addEventListener('pointerup',retryScore,{capture:true});window.addEventListener('keydown',retryScore,{capture:true});
+function persistSound(){try{for(const key of ['crown-of-nations.audio-enabled.v2','crown-of-nations.campaign-sound','crown-of-nations.battle-sound'])localStorage.setItem(key,campaignSound?'on':'off');}catch{}}
+el('menu-sound')?.addEventListener('click',()=>{campaignSound=battleSound=true;persistSound();browserCampaignAudio.setMuted(false);syncAudioState();browserCampaignAudio.retryMusic();});
 const deferredModalEvents=new Set();
 function effectChips(obj,cost=0){
  const chips=[];
@@ -261,7 +263,7 @@ function collectEventPrompts(){
  void liveWorld;
  return out;
 }
-function closeEventModal(){const m=el('event-modal');if(m){m.hidden=true;m.innerHTML='';}}
+function closeEventModal(){const m=el('event-modal');if(m){const wasOpen=!m.hidden;m.hidden=true;m.innerHTML='';if(wasOpen)syncAudioState();}}
 function renderEventModal(evt){
  const m=el('event-modal');if(!m||!evt){closeEventModal();return;}
  el('toast')?.classList.remove('visible');
@@ -276,7 +278,7 @@ function renderEventModal(evt){
   +'<div class="event-modal-foot">Campaign paused until resolved or deferred.</div></div>';
  m._eventKey=evt.key;
  m.hidden=false;
- browserCampaignAudio.playSfx('chime');
+ syncAudioState();browserCampaignAudio.playSfx('chime');
 }
 function maybePopupEventModal(prevKeys=new Set()){
  if(!game||battle||vassalCareer(game))return;
@@ -497,11 +499,9 @@ document.addEventListener('click',e=>{
 });
 el('campaign-sound')?.addEventListener('click',()=>{
  campaignSound=!campaignSound;
- browserCampaignAudio.unlock();
  browserCampaignAudio.setMuted(!campaignSound);
  battleSound=campaignSound;updateSoundButton();battle?.setSound(battleSound);
- try{localStorage.setItem('crown-of-nations.campaign-sound',campaignSound?'on':'off');localStorage.setItem('crown-of-nations.battle-sound',battleSound?'on':'off');}catch{}
- syncAudioState();
+ persistSound();syncAudioState();if(campaignSound)browserCampaignAudio.retryMusic();
 });
 el('battle-rally')?.addEventListener('click',()=>{if(battle&&!battle.deployment)browserCampaignAudio.playSfx('rally');});
 el('battle-showcase').addEventListener('click',()=>{
@@ -517,7 +517,7 @@ el('battle-showcase').addEventListener('click',()=>{
 el('battle-move-tap').addEventListener('click',()=>{if(battle){battle.tapMove=!battle.tapMove;battle.report();}});
 for(const [id,delta] of [['battle-zoom-in',-12],['battle-zoom-out',12]])el(id).addEventListener('click',()=>{if(battle){battle.cameraGoal=null;battle.camera.distance=Math.max(35,Math.min(165,battle.camera.distance+delta));}});
 el('battle-camera').addEventListener('change',e=>{if(battle&&!battle.focusCamera(e.target.value))message('Select an active regiment.');});
-el('battle-sound').addEventListener('click',()=>{battleSound=!battleSound;campaignSound=battleSound;browserCampaignAudio.setMuted(!campaignSound);updateSoundButton();battle?.setSound(battleSound);try{localStorage.setItem('crown-of-nations.battle-sound',battleSound?'on':'off');localStorage.setItem('crown-of-nations.campaign-sound',campaignSound?'on':'off');}catch{}syncAudioState();});
+el('battle-sound').addEventListener('click',()=>{battleSound=!battleSound;campaignSound=battleSound;browserCampaignAudio.setMuted(!campaignSound);updateSoundButton();battle?.setSound(battleSound);persistSound();syncAudioState();});
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
 el('battle-start').addEventListener('click',()=>battle?.startAssault());
