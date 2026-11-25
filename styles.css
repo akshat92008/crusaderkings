@@ -258,3 +258,38 @@
 #battle-guide{white-space:normal;line-height:1.4}
 #battle-canvas{touch-action:none}
 @media(max-width:650px){.battle-units .unitcard{flex-basis:126px}.battle-commands{justify-content:flex-start}.battle-guide{white-space:normal}.battle-bottom{max-height:38dvh}}
+
+/* Banner Lines illustrated battlefield: fixed board, compact readable HUD and touch-sized deck. */
+.battle-screen:has(#battle-timer){background:#536b3b}
+.battle-screen .battle-top{z-index:5;display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:linear-gradient(#192823f5,#192823df 80%,#19282300)}
+.battle-top>div:first-child{flex:1;min-width:0}
+.battle-top h2{font-size:16px;letter-spacing:.06em;margin:2px 0}
+.battle-top .eyebrow{font-size:9px;letter-spacing:.12em}
+.battle-top .battle-meta{font-size:10px;margin:2px 0}
+.banner-score{display:grid;grid-template-columns:minmax(80px,1fr) auto minmax(80px,1fr);gap:10px;align-items:center;max-width:640px;margin:7px 0;color:#f8e9cc}
+.banner-force{font:600 11px system-ui;display:grid;gap:2px}
+.banner-force b{font-size:14px;line-height:1.1;font-variant-numeric:tabular-nums}
+.banner-force>div{height:7px;background:#17251e;border:1px solid #ffffff25;border-radius:5px;overflow:hidden}
+.banner-force i{display:block;width:100%;height:100%;background:#7bd5f2;transition:width .2s}
+.banner-force.enemy{text-align:right}.banner-force.enemy i{background:#f79b77;margin-left:auto}
+#battle-timer{font:700 10px system-ui;text-align:center;color:#f6d99b;letter-spacing:.04em}
+#battle-strength{font-size:10px;line-height:1.1;max-width:600px}
+#battle-focus{font:500 10px system-ui;color:#e4d6b8;white-space:normal}
+.battle-bottom{z-index:5;padding:9px 14px max(10px,env(safe-area-inset-bottom));background:linear-gradient(#263c2b00,#16251df5 15%);overflow:visible}
+.battle-commands{background:none;border:0;padding:3px;margin:0;gap:6px}
+.battle-commands button,.battle-commands select{border-radius:7px;min-height:38px;font:600 11px system-ui}
+#battle-start{background:linear-gradient(#f0cf76,#c8953b)!important;color:#302410!important;box-shadow:0 2px 0 #69491e;min-width:140px}
+#battle-reserve{background:#31536b;color:#e4f1f9}
+.battle-units{gap:8px;padding:4px 2px 7px;scrollbar-width:thin}
+.battle-units .unitcard{position:relative;flex:0 0 112px;min-height:90px;border:1px solid #758f75;background:linear-gradient(#52664c,#273b2b);padding:6px;display:grid;grid-template-columns:30px 1fr;align-items:center;gap:3px;border-radius:8px;box-shadow:0 2px 3px #0004;color:#f7eedc}
+.regiment-icon{grid-column:1;grid-row:1;color:#ffe0a4;width:30px;height:30px;display:block}
+.regiment-count{grid-column:2;grid-row:1;justify-self:end;font:bold 17px system-ui;color:#fff3cf}
+.battle-units .unitcard b{grid-column:1/-1;font:700 11px system-ui;line-height:1.1;white-space:normal}
+.battle-units .unitcard small{grid-column:1/-1;font:500 9px system-ui;margin:0;text-transform:capitalize;color:#d4dfc6}
+.battle-units .unitcard .unithealth{grid-column:1/-1;display:block;margin:2px 0 0;height:5px;border-radius:3px;overflow:hidden}
+.battle-units .unitcard .unithealth span{display:block;height:100%;background:#a6d27b}
+.battle-units .unitcard.active{outline:2px solid #ffe39a;outline-offset:-2px;background:linear-gradient(#8e7543,#55462c)}
+.battle-units .unitcard.reserve{border-color:#81b8e1;background:linear-gradient(#426b86,#2a465d)}
+.battle-units .unitcard:disabled{opacity:.65;cursor:default}
+.battle-guide{font:500 11px system-ui;text-align:center;color:#f4e5ca;margin:0 0 4px}
+@media(max-width:650px){.battle-screen .battle-top{padding:7px 8px;gap:5px}.battle-top h2{font-size:13px}.banner-score{gap:5px;margin:4px 0}.banner-force{font-size:9px}.banner-force b{font-size:12px}#battle-timer{font-size:9px}#battle-focus{font-size:9px}.battle-bottom{padding:5px 6px max(6px,env(safe-area-inset-bottom));max-height:none}.battle-units .unitcard{flex-basis:98px;min-height:79px}.battle-commands{gap:4px;justify-content:flex-start}.battle-commands button,.battle-commands select{min-height:36px;font-size:10px}.battle-commands #battle-start{flex:1 1 100%;min-height:40px}.battle-guide{font-size:10px}.battle-buttons{max-width:108px}}

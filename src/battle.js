@@ -1,4 +1,5 @@
-import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells,cardFormationChoices} from './simple-card-battle.js';
+import {BannerRenderer} from './banner-renderer.js';
+import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells,cardFormationChoices,toggleCardReserve} from './simple-card-battle.js';
 import {chooseBattleRenderer, freshBattleCanvas, disposeNativeRenderer} from './battle-lifecycle.js';
 import {fieldFrameSteps, renderInterval} from './render-performance.js';
 import {browserFieldAudio, browserBattleMusic, browserCampaignAudio} from './field-audio.js';
@@ -480,7 +481,7 @@ export class BattleGame {
       defenderRealm: descriptor.enemy
     };
 
-    const chosen = chooseBattleRenderer(canvas, {
+    const chosen = descriptor.bannerView && this.simpleField ? {canvas,renderer:new BannerRenderer(canvas,this.terrainType),mode:'banner'} : chooseBattleRenderer(canvas, {
       probe: c => c.getContext?.('webgl2'),
       three: c => new ThreeBattleScene(c, config),
       native: c => new Renderer(c),
@@ -496,7 +497,7 @@ export class BattleGame {
     this.mobile = coarse;
     this.frameRemainder = 0;
 
-    if (descriptor.fieldBattle) {
+    if (descriptor.fieldBattle && !this.ctx.isBannerRenderer) {
       const seed = [...String(descriptor.to || 'practice')].reduce((n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0, 1450);
       const compact = coarse || this.ctx instanceof CanvasFallback;
       this.fieldLandscape = fieldScenery(seed, this.biome || 'temperate', compact);
@@ -733,7 +734,7 @@ export class BattleGame {
         this.drag.x = e.clientX;
         this.drag.y = e.clientY;
         this.drag.moved += Math.hypot(dx, dy);
-        if (this.drag.moved > 3) {
+        if (this.drag.moved > 3 && !this.ctx?.isBannerRenderer) {
           this.cameraGoal = null;
           this.camera.target[0] -= dx * 0.08;
           this.camera.target[2] -= dy * 0.08;
@@ -838,12 +839,21 @@ export class BattleGame {
     const ok=arrangeCardArmy(this.groups,'attacker',this.descriptor.defenseMode?-1:1,preset);
     this.report();return ok;
   }
+  toggleReserve(){
+    if(!this.deployment||this.done)return false;
+    const ok=toggleCardReserve(this.groups,this.selectedGroup());
+    if(ok){this.audio?.play('order');this.report();}return ok;
+  }
   placeRegiment(group, x, z) {
-    if (!this.deployment || !group || group.side !== 'attacker' || group.routed) return false;
+    if ((!this.deployment&&!group?.reserve) || this.done || !group || group.side !== 'attacker' || group.routed) return false;
     const home = this.descriptor.defenseMode ? -1 : 1;
     const cell=freeDeploymentCell(this.groups,group,x,z,home);
     if(!cell)return false;
-    moveCard(group,cell);
+    if(this.deployment&&this.ctx?.isBannerRenderer){
+      const nearest=deploymentCells(home).sort((a,b)=>Math.hypot(a.x-x,a.z-z)-Math.hypot(b.x-x,b.z-z))[0];
+      const occupied=this.groups.find(g=>g!==group&&g.side===group.side&&!g.routed&&Math.hypot(g.x-nearest.x,g.z-nearest.z)<1);
+      if(occupied){moveCard(occupied,{x:group.x,z:group.z});moveCard(group,nearest);}else moveCard(group,cell);
+    }else{moveCard(group,cell);group.reserve=false;group.deployFlash=.7;}
     issueFieldOrder(group, 'advance');
     group.deploymentRevision = (group.deploymentRevision || 0) + 1;
     this.report();
@@ -852,7 +862,7 @@ export class BattleGame {
   handleCanvasTap(x, y) {
     if (this.done) return null;
     if(this.simpleField&&this.deployment){const p=this.rayGround(x,y),g=this.selectedGroup();if(p&&this.placeRegiment(g,p[0],p[2]))return {action:'move',group:g,point:[g.x,g.z]};return null;}
-    if(this.simpleField&&!this.deployment)return null;
+    if(this.simpleField&&!this.deployment){const g=this.selectedGroup(),p=this.rayGround(x,y);if(g?.reserve&&p&&this.placeRegiment(g,p[0],p[2]))return {action:'deploy',group:g,point:[g.x,g.z]};return null;}
 
     if (this.tapMove) {
       const p = this.rayGround(x, y);
@@ -988,6 +998,7 @@ export class BattleGame {
   }
 
   rayGround(px, py) {
+    if(this.ctx?.isBannerRenderer)return this.ctx.ground(this,px,py);
     const { eye, forward, right, up } = this.cameraVectors();
     const w = this.canvas?.clientWidth || this.canvas?.width || 900;
     const h = this.canvas?.clientHeight || this.canvas?.height || 600;
@@ -1015,6 +1026,7 @@ export class BattleGame {
   }
 
   project(p) {
+    if(this.ctx?.isBannerRenderer)return this.ctx.project(this,p[0],p[2],p[1]);
     const { eye, forward, right, up } = this.cameraVectors();
     const d = sub(p, eye);
     const depth = dot(d, forward);
@@ -1072,6 +1084,7 @@ export class BattleGame {
         enemyPosture: this.enemyPosture,
         tapMove: this.tapMove,
         rendererMode: this.rendererMode,
+        reserveCount: this.groups.filter(g=>g.side==='attacker'&&g.reserve).length,
         renderLost: !!this.renderLost,
         roster: {
           attacker: battleRoster(this.groups, 'attacker', !!this.descriptor?.fieldBattle),
@@ -1268,6 +1281,7 @@ export class BattleGame {
 
   render() {
     if (!this.ctx) return;
+    if(this.ctx.isBannerRenderer){this.ctx.renderBattle(this);return;}
     const obj = [];
     const C = {
       grass: [0.29, 0.36, 0.29], earth: [0.43, 0.40, 0.31], shadow: [0.25, 0.27, 0.23],
@@ -1610,7 +1624,7 @@ export class BattleGame {
       this.raf = globalThis.requestAnimationFrame?.(this.loop);
       return;
     }
-    this.updateCamera(Math.min(dt, 0.05));
+    if(!this.ctx?.isBannerRenderer)this.updateCamera(Math.min(dt, 0.05));
     const before = this.elapsed;
     if (this.descriptor.fieldBattle) {
       const next = fieldFrameSteps(this.frameRemainder, dt, !this.paused && !this.done);

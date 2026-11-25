@@ -24,7 +24,7 @@ export function fieldAudioEvents(groups, seen, elapsed, ambientDue = 0) {
   for (const g of groups) {
     const old = seen.get(g.id) || { attack: 0, routed: false };
     if ((g.attackSerial || 0) > old.attack) {
-      events.push({ kind: g.type === 'archers' ? 'arrow' : g.type === 'cavalry' ? 'hoof' : 'steel', x: g.x, z: g.z });
+      events.push({ kind: g.type === 'archers' || g.specialistId==='horsebow' ? 'arrow' : g.type === 'cavalry' ? 'hoof' : 'steel', x: g.x, z: g.z });
     }
     if (g.routed && !old.routed && g.life > 0) {
       events.push({ kind: 'rout', x: g.x, z: g.z });

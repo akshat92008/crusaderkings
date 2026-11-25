@@ -20,6 +20,17 @@ export function freeDeploymentCell(groups,group,x,z,home){
  const occupied=groups.filter(g=>g!==group&&g.side===group.side&&!g.routed);
  return deploymentCells(home).filter(p=>occupied.every(g=>distance(p,g)>7)).sort((a,b)=>distance(a,{x,z})-distance(b,{x,z}))[0]||null;
 }
+export function toggleCardReserve(groups,g){
+ if(!g||g.side!=='attacker'||g.routed)return false;
+ if(g.reserve){g.reserve=false;return true;}
+ const own=groups.filter(x=>x.side===g.side&&!x.routed);
+ if(own.filter(x=>x.reserve).length>=Math.min(3,own.length-1))return false;
+ g.reserve=true;return true;
+}
+export function releaseCardReserves(state){
+ const own=state.groups.filter(g=>g.side==='attacker'&&!g.routed&&g.life>0);
+ if(state.fieldTime>=12||!own.some(g=>!g.reserve))for(const g of own)if(g.reserve){g.reserve=false;g.deployFlash=.7;}
+}
 export function moveCard(g,p){
  g.x=p.x;g.z=p.z;g.lane=p.x<-12?0:p.x>12?2:1;
  for(const k of ['targetX','orderX','anchorX','moveX'])g[k]=p.x;
@@ -59,12 +70,14 @@ export function cardCounter(g,e){
 export function stepCardBattle(state,dt,terrainInfo=null){
  if(!Number.isFinite(dt)||dt<=0)return;
  state.fieldTime=(state.fieldTime||0)+dt;
+ releaseCardReserves(state);
  state.effects=(state.effects||[]).filter(e=>(e.age+=dt)<e.duration);
  state.projectiles=(state.projectiles||[]).filter(p=>(p.t+=dt*2.3)<=1);
- const groups=state.groups.slice().sort(byId),live=groups.filter(g=>!g.routed&&g.life>0&&g.troopCount>0);
+ const groups=state.groups.slice().sort(byId),live=groups.filter(g=>!g.reserve&&!g.routed&&g.life>0&&g.troopCount>0);
  const snapshot=new Map(live.map(g=>[g.id,{x:g.x,z:g.z,life:g.life}])),hits=new Map();
  for(const g of groups){
-  g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.skirmishing=false;
+  g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.hitFlash=Math.max(0,(g.hitFlash||0)-dt);g.deployFlash=Math.max(0,(g.deployFlash||0)-dt);g.skirmishing=false;
+  if(g.reserve){g.moving=false;g.status='reserve';continue;}
   if(g.routed){g.routAge=(g.routAge||0)+dt;g.moving=true;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;const home=g.homeDirection||1;g.z=clamp(g.z+home*dt*5,-46,46);continue;}
   const enemies=live.filter(e=>e.side!==g.side),pos=snapshot.get(g.id);
   if(!pos||!enemies.length){g.moving=false;continue;}
@@ -92,9 +105,9 @@ export function stepCardBattle(state,dt,terrainInfo=null){
   if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
   else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});
  }
- for(const [g,loss] of hits){const pct=100*loss/Math.max(1,g.troopCount);g.life=clamp(g.life-pct,0,100);g.morale=clamp((g.morale??75)-pct*.55,0,100);}
+ for(const [g,loss] of hits){const pct=100*loss/Math.max(1,g.troopCount);g.life=clamp(g.life-pct,0,100);g.morale=clamp((g.morale??75)-pct*.55,0,100);g.hitFlash=.18;}
  for(const g of live){
-  if(g.life<=8||soldiers(g)<.5||(g.life<=35&&g.morale<=10)){g.routed=true;g.routAge=0;g.moving=true;g.attackPulse=0;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;}
+  if(g.life<=8||soldiers(g)<.5||(g.life<=35&&g.morale<=10)){g.routed=true;g.routAge=0;g.moving=true;g.attackPulse=0;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;state.effects.push({kind:'rout',x:g.x,z:g.z,age:0,duration:.6});}
   else g.troops=Math.round(soldiers(g));
  }
  if(state.effects.length>64)state.effects.splice(0,state.effects.length-64);
