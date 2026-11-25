@@ -8,6 +8,7 @@ import {militaryDoctrine,startingTroops} from './military-doctrines.js';
 import {terrainCombatModifiers} from './border-battle.js';
 import {supplyRoute,allocateTroops} from './campaign-balance.js';
 import {invasionReserved} from './invasion-reservations.js';
+import {allocateCommanderName} from './name-pools.js';
 
 // Specialization overlays and troop-source breakdowns preserve the three authoritative troop totals in old saves.
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg});
@@ -16,11 +17,6 @@ export const TROOP_SOURCES=['domainLevies','vassalLevies','retinues','mercenarie
 const size=a=>types.reduce((n,k)=>n+(a?.[k]||0),0);
 
 export const REGIMENTS={
- scouts:{name:'Light cavalry scouts',type:'cavalry',cost:95,damage:1.02,armor:.88,speed:1.25,range:1,counter:1},
- bowmen:{name:'Foot bowmen',type:'archers',cost:85,damage:1.08,armor:.95,speed:1,range:1.08,counter:1},
- shieldmen:{name:'Shield infantry',type:'infantry',cost:105,damage:.94,armor:1.32,speed:.88,range:1,counter:1.10},
- spearmen:{name:'Spearmen',type:'infantry',cost:85,damage:1.02,armor:1.05,speed:.98,range:1,counter:1.45},
- swordsmen:{name:'Swordsmen',type:'infantry',cost:85,damage:1.12,armor:1.02,speed:1.04,range:1,counter:1},
  pikes:{name:'Pike infantry',type:'infantry',cost:90,damage:1.04,armor:1.18,speed:.91,range:1,counter:1.8},
  guard:{name:'Armored household guard',type:'infantry',cost:120,damage:1.16,armor:1.25,speed:.88,range:1,counter:1.05},
  skirmishers:{name:'Light infantry',type:'infantry',cost:75,damage:1.10,armor:.90,speed:1.23,range:1,counter:1},
@@ -79,7 +75,7 @@ export const COMMANDER_TRAITS={
 
 const specialties={longbow:['longbow','pikes'],chivalry:['guard','lancers'],pike:['pikes','crossbow'],gunpowder:['handgun','crossbow'],steppe:['horsebow','lancers'],janissary:['guard','handgun'],elephant:['elephants','guard'],samurai:['guard','skirmishers'],archery:['longbow','skirmishers'],river:['skirmishers','crossbow'],highland:['pikes','guard'],woodland:['skirmishers','longbow'],maritime:['crossbow','guard'],warrior:['guard','skirmishers'],generic:['pikes','skirmishers']};
 
-export function regimentOptions(g,realm){return [...new Set(['skirmishers','swordsmen','spearmen','shieldmen','bowmen','scouts',...(specialties[militaryDoctrine(g.factions[realm]).id]||[])])];}
+export function regimentOptions(g,realm){return [...new Set(['skirmishers',...(specialties[militaryDoctrine(g.factions[realm]).id]||[])])];}
 
 function note(g,realm,msg){
  const m=g.military;
@@ -127,7 +123,7 @@ function initArmy(g,a){
    counts:Object.fromEntries(types.map(t=>[t,a[t]||0])),
    sources:defaultSources(g,a)
   };
-  for(const id of (specialties[militaryDoctrine(g.factions[a.owner]).id]||[])){
+  for(const id of regimentOptions(g,a.owner).slice(1)){
    const def=REGIMENTS[id];
    r.regiments[id]=Math.floor((a[def.type]||0)*.30);
   }
@@ -280,7 +276,7 @@ export function splitArmy(g,armyId,ratioOrCounts=0.5){
  const child={
   id:newId,owner:a.owner,province:a.province,
   infantry:splitCounts.infantry,archers:splitCounts.archers,cavalry:splitCounts.cavalry,
-  experience:a.experience||0,morale:a.morale||75,commander:'Detached commander',doctrine:a.doctrine
+  experience:a.experience||0,morale:a.morale||75,commander:allocateCommanderName(g,a.owner,newId),doctrine:a.doctrine
  };
  for(const t of types)a[t]-=splitCounts[t];
  g.armies[newId]=child;
@@ -415,7 +411,7 @@ export function militaryAction(g,world,action,id,extra){
   if(f.treasury<comp.cost)return no(`Need ${comp.cost} gold to retain ${comp.name}.`);
   f.treasury-=comp.cost;
   if(!a){
-   a={id:'a'+g.nextId++,owner:g.player,province:provId,infantry:0,archers:0,cavalry:0,experience:comp.experience,morale:comp.morale,commander:'Mercenary Captain',doctrine:militaryDoctrine(f).id};
+   a={id:'a'+g.nextId++,owner:g.player,province:provId,infantry:0,archers:0,cavalry:0,experience:comp.experience,morale:comp.morale,commander:allocateCommanderName(g,g.player,`merc:${extra}`),doctrine:militaryDoctrine(f).id};
    g.armies[a.id]=a;
   }
   const added=types.reduce((n,t)=>n+(comp.mix[t]||0),0);
@@ -456,7 +452,7 @@ export function militaryAction(g,world,action,id,extra){
   if(f.treasury<ord.cost||f.prestige<ord.prestigeCost)return no(`Requires ${ord.cost} gold and ${ord.prestigeCost} prestige.`);
   f.treasury-=ord.cost;f.prestige-=ord.prestigeCost;
   if(!a){
-   a={id:'a'+g.nextId++,owner:g.player,province:provId,infantry:0,archers:0,cavalry:0,experience:ord.experience,morale:ord.morale,commander:'Grand Master',doctrine:militaryDoctrine(f).id};
+   a={id:'a'+g.nextId++,owner:g.player,province:provId,infantry:0,archers:0,cavalry:0,experience:ord.experience,morale:ord.morale,commander:allocateCommanderName(g,g.player,`order:${extra}`),doctrine:militaryDoctrine(f).id};
    g.armies[a.id]=a;
   }
   const added=types.reduce((n,t)=>n+(ord.mix[t]||0),0);

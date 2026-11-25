@@ -7,12 +7,16 @@ from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots'; OUT.mkdir(exist_ok=True)
+CHROME=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
+server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()
 URL='http://127.0.0.1:'+str(server.server_port)
 try:
  with sync_playwright() as p:
-  browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'])
+  kw={'headless':True,'args':['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']}
+  if CHROME.exists():kw['executable_path']=str(CHROME)
+  browser=p.chromium.launch(**kw)
   page=browser.new_page(viewport={'width':1440,'height':900},device_scale_factor=1)
   errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   page.goto(URL,wait_until='domcontentloaded',timeout=45000)
@@ -49,4 +53,4 @@ try:
   print('PASS: language study and hybrid culture persisted through browser actions')
   browser.close()
 finally:
- server.shutdown()
+ server.server_close()

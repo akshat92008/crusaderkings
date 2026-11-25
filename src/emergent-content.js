@@ -475,7 +475,355 @@ export const REACTIVE_EMERGENT_EVENTS=[
  ])
 ];
 
-const findEmergentDef=id=>EMERGENT_EVENTS.find(e=>e.id===id)||REACTIVE_EMERGENT_EVENTS.find(e=>e.id===id)||null;
+export const EXTENDED_EMERGENT_EVENTS=[
+ // 31. Secret Hermetic Tome
+ E('em_ext_society_invite','Societies','The Ciphered Grimoire','A hooded courier leaves a Latin treatise sealed with alchemical wax on your reading desk.','societyInvite',[
+  C('Break the wax seal and convene a midnight study circle',60,{prestige:6,piety:-4,research:8},'em_ext_society_invite_circle'),
+  C('Summon your chaplain to lock it in the cathedral archives',20,{piety:10,stability:2},'em_ext_society_invite_burn')
+ ]),
+ E('em_ext_society_invite_circle','Societies','Lanterns of the Inner Sanctum','Under secret vows, scholars demonstrate celestial astrolabes and botanical distillations.','followup',[
+  C('Fund a discreet laboratory beneath the tower',110,{research:14,health:-10}),
+  C('Keep to open natural philosophy without secrecy',0,{prestige:8,piety:4})
+ ]),
+ E('em_ext_society_invite_burn','Societies','Gratitude of the Prelates','Cathedral canons applaud the sovereign’s orthodoxy and gift an illuminated psalter.','followup',[
+  C('Display the psalter during high feast days',30,{piety:8,legitimacy:5}),
+  C('Sell duplicate Latin manuscripts to monastic libraries',0,{gold:75})
+ ]),
+
+ // 32. Great Monument Quarry
+ E('em_ext_great_work_mason','Realm','The Master Stonemason’s Plan','An itinerant master builder unrolls parchment blueprints for vaulted arches and granite bastions.','greatWork',[
+  C('Commission marble quarries and skilled guildwrights',180,{prestige:16,development:1},'em_ext_great_work_mason_spire'),
+  C('Direct him toward practical frontier stonework',80,{stability:4},'em_ext_great_work_mason_keep')
+ ]),
+ E('em_ext_great_work_mason_spire','Realm','Scaffolding to the Clouds','Chisels ring across the capital as visiting envoys marvel at the rising limestone facade.','followup',[
+  C('Inscribe your dynasty’s chronicle along the lintel',90,{prestige:15,legitimacy:8}),
+  C('Speed completion with extra silver for shifts',80,{stability:6,development:1})
+ ]),
+ E('em_ext_great_work_mason_keep','Realm','Bulwark of Dressed Stone','Sturdy gatehouses and barbicans bolster confidence along exposed marcher roads.','followup',[
+  C('Garrison the gatehouses with veteran halberdiers',70,{morale:8,unrest:-3}),
+  C('Station customs clerks by the new stone bridge',0,{gold:100})
+ ]),
+
+ // 33. Silk Road Oasis
+ E('em_ext_silk_oasis','Trade','Brigands Along the Caravan Trail','Spiced silk caravans report armed horsemen demanding illegal transit tolls at desert wells.','silkOasis',[
+  C('Dispatch cavalry outriders to crush the bandits',110,{prestige:10,trade:10},'em_ext_silk_oasis_cleared'),
+  C('Negotiate a licensed escort charter with oasis elders',70,{trade:6,loyalty:5},'em_ext_silk_oasis_charter')
+ ]),
+ E('em_ext_silk_oasis_cleared','Trade','Banner Over the Cistern','The brigands scatter into the dunes, leaving camels and Baltic amber crates at your vanguard.','followup',[
+  C('Erect a brick caravanserai beside the spring',100,{gold:150,development:1}),
+  C('Return salvaged wares to merchant syndicates for goodwill',0,{prestige:12,trust:8})
+ ]),
+ E('em_ext_silk_oasis_charter','Trade','The Desert Compact','Oasis sheikhs swear allegiance as wardens of the trade road in exchange for silk exemptions.','followup',[
+  C('Grant their sons junior posts in the palace guard',40,{morale:6,loyalty:6}),
+  C('Collect standard customs weights at the city gate',0,{gold:120})
+ ]),
+
+ // 34. Eastern Imperial Embassy
+ E('em_ext_china_embassy','Diplomacy','The Silk-Bound Embassy','Ambassadors bearing jade seals and porcelains request formal audience from distant eastern courts.','chinaEmbassy',[
+  C('Receive them with golden banners and scholarly honors',150,{prestige:18,legitimacy:6},'em_ext_china_embassy_feast'),
+  C('Conduct a brisk commercial exchange of tariffs',40,{gold:110},'em_ext_china_embassy_trade')
+ ]),
+ E('em_ext_china_embassy_feast','Diplomacy','Gifts of Celadon and Bronze','In return for thoroughbred chargers, the envoys present treatises on siegecraft and gunpowder.','followup',[
+  C('Order arsenal masters to copy the bronze bombard drawings',110,{morale:10,research:10}),
+  C('Present the porcelain vessels to royal cathedral treasuries',0,{prestige:12,piety:6})
+ ]),
+ E('em_ext_china_embassy_trade','Diplomacy','Bills of Caravan Exchange','Silver ingots cross borders swiftly, filling customs vaults along every river wharf.','followup',[
+  C('Charter a permanent Eastern Guildhall in the capital',90,{trade:12}),
+  C('Invest surplus bullion into coinage reserves',0,{gold:130})
+ ]),
+
+ // 35. Witchcraft Panics
+ E('em_ext_witch_trial','Intrigue','Whispers of Night-Covens','Villagers drag an herbalist widow before county judges, blaming blight and stillborn calves on sorcery.','witchHunt',[
+  C('Dispatch learned royal inquisitors to examine evidence carefully',90,{stability:6,piety:5},'em_ext_witch_trial_law'),
+  C('Permit local magistrates to stage exemplary public burnings',20,{piety:8,unrest:6},'em_ext_witch_trial_pyre')
+ ]),
+ E('em_ext_witch_trial_law','Intrigue','Reason Over Superstition','Your judges uncover poisoned grain wells planted by a greedy bailiff rather than diabolism.','followup',[
+  C('Hang the corrupt bailiff and pension the widow',40,{legitimacy:10,trust:10}),
+  C('Distribute treatises on veterinary crop blight',70,{research:8,food:25})
+ ]),
+ E('em_ext_witch_trial_pyre','Intrigue','Ashes in the Market Square','A fearful hush settles over the shire, though murmurs linger among bereaved kinsmen.','followup',[
+  C('Send traveling preachers to calm the terrified villages',50,{piety:6,unrest:-4}),
+  C('Levy penance fines on unruly parish elders',0,{gold:85})
+ ]),
+
+ // 36. Papal Legate & Simony
+ E('em_ext_papal_legate','Faith','The Legate’s Ledger','A sharp-eyed religious legate audits diocesan accounts, accusing wealthy abbeys of simony.','legateAudit',[
+  C('Back the legate’s reform of clerical offices',80,{piety:16,legitimacy:6},'em_ext_papal_legate_reform'),
+  C('Shield loyal aristocratic prelates behind crown privilege',100,{loyalty:10,piety:-8},'em_ext_papal_legate_shield')
+ ]),
+ E('em_ext_papal_legate_reform','Faith','The Clean Abbeys','Disgraced simoniacs surrender ill-gotten plate, strengthening moral authority and royal piety.','followup',[
+  C('Devote confiscated silver to parish almshouses',60,{piety:12,unrest:-5}),
+  C('Apply ecclesiastical fines to crown defense budgets',0,{gold:140})
+ ]),
+ E('em_ext_papal_legate_shield','Faith','Baronial Gratitude','Powerful clerical families pledge loyal knights and unwavering counsel at royal diets.','followup',[
+  C('Name a prelate’s nephew to the Privy Seal',0,{loyalty:8,prestige:6}),
+  C('Collect discreet loyalty gifts from cathedral chapters',0,{gold:110})
+ ]),
+
+ // 37. Regency Ambition
+ E('em_ext_regent_ambition','Politics','The Seal Behind the Throne','Whispers warn that an ambitious court steward is issuing land patents under the royal signet.','regentPlot',[
+  C('Seize the signet ring in an unannounced night council',70,{legitimacy:10,securityMonths:10},'em_ext_regent_ambition_seized'),
+  C('Demand quiet accounting of every crown patent',0,{stability:4},'em_ext_regent_ambition_audit')
+ ]),
+ E('em_ext_regent_ambition_seized','Politics','Treason Unmasked','Shocked councilors kneel as forged charters are flung across the oak table.','followup',[
+  C('Strip the steward’s estates and scatter conspirators',0,{gold:150,loyalty:-4,legitimacy:8}),
+  C('Impose heavy ransoms for treasonous pardons',0,{gold:210,prestige:5})
+ ]),
+ E('em_ext_regent_ambition_audit','Politics','The Balanced Rolls','Auditors rectify the rent rolls, plugging silent leaks without triggering noble panic.','followup',[
+  C('Standardize double-entry royal parchment seals',80,{tax:8,stability:6}),
+  C('Accept the steward’s humble resignation',0,{prestige:6})
+ ]),
+
+ // 38. Trial by Combat
+ E('em_ext_trial_combat','Chivalry','Gauntlet Flung in the Hall','Two frontier barons throw mailed gauntlets before the dais, each swearing the other forged border deeds.','trialCombat',[
+  C('Sanction a solemn judicial duel under royal marshals',100,{prestige:16,morale:6},'em_ext_trial_combat_duel'),
+  C('Compel both houses to accept royal boundary arbitration',60,{stability:8,loyalty:4},'em_ext_trial_combat_arbitrate')
+ ]),
+ E('em_ext_trial_combat_duel','Chivalry','Steel Decides Before God','At dawn the challenger’s pollaxe shatters his foe’s shield; the hall erupts as truth is proclaimed.','followup',[
+  C('Award the victor knightly spurs and border command',50,{morale:8,prestige:8}),
+  C('Heal the fallen baron’s wounds to prevent blood vendetta',60,{loyalty:8,piety:5})
+ ]),
+ E('em_ext_trial_combat_arbitrate','Chivalry','Surveyors at the Milestone','Crowned surveyors drive iron boundary stakes along disputed hills without bloodshed.','followup',[
+  C('Levy equal court fees from both border baronies',0,{gold:95}),
+  C('Confirm ancient charters for future generations',0,{legitimacy:8})
+ ]),
+
+ // 39. Underground Cult
+ E('em_ext_secret_cult','Faith','Ciphers in the Sacristy','Watchmen uncover carved cellar altars and coded hymnals hidden beneath respected guild houses.','secretCult',[
+  C('Infiltrate the secret society with spymaster agents',110,{securityMonths:14,stress:4},'em_ext_secret_cult_exposed'),
+  C('Issue quiet royal pardon for voluntary recantation',50,{stability:8,piety:4},'em_ext_secret_cult_reconcile')
+ ]),
+ E('em_ext_secret_cult_exposed','Faith','The Masked Deacons Confess','Before dawn, agents arrest ringleaders holding foreign cipher keys and hidden bullion.','followup',[
+  C('Confiscate the cellar hoard for cathedral works',0,{gold:170,piety:10}),
+  C('Turn double agents to watch neighboring courts',80,{securityMonths:18})
+ ]),
+ E('em_ext_secret_cult_reconcile','Faith','Return to the Open Fold','Scores of penitent burghers burn their cipher books in public repentance, thanking royal mercy.','followup',[
+  C('Host a civic sermon of unity and concord',40,{unrest:-6,trust:8}),
+  C('Appoint faithful wardens over guild assemblies',0,{stability:5})
+ ]),
+
+ // 40. The White Stag
+ E('em_ext_white_stag','Court','Tracks of the White Stag','Royal foresters gallop into camp: an albino stag of legendary size grazes in mist-wreathed oaks.','whiteStag',[
+  C('Ride hard with horn and hound to claim the trophy',90,{prestige:14,stress:-12},'em_ext_white_stag_trophy'),
+  C('Watch silently in reverence and forbid the chase',0,{piety:14,stress:-8},'em_ext_white_stag_omen')
+ ]),
+ E('em_ext_white_stag_trophy','Court','Horns Mounted in the Great Hall','At dusk the royal spear strikes true; poets weave ballads comparing your prowess to ancient kings.','followup',[
+  C('Feast the hunting retinue with spiced venison',70,{loyalty:8,morale:6}),
+  C('Send gilded antler horns to allied rulers',40,{prestige:12})
+ ]),
+ E('em_ext_white_stag_omen','Court','The Sacred Clearing','Bards sing that heaven spared the white hart to bless a just and merciful dynasty.','followup',[
+  C('Declare the oak glade a protected royal sanctuary',60,{piety:12,legitimacy:6}),
+  C('Open forest pannage to needy villagers in winter',0,{trust:10,unrest:-4})
+ ]),
+
+ // 41. Legendary Bloodline Chronicler
+ E('em_ext_bloodline_chronicle','Dynasty','Genealogist of Forgotten Kings','A wandering chronicler claims ancient parchment fragments link your dynasty to heroic founders.','bloodlineEpic',[
+  C('Commission an illustrated royal codex across the realm',170,{prestige:22,legitimacy:12},'em_ext_bloodline_chronicle_codex'),
+  C('Reward him modestly and verify only sober charters',50,{legitimacy:5},'em_ext_bloodline_chronicle_sober')
+ ]),
+ E('em_ext_bloodline_chronicle_codex','Dynasty','Recited in Every Shire','Heralds proclaim the gilded genealogy at tournaments; vassals speak your lineage with newfound awe.','followup',[
+  C('Place gilded copies in cathedral and university libraries',80,{prestige:12,research:8}),
+  C('Strike commemorative silver groats',0,{trade:8,legitimacy:5})
+ ]),
+ E('em_ext_bloodline_chronicle_sober','Dynasty','Verified Deeds Above Fables','Courts praise the ruler’s grounded dignity and honest respect for attested legal precedent.','followup',[
+  C('Archive the charters cleanly in the chancery',40,{stability:6}),
+  C('Honor living heroes of recent campaigns',0,{morale:6})
+ ]),
+
+ // 42. Great Comet
+ E('em_ext_great_comet','Realm','Blazing Star Over the Citadel','A crimson-tailed comet slices night skies; astrologers and preachers fiercely debate its omen.','greatComet',[
+  C('Proclaim it heaven’s torch lighting royal destiny',100,{morale:12,legitimacy:8},'em_ext_great_comet_destiny'),
+  C('Order royal astronomers to chart its celestial arc',80,{research:12,stress:-6},'em_ext_great_comet_science')
+ ]),
+ E('em_ext_great_comet_destiny','Realm','Zeal Beneath Starlit Banners','Soldiers polish lances and sing hymns under the fiery tail, convinced victory is ordained.','followup',[
+  C('Muster frontier garrisons for a grand review',70,{morale:10,prestige:8}),
+  C('Lead barefoot prayers of thanksgiving at dawn',0,{piety:14})
+ ]),
+ E('em_ext_great_comet_science','Realm','Tables of Celestial Motion','Exact copper-ring measurements refute panic and earn acclaim from scholars abroad.','followup',[
+  C('Endow an observatory dome atop the citadel',110,{research:14,prestige:10}),
+  C('Calm markets with royal pamphlets explaining the stars',0,{stability:8,unrest:-4})
+ ]),
+
+ // 43. Marshal’s Ransom
+ E('em_ext_marshal_ransom','Warfare','Letters from a Captive Veteran','A scarred frontier commander long presumed slain sends ring-sealed word from a mountain keep.','marshalRansom',[
+  C('Pay the full silver ransom to bring him home',150,{morale:12,prestige:10},'em_ext_marshal_ransom_paid'),
+  C('Send covert rescuers to scale the keep by night',90,{prestige:8,securityMonths:8},'em_ext_marshal_ransom_raid')
+ ]),
+ E('em_ext_marshal_ransom_paid','Warfare','Return of the Old Lion','Troops roar with joy as the scarred veteran rides through the gate ready to drill recruits.','followup',[
+  C('Appoint him Inspector of Royal Arsenals',60,{morale:10,experience:8}),
+  C('Hold a feast in honor of unbroken loyalty',40,{loyalty:8})
+ ]),
+ E('em_ext_marshal_ransom_raid','Warfare','Dagger and Rope by Moonlight','Climbers lower the commander safely over mossy battlements, humiliating arrogant border wardens.','followup',[
+  C('Reward the night scouts with gilded daggers',40,{prestige:10,securityMonths:10}),
+  C('Strike back along the unguarded pass',0,{morale:8})
+ ]),
+
+ // 44. University Disputation
+ E('em_ext_university_debate','Learning','Disputation of Crown and Canon','University doctors clash over whether civil statutes override ancient diocesan immunities.','uniDebate',[
+  C('Sponsor open royal disputation and publish conclusions',100,{research:12,legitimacy:6},'em_ext_uni_debate_published'),
+  C('Uphold traditional jurisdiction to soothe prelates',20,{piety:10,loyalty:4},'em_ext_uni_debate_tradition')
+ ]),
+ E('em_ext_uni_debate_published','Learning','Jurists of the New Realm','Young legists flock to crown service, drafting clearer writs and fairer municipal charters.','followup',[
+  C('Appoint top doctors as circuit assize judges',80,{stability:8,tax:6}),
+  C('Grant printing privileges to the university press',40,{research:10})
+ ]),
+ E('em_ext_uni_debate_tradition','Learning','Bells of Concord','Bishops ring cathedral bells praising pious restraint, cementing pulpit support across shires.','followup',[
+  C('Accept monastic petitions for charity exemptions',0,{piety:10,trust:6}),
+  C('Invite learned abbots onto the royal council',0,{loyalty:8})
+ ]),
+
+ // 45. Narrow Sea Smugglers
+ E('em_ext_sea_smugglers','Economy','Lanterns on the Foggy Cove','Revenue cutters corner notorious smugglers unloading velvet bolts and French brandy beneath chalk cliffs.','seaSmugglers',[
+  C('Seize ships and auction contraband publicly',70,{gold:160,stability:4},'em_ext_sea_smugglers_seized'),
+  C('Recruit the captains as licensed privateers',90,{trade:8,morale:6},'em_ext_sea_smugglers_letter')
+ ]),
+ E('em_ext_sea_smugglers_seized','Economy','The Cliffside Hoard','Auctioned silks enrich harbor coffers and warn coastal villages against dodging royal customs.','followup',[
+  C('Build timber lighthouses at dangerous shoals',100,{trade:10,development:1}),
+  C('Raise customs bailiff patrols along creeks',0,{gold:90})
+ ]),
+ E('em_ext_sea_smugglers_letter','Economy','Hawks of the Crown','Reformed smugglers turn razor-sharp seamanship against hostile shipping lanes.','followup',[
+  C('Demand a quarter share of every prize captured',0,{gold:150}),
+  C('Assign them to patrol pirate anchorages',60,{trade:12,prestige:6})
+ ]),
+
+ // 46. Royal Falconry Hunt
+ E('em_ext_royal_falcon','Court','The Gyrfalcon of the North','Northern envoys present a snow-white gyrfalcon trained to stoop higher than any hawk in Europe.','royalFalcon',[
+  C('Train daily on windswept moors with master falconers',80,{stress:-14,prestige:10},'em_ext_royal_falcon_bond'),
+  C('Gift the prized bird to seal a noble vassal’s devotion',0,{loyalty:14,prestige:6},'em_ext_royal_falcon_gift')
+ ]),
+ E('em_ext_royal_falcon_bond','Court','Wings Over the Heath','Watching the gyrfalcon soar clears courtly melancholy and steels your judgment in council.','followup',[
+  C('Invite foreign ambassadors to a grand hawking meet',80,{prestige:12,stress:-8}),
+  C('Compose verses on kingship and nature',0,{piety:6,stress:-6})
+ ]),
+ E('em_ext_royal_falcon_gift','Court','Fealty Sworn on the Gauntlet','Deeply moved by the priceless gift, the noble lord pledges banners and loyal heirs to the crown.','followup',[
+  C('Confirm his hereditary wardenship of the forests',0,{loyalty:10,stability:4}),
+  C('Enjoy lavish hospitality at his mountain castle',0,{stress:-10})
+ ]),
+
+ // 47. Contested Inheritance Will
+ E('em_ext_contested_will','Dynasty','Parchment Under Three Seals','On his deathbed, a childless count leaves rival wills favoring his nephew, the church, and the crown.','contestedWill',[
+  C('Uphold escheat rights and fold the county into crown lands',90,{gold:160,loyalty:-6},'em_ext_contested_will_crown'),
+  C('Honor the pious bequest while negotiating wardship dues',40,{piety:12,loyalty:8},'em_ext_contested_will_piety')
+ ]),
+ E('em_ext_contested_will_crown','Dynasty','Royal Bailiffs Enter the Keep','Crown stewards take inventory of granaries and silver plate, bolstering central domain revenues.','followup',[
+  C('Charter the town market under crown protection',70,{tax:8,trust:6}),
+  C('Compensate the disappointed nephew with a court post',60,{loyalty:6})
+ ]),
+ E('em_ext_contested_will_piety','Dynasty','Prayers and Wardship Gold','Priests chant perpetual masses for your house while noble houses applaud royal respect for custom.','followup',[
+  C('Host the young heir at court as a royal ward',40,{loyalty:10}),
+  C('Collect traditional relief dues at Michaelmas',0,{gold:110})
+ ]),
+
+ // 48. Peasant Mystic
+ E('em_ext_peasant_mystic','Faith','The Shepherdess of Signs','Thousands gather at a hillside well where a young shepherdess preaches repentance and peace.','peasantMystic',[
+  C('Send courteous theologians to question and bless her',70,{piety:12,unrest:-6},'em_ext_peasant_mystic_blessed'),
+  C('Disperse unauthorized crowds gently before harvests rot',50,{stability:6,food:20},'em_ext_peasant_mystic_disperse')
+ ]),
+ E('em_ext_peasant_mystic_blessed','Faith','Hymns at Harvesttide','Vindicated by clerics, the movement turns peaceful fervor toward rebuilding parish churches.','followup',[
+  C('Donate royal timber for the new chapel roof',80,{piety:12,trust:10}),
+  C('Enlist devout pilgrims into highway repair crews',0,{development:1})
+ ]),
+ E('em_ext_peasant_mystic_disperse','Faith','Orderly Fields and Full Barns','Workers return to scythes and plows cleanly; full granaries guard the realm against winter famine.','followup',[
+  C('Buy surplus grain for army depots',80,{food:40,morale:6}),
+  C('Grant a modest harvest ale feast',30,{unrest:-5})
+ ]),
+
+ // 49. Condottiere Ultimatum
+ E('em_ext_condottiere_demand','Warfare','Captains at the Counting Table','Grizzled mercenary captains rattle scabbards, demanding double winter quarters before renewing banners.','condottiereDemand',[
+  C('Meet their silver terms and bind them with iron oaths',160,{morale:10,prestige:4},'em_ext_condottiere_demand_paid'),
+  C('Surround their camp with household knights and arrest ringleaders',90,{prestige:12,morale:-4},'em_ext_condottiere_demand_crush')
+ ]),
+ E('em_ext_condottiere_demand_paid','Warfare','Steel Bought and Bound','Satisfied veterans sharpen pikes and drill raw levies through icy fogs with deadly precision.','followup',[
+  C('Deploy them immediately to shield exposed borders',40,{morale:8,stability:4}),
+  C('Have royal scribes register every captain’s hostages',0,{securityMonths:10})
+ ]),
+ E('em_ext_condottiere_demand_crush','Warfare','Discipline Restored by Dawn','Seeing armored royal banners ring the ridge, mutineers throw down pikes and accept regular pay.','followup',[
+  C('Confiscate the mutinous war-chest',0,{gold:140,stability:6}),
+  C('Fold contrite veterans into crown regiments',50,{morale:6})
+ ]),
+
+ // 50. Crown Regalia
+ E('em_ext_crown_regalia','Court','The Goldsmith’s Masterpiece','Famed jewelers present rough rubies and enamelled filigree fit to reforge the coronation crown.','crownRegalia',[
+  C('Commission a gleaming new royal diadem and scepter',200,{legitimacy:14,prestige:20},'em_ext_crown_regalia_forged'),
+  C('Purchase gemstones discreetly for sovereign credit',90,{gold:120},'em_ext_crown_regalia_vault')
+ ]),
+ E('em_ext_crown_regalia_forged','Court','Majesty Enthroned','Beneath vaulted candlelight, ambassadors bow low before the jewel-encrusted regalia of your dynasty.','followup',[
+  C('Receive foreign oaths in solemn majesty',0,{legitimacy:10,prestige:10}),
+  C('Have chroniclers paint the coronation regalia',60,{stress:-8,prestige:8})
+ ]),
+ E('em_ext_crown_regalia_vault','Court','Silent Reserves of the Crown','Merchant bankers lower interest rates at the mere rumor of rubies locked within royal coffers.','followup',[
+  C('Expand guild credit lines across market towns',50,{trade:10}),
+  C('Keep emergency war reserves sealed',0,{stability:6})
+ ])
+];
+
+export const EXTENDED_REACTIVE_EVENTS=[
+ E('em_ext_react_society','Societies','Gathering of the Secret Chapter','Fellow society initiates invite you to share discoveries and advance your standing in secret arts.','reactSociety',[
+  C('Donate rare manuscripts and sponsor initiates',90,{research:10,prestige:10}),
+  C('Share prudent counsel without emptying crown coffers',0,{prestige:6,stress:-4})
+ ]),
+ E('em_ext_react_great_work','Realm','Festival at the Great Monument','Pilgrims, masons, and foreign poets gather beneath your monument’s arches, boosting civic pride.','reactGreatWork',[
+  C('Host public banquets beneath the colonnades',100,{legitimacy:10,prestige:12,unrest:-4}),
+  C('Collect visitor tolls for monument maintenance',0,{gold:120,prestige:4})
+ ]),
+ E('em_ext_react_heresy','Faith','Travelling Heretics Debate in the Square','Heterodox preachers draw restless crowds outside parish doors, challenging clerical authority.','reactHeresy',[
+  C('Send royal scholars for public theological debate',80,{piety:10,trust:6}),
+  C('Authorize parish bailiffs to silence illicit assemblies',40,{stability:6,unrest:3})
+ ]),
+ E('em_ext_react_antipope','Faith','Schism Bulls Nailed to Cathedral Doors','Rival papal envoys post conflicting encyclicals in market squares, troubling pious lords.','reactAntipope',[
+  C('Declare steadfast loyalty to canonical order',60,{piety:14,legitimacy:6}),
+  C('Exploit clerical confusion to assert royal prerogative',0,{gold:110,piety:-6})
+ ]),
+ E('em_ext_react_crusade','Faith','Banner of the Sacred Campaign','Pilgrims sew crosses and vows onto cloaks along high roads as sacred armies muster abroad.','reactCrusade',[
+  C('Contribute silver provisions to the holy war chest',130,{piety:18,prestige:12}),
+  C('Dispatch veteran sergeants to keep order along pilgrim roads',50,{morale:8,stability:4})
+ ]),
+ E('em_ext_react_silk_road','Trade','Caravanserai Overflowing with Spices','Camel trains along overland trade corridors bring lacquered chests, indigo, and brisk tariffs.','reactSilkRoad',[
+  C('Invest in fortified waystations and well houses',110,{trade:12,development:1}),
+  C('Auction royal spice monopolies at court',0,{gold:160})
+ ]),
+ E('em_ext_react_stressed_ruler','Personal','Sleepless Nights in the Candlelit Study','Endless petitions and parchment ledgers leave hands trembling as councilors watch anxiously.','reactStress',[
+  C('Retire to countryside gardens for ten days of rest',70,{stress:-22,health:-6}),
+  C('Call trusted physicians and endure through sheer duty',40,{stress:-10,legitimacy:4})
+ ]),
+ E('em_ext_react_council_divide','Politics','Sharp Quarrel at the Privy Table','Senior councilors trade bitter accusations over taxation and frontier troop deployments.','reactCouncil',[
+  C('Mediate patiently and restore collegial unity',80,{loyalty:10,stability:6,stress:4}),
+  C('Rebuke both factions and rule by sovereign decree',0,{legitimacy:8,loyalty:-4})
+ ]),
+ E('em_ext_react_minor_title','Court','Pride Among Court Officeholders','Holders of ceremonial court offices vie elegantly in masques, heraldry, and civic patronage.','reactMinorTitle',[
+  C('Sponsor a courtly masque celebrating loyal servants',90,{prestige:12,loyalty:8,stress:-8}),
+  C('Charge gentle fees for sealing noble heraldic patents',0,{gold:95,prestige:4})
+ ]),
+ E('em_ext_react_truces_broker','Diplomacy','Envoys Test the Fragile Truce','Border wardens report cavalry patrols probing mountain passes despite sealed peace treaties.','reactTruce',[
+  C('Exchange hostages and reaffirm truce oaths publicly',70,{stability:8,prestige:6}),
+  C('Quietly reinforce frontier castles just in case',80,{morale:8,securityMonths:8})
+ ])
+];
+
+export const EXTENDED_EMERGENT_DECISIONS=[
+ {id:'em_ext_dec_coronation_progress',category:'Dynasty',title:'Royal Progress Through Provinces',cost:160,cooldown:60,desc:'Tour provincial towns with banners and judges to affirm legitimacy and reduce unrest.',effects:{legitimacy:12,prestige:14,unrest:-6}},
+ {id:'em_ext_dec_war_games',category:'Warfare',title:'Stage Grand Field Maneuvers',cost:140,cooldown:48,desc:'Drill infantry, archers, and heavy cavalry together on royal heathlands.',effects:{morale:14,prestige:10}},
+ {id:'em_ext_dec_silk_bazaar',category:'Economy',title:'Charter Grand Silk & Spice Fair',cost:150,cooldown:60,desc:'Guarantee safe-conduct passes for foreign caravans and maritime factors.',effects:{gold:190,trade:12,development:1}},
+ {id:'em_ext_dec_dynastic_chronicle',category:'Dynasty',title:'Commission Dynastic History',cost:120,cooldown:72,desc:'Employ court poets and archivists to glorify your bloodline for posterity.',effects:{prestige:22,legitimacy:6}},
+ {id:'em_ext_dec_hospital_infirmary',category:'Realm',title:'Endow Plague & Fever Ward',cost:130,cooldown:60,desc:'Establish isolated stone infirmaries and herbal apothecaries to check outbreaks.',effects:{health:-14,stability:6,trust:8}},
+ {id:'em_ext_dec_counterspy_ring',category:'Intrigue',title:'Expand Counter-Espionage Network',cost:110,cooldown:48,desc:'Plant loyal informants across ports, taverns, and foreign embassies.',effects:{securityMonths:24,stability:4}}
+];
+
+const findEmergentDef=id=>EMERGENT_EVENTS.find(e=>e.id===id)||REACTIVE_EMERGENT_EVENTS.find(e=>e.id===id)||EXTENDED_EMERGENT_EVENTS.find(e=>e.id===id)||EXTENDED_REACTIVE_EVENTS.find(e=>e.id===id)||null;
+
+export function extendedEmergentDecisions(g,world,r=g.player){
+ const s=initEmergent(g);
+ const rs=s.realms[r];
+ if(!rs)return [];
+ return EXTENDED_EMERGENT_DECISIONS.map(d=>{
+  const last=rs.decisions[d.id]??-1000;
+  const remaining=Math.max(0,last+d.cooldown-g.turn);
+  const affordable=(g.factions?.[r]?.treasury??0)>=d.cost;
+  const ready=remaining===0&&affordable;
+  const reason=remaining>0?`Cooldown: ${remaining} months`:(affordable?'':'Insufficient gold');
+  return {...d,remaining,ready,reason};
+ });
+}
 
 export function reactiveEmergentCandidates(g,r){
  const f=g.factions?.[r];
@@ -484,7 +832,8 @@ export function reactiveEmergentCandidates(g,r){
  const recent=rs?.recentReactive||{};
  const eligible=ev=>(g.turn-(recent[ev.id]??-120))>=24;
  const out=[];
- const hasVendetta=Object.values(g.politics?.people||{}).some(p=>p?.alive&&p.realm===r&&(p.grievances||[]).some(gr=>gr.severity>=45));
+ const people=Object.values(g.politics?.people||{});
+ const hasVendetta=people.some(p=>p?.alive&&p.realm===r&&(p.grievances||[]).some(gr=>gr.severity>=45));
  if(hasVendetta)out.push(REACTIVE_EMERGENT_EVENTS[0]);
  const hasEpidemic=Object.values(g.economy?.crises||{}).some(c=>c?.kind==='epidemic'&&g.provinces?.[c.province]?.owner===r)||Object.keys(g.heritage?.epidemics||{}).some(pid=>g.provinces?.[pid]?.owner===r);
  if(hasEpidemic)out.push(REACTIVE_EMERGENT_EVENTS[1]);
@@ -494,6 +843,23 @@ export function reactiveEmergentCandidates(g,r){
  if(['republic','city'].includes(gov))out.push(REACTIVE_EMERGENT_EVENTS[3]);
  else if(gov==='steppe')out.push(REACTIVE_EMERGENT_EVENTS[4]);
  else if(['imperial','centralized'].includes(gov))out.push(REACTIVE_EMERGENT_EVENTS[5]);
+
+ // Deep CK2 reactive triggers
+ const rId=g.politics?.realms?.[r]?.ruler;
+ const head=rId?g.politics?.people?.[rId]:null;
+ if(rId&&g.deepSystems?.societies?.memberships?.[rId])out.push(EXTENDED_REACTIVE_EVENTS[0]);
+ if(Object.values(g.deepSystems?.greatWorks||{}).some(w=>g.provinces?.[w.provinceId]?.owner===r))out.push(EXTENDED_REACTIVE_EVENTS[1]);
+ if(Object.values(g.identity?.heresies||g.deepSystems?.heresies||{}).some(h=>g.provinces?.[h.province]?.owner===r))out.push(EXTENDED_REACTIVE_EVENTS[2]);
+ const faithLower=String(g.civic?.realms?.[r]?.faith||f.religion||'').toLowerCase();
+ if((faithLower.includes('catholic')||faithLower.includes('latin'))&&Object.values(g.deepSystems?.antipopes||{}).some(a=>a?.active))out.push(EXTENDED_REACTIVE_EVENTS[3]);
+ if(g.deepSystems?.crusade?.status==='active')out.push(EXTENDED_REACTIVE_EVENTS[4]);
+ if(Object.values(g.deepSystems?.tradePosts||{}).some(tp=>tp.owner===r)||['Asia','Africa'].includes(f.continent)&&(g.economy?.realms?.[r]?.tradeNet||0)>=5)out.push(EXTENDED_REACTIVE_EVENTS[5]);
+ if((head?.civic?.stress||0)>=55)out.push(EXTENDED_REACTIVE_EVENTS[6]);
+ const council=Object.values(g.politics?.realms?.[r]?.council||{});
+ if(council.some(cid=>people.some(p=>p.id===cid&&(p.grievances?.length||0)>0)))out.push(EXTENDED_REACTIVE_EVENTS[7]);
+ if(Object.keys(g.deepSystems?.minorTitles?.[r]||{}).length>0)out.push(EXTENDED_REACTIVE_EVENTS[8]);
+ if(Object.keys(g.conflict?.truces||{}).some(k=>k.split('|').includes(r)&&g.conflict.truces[k]>g.turn))out.push(EXTENDED_REACTIVE_EVENTS[9]);
+
  return out.filter(eligible);
 }
 
@@ -538,6 +904,7 @@ function applyEmergentEffects(g,r,effects){
  const head=ruler(g,r);
  for(const [k,v] of Object.entries(effects)){
   if(k==='gold'&&f)f.treasury+=v;
+  else if(k==='food'&&f)f.food=Math.max(0,(f.food||0)+v);
   else if(k==='prestige'&&f)f.prestige=Math.max(0,(f.prestige||0)+v);
   else if(k==='piety'&&f)f.piety=Math.max(0,(f.piety||0)+v);
   else if(k==='legitimacy'&&f)f.legitimacy=cap((f.legitimacy||0)+v,0,100);
@@ -548,6 +915,27 @@ function applyEmergentEffects(g,r,effects){
   }
   else if(k==='securityMonths'&&g.intrigue?.security){
    g.intrigue.security[r]={level:2,until:g.turn+v};
+  }
+  else if(k==='research'&&g.identity?.realms?.[r]?.research){
+   g.identity.realms[r].research.progress+=v;
+  }
+  else if(k==='trade'&&g.economy?.realms?.[r]){
+   g.economy.realms[r].tradeNet=(g.economy.realms[r].tradeNet||0)+v;
+  }
+  else if(k==='tax'&&f){
+   f.treasury+=Math.max(10,Math.round(v*8));
+  }
+  else if(k==='unrest'){
+   for(const p of Object.values(g.provinces||{}))if(p.owner===r)p.unrest=cap((p.unrest||0)+v,0,100);
+  }
+  else if(k==='trust'){
+   for(const p of Object.values(g.provinces||{}))if(p.owner===r&&g.civic?.provinces?.[p.id])g.civic.provinces[p.id].localTrust=cap((g.civic.provinces[p.id].localTrust||50)+v,0,100);
+  }
+  else if(k==='development'){
+   for(const p of Object.values(g.provinces||{}))if(p.owner===r){p.development=cap((p.development||1)+v,1,20);break;}
+  }
+  else if(k==='experience'){
+   for(const a of Object.values(g.armies||{}))if(a.owner===r)a.experience=cap((a.experience||0)+v*0.01,0,1);
   }
   else if(k==='loyalty'){
    const rId=g.politics?.realms?.[r]?.ruler;
@@ -593,7 +981,7 @@ export function emergentAction(g,world,action,id,extra){
  }
 
  if(action==='decision'){
-  const dec=EMERGENT_DECISIONS.find(d=>d.id===id);
+  const dec=EMERGENT_DECISIONS.find(d=>d.id===id)||EXTENDED_EMERGENT_DECISIONS.find(d=>d.id===id);
   if(!dec)return no('Unknown decision.');
   const last=rs.decisions[id]??-1000;
   if(g.turn-last<dec.cooldown)return no('Decision is on cooldown.');
@@ -648,7 +1036,7 @@ export function tickEmergent(g,world){
     rs.recentReactive??={};
     rs.recentReactive[root.id]=g.turn;
    }else{
-    const roots=EMERGENT_EVENTS.filter(e=>e.trigger!=='followup');
+    const roots=[...EMERGENT_EVENTS,...EXTENDED_EMERGENT_EVENTS].filter(e=>e.trigger!=='followup');
     root=roots[Math.floor(rand(s)*roots.length)];
    }
    if(root){

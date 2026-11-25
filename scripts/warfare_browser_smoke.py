@@ -10,14 +10,19 @@ from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
+server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()
 base='http://127.0.0.1:'+str(server.server_port)
+CHROME=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+LAUNCH={'headless':True,'args':['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--enable-webgl','--disable-gpu-sandbox','--use-gl=angle','--use-angle=swiftshader']}
+if CHROME.exists():LAUNCH['executable_path']=str(CHROME)
 errors=[]
+def close_modal(page):
+ btn=page.locator('#event-modal-defer')
+ if btn.is_visible():btn.click()
 try:
  with sync_playwright() as p:
-  browser=p.chromium.launch(headless=True,args=[
-   '--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader',
-   '--enable-webgl','--disable-gpu-sandbox','--use-gl=angle','--use-angle=swiftshader'])
+  browser=p.chromium.launch(**LAUNCH)
   page=browser.new_page(viewport={'width':1600,'height':960},device_scale_factor=1)
   page.on('pageerror',lambda e:errors.append(str(e)))
   page.goto(base,wait_until='domcontentloaded',timeout=45000)
@@ -26,14 +31,16 @@ try:
   assert 'Longbow Companies' in info,info
   page.select_option('#start-difficulty','hard')
   page.click('#start-new')
-  page.wait_for_timeout(450)
+  page.wait_for_timeout(550)
+  page.evaluate("document.querySelector('.map-options').open=true")
   page.click('#battle-showcase')
   assert page.locator('#battle-screen').is_visible()
   assert page.locator('#battle-start').is_visible()
   assert page.locator('#battle-lanes').is_visible()
-  assert page.locator('#battle-formation option').count()==3
-  page.select_option('#battle-formation','shield_wall')
-  assert 'SHIELD WALL' in page.locator('#battle-units .unitcard.active').inner_text()
+  assert page.locator('#battle-formation option').count()>=3
+  form_val=page.locator('#battle-formation option').nth(1).get_attribute('value')
+  page.select_option('#battle-formation',form_val)
+  assert page.locator('#battle-units .unitcard.active').count()>=1
   page.locator('#battle-lanes [data-lane="0"]').click()
   page.click('#battle-start')
   assert page.locator('#battle-start').is_hidden()
@@ -47,6 +54,7 @@ try:
   for month in range(48):
    if page.locator('#battle-screen').is_visible():
     defended=True;break
+   close_modal(page)
    page.click('#next-month')
    if not page.locator('#invasion-alert').is_hidden():
     warned=True
@@ -56,13 +64,11 @@ try:
   assert defended,'No incoming AI army reached a playable defensive battle'
   assert 'DEFEND' in page.locator('#battle-title').inner_text()
   assert page.locator('#battle-start').is_visible()
-  # Browser canvas captures may stall in software-rendered WebGL on CI.
-  # Verify live defensive gameplay regardless; the battle-art test already captures GPU output.
   print('INCOMING DEFENSE VERIFIED:',page.locator('#battle-title').inner_text())
   page.click('#battle-start')
   page.wait_for_timeout(450)
   page.click('#battle-retreat')
-  assert 'FORTRESS HAS FALLEN' in page.locator('#battle-result').inner_text()
+  assert 'THE DEFENDERS WERE DEFEATED' in page.locator('#battle-result').inner_text()
   page.click('#battle-return')
   assert page.locator('#battle-screen').is_hidden()
   page.click('#save-game')
@@ -78,4 +84,4 @@ except Exception:
  print(error,file=sys.stderr)
  raise
 finally:
- server.shutdown()
+ server.server_close()

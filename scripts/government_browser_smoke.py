@@ -6,7 +6,9 @@ import threading
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots'; OUT.mkdir(exist_ok=True)
+CHROME=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
+server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()
 URL='http://127.0.0.1:'+str(server.server_port)
 def load(page, realm):
@@ -39,7 +41,9 @@ def save_state(page):
  return page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save'))")
 try:
  with sync_playwright() as p:
-  browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'])
+  kw={'headless':True,'args':['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']}
+  if CHROME.exists():kw['executable_path']=str(CHROME)
+  browser=p.chromium.launch(**kw)
   for realm,summary in [('england','Estate assembly'),('ming','Provincial administration'),('horde','Clan assembly and herds'),('vijayanagara','Provincial charters'),('france','Royal inspectors'),('haudenosaunee','Member assembly')]:
    page=browser.new_page(viewport={'width':1440,'height':900},device_scale_factor=1)
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -89,4 +93,4 @@ try:
    page.close()
   browser.close()
 finally:
- server.shutdown()
+ server.server_close()

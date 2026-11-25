@@ -1,4 +1,5 @@
 import {invasionReserved} from './invasion-reservations.js';
+import {allocateCommanderName} from './name-pools.js';
 import {humanControlsRealm,reconcileCareer} from './player-career.js';
 import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison,terrainCombatModifiers} from './border-battle.js';
 import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
@@ -42,6 +43,7 @@ export function createGame(world,player='ottomans'){
  const game={version:1,mapVersion:world.meta?.mapVersion||'legacy',seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
  initializeKingdomSystems(game,world);
  initDeepSystems(game,world);
+ for(const a of Object.values(game.armies))a.commander=allocateCommanderName(game,a.owner,a.id);
  return game;
 }
 export function makeLog(g,text){g.log.unshift({date:`${MONTHS[g.month]} ${g.year}`,text});g.log=g.log.slice(0,30);}
@@ -49,8 +51,9 @@ export const ownerName=(g,id)=>g.factions[id]?.name||id;
 export function controlled(g,id){return Object.values(g.provinces).filter(p=>p.owner===id);}
 export function armiesAt(g,province,owner){return Object.values(g.armies).filter(a=>a.province===province&&!embarked(g,a.id)&&(owner===undefined||a.owner===owner&&!a.contingent));}
 export function armySize(a){return a?Math.max(0,Math.round(a.infantry+a.archers+a.cavalry)):0;}
-export function empireStats(g,owner){
- const p=controlled(g,owner); const f=g.factions[owner];
+export function empireStats(g,owner,cache=null){
+ const p=cache?.provs||controlled(g,owner); const f=g.factions[owner];
+ const ownArmies=cache?.armies||Object.values(g.armies).filter(a=>a.owner===owner);
  const tax=[.65,1,1.5][f?.policies.tax??1];
  const trade=tradeIncome(g,owner);
  const tradePosts=tradePostIncome(g,owner)+independentPolityTradeIncome(g,owner);
@@ -58,9 +61,11 @@ export function empireStats(g,owner){
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
  const taxIncome=Math.round(economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade+tradePosts;
- const upkeep=Math.round(Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.08,0))+navalUpkeep(g,owner);
- const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a)*.025,0));
- return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops:Object.values(g.armies).filter(a=>a.owner===owner).reduce((s,a)=>s+armySize(a),0),population:p.reduce((s,a)=>s+a.population,0)};
+ let rawUpkeep=0,rawFoodDrain=0,troops=0;
+ for(const a of ownArmies){const sz=armySize(a);rawUpkeep+=sz*.08;rawFoodDrain+=sz*.025;troops+=sz;}
+ const upkeep=Math.round(rawUpkeep)+navalUpkeep(g,owner);
+ const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-rawFoodDrain);
+ return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops,population:p.reduce((s,a)=>s+a.population,0)};
 }
 export function setPolicy(g,key,value){
  if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
@@ -101,7 +106,7 @@ export function recruit(g,provinceId,type='infantry'){
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
- if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:'Newly appointed general'};g.armies[a.id]=a;}
+ if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:allocateCommanderName(g,g.player,g.nextId)};g.armies[a.id]=a;}
  a[type]+=recruited;initMilitary(g);syncRegiments(g,a);
  a.doctrine=doctrine.id;
  makeLog(g,`${recruited} ${type} recruited in ${provinceId}.`);
@@ -224,13 +229,17 @@ function rand(g){g.seed=(1664525*g.seed+1013904223)>>>0;return g.seed/4294967296
 export function advanceMonth(g,world){
  world=campaignWorld(g,world);
  g.turn++;g.month++;if(g.month===12){g.month=0;g.year++;}
+ const provsByOwner=new Map(),armiesByOwner=new Map();
+ for(const pr of Object.values(g.provinces)){let arr=provsByOwner.get(pr.owner);if(!arr){arr=[];provsByOwner.set(pr.owner,arr);}arr.push(pr);}
+ for(const a of Object.values(g.armies)){let arr=armiesByOwner.get(a.owner);if(!arr){arr=[];armiesByOwner.set(a.owner,arr);}arr.push(a);}
  for(const f of Object.values(g.factions)){
   if(f.id==='independent')continue;
-  const s=empireStats(g,f.id);
+  const land=provsByOwner.get(f.id)||[];
+  const s=empireStats(g,f.id,{provs:land,armies:armiesByOwner.get(f.id)||[]});
   f.treasury=Math.round(f.treasury+s.balance);
   f.food=clamp(Math.round(f.food+s.foodDelta),-1000,50000);
   let avgUnrest=0;
-  for(const p of controlled(g,f.id)){
+  for(const p of land){
    p.population=clamp(p.population+(p.buildings.farm>0&&g.turn%4===0?1:0),4,800);
    const adjust= (f.policies.tax===2?2:f.policies.tax===0?-2:0)+(f.policies.levy===2?1:0)-(f.policies.tolerance===2?2:f.policies.tolerance===0?-1:0)-(p.buildings.farm>0?1:0);
    p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;

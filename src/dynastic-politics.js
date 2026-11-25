@@ -1,4 +1,5 @@
 import {personalUnionAction,reconcilePersonalUnions,unionJuniorDomain} from './personal-unions.js';
+import {allocateCharacterName,allocateHouseName} from './name-pools.js';
 import {humanControlsRealm,humanControlsCharacter,reconcileCareer} from './player-career.js';
 import {estateLaw,estateSuccession} from './estate-succession.js';
 import {characterInteraction,recordLifeEvent,rememberBereavement,personalPoliticalSupport} from './character-agency.js';
@@ -40,10 +41,12 @@ function log(g,s){g.log.unshift({date:g.year+' · month '+(g.month+1),text:s});g
 
 function person(g,realm,age,opts={}){
  const p=g.politics,id='c'+p.next++,n=hash(realm+id),f=g.factions[realm];
+ const sex=opts.sex||((n&1)?'female':'male');
+ const assignedName=opts.name||allocateCharacterName(g,{realm,continent:f?.continent,culture:opts.culture||f?.culture,faith:opts.faith||f?.religion,sex,seed:`person:${realm}:${id}`});
  const c={
   id,realm,house:opts.house||'House of '+f.name,
-  name:opts.name||pick(pools[f.continent]||pools.Europe,n)+' '+id,
-  age,alive:true,sex:opts.sex||((n&1)?'female':'male'),
+  name:assignedName,
+  age,alive:true,sex,
   parents:opts.parents||[],children:[],spouse:null,spouses:[],concubines:[],
   traits:[pick(traits,n),pick(traits,n>>>8)].filter((x,i,a)=>a.indexOf(x)===i),
   skills:{diplomacy:1+n%5,martial:1+(n>>>5)%5,stewardship:1+(n>>>10)%5,intrigue:1+(n>>>15)%5,learning:1+(n>>>20)%5},
@@ -95,7 +98,7 @@ function sync(g,realm){
 function newHolding(g,id){
  const p=g.politics,pr=g.provinces[id],realm=pr.owner;
  if(!p.realms[realm]){delete p.holdings[id];return;}
- const lord=person(g,realm,30+hash(id)%25,{house:'House of '+id.toUpperCase()});
+ const lord=person(g,realm,30+hash(id)%25,{house:allocateHouseName(g,{realm,seed:`holding:${id}:${g.turn||0}`})});
  person(g,realm,12+hash(id+'child')%12,{house:lord.house,parents:[lord.id]});
  p.holdings[id]={realm,lord:lord.id,loyalty:65,tax:1,levy:1,autonomy:1,wealth:0,concessionUntil:0};
 }
@@ -157,7 +160,7 @@ export function initPolitics(g,world){
  for(const f of world.factions){
   const old=g.kingdom.courts[f.id];
   const r=person(g,f.id,old.ruler.age,{name:old.ruler.name,sex:'male',house:old.dynasty,prestige:25,skills:{diplomacy:old.ruler.diplomacy,martial:old.ruler.martial,stewardship:old.ruler.stewardship,intrigue:2,learning:2}});
-  const wife=person(g,f.id,Math.max(18,r.age-4),{sex:'female',house:'Consort house of '+f.name});
+  const wife=person(g,f.id,Math.max(18,r.age-4),{sex:'female',house:allocateHouseName(g,{realm:f.id,seed:`consort:${f.id}`})});
   link(r,wife);
   const parent=person(g,f.id,r.age+23,{house:r.house});
   r.parents.push(parent.id);parent.children.push(r.id);
@@ -166,7 +169,7 @@ export function initPolitics(g,world){
   const h=person(g,f.id,Math.min(old.heir.age,Math.max(1,r.age-18),Math.max(1,wife.age-18)),{name:old.heir.name,house:r.house,parents:[r.id,wife.id],sex:'male'});
   person(g,f.id,Math.max(1,h.age-3),{house:r.house,parents:[r.id,wife.id],sex:'female'});
   const council={};
-  for(const role of ['chancellor','marshal','steward','spymaster','scholar'])council[role]=person(g,f.id,25+hash(f.id+role)%30,{house:'Court of '+f.name}).id;
+  for(const role of ['chancellor','marshal','steward','spymaster','scholar'])council[role]=person(g,f.id,25+hash(f.id+role)%30,{sex:(hash(f.id+role)%6===0)?'female':'male',house:allocateHouseName(g,{realm:f.id,seed:`council:${f.id}:${role}`})}).id;
   p.realms[f.id]={ruler:r.id,law:'eldest',council,lastLaw:-120};
  }
  for(const id of Object.keys(g.provinces))newHolding(g,id);
@@ -683,7 +686,7 @@ export function tickPolitics(g,world){
     if(a.realm!==realm||a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;
     const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];
     if(match&&marry(g,a,p.people[match.b]).ok){}
-    else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:'House of '+realm+' consorts'});link(a,b);}
+    else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:allocateHouseName(g,{realm,seed:`consort:${a.id}:${g.turn}`})});link(a,b);}
    }
   }
  }

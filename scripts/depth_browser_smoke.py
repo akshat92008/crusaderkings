@@ -7,8 +7,12 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots';OUT.mkdir(exist_ok=True)
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
+server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()
 URL='http://127.0.0.1:'+str(server.server_port)
+CHROME=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+LAUNCH={'headless':True,'args':['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']}
+if CHROME.exists():LAUNCH['executable_path']=str(CHROME)
 def state(page):
  return page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save'))")
 def tab(page,name):
@@ -21,7 +25,7 @@ def reveal(button):
  button.evaluate("(el)=>{for(let p=el.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;}")
 try:
  with sync_playwright() as p:
-  browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'])
+  browser=p.chromium.launch(**LAUNCH)
   page=browser.new_page(viewport={'width':1440,'height':900})
   errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   page.goto(URL,wait_until='domcontentloaded',timeout=45000)
@@ -74,4 +78,4 @@ try:
   print('PASS: live ambition, situation response, context decision, activity planning and persisted results')
   browser.close()
 finally:
- server.shutdown()
+ server.server_close()

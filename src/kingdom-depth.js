@@ -1,4 +1,5 @@
 import {reconcilePersonalUnions,tickPersonalUnions} from './personal-unions.js';
+import {allocateCharacterName,allocateCommanderName} from './name-pools.js';
 import {invasionReserved} from './invasion-reservations.js';
 import {humanControlsRealm,reconcileCareer} from './player-career.js';
 import {initLandless,tickLandless} from './landless-systems.js';
@@ -56,12 +57,14 @@ const provinces=(g,id)=>Object.values(g.provinces).filter(p=>p.owner===id);
 const armies=(g,id)=>Object.values(g.armies).filter(a=>a.owner===id);
 const size=a=>a?Math.max(0,a.infantry+a.archers+a.cavalry):0;
 const getRelation=(g,a,b)=>g.factions[a]?.relations?.[b]||0;
-function newCourt(f){
- const n=hash(f.id),pool=seeds[f.continent]||seeds.Europe;
+function newCourt(f,g){
+ const n=hash(f.id);
+ const rulerName=allocateCharacterName(g,{realm:f.id,continent:f.continent,culture:f.culture,faith:f.religion,place:f.name,withSeat:true,sex:'male',seed:`ruler:${f.id}`});
+ const heirName=allocateCharacterName(g,{realm:f.id,continent:f.continent,culture:f.culture,faith:f.religion,place:f.name,withSeat:true,sex:'male',seed:`heir:${f.id}`});
  return {
   dynasty:'House of '+f.name,
-  ruler:{name:choose(pool,n)+' of '+f.name,age:28+n%23,stewardship:1+n%5,martial:1+(n>>>4)%5,diplomacy:1+(n>>>8)%5},
-  heir:{name:choose(pool,n>>>5)+' of '+f.name,age:6+(n>>>13)%20},
+  ruler:{name:rulerName,age:28+n%23,stewardship:1+n%5,martial:1+(n>>>4)%5,diplomacy:1+(n>>>8)%5},
+  heir:{name:heirName,age:6+(n>>>13)%20},
   steward:1+(n>>>7)%3,marshal:1+(n>>>10)%3,
   lastAudience:-12,lastChronicle:-12,lastSuccession:-12,successions:0
  };
@@ -69,10 +72,10 @@ function newCourt(f){
 export function initializeKingdomSystems(g,world){
  if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initAgency(g);initLandless(g,world);reconcilePersonalUnions(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
- for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f);
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
+ for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f,g);
  initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initAgency(g);initLandless(g,world);reconcilePersonalUnions(g);
  return g.kingdom;
 }
@@ -291,9 +294,9 @@ function tickSuccession(g,world){
   const c=g.kingdom.courts[faction.id],f=g.factions[faction.id];if(!c||!f)continue;
   c.ruler.age++;c.heir.age++;
   if(c.ruler.age<58||rand(g)>(c.ruler.age-57)*.003)continue;
-  const before=c.ruler,seed=hash(c.heir.name+g.year),pool=seeds[faction.continent]||seeds.Europe;
+  const before=c.ruler,seed=hash(c.heir.name+g.year);
   c.ruler={name:c.heir.name,age:Math.max(16,c.heir.age),stewardship:1+seed%5,martial:1+(seed>>>5)%5,diplomacy:1+(seed>>>9)%5};
-  c.heir={name:choose(pool,seed)+' of '+faction.name,age:3+seed%13};c.successions++;
+  c.heir={name:allocateCharacterName(g,{realm:faction.id,continent:faction.continent,culture:faction.culture,faith:faction.religion,place:faction.name,withSeat:true,sex:'male',seed:`heir:${faction.id}:${g.turn}:${c.successions}`}),age:3+seed%13};c.successions++;
   f.legitimacy=clamp(f.legitimacy-8,0,100);f.stability=clamp(f.stability-4,0,100);
   if(faction.id===g.player||rand(g)<.05)log(g,c.dynasty+': '+before.name+' died. '+c.ruler.name+' now rules '+faction.name+'.');
  }
@@ -301,22 +304,25 @@ function tickSuccession(g,world){
 function aiMonthly(g,world){
  // Cap each rival to one infrastructure action and one recruitment decision
  // per cycle. No API calls, runaway build loops or invented "learning".
+ const provsByOwner=new Map(),armiesByOwner=new Map(),provMap=new Map(world.provinces.map(x=>[x.id,x]));
+ for(const p of Object.values(g.provinces)){let arr=provsByOwner.get(p.owner);if(!arr){arr=[];provsByOwner.set(p.owner,arr);}arr.push(p);}
+ for(const a of Object.values(g.armies)){let arr=armiesByOwner.get(a.owner);if(!arr){arr=[];armiesByOwner.set(a.owner,arr);}arr.push(a);}
  for(const f of world.factions){
   if(humanControlsRealm(g,f.id))continue;
-  const nation=g.factions[f.id],land=provinces(g,f.id);
+  const nation=g.factions[f.id],land=provsByOwner.get(f.id)||[];
   if(!nation||!land.length)continue;
   if(g.turn%3===0&&nation.treasury>450){
    const p=choose(land.filter(p=>controller(g,p.id)===f.id),hash(f.id+g.turn));if(!p)continue;
-   const neighbor=world.provinces.find(x=>x.id===p.id)?.neighbors||[];
+   const neighbor=provMap.get(p.id)?.neighbors||[];
    const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
    const goal=strategicPlan(g,f.id)?.goal,kind=nation.food<130||goal==='recover'?'farm':goal==='defend'&&frontier&&(p.buildings.fort||0)<3?'fort':goal==='conquer'&&(p.buildings.barracks||0)<3?'barracks':(p.buildings.market||0)<3?'market':'farm';
    const base={farm:180,fort:440,market:260,barracks:300}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
    if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
   }
   if(g.turn%6===0){
-   const all=armies(g,f.id),friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id)),eligible=all.filter(a=>!a.contingent&&!embarked(g,a.id)&&controller(g,a.province)===f.id&&!invasionReserved(g,a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
+   const all=armiesByOwner.get(f.id)||[],friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id)),eligible=all.filter(a=>!a.contingent&&!embarked(g,a.id)&&controller(g,a.province)===f.id&&!invasionReserved(g,a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
    const budget=aiRecruitmentBudget({treasury:nation.treasury,food:nation.food,population:land.reduce((n,p)=>n+p.population,0),armySize:all.reduce((n,a)=>n+size(a),0),goal:strategicPlan(g,f.id)?.goal,levy:politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy});
-   if(budget&&friendly.length){let a=eligible[0];if(!a&&!all.some(a=>size(a)>0)){const id='a'+g.nextId++;a={id,owner:f.id,province:friendly[0].id,infantry:0,archers:0,cavalry:0,experience:0,morale:70,commander:'Newly appointed general',doctrine:militaryDoctrine(f).id};g.armies[id]=a;}
+   if(budget&&friendly.length){let a=eligible[0];if(!a&&!all.some(a=>size(a)>0)){const id='a'+g.nextId++;a={id,owner:f.id,province:friendly[0].id,infantry:0,archers:0,cavalry:0,experience:0,morale:70,commander:allocateCommanderName(g,f.id,id),doctrine:militaryDoctrine(f).id};g.armies[id]=a;}
     if(a){nation.treasury-=budget.cost;const mix=startingTroops(f,budget.count);for(const t of ['infantry','archers','cavalry'])a[t]+=mix[t];a.morale=clamp(a.morale+1,0,100);syncRegiments(g,a);}
    }
   }

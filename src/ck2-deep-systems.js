@@ -2,6 +2,7 @@
  * CK2 Deep Systems & Cross-System Mechanics (Wave-1)
  * Deterministic, serializable grand-strategy systems with zero Math.random().
  */
+import {allocateCharacterName,allocateCardinalName,allocatePopeName} from './name-pools.js';
 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const num = n => (Number.isFinite(n) ? n : 0);
@@ -527,8 +528,6 @@ const PERSONALITY_TRAITS = [
 
 function createPolityRuler(g, pid, wp, continent, faith, culture, ageOffset = 0, gen = 1) {
  const seed = hashStr(`${pid}:${gen}:${wp?.name || pid}`);
- const pool = IND_NAMES[continent] || IND_NAMES.Europe;
- const name = pool[seed % pool.length];
  const rawRegion = (wp?.regionName || wp?.historicalPolity || wp?.name || pid).replace(/\s*·\s*\d+$/, '');
  const dynasty = `House of ${rawRegion}`;
  const age = ageOffset || (24 + (seed % 32));
@@ -538,7 +537,15 @@ function createPolityRuler(g, pid, wp, continent, faith, culture, ageOffset = 0,
  const traits = t1 === t2 ? [t1] : [t1, t2];
  const ruler = {
   id: `ind_${pid}_${gen}`,
-  name: `${name} of ${rawRegion}`,
+  name: allocateCharacterName(g, {
+   continent,
+   culture,
+   faith,
+   place: rawRegion,
+   withSeat: gen === 1,
+   sex,
+   seed: `ind:${pid}:${gen}`
+  }),
   dynasty,
   age,
   sex,
@@ -1596,11 +1603,12 @@ export function initCardinals(g) {
  }
  while (seats.length < 9) {
   const idx = seats.length + 1;
+  const seatRealm = catholicRealms[idx % Math.max(1, catholicRealms.length)] || 'papacy';
   seats.push({
    seatIndex: idx,
    personId: `curia_prelate_${idx}`,
-   realm: catholicRealms[idx % Math.max(1, catholicRealms.length)] || 'papacy',
-   name: `Cardinal Prelate ${idx}`,
+   realm: seatRealm,
+   name: allocateCardinalName(g, seatRealm, idx),
    learning: 3 + (idx % 3),
    piety: 25 + idx * 3,
    score: (3 + (idx % 3)) * 12 + (25 + idx * 3) * 0.5,
@@ -2880,6 +2888,135 @@ export function applyCrossSystemChoice(g, effectSpec = {}, opts = {}) {
 // MONTHLY SIMULATION TICK & VIEW AGGREGATION
 // ============================================================================
 
+function isHumanActiveRealm(g, realm) {
+ const vassalMode = g?.playerCareer?.mode === 'vassal';
+ return realm === g?.player && !vassalMode;
+}
+
+/**
+ * Staggered deterministic AI participation across deep CK2 systems
+ * (Societies, Coronations, Schools, Trade Posts, Great Works, Hospitals, Crusades, Cardinals).
+ */
+export function tickDeepAiAutonomy(g, world = null) {
+ const d = ensureDeepSystems(g);
+ if (!d || !g.turn || (g.turn % 3) !== 0) return;
+ const quarterSlot = Math.floor(g.turn / 3);
+ const provByOwner = new Map();
+ for (const p of Object.values(g.provinces || {})) {
+  if (!p?.owner || p.owner === 'independent') continue;
+  let arr = provByOwner.get(p.owner);
+  if (!arr) { arr = []; provByOwner.set(p.owner, arr); }
+  arr.push(p);
+ }
+
+ const crusadeActive = d.crusade?.status === 'active';
+ const existingGreatWorkRealms = new Set();
+ for (const gw of Object.values(d.greatWorks || {})) {
+  const owner = g.provinces?.[gw.provinceId]?.owner;
+  if (owner) existingGreatWorkRealms.add(owner);
+ }
+
+ for (const realm of Object.keys(g.politics?.realms || {})) {
+  if (isHumanActiveRealm(g, realm)) continue;
+  const f = g.factions?.[realm];
+  const r = getRuler(g, realm);
+  if (!f || !r?.alive || (r.age || 0) < 16) continue;
+  const land = provByOwner.get(realm) || [];
+  if (!land.length) continue;
+
+  const h = hashStr(realm);
+  // Stagger realms every 2 quarters (~6 months) to preserve tight campaign pacing & CPU budget
+  if (((h + quarterSlot) & 1) !== 0) continue;
+
+  const sortedLand = land.slice().sort((a, b) => (b.development || 0) - (a.development || 0) || a.id.localeCompare(b.id));
+  const capProv = sortedLand[0];
+  const capId = capProv.id;
+
+  // 1. Coronation if ruler uncrowned
+  if (d.coronations?.[realm]?.rulerId !== r.id && g.heritage?.realms?.[realm]?.lastCoronation !== r.id && f.treasury >= 240) {
+   const tier = f.treasury >= 520 && land.length >= 8 ? 'imperial' : f.treasury >= 340 ? 'royal' : 'modest';
+   coronateRuler(g, realm, tier);
+  }
+
+  // 2. Societies: join, complete mission, or advance rank
+  const mem = d.societies?.memberships?.[r.id];
+  if (!mem) {
+   const sk = r.skills || {};
+   const traits = r.traits || [];
+   const socId = (traits.includes('brave') || (sk.martial || 0) >= 4) ? 'warrior_lodge'
+    : (traits.includes('deceitful') || (sk.intrigue || 0) >= 4) ? 'assassins_order'
+     : ((sk.learning || 0) >= 4) ? 'hermetic_society' : 'monastic_order';
+   joinSociety(g, socId, r.id);
+  } else {
+   if (mem.rank < 4 && (mem.devotion || 0) >= SOCIETY_RANK_THRESHOLDS[mem.rank]) {
+    advanceSocietyRank(g, r.id);
+   } else if ((g.turn - (mem.lastMissionTurn ?? -120)) >= 3) {
+    societyMission(g, r.id);
+   }
+  }
+
+  // 3. Religious School adoption
+  if (!selectedReligiousSchool(g, realm) && f.treasury >= 240) {
+   const faith = getRealmFaith(g, realm);
+   const sys = resolveFaithSystem(g, faith);
+   const fam = resolveFaithFamily(g, faith);
+   const compat = Object.values(RELIGIOUS_SCHOOLS).filter(sc =>
+    sys === sc.system || (fam && sc.families.includes(fam)) || sys === 'traditional' || (sys === 'orthodox' && sc.system === 'catholic')
+   );
+   if (compat.length) {
+    selectReligiousSchool(g, realm, compat[(h + quarterSlot) % compat.length].id);
+   }
+  }
+
+  // 4. Epidemic Hospital & Court Isolation response
+  const hasEpi = land.some(p => g.economy?.crises?.[p.id]?.kind === 'epidemic' || g.heritage?.epidemics?.[p.id]);
+  if (hasEpi && !isCourtIsolated(g, realm)) {
+   toggleCourtIsolation(g, realm);
+  } else if (!hasEpi && isCourtIsolated(g, realm)) {
+   toggleCourtIsolation(g, realm);
+  }
+  const capInd = g.economy?.provinces?.[capId]?.industries;
+  if (capInd && (capInd.infirmary || 0) < 2 && f.treasury >= (hasEpi ? 420 : 680)) {
+   f.treasury -= 250;
+   capInd.infirmary = (capInd.infirmary || 0) + 1;
+  }
+
+  // 5. Crusade Pledging for same faith system
+  if (crusadeActive && !d.crusade.pledged?.[realm] && realm !== d.crusade.targetFaction && f.treasury >= 200) {
+   const sys = resolveFaithSystem(g, getRealmFaith(g, realm));
+   if (sys === d.crusade.callerSystem && (f.relations?.[d.crusade.targetFaction] || 0) <= 10) {
+    pledgeCrusade(g, realm);
+   }
+  }
+
+  // 6. Catholic Curia Cardinal patronage
+  if (resolveFaithSystem(g, getRealmFaith(g, realm)) === 'catholic' && f.treasury >= 650 && ((h + quarterSlot) % 5 === 0)) {
+   const col = initCardinals(g);
+   const ownSeats = col.seats.filter(s => s.realm === realm).length;
+   const scholarId = g.politics?.realms?.[realm]?.council?.scholar;
+   if (ownSeats < 2 && scholarId && !col.seats.some(s => s.personId === scholarId)) {
+    promoteCardinal(g, scholarId, 150, realm);
+   }
+  }
+
+  // 7. Trade Posts & Great Works investment when wealthy
+  if (f.treasury >= 620 && ((h + quarterSlot) % 4 === 0)) {
+   const tpTarget = sortedLand.find(p => getController(g, p.id) === realm && (!d.tradePosts?.[p.id] || d.tradePosts[p.id].level < 3));
+   if (tpTarget) buildTradePost(g, tpTarget.id, realm);
+  }
+  if (!existingGreatWorkRealms.has(realm) && land.length >= 4 && f.treasury >= 1150 && getController(g, capId) === realm) {
+   const kinds = ['royal_palace', 'cathedral', 'university', 'grand_fortress'];
+   const kind = kinds[(h + r.age) % kinds.length];
+   if (startGreatWork(g, capId, kind, realm).ok) {
+    existingGreatWorkRealms.add(realm);
+   }
+  } else if (existingGreatWorkRealms.has(realm) && f.treasury >= 980 && ((h + quarterSlot) % 4 === 0)) {
+   const gw = Object.values(d.greatWorks || {}).find(w => w.realm === realm && w.status === 'constructing' && g.provinces?.[w.provinceId]?.owner === realm);
+   if (gw) upgradeGreatWork(g, gw.provinceId, realm);
+  }
+ }
+}
+
 export function tickDeepSystems(g, world = null) {
  const d = ensureDeepSystems(g);
  if (!d || d.lastTick === g.turn) return d;
@@ -3055,12 +3192,39 @@ export function tickDeepSystems(g, world = null) {
  }
 
  if (annual) {
+  // Papal aging & Conclave election
+  if (d.cardinals?.pope && d.cardinals?.seats?.length) {
+   d.cardinals.pope.age = (d.cardinals.pope.age || 53) + 1;
+   if (d.cardinals.pope.age >= 72 && (hashStr(`conclave:${g.turn}`) % 5 === 0)) {
+    const sorted = d.cardinals.seats.slice().sort((a, b) => (b.score || 0) - (a.score || 0) || a.seatIndex - b.seatIndex);
+    const winner = sorted[0];
+    const oldName = d.cardinals.pope.name;
+    const newPopeName = allocatePopeName(g, (g.turn || 0) + (winner?.seatIndex || 1));
+    d.cardinals.pope = {
+     id: `pope_${g.turn}`,
+     name: newPopeName,
+     realm: winner?.realm || 'papacy',
+     age: 52 + (hashStr(newPopeName) % 14),
+     electedTurn: g.turn || 0
+    };
+    if (winner?.realm) {
+     const fs = g.identity?.realms?.[winner.realm]?.faithSystem;
+     if (fs?.system === 'catholic') fs.papalFavor = clamp((fs.papalFavor || 55) + 15, 0, 100);
+     if (g.factions?.[winner.realm]) g.factions[winner.realm].prestige = (g.factions[winner.realm].prestige || 0) + 20;
+     addLog(g, winner.realm, `${oldName} passed away; ${winner.name} was elected Pope as ${newPopeName}!`);
+     winner.name = allocateCardinalName(g, winner.realm, winner.seatIndex + (g.turn || 1));
+     winner.personId = `curia_prelate_${winner.seatIndex}_${g.turn || 1}`;
+     winner.appointedTurn = g.turn || 0;
+    }
+   }
+  }
   for (const [id, fav] of Object.entries(d.favors)) {
    if (fav.used && (g.turn || 0) - (fav.usedTurn || 0) > 24) delete d.favors[id];
    else if ((fav.expires || 0) <= (g.turn || 0)) delete d.favors[id];
   }
  }
 
+ tickDeepAiAutonomy(g, world);
  return d;
 }
 

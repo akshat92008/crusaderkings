@@ -2,6 +2,7 @@
 import {controller} from './campaign-war.js';
 import {syncTitles,isImprisoned} from './feudal-systems.js';
 import {startingTroops,militaryDoctrine} from './military-doctrines.js';
+import {allocateCharacterName,allocateCommanderName,allocateHouseName} from './name-pools.js';
 
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),clone=x=>JSON.parse(JSON.stringify(x)),pair=(a,b)=>[a,b].sort().join('|');
 
@@ -64,12 +65,12 @@ export function foundBreakaway(g,world,x){
  const moved=new Set(candidates.map(p=>p.id));
  for(const p of Object.values(g.politics.people))if(p.realm===parent&&p.alive&&candidates.some(c=>c.house===p.house)&&p.id!==g.politics.realms[parent].ruler&&!remain.some(v=>g.politics.holdings[v.id]?.lord===p.id))moved.add(p.id);
  for(const cid of moved)g.politics.people[cid].realm=id;
- for(const [role,cid] of Object.entries(g.politics.realms[parent].council))if(moved.has(cid))g.politics.realms[parent].council[role]=person(g,parent,'Appointed '+role+' of '+old.name,'Court of '+old.name,role).id;
- for(const role of ['chancellor','marshal','steward','spymaster','scholar'])g.politics.realms[id].council[role]=person(g,id,'Appointed '+role+' of '+name,'Court of '+name,role).id;
+ for(const [role,cid] of Object.entries(g.politics.realms[parent].council))if(moved.has(cid))g.politics.realms[parent].council[role]=person(g,parent,allocateCharacterName(g,{realm:parent,continent:old.continent,culture:old.culture,faith:old.religion,seed:`rebel-council:${parent}:${role}:${g.turn}`}),allocateHouseName(g,{realm:parent,continent:old.continent,seed:`rch:${parent}:${role}:${g.turn}`}),role).id;
+ for(const role of ['chancellor','marshal','steward','spymaster','scholar'])g.politics.realms[id].council[role]=person(g,id,allocateCharacterName(g,{realm:id,continent:old.continent,culture:old.culture,faith:old.religion,seed:`brk-council:${id}:${role}:${g.turn}`}),allocateHouseName(g,{realm:id,continent:old.continent,seed:`bch:${id}:${role}:${g.turn}`}),role).id;
  for(const p of members){
   g.provinces[p].owner=id;g.provinces[p].unrest=cap(g.provinces[p].unrest-20,0,100);
   const h=g.politics.holdings[p];h.realm=id;h.loyalty=70;
-  if(!moved.has(h.lord))h.lord=person(g,id,'Lord of '+(map.get(p)?.name||p),'House of '+p,'local lord').id;
+  if(!moved.has(h.lord))h.lord=person(g,id,allocateCharacterName(g,{realm:id,continent:old.continent,culture:old.culture,faith:old.religion,place:map.get(p)?.name||name,withSeat:true,seed:`brklord:${p}:${g.turn}`}),allocateHouseName(g,{realm:id,continent:old.continent,seed:`brkhouse:${p}:${g.turn}`}),'local lord').id;
   delete g.politics.situations['grievance:'+p];
  }
  const children=leader.children.map(i=>g.politics.people[i]).filter(p=>p?.alive&&p.realm===id).sort((a,b)=>b.age-a.age),heir=children[0];
@@ -81,7 +82,7 @@ export function foundBreakaway(g,world,x){
  g.identity.realms[id]={...clone(g.identity.realms[parent]),research:null,lastTradition:g.turn,lastFaith:g.turn,faithAuthority:45};
  for(const a of Object.values(g.armies))if(a.owner===parent&&memberSet.has(a.province)&&!g.naval.voyages[a.id]){const target=remain.find(p=>controller(g,p.id)===parent);if(target)a.province=target.id;else delete g.armies[a.id];}
  const count=Math.max(20,Math.min(350,Math.round(x.rebels??x.power??members.length*45))),aid='a'+g.nextId++;
- g.armies[aid]={id:aid,owner:id,province:members[0],...startingTroops(g.factions[id],count),experience:.1,morale:75,commander:'Commander of '+name,doctrine:militaryDoctrine(g.factions[id]).id};
+ g.armies[aid]={id:aid,owner:id,province:members[0],...startingTroops(g.factions[id],count),experience:.1,morale:75,commander:allocateCommanderName(g,id,members[0]),doctrine:militaryDoctrine(g.factions[id]).id};
  s.states[id]={id,parent,founder:leader.id,turn:g.turn,members:[...members],reason:x.status};
  x.newRealm=id;
  s.history.unshift({id,parent,turn:g.turn,provinces:[...members]});
