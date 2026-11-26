@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sovereign-1450-v2';
+const CACHE_NAME = 'sovereign-1450-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -10,11 +10,13 @@ const CORE_ASSETS = [
   './assets/branding/icon-192.png',
   './assets/branding/icon-512.png',
   './assets/hometown/manifest.json',
+  './assets/battle/sprites/manifest.json',
   './data/world.json',
   './data/historical-polities-1450.json',
   './src/main.js',
   './src/simulation.js',
   './src/map.js',
+  './src/banner-renderer.js',
   './src/kingdom-ui.js',
   './src/kingdom-depth.js',
   './src/dynastic-politics.js',
@@ -42,6 +44,20 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET' || !req.url.startsWith(self.location.origin)) return;
+  const url = new URL(req.url);
+  const freshFirst = req.mode === 'navigate' || /\.(html|css|js|json|webmanifest)$/i.test(url.pathname) || url.pathname === '/';
+  if (freshFirst) {
+    event.respondWith(
+      fetch(req).then(res => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(req, clone)).catch(() => {});
+        }
+        return res;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(req).then(cached => cached || fetch(req).then(res => {
       if (res && res.status === 200 && res.type === 'basic') {
