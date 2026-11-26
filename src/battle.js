@@ -723,6 +723,7 @@ export class BattleGame {
         g.readiness = armyReadiness(game, a);
       }
       g.simpleField=this.simpleField;
+      g.realmId = game?.player || playerFaction?.id || null;
       g.commanderMartial = atkMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
@@ -765,6 +766,7 @@ export class BattleGame {
         g.readiness = armyReadiness(game, enemyArmy || enemies);
       }
       g.simpleField=this.simpleField;
+      g.realmId = enemy?.id || descriptor.enemy || null;
       g.commanderMartial = defMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;

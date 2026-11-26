@@ -22,5 +22,13 @@ for (const [key, url] of Object.entries(manifest.extras || {})) {
     process.exit(1);
   }
 }
+for (const [cult, units] of Object.entries(manifest.cultures || {})) {
+  for (const [key, entry] of Object.entries(units || {})) {
+    if (!existsSync(entry.url)) {
+      console.error('Missing civilization battle sprite:', cult, key, entry.url);
+      process.exit(1);
+    }
+  }
+}
 
-console.log(`Source & 2D Banner Lines asset checks passed (${readdirSync('src').length} src entries, ${Object.keys(manifest.units || {}).length} unit sheets).`);
+console.log(`Source & 2D Banner Lines asset checks passed (${readdirSync('src').length} src entries, ${Object.keys(manifest.units || {}).length} default + ${Object.keys(manifest.cultures || {}).length} culture sprite sets).`);

@@ -1,18 +1,304 @@
-"""Generate and extract crisp 2D isometric sprite strips for Banner Lines tactical battles."""
-import json
-import zipfile
+"""Extract transparent, multi-frame civilization unit & VFX sprite sheets for Banner Lines."""
+from collections import deque
 from pathlib import Path
+import io
+import json
+import subprocess
+import zipfile
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'assets' / 'battle' / 'sprites'
+CULTURE_OUT = OUT / 'cultures'
 OUT.mkdir(parents=True, exist_ok=True)
+CULTURE_OUT.mkdir(parents=True, exist_ok=True)
+
+# 6x6 Gemini 2048x2048 historical sprite sheets tracked in git HEAD -> unit role mappings.
+# Selected frames: row 0 col 0 (idle), row 1 col 2 (walk), row 3 col 2 (attack), row 4 col 1 (hit/rout).
+FRAME_COORDS = [(0, 0), (2, 1), (2, 3), (1, 4)]
+
+DEFAULT_SHEETS = {
+    'infantry': ('7r747w7r747w7r74', 96, 96),
+    'heavy_infantry': ('7zn1jd7zn1jd7zn1', 96, 96),
+    'pikemen': ('gt5r22gt5r22gt5r', 96, 96),
+    'archers': ('2jlxix2jlxix2jlx', 96, 96),
+    'gunpowder': ('7pzhfq7pzhfq7pzh', 96, 96),
+    'commander': ('agskuragskuragsk', 118, 102),
+    'cavalry': ('xfh656xfh656xfh6', 118, 102),
+    'elephants': ('7y9kha7y9kha7y9k', 128, 110),
+}
+
+CULTURE_SHEETS = {
+    'europe_west': {
+        'infantry': ('7r747w7r747w7r74', 96, 96),
+        'heavy_infantry': ('fb33uyfb33uyfb33', 96, 96),
+        'pikemen': ('gt5r22gt5r22gt5r', 96, 96),
+        'archers': ('acp9q7acp9q7acp9', 96, 96),
+        'crossbow': ('2jlxix2jlxix2jlx', 96, 96),
+        'gunpowder': ('7pzhfq7pzhfq7pzh', 96, 96),
+        'cavalry': ('xfh656xfh656xfh6', 118, 102),
+        'commander': ('agskuragskuragsk', 118, 102),
+    },
+    'europe_east': {
+        'infantry': ('7zn1jd7zn1jd7zn1', 96, 96),
+        'heavy_infantry': ('9lw3b9lw3b9lw3b9', 96, 96),
+        'pikemen': ('jzggtdjzggtdjzgg', 96, 96),
+        'archers': ('c5hj3mc5hj3mc5hj', 96, 96),
+        'gunpowder': ('7pzhfq7pzhfq7pzh', 96, 96),
+        'cavalry': ('agskuragskuragsk', 118, 102),
+        'commander': ('xfh656xfh656xfh6', 118, 102),
+    },
+    'ottoman': {
+        'infantry': ('33oz2y33oz2y33oz', 96, 96),
+        'heavy_infantry': ('d7xpf5d7xpf5d7xp', 96, 96),
+        'pikemen': ('3x5hn63x5hn63x5h', 96, 96),
+        'archers': ('iehse6iehse6iehs', 96, 96),
+        'gunpowder': ('vuvk5zvuvk5zvuvk', 96, 96),
+        'cavalry': ('fia0dsfia0dsfia0', 118, 102),
+        'commander': ('y3xy70y3xy70y3xy', 118, 102),
+    },
+    'persian': {
+        'infantry': ('m1k4uxm1k4uxm1k4', 96, 96),
+        'heavy_infantry': ('v2kpj7v2kpj7v2kp', 96, 96),
+        'pikemen': ('44unij44unij44un', 96, 96),
+        'archers': ('iehse6iehse6iehs', 96, 96),
+        'gunpowder': ('vuvk5zvuvk5zvuvk', 96, 96),
+        'cavalry': ('y3xy70y3xy70y3xy', 118, 102),
+        'commander': ('fia0dsfia0dsfia0', 118, 102),
+    },
+    'southindia': {
+        'infantry': ('snyt3isnyt3isnyt', 96, 96),
+        'heavy_infantry': ('v2kpj7v2kpj7v2kp', 96, 96),
+        'pikemen': ('r0d056r0d056r0d0', 96, 96),
+        'archers': ('qottp7qottp7qott', 96, 96),
+        'gunpowder': ('vuvk5zvuvk5zvuvk', 96, 96),
+        'cavalry': ('y3xy70y3xy70y3xy', 118, 102),
+        'elephants': ('7y9kha7y9kha7y9k', 128, 110),
+        'commander': ('bm3p0qbm3p0qbm3p', 128, 110),
+    },
+    'northindia': {
+        'infantry': ('m1k4uxm1k4uxm1k4', 96, 96),
+        'heavy_infantry': ('v2kpj7v2kpj7v2kp', 96, 96),
+        'pikemen': ('44unij44unij44un', 96, 96),
+        'archers': ('qottp7qottp7qott', 96, 96),
+        'gunpowder': ('vuvk5zvuvk5zvuvk', 96, 96),
+        'cavalry': ('y3xy70y3xy70y3xy', 118, 102),
+        'elephants': ('7y9kha7y9kha7y9k', 128, 110),
+        'commander': ('bm3p0qbm3p0qbm3p', 128, 110),
+    },
+    'ming': {
+        'infantry': ('d8i71id8i71id8i7', 96, 96),
+        'heavy_infantry': ('d8i71id8i71id8i7', 96, 96),
+        'pikemen': ('6s7zl66s7zl66s7z', 96, 96),
+        'archers': ('e41b5qe41b5qe41b', 96, 96),
+        'gunpowder': ('7pzhfq7pzhfq7pzh', 96, 96),
+        'cavalry': ('xhxz1xxhxz1xxhxz', 118, 102),
+        'commander': ('lesd2wlesd2wlesd', 118, 102),
+    },
+    'japan': {
+        'infantry': ('feoyafeoyafeoyaf', 96, 96),
+        'heavy_infantry': ('feoyafeoyafeoyaf', 96, 96),
+        'pikemen': ('6s7zl66s7zl66s7z', 96, 96),
+        'archers': ('j27cxtj27cxtj27c', 96, 96),
+        'gunpowder': ('7pzhfq7pzhfq7pzh', 96, 96),
+        'cavalry': ('lesd2wlesd2wlesd', 118, 102),
+        'commander': ('lesd2wlesd2wlesd', 118, 102),
+    },
+    'southeast': {
+        'infantry': ('snyt3isnyt3isnyt', 96, 96),
+        'heavy_infantry': ('d8i71id8i71id8i7', 96, 96),
+        'pikemen': ('6s7zl66s7zl66s7z', 96, 96),
+        'archers': ('e41b5qe41b5qe41b', 96, 96),
+        'cavalry': ('lesd2wlesd2wlesd', 118, 102),
+        'elephants': ('7y9kha7y9kha7y9k', 128, 110),
+        'commander': ('bm3p0qbm3p0qbm3p', 128, 110),
+    },
+    'steppe': {
+        'infantry': ('jyxrnejyxrnejyxr', 96, 96),
+        'heavy_infantry': ('7zn1jd7zn1jd7zn1', 96, 96),
+        'pikemen': ('jzggtdjzggtdjzgg', 96, 96),
+        'archers': ('jyxrnejyxrnejyxr', 96, 96),
+        'horsebow': ('au30gmau30gmau30', 118, 102),
+        'cavalry': ('ybyd5gybyd5gybyd', 118, 102),
+        'commander': ('xhxz1xxhxz1xxhxz', 118, 102),
+    },
+    'africa': {
+        'infantry': ('hzntlwhzntlwhznt', 96, 96),
+        'heavy_infantry': ('dv8f0qdv8f0qdv8f', 96, 96),
+        'pikemen': ('3x5hn63x5hn63x5h', 96, 96),
+        'archers': ('iehse6iehse6iehs', 96, 96),
+        'cavalry': ('fia0dsfia0dsfia0', 118, 102),
+        'commander': ('33oz2y33oz2y33oz', 96, 96),
+    },
+    'mesoamerica': {
+        'infantry': ('r1potdr1potdr1po', 96, 96),
+        'heavy_infantry': ('r7klf8r7klf8r7kl', 96, 96),
+        'pikemen': ('w0b414w0b414w0b4', 96, 96),
+        'archers': ('hhzz41hhzz41hhzz', 96, 96),
+        'cavalry': ('r7klf8r7klf8r7kl', 96, 96),
+        'commander': ('r1potdr1potdr1po', 96, 96),
+    },
+    'andean': {
+        'infantry': ('w0b414w0b414w0b4', 96, 96),
+        'heavy_infantry': ('tkxrwotkxrwotkxr', 96, 96),
+        'pikemen': ('tl4dc2tl4dc2tl4d', 96, 96),
+        'archers': ('8bq5ae8bq5ae8bq5', 96, 96),
+        'cavalry': ('w0b414w0b414w0b4', 96, 96),
+        'commander': ('r1potdr1potdr1po', 96, 96),
+    },
+}
+
+_SHEET_CACHE = {}
 
 
-def save_webp(img: Image.Image, name: str):
-    path = OUT / f'{name}.webp'
-    img.save(path, 'WEBP', quality=90, lossless=False)
-    return f'assets/battle/sprites/{name}.webp'
+def load_git_sheet(sheet_id: str) -> Image.Image:
+    if sheet_id in _SHEET_CACHE:
+        return _SHEET_CACHE[sheet_id]
+    # Note: one blob uses mixed case or space suffix if ever needed; HEAD paths follow Gemini_Generated_Image_<id>.png
+    rel = f'assets/Gemini_Generated_Image_{sheet_id}.png'
+    try:
+        raw = subprocess.check_output(['git', 'show', f'HEAD:{rel}'], cwd=str(ROOT), stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        dl = Path.home() / 'Downloads' / f'Gemini_Generated_Image_{sheet_id}.png'
+        raw = dl.read_bytes()
+    im = Image.open(io.BytesIO(raw)).convert('RGBA')
+    _SHEET_CACHE[sheet_id] = im
+    return im
+
+
+def key_cell_background(cell: Image.Image) -> Image.Image:
+    """Perimeter flood-fill keying for white or light/dark checkerboard mattes.
+
+    Samples actual neutral matte colors from the cell's border band so dark
+    checkerboard squares are removed cleanly alongside light ones, without ever
+    entering the colored soldier interior.
+    """
+    w, h = cell.size
+    px = cell.load()
+    visited = bytearray(w * h)
+    q = deque()
+
+    # Sample distinct neutral tones from the outermost 32px corner bands (covers light & dark checker tiles)
+    samples = []
+    for y in list(range(2, min(36, h), 4)) + list(range(max(0, h - 36), h - 1, 4)):
+        for x in list(range(2, min(36, w), 4)) + list(range(max(0, w - 36), w - 1, 4)):
+            r, g, b, _ = px[x, y]
+            if max(r, g, b) - min(r, g, b) <= 22:
+                if all(abs(r - sr) + abs(g - sg) + abs(b - sb) > 16 for sr, sg, sb in samples):
+                    samples.append((r, g, b))
+        if len(samples) >= 8:
+            break
+    matte_tones = samples
+
+    def is_matte(r: int, g: int, b: int) -> bool:
+        hi = max(r, g, b)
+        lo = min(r, g, b)
+        sat = hi - lo
+        if (sat <= 22 and hi >= 145) or (hi >= 238 and sat <= 34):
+            return True
+        if sat <= 18:
+            for sr, sg, sb in matte_tones:
+                tol = 10 if max(sr, sg, sb) < 28 else 22
+                if abs(r - sr) <= tol and abs(g - sg) <= tol and abs(b - sb) <= tol:
+                    return True
+        return False
+
+    for x in range(w):
+        q.append((x, 0))
+        q.append((x, h - 1))
+    for y in range(1, h - 1):
+        q.append((0, y))
+        q.append((w - 1, y))
+
+    while q:
+        x, y = q.popleft()
+        idx = y * w + x
+        if visited[idx]:
+            continue
+        r, g, b, a = px[x, y]
+        if not is_matte(r, g, b):
+            continue
+        visited[idx] = 1
+        px[x, y] = (0, 0, 0, 0)
+        if x > 0 and not visited[idx - 1]:
+            q.append((x - 1, y))
+        if x + 1 < w and not visited[idx + 1]:
+            q.append((x + 1, y))
+        if y > 0 and not visited[idx - w]:
+            q.append((x, y - 1))
+        if y + 1 < h and not visited[idx + w]:
+            q.append((x, y + 1))
+
+    # Gentle 1px edge de-fringing for pale anti-aliased halos touching transparent pixels
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            hi = max(r, g, b)
+            lo = min(r, g, b)
+            if hi - lo <= 22 and hi >= 145:
+                neighbors_clear = (
+                    px[x - 1, y][3] == 0 or px[x + 1, y][3] == 0 or
+                    px[x, y - 1][3] == 0 or px[x, y + 1][3] == 0
+                )
+                if neighbors_clear:
+                    px[x, y] = (int(r * 0.55), int(g * 0.55), int(b * 0.55), 115)
+    return cell
+
+
+def slice_strip(sheet_id: str, fw: int, fh: int) -> Image.Image:
+    im = load_git_sheet(sheet_id)
+    w, h = im.size
+    strip = Image.new('RGBA', (fw * len(FRAME_COORDS), fh), (0, 0, 0, 0))
+    cells = []
+    bboxes = []
+    for col, row in FRAME_COORDS:
+        x0 = round(col * w / 6) + 5
+        y0 = round(row * h / 6) + 5
+        x1 = round((col + 1) * w / 6) - 5
+        y1 = round((row + 1) * h / 6) - 5
+        cell = key_cell_background(im.crop((x0, y0, x1, y1)))
+        bb = cell.getbbox()
+        cells.append(cell)
+        if bb:
+            bboxes.append(bb)
+
+    if not bboxes:
+        return strip
+
+    # Consistent union crop box + bottom alignment so sprites don't jitter between poses
+    ux0 = min(b[0] for b in bboxes)
+    uy0 = min(b[1] for b in bboxes)
+    ux1 = max(b[2] for b in bboxes)
+    uy1 = max(b[3] for b in bboxes)
+    pad = 4
+    ux0 = max(0, ux0 - pad)
+    uy0 = max(0, uy0 - pad)
+    ux1 = min(cells[0].width, ux1 + pad)
+    uy1 = min(cells[0].height, uy1 + pad)
+
+    crop_w = max(1, ux1 - ux0)
+    crop_h = max(1, uy1 - uy0)
+    target_h = fh - 6
+    target_w = fw - 6
+    scale = min(target_w / crop_w, target_h / crop_h)
+    nw = max(1, round(crop_w * scale))
+    nh = max(1, round(crop_h * scale))
+
+    for i, cell in enumerate(cells):
+        cropped = cell.crop((ux0, uy0, ux1, uy1)).resize((nw, nh), Image.Resampling.LANCZOS)
+        dx = i * fw + (fw - nw) // 2
+        dy = fh - nh - 2
+        strip.paste(cropped, (dx, dy), cropped)
+    return strip
+
+
+def save_webp(img: Image.Image, rel_no_ext: str) -> str:
+    path = OUT / f'{rel_no_ext}.webp'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(path, 'WEBP', quality=88, method=5)
+    return f'assets/battle/sprites/{rel_no_ext}.webp'
 
 
 def extract_particles_and_strips():
@@ -32,6 +318,23 @@ def extract_particles_and_strips():
                         im = Image.open(f).convert('RGBA').resize((64, 64), Image.LANCZOS)
                         assets[key] = save_webp(im, key)
 
+    # Also extract crisp battle VFX sprites from Downloads when available
+    dl_vfx = {
+        'fx_slash': ('Axe_slash_trail_sprite_sheet_5833cc93.jpg', (0, 0)),
+        'fx_impact': ('Combat_VFX_impact_flash_sprite_94a7b372.jpg', (1, 0)),
+        'fx_dust': ('Earthy_dust_burst_sprite_sheet_c25414cb.jpg', (0, 0)),
+    }
+    for key, (fname, (col, row)) in dl_vfx.items():
+        src = Path.home() / 'Downloads' / fname
+        if not src.exists():
+            continue
+        im = Image.open(src).convert('RGBA')
+        w, h = im.size
+        cell = im.crop((round(col * w / 4) + 4, round(row * h / 4) + 4, round((col + 1) * w / 4) - 4, round((row + 1) * h / 4) - 4))
+        cell = key_cell_background(cell)
+        cell.thumbnail((96, 96), Image.Resampling.LANCZOS)
+        assets[key] = save_webp(cell, key)
+
     vil_zip = ROOT / 'assets' / 'packs' / 'Villager_01.zip'
     if vil_zip.exists():
         with zipfile.ZipFile(vil_zip) as zf:
@@ -49,174 +352,30 @@ def extract_particles_and_strips():
     return assets
 
 
-def draw_shadow(d: ImageDraw.ImageDraw, cx: int, cy: int, rx: int = 16, ry: int = 7):
-    d.ellipse((cx - rx, cy - ry, cx + rx, cy + ry), fill=(12, 16, 14, 115))
-
-
-def draw_humanoid(d: ImageDraw.ImageDraw, cx: int, cy: int, frame: int, *,
-                  tunic=(185, 68, 56), armor=(175, 186, 198), helm=(195, 204, 214),
-                  shield=True, kind='infantry'):
-    draw_shadow(d, cx, cy, 15, 6)
-    bob = -2 if frame == 1 else (1 if frame == 3 else 0)
-    lean = 4 if frame == 2 else (-3 if frame == 3 else 0)
-    stride = 5 if frame == 1 else (2 if frame == 2 else 0)
-
-    # Legs / boots
-    d.line((cx - 4 - stride // 2, cy - 16 + bob, cx - 5 - stride, cy - 2), fill=(52, 40, 32, 255), width=4)
-    d.line((cx + 4 + stride // 2, cy - 16 + bob, cx + 5 + stride, cy - 2), fill=(68, 52, 40, 255), width=4)
-
-    # Cape / tunic skirt
-    d.polygon([(cx - 9, cy - 20 + bob), (cx + 9, cy - 20 + bob), (cx + 11, cy - 10 + bob), (cx - 11, cy - 10 + bob)],
-              fill=tunic + (255,), outline=(28, 22, 20, 255))
-
-    # Torso + armor
-    tx = cx + lean // 2
-    d.rounded_rectangle((tx - 9, cy - 36 + bob, tx + 9, cy - 18 + bob), radius=4, fill=armor + (255,), outline=(30, 32, 36, 255))
-    # Pauldrons
-    d.ellipse((tx - 12, cy - 37 + bob, tx - 5, cy - 28 + bob), fill=armor + (255,), outline=(30, 32, 36, 255))
-    d.ellipse((tx + 5, cy - 37 + bob, tx + 12, cy - 28 + bob), fill=armor + (255,), outline=(30, 32, 36, 255))
-
-    # Head + helmet
-    hx = cx + lean // 2
-    d.ellipse((hx - 7, cy - 49 + bob, hx + 7, cy - 35 + bob), fill=(232, 194, 156, 255), outline=(40, 28, 20, 255))
-    if kind in ('heavy_infantry', 'pikemen', 'commander'):
-        d.pieslice((hx - 9, cy - 52 + bob, hx + 9, cy - 37 + bob), 180, 360, fill=helm + (255,), outline=(30, 32, 36, 255))
-        if kind == 'commander':
-            d.polygon([(hx, cy - 52 + bob), (hx - 4, cy - 59 + bob), (hx + 6, cy - 55 + bob)], fill=(238, 196, 86, 255))
-    elif kind == 'archers':
-        d.pieslice((hx - 8, cy - 51 + bob, hx + 8, cy - 39 + bob), 175, 365, fill=(78, 102, 62, 255), outline=(28, 38, 22, 255))
-    elif kind == 'gunpowder':
-        d.ellipse((hx - 10, cy - 49 + bob, hx + 10, cy - 43 + bob), fill=(58, 48, 42, 255))
-        d.rectangle((hx - 6, cy - 54 + bob, hx + 6, cy - 46 + bob), fill=(72, 60, 52, 255), outline=(28, 22, 18, 255))
-    else:
-        d.pieslice((hx - 8, cy - 50 + bob, hx + 8, cy - 38 + bob), 180, 360, fill=helm + (255,), outline=(30, 32, 36, 255))
-
-    # Weapons & shields by archetype
-    if shield and kind in ('infantry', 'heavy_infantry'):
-        sx = cx - 12 + lean // 2
-        sy = cy - 28 + bob
-        d.polygon([(sx - 7, sy - 8), (sx + 7, sy - 8), (sx + 6, sy + 4), (sx, sy + 12), (sx - 6, sy + 4)],
-                  fill=tunic + (255,), outline=(228, 198, 118, 255))
-        d.line((sx, sy - 6, sx, sy + 8), fill=(242, 220, 145, 255), width=2)
-
-    if kind in ('infantry', 'heavy_infantry'):
-        ang_dx = 18 if frame == 2 else 11
-        ang_dy = -16 if frame == 2 else -28
-        w = 4 if kind == 'heavy_infantry' else 3
-        d.line((tx + 8, cy - 26 + bob, tx + ang_dx, cy - 26 + bob + ang_dy), fill=(224, 232, 240, 255), width=w)
-        d.line((tx + 5, cy - 28 + bob, tx + 11, cy - 24 + bob), fill=(208, 168, 72, 255), width=3)
-    elif kind == 'pikemen':
-        tip_x = tx + (26 if frame == 2 else 18)
-        tip_y = cy - (26 if frame == 2 else 54) + bob
-        d.line((tx - 6, cy - 12 + bob, tip_x, tip_y), fill=(120, 88, 52, 255), width=3)
-        d.polygon([(tip_x - 3, tip_y), (tip_x + 4, tip_y - 7), (tip_x + 2, tip_y + 2)], fill=(225, 234, 244, 255))
-    elif kind == 'archers':
-        bx = tx + 11 + (3 if frame == 2 else 0)
-        by = cy - 29 + bob
-        d.arc((bx - 6, by - 14, bx + 8, by + 14), 275, 85, fill=(146, 102, 54, 255), width=3)
-        if frame == 2:
-            d.line((tx + 4, by, bx + 14, by), fill=(238, 226, 190, 255), width=2)
-    elif kind == 'gunpowder':
-        gx = tx + 16 + (4 if frame == 2 else 0)
-        gy = cy - 29 + bob
-        d.line((tx + 2, cy - 27 + bob, gx, gy), fill=(84, 72, 62, 255), width=4)
-        if frame == 2:
-            d.ellipse((gx - 2, gy - 6, gx + 10, gy + 6), fill=(255, 206, 92, 245))
-            d.ellipse((gx + 1, gy - 3, gx + 7, gy + 3), fill=(255, 250, 210, 255))
-    elif kind == 'commander':
-        # Banner pole & heraldic pennon
-        px = tx + 10
-        d.line((px, cy - 2, px, cy - 60 + bob), fill=(198, 166, 94, 255), width=3)
-        wave = 3 if frame in (1, 2) else 0
-        d.polygon([(px, cy - 59 + bob), (px + 20, cy - 54 + bob + wave), (px + 14, cy - 48 + bob), (px + 20, cy - 43 + bob - wave), (px, cy - 41 + bob)],
-                  fill=tunic + (255,), outline=(238, 206, 118, 255))
-
-    if frame == 3:
-        d.line((cx - 12, cy - 44, cx + 12, cy - 20), fill=(255, 118, 92, 210), width=3)
-
-
-def draw_cavalry(d: ImageDraw.ImageDraw, cx: int, cy: int, frame: int):
-    draw_shadow(d, cx, cy + 2, 26, 9)
-    bob = -3 if frame == 1 else (2 if frame == 2 else 0)
-    # Horse body
-    d.ellipse((cx - 21, cy - 28 + bob, cx + 18, cy - 10 + bob), fill=(116, 76, 48, 255), outline=(42, 28, 18, 255))
-    # Caparison cloth
-    d.polygon([(cx - 17, cy - 25 + bob), (cx + 12, cy - 25 + bob), (cx + 14, cy - 12 + bob), (cx - 19, cy - 12 + bob)],
-              fill=(182, 58, 48, 255), outline=(228, 196, 112, 255))
-    # Horse legs
-    step = 6 if frame in (1, 2) else 1
-    d.line((cx - 14, cy - 14 + bob, cx - 17 - step, cy), fill=(86, 54, 34, 255), width=4)
-    d.line((cx - 6, cy - 14 + bob, cx - 5 + step // 2, cy), fill=(86, 54, 34, 255), width=4)
-    d.line((cx + 8, cy - 14 + bob, cx + 10 + step, cy), fill=(86, 54, 34, 255), width=4)
-    d.line((cx + 14, cy - 14 + bob, cx + 18 + step // 2, cy - 2), fill=(86, 54, 34, 255), width=4)
-    # Horse neck & head
-    d.polygon([(cx + 10, cy - 24 + bob), (cx + 22, cy - 40 + bob), (cx + 28, cy - 33 + bob), (cx + 16, cy - 17 + bob)],
-              fill=(124, 82, 52, 255), outline=(42, 28, 18, 255))
-    # Rider
-    d.rounded_rectangle((cx - 8, cy - 45 + bob, cx + 7, cy - 26 + bob), radius=4, fill=(192, 202, 214, 255), outline=(30, 32, 36, 255))
-    d.ellipse((cx - 6, cy - 57 + bob, cx + 6, cy - 44 + bob), fill=(200, 208, 218, 255), outline=(30, 32, 36, 255))
-    # Lance
-    lx = cx + (30 if frame == 2 else 22)
-    ly = cy - (26 if frame == 2 else 54) + bob
-    d.line((cx - 8, cy - 30 + bob, lx, ly), fill=(154, 112, 62, 255), width=3)
-    d.polygon([(lx - 4, ly - 2), (lx + 6, ly - 4), (lx + 1, ly + 4)], fill=(230, 238, 245, 255))
-    d.polygon([(lx - 10, ly + 1), (lx - 3, ly - 5), (lx - 14, ly - 4)], fill=(225, 185, 76, 255))
-    if frame == 3:
-        d.line((cx - 14, cy - 48, cx + 14, cy - 20), fill=(255, 118, 92, 210), width=3)
-
-
-def draw_elephant(d: ImageDraw.ImageDraw, cx: int, cy: int, frame: int):
-    draw_shadow(d, cx, cy + 3, 30, 11)
-    bob = -2 if frame == 1 else (1 if frame == 2 else 0)
-    # Huge body
-    d.ellipse((cx - 26, cy - 44 + bob, cx + 24, cy - 14 + bob), fill=(122, 126, 134, 255), outline=(48, 50, 56, 255))
-    # Legs
-    stride = 3 if frame in (1, 2) else 0
-    for lx, dx in ((-18, -stride), (-7, stride), (7, -stride), (16, stride)):
-        d.rounded_rectangle((cx + lx + dx - 4, cy - 22 + bob, cx + lx + dx + 4, cy + 1), radius=2, fill=(104, 108, 116, 255), outline=(42, 44, 48, 255))
-    # Head & ears
-    d.ellipse((cx + 12, cy - 45 + bob, cx + 32, cy - 22 + bob), fill=(132, 136, 144, 255), outline=(48, 50, 56, 255))
-    d.ellipse((cx + 8, cy - 43 + bob, cx + 20, cy - 24 + bob), fill=(110, 114, 122, 255), outline=(48, 50, 56, 255))
-    # Trunk & golden tusks
-    trunk_y = cy - (26 if frame == 2 else 10) + bob
-    d.line((cx + 29, cy - 30 + bob, cx + 35, trunk_y), fill=(126, 130, 138, 255), width=5)
-    d.line((cx + 26, cy - 25 + bob, cx + 38, cy - 20 + bob), fill=(246, 232, 178, 255), width=3)
-    # Gilded howdah + blanket (Vijayanagara flagship!)
-    d.polygon([(cx - 18, cy - 43 + bob), (cx + 12, cy - 43 + bob), (cx + 14, cy - 24 + bob), (cx - 20, cy - 24 + bob)],
-              fill=(178, 62, 42, 255), outline=(238, 200, 96, 255))
-    d.rounded_rectangle((cx - 15, cy - 58 + bob, cx + 9, cy - 41 + bob), radius=3, fill=(216, 168, 62, 255), outline=(88, 56, 22, 255))
-    # Rider inside howdah
-    d.ellipse((cx - 8, cy - 66 + bob, cx + 2, cy - 55 + bob), fill=(235, 198, 140, 255), outline=(42, 30, 20, 255))
-    d.pieslice((cx - 10, cy - 69 + bob, cx + 4, cy - 58 + bob), 180, 360, fill=(220, 178, 68, 255))
-
-
-def build_unit_sheets():
-    manifest = {}
-    specs = {
-        'infantry': (64, 64, lambda d, cx, cy, f: draw_humanoid(d, cx, cy, f, tunic=(172, 62, 52), armor=(168, 178, 192), shield=True, kind='infantry')),
-        'heavy_infantry': (64, 64, lambda d, cx, cy, f: draw_humanoid(d, cx, cy, f, tunic=(146, 48, 42), armor=(204, 214, 226), helm=(218, 226, 236), shield=True, kind='heavy_infantry')),
-        'pikemen': (64, 64, lambda d, cx, cy, f: draw_humanoid(d, cx, cy, f, tunic=(160, 82, 48), armor=(178, 188, 198), shield=False, kind='pikemen')),
-        'archers': (64, 64, lambda d, cx, cy, f: draw_humanoid(d, cx, cy, f, tunic=(78, 118, 68), armor=(122, 98, 72), shield=False, kind='archers')),
-        'gunpowder': (64, 64, lambda d, cx, cy, f: draw_humanoid(d, cx, cy, f, tunic=(132, 66, 52), armor=(138, 146, 156), shield=False, kind='gunpowder')),
-        'commander': (64, 64, lambda d, cx, cy, f: draw_humanoid(d, cx, cy, f, tunic=(188, 54, 46), armor=(218, 192, 112), helm=(238, 212, 128), shield=False, kind='commander')),
-        'cavalry': (88, 72, draw_cavalry),
-        'elephants': (96, 78, draw_elephant),
-    }
-    for key, (fw, fh, fn) in specs.items():
-        strip = Image.new('RGBA', (fw * 4, fh), (0, 0, 0, 0))
-        d = ImageDraw.Draw(strip)
-        for frame in range(4):
-            fn(d, frame * fw + fw // 2, fh - 6, frame)
-        manifest[key] = {'url': save_webp(strip, key), 'frames': 4, 'frameW': fw, 'frameH': fh}
-    return manifest
-
-
 def main():
     extras = extract_particles_and_strips()
-    units = build_unit_sheets()
-    data = {'version': 1, 'units': units, 'extras': extras}
+    units = {}
+    built_cache = {}
+
+    for key, (sid, fw, fh) in DEFAULT_SHEETS.items():
+        cache_key = (sid, fw, fh)
+        strip = built_cache.get(cache_key)
+        if strip is None:
+            strip = slice_strip(sid, fw, fh)
+            built_cache[cache_key] = strip
+        units[key] = {'url': save_webp(strip, key), 'frames': len(FRAME_COORDS), 'frameW': fw, 'frameH': fh}
+
+    cultures = {}
+    for cult, spec_map in CULTURE_SHEETS.items():
+        cultures[cult] = {}
+        for ukey, (sid, fw, fh) in spec_map.items():
+            strip = slice_strip(sid, fw, fh)
+            rel = f'cultures/{cult}-{ukey}'
+            cultures[cult][ukey] = {'url': save_webp(strip, rel), 'frames': len(FRAME_COORDS), 'frameW': fw, 'frameH': fh}
+
+    data = {'version': 2, 'units': units, 'cultures': cultures, 'extras': extras}
     (OUT / 'manifest.json').write_text(json.dumps(data, indent=2) + '\n')
-    print(f'Generated {len(units)} battle sprite strips and {len(extras)} battle FX sprites in {OUT}')
+    print(f'Extracted {len(units)} default unit strips, {sum(len(v) for v in cultures.values())} civilization unit strips across {len(cultures)} cultures, and {len(extras)} FX sprites.')
 
 
 if __name__ == '__main__':

@@ -1,53 +1,627 @@
 {
-  "version": 1,
+  "version": 2,
   "units": {
     "infantry": {
       "url": "assets/battle/sprites/infantry.webp",
       "frames": 4,
-      "frameW": 64,
-      "frameH": 64
+      "frameW": 96,
+      "frameH": 96
     },
     "heavy_infantry": {
       "url": "assets/battle/sprites/heavy_infantry.webp",
       "frames": 4,
-      "frameW": 64,
-      "frameH": 64
+      "frameW": 96,
+      "frameH": 96
     },
     "pikemen": {
       "url": "assets/battle/sprites/pikemen.webp",
       "frames": 4,
-      "frameW": 64,
-      "frameH": 64
+      "frameW": 96,
+      "frameH": 96
     },
     "archers": {
       "url": "assets/battle/sprites/archers.webp",
       "frames": 4,
-      "frameW": 64,
-      "frameH": 64
+      "frameW": 96,
+      "frameH": 96
     },
     "gunpowder": {
       "url": "assets/battle/sprites/gunpowder.webp",
       "frames": 4,
-      "frameW": 64,
-      "frameH": 64
+      "frameW": 96,
+      "frameH": 96
     },
     "commander": {
       "url": "assets/battle/sprites/commander.webp",
       "frames": 4,
-      "frameW": 64,
-      "frameH": 64
+      "frameW": 118,
+      "frameH": 102
     },
     "cavalry": {
       "url": "assets/battle/sprites/cavalry.webp",
       "frames": 4,
-      "frameW": 88,
-      "frameH": 72
+      "frameW": 118,
+      "frameH": 102
     },
     "elephants": {
       "url": "assets/battle/sprites/elephants.webp",
       "frames": 4,
-      "frameW": 96,
-      "frameH": 78
+      "frameW": 128,
+      "frameH": 110
+    }
+  },
+  "cultures": {
+    "europe_west": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/europe_west-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/europe_west-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/europe_west-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/europe_west-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "crossbow": {
+        "url": "assets/battle/sprites/cultures/europe_west-crossbow.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/europe_west-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/europe_west-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/europe_west-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "europe_east": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/europe_east-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/europe_east-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/europe_east-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/europe_east-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/europe_east-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/europe_east-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/europe_east-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "ottoman": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/ottoman-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/ottoman-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/ottoman-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/ottoman-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/ottoman-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/ottoman-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/ottoman-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "persian": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/persian-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/persian-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/persian-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/persian-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/persian-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/persian-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/persian-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "southindia": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/southindia-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/southindia-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/southindia-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/southindia-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/southindia-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/southindia-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "elephants": {
+        "url": "assets/battle/sprites/cultures/southindia-elephants.webp",
+        "frames": 4,
+        "frameW": 128,
+        "frameH": 110
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/southindia-commander.webp",
+        "frames": 4,
+        "frameW": 128,
+        "frameH": 110
+      }
+    },
+    "northindia": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/northindia-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/northindia-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/northindia-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/northindia-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/northindia-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/northindia-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "elephants": {
+        "url": "assets/battle/sprites/cultures/northindia-elephants.webp",
+        "frames": 4,
+        "frameW": 128,
+        "frameH": 110
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/northindia-commander.webp",
+        "frames": 4,
+        "frameW": 128,
+        "frameH": 110
+      }
+    },
+    "ming": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/ming-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/ming-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/ming-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/ming-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/ming-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/ming-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/ming-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "japan": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/japan-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/japan-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/japan-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/japan-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "gunpowder": {
+        "url": "assets/battle/sprites/cultures/japan-gunpowder.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/japan-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/japan-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "southeast": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/southeast-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/southeast-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/southeast-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/southeast-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/southeast-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "elephants": {
+        "url": "assets/battle/sprites/cultures/southeast-elephants.webp",
+        "frames": 4,
+        "frameW": 128,
+        "frameH": 110
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/southeast-commander.webp",
+        "frames": 4,
+        "frameW": 128,
+        "frameH": 110
+      }
+    },
+    "steppe": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/steppe-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/steppe-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/steppe-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/steppe-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "horsebow": {
+        "url": "assets/battle/sprites/cultures/steppe-horsebow.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/steppe-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/steppe-commander.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      }
+    },
+    "africa": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/africa-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/africa-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/africa-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/africa-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/africa-cavalry.webp",
+        "frames": 4,
+        "frameW": 118,
+        "frameH": 102
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/africa-commander.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      }
+    },
+    "mesoamerica": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/mesoamerica-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/mesoamerica-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/mesoamerica-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/mesoamerica-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/mesoamerica-cavalry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/mesoamerica-commander.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      }
+    },
+    "andean": {
+      "infantry": {
+        "url": "assets/battle/sprites/cultures/andean-infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "heavy_infantry": {
+        "url": "assets/battle/sprites/cultures/andean-heavy_infantry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "pikemen": {
+        "url": "assets/battle/sprites/cultures/andean-pikemen.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "archers": {
+        "url": "assets/battle/sprites/cultures/andean-archers.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "cavalry": {
+        "url": "assets/battle/sprites/cultures/andean-cavalry.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      },
+      "commander": {
+        "url": "assets/battle/sprites/cultures/andean-commander.webp",
+        "frames": 4,
+        "frameW": 96,
+        "frameH": 96
+      }
     }
   },
   "extras": {
@@ -55,6 +629,9 @@
     "fx_spark": "assets/battle/sprites/fx_spark.webp",
     "fx_dirt": "assets/battle/sprites/fx_dirt.webp",
     "fx_flash": "assets/battle/sprites/fx_flash.webp",
+    "fx_slash": "assets/battle/sprites/fx_slash.webp",
+    "fx_impact": "assets/battle/sprites/fx_impact.webp",
+    "fx_dust": "assets/battle/sprites/fx_dust.webp",
     "levy_villager": "assets/battle/sprites/levy_villager.webp"
   }
 }

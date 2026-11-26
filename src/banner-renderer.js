@@ -1,4 +1,5 @@
 import {cardRole} from './simple-card-battle.js';
+import {spriteCultureGroup} from './game-art.js';
 
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 
@@ -14,6 +15,7 @@ function roleIcon(g){
  const role=cardRole(g),k=g?.kind||g?.specialistId||'';
  if(k==='elephants'||g?.specialistId==='elephants')return {tag:'elephants',sym:'ELE',color:'#b87c38'};
  if(k==='gunpowder'||g?.specialistId==='handgun')return {tag:'gunpowder',sym:'GUN',color:'#8d5c48'};
+ if(g?.specialistId==='horsebow')return {tag:'horsebow',sym:'HSB',color:'#b8893c'};
  if(role==='ranged')return {tag:'archers',sym:'BOW',color:'#4e8b5b'};
  if(role==='mounted')return {tag:'cavalry',sym:'CAV',color:'#b8893c'};
  if(k==='pikemen'||k==='spearmen'||g?.specialistId==='pikes')return {tag:'pikemen',sym:'PIK',color:'#4c7a96'};
@@ -21,14 +23,21 @@ function roleIcon(g){
  return {tag:'infantry',sym:'INF',color:'#a84b3e'};
 }
 
+export function unitCultureKey(g){
+ return spriteCultureGroup(g?.realmId||g?.realm||g?.profile?.realm)||null;
+}
+
 export function regimentCardIcon(g){
  const info=roleIcon(g);
- if(info.tag==='elephants')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 14c0-4 3-7 7-7h4c3 0 5 2 5 5v4h-2v3h-3v-3H9v3H6v-3H5zm13-2c1 1 2 2 2 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="8" y="4" width="6" height="4" rx="1" fill="currentColor" opacity=".8"/></svg>';
- if(info.tag==='gunpowder')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h14l4-2v4l-4-2H3zm2-5l5 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="19" cy="11" r="2" fill="currentColor"/></svg>';
- if(info.tag==='archers')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4c5 3 5 13 0 16M5 12h13m-3-3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
- if(info.tag==='cavalry')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19l4-10 4-3 4 2-2 4h3l-2 7M8 14h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
- if(info.tag==='pikemen')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20L19 4M15 4h4v4M7 18l-2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
- return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12v6c0 5-6 9-6 9s-6-4-6-9z" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2"/></svg>';
+ const cult=unitCultureKey(g);
+ const url=cult?'assets/battle/sprites/cultures/'+cult+'-'+(info.tag==='horsebow'&&cult!=='steppe'?'archers':info.tag==='elephants'&&!['southindia','northindia','southeast'].includes(cult)?'cavalry':info.tag)+'.webp':'assets/battle/sprites/'+(info.tag==='horsebow'?'cavalry':info.tag)+'.webp';
+ const spriteOverlay='<span class="regiment-sprite-thumb" style="background-image:url(\''+url+'\')" aria-hidden="true"></span>';
+ if(info.tag==='elephants')return spriteOverlay+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 14c0-4 3-7 7-7h4c3 0 5 2 5 5v4h-2v3h-3v-3H9v3H6v-3H5zm13-2c1 1 2 2 2 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="8" y="4" width="6" height="4" rx="1" fill="currentColor" opacity=".8"/></svg>';
+ if(info.tag==='gunpowder')return spriteOverlay+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h14l4-2v4l-4-2H3zm2-5l5 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="19" cy="11" r="2" fill="currentColor"/></svg>';
+ if(info.tag==='archers')return spriteOverlay+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4c5 3 5 13 0 16M5 12h13m-3-3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+ if(info.tag==='cavalry'||info.tag==='horsebow')return spriteOverlay+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19l4-10 4-3 4 2-2 4h3l-2 7M8 14h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+ if(info.tag==='pikemen')return spriteOverlay+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20L19 4M15 4h4v4M7 18l-2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+ return spriteOverlay+'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12v6c0 5-6 9-6 9s-6-4-6-9z" fill="currentColor" opacity=".25" stroke="currentColor" stroke-width="2"/></svg>';
 }
 
 const TERRAIN_THEMES={
@@ -41,36 +50,80 @@ const TERRAIN_THEMES={
  coast:{top:'#345149',mid:'#436559',bot:'#253c36',grid:'rgba(215,238,225,.14)',cover:'#2e4c44'}
 };
 
-const SPRITE_STATE={manifest:null,loading:false,images:new Map(),loaded:0,total:0};
+const SPRITE_STATE={manifest:null,loading:false,images:new Map(),queued:new Set(),loaded:0,total:0};
 
-function ensureSprites(){
- if(SPRITE_STATE.loading||SPRITE_STATE.manifest)return;
- if(typeof fetch!=='function'||typeof Image!=='undefined'===false)return;
- SPRITE_STATE.loading=true;
- fetch('assets/battle/sprites/manifest.json').then(r=>r.ok?r.json():null).then(m=>{
-  if(!m)return;
-  SPRITE_STATE.manifest=m;
-  const urls=[];
-  for(const [k,v] of Object.entries(m.units||{}))urls.push([k,v.url]);
-  for(const [k,u] of Object.entries(m.extras||{}))urls.push([k,u]);
-  SPRITE_STATE.total=urls.length;
-  for(const [k,url] of urls){
-   const img=new Image();
-   img.onload=()=>{SPRITE_STATE.loaded++;SPRITE_STATE.images.set(k,img);};
-   img.src=url;
+function loadSpriteUrl(key,url,countTowardReady=true){
+ if(SPRITE_STATE.queued.has(key)||!url)return;
+ SPRITE_STATE.queued.add(key);
+ if(countTowardReady)SPRITE_STATE.total++;
+ const img=new Image();
+ img.onload=()=>{if(countTowardReady)SPRITE_STATE.loaded++;SPRITE_STATE.images.set(key,img);};
+ img.onerror=()=>{if(countTowardReady)SPRITE_STATE.loaded++;};
+ img.src=url;
+}
+
+function ensureSprites(groups=null){
+ if(typeof fetch!=='function'||typeof Image==='undefined')return;
+ if(!SPRITE_STATE.loading&&!SPRITE_STATE.manifest){
+  SPRITE_STATE.loading=true;
+  fetch('assets/battle/sprites/manifest.json').then(r=>r.ok?r.json():null).then(m=>{
+   if(!m)return;
+   SPRITE_STATE.manifest=m;
+   for(const [k,v] of Object.entries(m.units||{}))loadSpriteUrl(k,v.url,true);
+   for(const [k,u] of Object.entries(m.extras||{}))loadSpriteUrl(k,u,true);
+   for(const [cult,mp] of Object.entries(m.cultures||{})){
+    for(const [uk,v] of Object.entries(mp||{}))loadSpriteUrl(cult+':'+uk,v.url,false);
+   }
+  }).catch(()=>{});
+ }
+ if(SPRITE_STATE.manifest?.cultures&&Array.isArray(groups)){
+  for(const g of groups){
+   const cult=unitCultureKey(g);
+   if(!cult)continue;
+   const mp=SPRITE_STATE.manifest.cultures[cult];
+   if(!mp)continue;
+   for(const [uk,v] of Object.entries(mp))loadSpriteUrl(cult+':'+uk,v.url,false);
   }
- }).catch(()=>{});
+ }
 }
 
 function unitSheetKey(g){
  const role=cardRole(g),k=g?.kind||g?.specialistId||'';
  if(k==='elephants'||g?.specialistId==='elephants')return 'elephants';
  if(k==='gunpowder'||g?.specialistId==='handgun')return 'gunpowder';
- if(role==='ranged')return 'archers';
+ if(g?.specialistId==='horsebow')return 'horsebow';
+ if(role==='ranged')return (g?.specialistId==='crossbow'||k==='crossbow')?'crossbow':'archers';
  if(role==='mounted')return 'cavalry';
  if(k==='pikemen'||k==='spearmen'||g?.specialistId==='pikes')return 'pikemen';
  if(g?.specialistId==='guard'||k==='heavy_infantry')return 'heavy_infantry';
  return 'infantry';
+}
+
+function resolveUnitSprite(g,manifest){
+ const baseKey=unitSheetKey(g);
+ const cult=unitCultureKey(g);
+ const cultMap=cult&&manifest?.cultures?.[cult];
+ if(cultMap){
+  const altKey=baseKey==='crossbow'&&!cultMap.crossbow?'archers':baseKey==='horsebow'&&!cultMap.horsebow?'cavalry':baseKey;
+  if(cultMap[altKey]){
+   const img=SPRITE_STATE.images.get(cult+':'+altKey);
+   if(img)return {img,meta:cultMap[altKey],key:cult+':'+altKey};
+  }
+ }
+ const fallbackKey=baseKey==='horsebow'?'cavalry':baseKey==='crossbow'?'archers':baseKey;
+ const meta=manifest?.units?.[fallbackKey]||manifest?.units?.infantry;
+ const img=SPRITE_STATE.images.get(fallbackKey)||SPRITE_STATE.images.get('infantry');
+ return {img,meta,key:fallbackKey};
+}
+
+function resolveCommanderSprite(g,manifest){
+ const cult=unitCultureKey(g);
+ const cultCmd=cult&&manifest?.cultures?.[cult]?.commander;
+ if(cultCmd){
+  const img=SPRITE_STATE.images.get(cult+':commander');
+  if(img)return {img,meta:cultCmd};
+ }
+ return {img:SPRITE_STATE.images.get('commander'),meta:manifest?.units?.commander};
 }
 
 function unitPoseFrame(g,elapsed,idx){
@@ -231,21 +284,19 @@ export class BannerRenderer{
   }
 
   // Soldier-level Y-sorted 2D isometric sprite rendering
+  ensureSprites(drawList.map(d=>d.g));
   const soldierDraws=[];
-  const manifestUnits=SPRITE_STATE.manifest?.units||{};
-  const cmdImg=SPRITE_STATE.images.get('commander'),cmdMeta=manifestUnits.commander;
 
   for(const {g} of drawList){
    const n=g.routed?2:clamp(Math.ceil((g.troops||g.troopCount||30)/28),3,9);
    const offs=soldierOffsets(g,n);
-   const sheetKey=unitSheetKey(g);
-   const img=SPRITE_STATE.images.get(sheetKey);
-   const meta=manifestUnits[sheetKey];
+   const {img,meta,key:sheetKey}=resolveUnitSprite(g,SPRITE_STATE.manifest);
+   const cmd=resolveCommanderSprite(g,SPRITE_STATE.manifest);
    for(let i=0;i<offs.length;i++){
     const wx=g.x+offs[i][0],wz=g.z+offs[i][1];
     const [px,py]=P(wx,wz);
     const frame=unitPoseFrame(g,t,i);
-    soldierDraws.push({g,px,py,frame,img,meta,sheetKey,isCmd:i===0&&!g.routed,idx:i});
+    soldierDraws.push({g,px,py,frame,img,meta,sheetKey,cmdImg:cmd.img,cmdMeta:cmd.meta,isCmd:i===0&&!g.routed,idx:i});
    }
   }
   soldierDraws.sort((a,b)=>a.py-b.py||a.px-b.px);
@@ -253,8 +304,8 @@ export class BannerRenderer{
   const spriteScale=clamp(v.s/8.2,.48,1.38);
   for(const s of soldierDraws){
    const sideTint=s.g.side==='attacker'?'#d9a84c':'#c45749';
-   const drawW=(s.meta?.frameW||64)*spriteScale*.68;
-   const drawH=(s.meta?.frameH||64)*spriteScale*.68;
+   const drawW=(s.meta?.frameW||64)*spriteScale*.58;
+   const drawH=(s.meta?.frameH||64)*spriteScale*.58;
    const flip=s.g.side==='defender'?-1:1;
 
    c.save();
@@ -273,10 +324,11 @@ export class BannerRenderer{
    }
    c.restore();
 
-   if(s.isCmd&&cmdImg&&cmdMeta&&s.img){
+   if(s.isCmd&&s.cmdImg&&s.cmdMeta&&s.img){
     c.save();c.translate(s.px+9*spriteScale,s.py-4*spriteScale);
-    const cw=cmdMeta.frameW*spriteScale*.62,ch=cmdMeta.frameH*spriteScale*.62;
-    c.drawImage(cmdImg,(s.g.moving?1:0)*cmdMeta.frameW,0,cmdMeta.frameW,cmdMeta.frameH,-cw/2,-ch,cw,ch);
+    const cw=s.cmdMeta.frameW*spriteScale*.54,ch=s.cmdMeta.frameH*spriteScale*.54;
+    if(s.g.side==='defender')c.scale(-1,1);
+    c.drawImage(s.cmdImg,(s.g.moving?1:0)*s.cmdMeta.frameW,0,s.cmdMeta.frameW,s.cmdMeta.frameH,-cw/2,-ch,cw,ch);
     c.restore();
    }
    if(s.isCmd){
@@ -305,7 +357,9 @@ export class BannerRenderer{
   }
 
   // Projectiles & Battle FX sprites
-  const fxSpark=SPRITE_STATE.images.get('fx_spark'),fxSmoke=SPRITE_STATE.images.get('fx_smoke');
+  const fxImpact=SPRITE_STATE.images.get('fx_impact')||SPRITE_STATE.images.get('fx_spark');
+  const fxDust=SPRITE_STATE.images.get('fx_dust')||SPRITE_STATE.images.get('fx_smoke');
+  const fxSlash=SPRITE_STATE.images.get('fx_slash');
   for(const p of b.projectiles||[]){
    const u=clamp(p.t||0,0,1),x=p.sx+(p.tx-p.sx)*u,z=p.sz+(p.tz-p.sz)*u,arc=Math.sin(u*Math.PI)*9;
    const [px,py]=P(x,z,arc),[px0,py0]=P(p.sx,p.sz,0);
@@ -316,9 +370,9 @@ export class BannerRenderer{
    const u=clamp((ef.age||0)/(ef.duration||.4),0,1);
    const [ex,ey]=P(ef.x,ef.z);
    c.save();c.globalAlpha=1-u;
-   const sprite=ef.kind==='rout'?fxSmoke:fxSpark;
+   const sprite=ef.kind==='rout'?fxDust:ef.kind==='slash'&&fxSlash?fxSlash:fxImpact;
    if(sprite){
-    const sz=(18+u*16)*spriteScale;
+    const sz=(20+u*18)*spriteScale;
     c.drawImage(sprite,ex-sz/2,ey-sz/2,sz,sz);
    }else{
     c.beginPath();c.arc(ex,ey,(4+u*10)*spriteScale,0,Math.PI*2);

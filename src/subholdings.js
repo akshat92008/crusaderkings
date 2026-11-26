@@ -209,8 +209,8 @@ export function renderCountySubholdings(g,id,esc,mode='feudal'){
   const holder=validDelegate(g,h,row?.holder||bRec?.holder)||live(g,h.lord);
   const opinion=holder&&actor&&holder.id!==actor?personalOpinion(g,actor,holder.id):null;
   const baronyGold=Math.floor(num(bRec?.wealth));
-  out+='<div class="rule subholding-card">';
-  out+='<div class="subholding-head"><b>'+esc(d.icon+' '+d.name+' · '+d.title)+'</b><span class="badge">'+(terms.level?'Lv. '+terms.level+'/3':'Unbuilt')+'</span></div>';
+  out+='<div class="rule subholding-card" data-holding-kind="'+esc(kind)+'">';
+  out+='<div class="subholding-head"><b>'+esc(d.icon+' '+d.name+' · '+d.title)+'</b><span class="holding-pips" aria-label="Level '+terms.level+' of 3">'+[1,2,3].map(n=>'<i class="'+(n<=terms.level?'built':'empty')+'"></i>').join('')+'</span><span class="badge">'+(terms.level?'Lv. '+terms.level+'/3':'Unbuilt')+'</span></div>';
   out+='<p class="smallnote">'+esc(d.description)+'</p>';
   if(terms.level&&holder){
    const mark=portraitImage(holder);

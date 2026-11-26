@@ -1,46 +1,933 @@
-/* Sovereign: 1450 identity theme: obsidian slate, imperial crimson and antique gold. */
-:root{--bg:#0a1114;--panel:#121b20;--panel2:#192329;--ink:#f3e9d5;--muted:#b2b9b4;--gold:#ccab70;--goldlight:#f3d89b;--crimson:#6e181e;--line:rgba(204,171,112,.29)}
-body{background:var(--bg)}
-.topbar{background:linear-gradient(110deg,#0c1418,#1f171a 52%,#0c1518);border-bottom-color:#8c6e42}
-.brand .crest{background:none;clip-path:none;border:1px solid #8a6c40;border-radius:6px;overflow:hidden;height:42px;width:42px}
+/* Sovereign: 1450 — Crusader Kings II Manuscript, Aged-Parchment, Walnut & Brushed-Iron UI */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+ --bg:#120d0a;
+ --oak:#231812;
+ --oak-hi:#34251c;
+ --iron:#292420;
+ --brass:#b8924f;
+ --brass-hi:#ecc97c;
+ --brass-dark:#5b4322;
+ --parchment:#eadbb9;
+ --parchment-2:#dcc89c;
+ --parchment-3:#cfba89;
+ --ink:#24170f;
+ --ink-soft:#543c29;
+ --crimson:#7c1f1b;
+ --crimson-hi:#a22e28;
+ --panel:#211711;
+ --panel2:#2b1e16;
+ --muted:#634832;
+ --gold:#c89f55;
+ --goldlight:#f1d38e;
+ --line:rgba(122,90,46,.36);
+ --positive:#27633e;
+ --negative:#8f2923;
+}
+
+body{
+ background:var(--bg);
+ color:#f2e4c4;
+ font-family:'Crimson Text',Georgia,serif;
+}
+
+/* Custom warm brass & oak scrollbars */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#1b120d}
+::-webkit-scrollbar-thumb{background:#6b502a;border:1px solid #a88346;border-radius:3px}
+
+/* ==========================================================================
+   1. TOP BAR — CK2 Sovereign Medallion, Brass Resource Strip & Chronometer
+   ========================================================================== */
+.topbar{
+ height:auto;
+ min-height:58px;
+ padding:5px 14px;
+ gap:12px;
+ background:
+  linear-gradient(180deg,rgba(241,208,136,.12),rgba(0,0,0,0) 2px),
+  linear-gradient(180deg,#2d2018 0%,#1d140f 65%,#130c09 100%);
+ border-bottom:2px solid #96733b;
+ box-shadow:0 4px 18px rgba(0,0,0,.78),inset 0 -1px 0 #4d381b;
+ z-index:12;
+}
+
+/* Hide redundant SaaS header logo while actively playing a campaign */
+body.in-campaign .topbar .brand{display:none}
+.brand .crest{
+ background:#251811;
+ clip-path:none;
+ border:2px solid #b58d4b;
+ border-radius:4px;
+ overflow:hidden;
+ height:40px;
+ width:40px;
+ box-shadow:inset 0 0 8px rgba(0,0,0,.7);
+}
 .crest img,.hero-crest img{display:block;width:100%;height:100%;object-fit:contain}
-.hero-crest{background:none;border:0;clip-path:none;box-shadow:none;height:100px;width:88px;margin-inline:auto}
-.hero-crest.sovereign-brand-banner{width:min(360px,100%);height:auto;max-height:132px;margin:8px auto 4px;border-radius:8px;overflow:hidden;border:1px solid #8a6d3f;box-shadow:0 8px 26px rgba(0,0,0,.55)}
-.hero-crest.sovereign-brand-banner img{width:100%;height:auto;max-height:132px;object-fit:cover}
-.startcard{background-image:linear-gradient(155deg,#12191ef2,#181014f7),url('court-compass.svg');background-position:center;background-size:cover;border-color:#a88952}
-.leftbar,.rightbar{background:linear-gradient(145deg,#151e24,#0e1519)}
-.panel-title{letter-spacing:2px;border-bottom:1px solid #6e5b3e}
-.tab-content .rule,.realm-overview,.character-hero{background:linear-gradient(150deg,#1a242b,#141d22);border-color:#6b5c42;border-radius:5px}
-.tab-content .paragraph{font-size:12px;line-height:1.65;color:#d3d4c9}
-.tab-content .sectiontitle{font-size:13px;letter-spacing:.6px;border-bottom:1px solid var(--line);padding-bottom:7px}
-.tab-content .rowbtn,.workspace-btn,.navigation-trail button,.quick-nav>button,.quick-nav summary{background:#232b30;border-color:#786446;color:#f1dfba}
-.tab-content .rowbtn:hover:not(:disabled),.workspace-btn:hover,.navigation-trail button:hover:not(:disabled){background:#3c2326;border-color:var(--gold)}
-.tab.active,.workspace-btn.active{background:linear-gradient(100deg,#6e181e,#422923);color:#ffe9b8;border-color:#c6a361}
-.goldbtn{background:linear-gradient(#ebcf91,#b89355);border-color:#eed399;color:#1d1914}
-.portrait-mark{border:2px solid #aa8c55;box-shadow:inset 0 0 0 2px #1a2126}
-.dispatch-deck{margin:10px 0 14px;padding:10px;border:1px solid #8a6d42;border-radius:6px;background:linear-gradient(160deg,#1c1619,#111b20)}
-.dispatch-head{display:flex;justify-content:space-between;align-items:center;font-family:Cinzel,serif;font-size:11px;letter-spacing:1.2px;color:#f2d497;margin-bottom:8px}
-.dispatch-head small{color:#b9a585;font-family:Inter,sans-serif;font-size:10px}
-.dispatch-card{padding:8px 10px;border:1px solid rgba(204,171,112,.25);border-left:3px solid var(--gold);border-radius:4px;background:#162228;margin-bottom:7px}
-.dispatch-card.level-urgent{border-left-color:#e06b61;background:linear-gradient(90deg,#2c1618,#162228)}
-.dispatch-card.level-high{border-left-color:#e8b35b}
-.dispatch-cat{font-size:9px;letter-spacing:1.2px;color:#d6b87c;font-weight:700;margin-bottom:2px}
-.dispatch-card b{display:block;font-size:12px;color:#f7ecd5;margin-bottom:3px}
-.dispatch-card p{font-size:11px;line-height:1.45;color:#c7cfca;margin:0 0 5px}
+.brandname{color:#f2d89b;text-shadow:0 2px 4px #000}
+
+/* CK2 Top-Left Ruler Medallion */
+.hud-ruler{
+ display:flex;
+ align-items:center;
+ gap:10px;
+ padding:4px 12px 4px 5px;
+ background:linear-gradient(180deg,#3a291d,#221710);
+ border:2px solid #b8914c;
+ box-shadow:inset 0 1px 0 rgba(255,232,175,.28),0 3px 10px rgba(0,0,0,.65);
+ border-radius:28px 6px 6px 28px;
+ color:#f7e8c8;
+ position:relative;
+}
+.hud-ruler:hover{border-color:#efd087;filter:brightness(1.07)}
+.hud-ruler .portrait-mark{
+ width:46px;
+ height:46px;
+ border-radius:50%;
+ border:3px solid #d4ab5c;
+ box-shadow:0 0 0 2px #3c2a15,0 3px 10px rgba(0,0,0,.75);
+}
+.hud-ruler .portrait-frame{border-radius:50%;border:0;width:100%;height:100%}
+.hud-ruler small{
+ font-family:Cinzel,serif;
+ font-size:9px;
+ letter-spacing:1.2px;
+ color:#cba76a;
+}
+.hud-ruler b{
+ font-family:Cinzel,serif;
+ font-size:13px;
+ color:#fff0cb;
+ text-shadow:0 1px 2px #000;
+}
+.hud-warning{
+ color:#ffae7a;
+ background:rgba(124,31,27,.68);
+ border:1px solid #d47a57;
+ border-radius:3px;
+ padding:1px 5px;
+ margin-top:2px;
+}
+
+/* Carved Oak & Brass Resource Counters */
+.topresources{
+ display:flex;
+ gap:8px;
+ margin:0 auto 0 4px;
+ align-items:center;
+ flex-wrap:wrap;
+}
+.resource{
+ display:flex;
+ gap:7px;
+ align-items:center;
+ padding:4px 10px;
+ background:linear-gradient(180deg,#1a120d,#281c14);
+ border:1px solid #785b30;
+ border-radius:4px;
+ box-shadow:inset 0 1px 4px rgba(0,0,0,.75);
+}
+.resource .game-art-icon{width:24px;height:24px;box-shadow:0 1px 3px #000}
+.resource small{
+ font-family:Cinzel,serif;
+ font-size:8.5px;
+ letter-spacing:1.1px;
+ color:#bca06c;
+ line-height:1.1;
+}
+.resource b{
+ font-family:Cinzel,serif;
+ font-size:14px;
+ color:#fbf0d4;
+ line-height:1.2;
+ text-shadow:0 1px 2px #000;
+ font-variant-numeric:tabular-nums;
+}
+
+/* CK2 Brass Date Ribbon & Time Controls */
+.timebar{gap:6px;margin-left:auto}
+.date{
+ font-family:Cinzel,serif;
+ font-weight:700;
+ font-size:12px;
+ letter-spacing:1.2px;
+ color:#24170f;
+ padding:7px 14px;
+ background:linear-gradient(180deg,#efe1be,#d3bc89);
+ border:2px solid #96723a;
+ border-radius:3px;
+ box-shadow:inset 0 0 8px rgba(102,68,24,.35),0 2px 6px rgba(0,0,0,.55);
+}
+.goldbtn{
+ font-family:Cinzel,serif;
+ border:2px solid #cfa85c;
+ border-radius:3px;
+ color:#fff3d6;
+ background:linear-gradient(180deg,#8b251f 0%,#631714 58%,#47100e 100%);
+ box-shadow:inset 0 1px 0 rgba(255,212,160,.32),0 2px 6px rgba(0,0,0,.6);
+ font-size:10.5px;
+ letter-spacing:1px;
+ font-weight:700;
+ padding:9px 14px;
+ text-shadow:0 1px 2px #000;
+}
+.goldbtn:hover:not(:disabled){filter:brightness(1.14);border-color:#f4d489}
+.goldbtn.primary{
+ background:linear-gradient(180deg,#a82e26 0%,#771b16 60%,#4f110e 100%);
+ padding:13px 18px;
+ font-size:12px;
+}
+.iconbtn,.smallbtn{
+ font-family:Cinzel,serif;
+ color:#f2dfba;
+ background:linear-gradient(180deg,#3d2d22,#241912);
+ border:1px solid #8a6838;
+ border-radius:3px;
+ box-shadow:inset 0 1px 0 rgba(255,230,175,.18),0 2px 5px rgba(0,0,0,.5);
+}
+.iconbtn:hover,.smallbtn:hover{border-color:#e8c474;background:linear-gradient(180deg,#4d3829,#2f2117)}
+.speed-control select{
+ font-family:Cinzel,serif;
+ background:#231811;
+ color:#f4e2bc;
+ border:1px solid #8a6838;
+ border-radius:3px;
+ min-height:36px;
+}
+
+/* ==========================================================================
+   2. FULL-BLEED MAP, FLOATING ACTION PILLS & CK2 CHANCELLERY BAR
+   ========================================================================== */
+.gamebody,.atlas-expanded .gamebody{
+ background:#0f181c;
+}
+.maparea,.atlas-expanded .maparea{
+ background:#0d1a1f;
+ position:relative;
+}
+.canvaswrap,.atlas-expanded .canvaswrap,.maparea .canvaswrap{
+ margin:0;
+ border:0;
+ outline:0;
+ box-shadow:none;
+}
+.canvaswrap::after{
+ box-shadow:inset 0 0 42px rgba(15,10,6,.55),inset 0 0 0 2px rgba(176,138,72,.35);
+}
+
+/* CK2 Floating-Feel Map Toolbar & Hanging Council Ribbon (zero overlap at any width) */
+.maptop{
+ position:relative;
+ top:auto;
+ left:auto;
+ right:auto;
+ padding:5px 10px;
+ border:0;
+ border-bottom:1px solid rgba(152,115,58,.45);
+ background:linear-gradient(180deg,rgba(32,22,16,.94),rgba(21,15,11,.88));
+ box-shadow:0 2px 10px rgba(0,0,0,.55);
+ z-index:8;
+}
+.maptop:has(.map-options[open]){z-index:11}
+.map-home{gap:5px}
+.map-home .goldbtn,.map-home .smallbtn,.map-options summary{
+ padding:6px 10px;
+ font-size:10.5px;
+ min-height:34px;
+ box-shadow:0 2px 6px rgba(0,0,0,.55);
+}
+.map-options summary{
+ font-family:Cinzel,serif;
+ color:#f2dfba;
+ background:linear-gradient(180deg,#3d2d22,#241912);
+ border:1px solid #8a6838;
+ border-radius:3px;
+}
+.map-options .mapactions{
+ background:linear-gradient(180deg,#2a1e17,#1a120d);
+ border:2px solid #96723b;
+ border-radius:4px;
+ box-shadow:0 10px 28px rgba(0,0,0,.85);
+}
+.mapactions .showcasebtn{
+ background:linear-gradient(180deg,#7c211c,#4b1310);
+ border-color:#d2ab60;
+ color:#ffebc2;
+}
+
+/* CK2 Hanging Council / Alert Ribbon */
+.quick-nav{
+ position:relative;
+ top:auto;
+ left:auto;
+ right:auto;
+ padding:4px 10px;
+ background:linear-gradient(180deg,rgba(24,17,12,.86),rgba(17,12,9,.65));
+ border-bottom:1px solid rgba(130,97,48,.36);
+ gap:5px;
+ z-index:7;
+}
+.quick-nav>button,.quick-nav summary{
+ flex:0 1 auto;
+ min-width:74px;
+ padding:5px 10px;
+ font-family:Cinzel,serif;
+ font-size:10px;
+ letter-spacing:.5px;
+ color:#f4e3be;
+ background:linear-gradient(180deg,#37281e,#201610);
+ border:1px solid #9c7940;
+ border-radius:0 0 7px 7px;
+ border-top:2px solid #c99f54;
+ box-shadow:0 4px 10px rgba(0,0,0,.65);
+}
+.quick-nav>button:hover,.quick-nav summary:hover{
+ background:linear-gradient(180deg,#6e201b,#3b1512);
+ border-color:#efd087;
+ transform:translateY(1px);
+}
+.quick-nav details{margin-left:auto}
+#outliner-list{
+ background:linear-gradient(rgba(232,217,183,.96),rgba(214,194,150,.96)),url('ui/parchment/parchmentBasic.webp') center/cover;
+ border:2px solid #8c6934;
+ border-radius:4px;
+ color:var(--ink);
+ box-shadow:0 12px 32px rgba(0,0,0,.8);
+}
+.outliner-group h4{
+ font-family:Cinzel,serif;
+ color:#6b1c17;
+ border-bottom:1px solid rgba(110,77,36,.32);
+ padding-bottom:3px;
+}
+.outliner-row{
+ color:var(--ink);
+ border-bottom-color:rgba(110,77,36,.22);
+}
+.outliner-row small{color:var(--ink-soft)}
+.outliner-row:hover,.outliner-row:focus-visible{background:rgba(166,122,52,.22)}
+
+/* CK2 Map Legend, Zoom & Mode Dock */
+.mapmodes{
+ top:auto;
+ bottom:44px;
+ left:auto;
+ right:62px;
+ max-width:min(440px,calc(100% - 82px));
+ background:linear-gradient(180deg,#2c2018f2,#19120df5);
+ border:2px solid #9a753d;
+ border-radius:4px;
+ box-shadow:0 8px 24px rgba(0,0,0,.85);
+ padding:5px;
+ gap:4px;
+}
+.mapmodebtn{
+ font-family:Cinzel,serif;
+ color:#e9d6ae;
+ background:linear-gradient(180deg,#3b2b20,#261b14);
+ border:1px solid #75582e;
+ border-radius:2px;
+ padding:6px 8px;
+ font-size:9px;
+}
+.mapmodebtn:hover{background:#523a29;color:#fff2ce}
+.mapmodebtn.active{
+ color:#24170f;
+ background:linear-gradient(180deg,#f0da9e,#c89d51);
+ border-color:#ffe7ae;
+ font-weight:800;
+}
+.map-zoom{right:12px;bottom:34px;gap:4px}
+.map-zoom button{
+ width:38px;
+ height:38px;
+ background:linear-gradient(180deg,#3d2c20,#241911);
+ border:1.5px solid #9d783d;
+ color:#f6e2b4;
+ border-radius:3px;
+ box-shadow:0 3px 9px rgba(0,0,0,.7);
+}
+.mapcorner.bottomright{
+ bottom:8px;
+ right:12px;
+ background:linear-gradient(180deg,#e9dab6,#d2bd8e);
+ border:1px solid #8a6835;
+ color:#362417;
+ font-family:Cinzel,serif;
+ font-size:9.5px;
+ padding:5px 10px;
+}
+.map-legend-overlay{
+ background:linear-gradient(rgba(235,221,189,.95),rgba(218,199,158,.95)),url('ui/parchment/parchmentBasic.webp') center/cover;
+ border:2px solid #8a6835;
+ color:var(--ink);
+ box-shadow:0 6px 18px rgba(0,0,0,.7);
+}
+.map-legend-overlay b{color:#741f1a;font-family:Cinzel,serif}
+
+/* Slim Dark-Oak & Gold Chronicle Footer */
+.mapfooter,.eventticker{
+ background:linear-gradient(180deg,#231811,#140d09);
+ border-top:1px solid #785a2f;
+ color:#d7c194;
+ padding:4px 12px;
+ min-height:26px;
+ height:auto;
+ font-size:10.5px;
+}
+.tickerhead{font-family:Cinzel,serif;color:#ecc978;font-size:9.5px}
+.invasion-alert{
+ background:linear-gradient(95deg,#5f1714,#2c1713);
+ border-top:2px solid #c9944c;
+ border-bottom:2px solid #c9944c;
+ color:#ffe7bc;
+ font-family:Cinzel,serif;
+}
+
+/* ==========================================================================
+   3. CK2 PARCHMENT PROVINCE SHEET & CHANCERY LEDGER DRAWERS
+   ========================================================================== */
+.leftbar,.rightbar,.atlas-expanded .leftbar,.atlas-expanded .rightbar{
+ background:#201610;
+ border:2px solid #9b773c;
+ box-shadow:inset 0 0 0 1px #422e1c,0 12px 36px rgba(0,0,0,.85);
+}
+.panel-title,.drawer-close{
+ background:linear-gradient(180deg,#33241a,#201610);
+ border-bottom:1.5px solid #8e6b37;
+ color:#f4dc9f;
+ font-family:Cinzel,serif;
+ font-weight:700;
+}
+.drawer-close{padding:10px 14px;min-height:40px}
+.faction-ident{
+ background:linear-gradient(180deg,#291d15,#1b120d);
+ border-bottom:1.5px solid #7d5d30;
+ padding:12px 14px;
+}
+.faction-ident strong{color:#f9e7be;font-size:14px}
+.faction-ident small{color:#c9b082}
+.faction-ident .flag{
+ border:2px solid #c59d52;
+ border-radius:4px;
+ box-shadow:0 2px 8px rgba(0,0,0,.7);
+}
+
+/* Carved Oak Workspace & Sub-page Tabs */
+.workspace-nav{
+ background:#1b120d;
+ padding:7px 8px 4px;
+ gap:4px;
+}
+.workspace-btn{
+ font-family:Cinzel,serif;
+ background:linear-gradient(180deg,#35261c,#221710);
+ border:1px solid #75582f;
+ color:#e4cf9f;
+ border-radius:3px 3px 0 0;
+ min-height:36px;
+ padding:6px 4px;
+ font-size:10px;
+}
+.workspace-btn.active,.tab.active{
+ background:linear-gradient(180deg,#8b251f,#5a1613);
+ border-color:#e5c070;
+ color:#fff1cd;
+ text-shadow:0 1px 2px #000;
+}
+.tabs{background:#1b120d;padding:4px 8px 8px;border-bottom:2px solid #8d6a36;gap:4px}
+.tab{
+ background:linear-gradient(180deg,#2d2018,#1f150f);
+ border:1px solid #6b502a;
+ color:#dfcaa0;
+ border-radius:3px;
+ min-height:36px;
+ padding:6px 8px;
+}
+.tab:hover:not(.active){background:#3d2c21;color:#fff0cb}
+.navigation-trail{
+ background:#251a13;
+ border-bottom:1px solid #6b502a;
+ color:#d7bf90;
+}
+.navigation-trail button{
+ background:#38281d;
+ border-color:#8a6838;
+ color:#f4e0b6;
+ min-height:32px;
+}
+.priority-strip{background:#251a13;padding:6px 8px}
+.priority-item{
+ font-family:Cinzel,serif;
+ background:linear-gradient(180deg,#3d2b1d,#271c13);
+ border:1px solid #a27d43;
+ color:#f7e2b2;
+}
+.priority-item.urgent{background:linear-gradient(180deg,#7c211c,#4a1310);border-color:#e28e6b;color:#ffe6da}
+
+/* Scrollable Illuminated Parchment Interior */
+.tab-content,.inspector{
+ background:
+  linear-gradient(rgba(236,222,188,.93),rgba(222,202,158,.94)),
+  url('ui/parchment/parchmentBasic.webp') center/420px repeat;
+ color:var(--ink);
+ font-family:'Crimson Text',Georgia,serif;
+}
+.rightbar #province-panel{display:flex;flex-direction:column;flex:1}
+.emptyselection{
+ background:linear-gradient(rgba(236,222,188,.93),rgba(222,202,158,.94)),url('ui/parchment/parchmentBasic.webp') center/cover;
+ color:var(--ink);
+ height:100%;
+}
+.emptyselection h2,.inspector h2,.tab-content h2,.tab-content h3{
+ color:#2f190f;
+ font-family:Cinzel,serif;
+}
+.emptyselection p,.inspector .owner{color:var(--ink-soft)}
+.inspector .eyebrow,.tab-content .label{
+ color:#73201b;
+ font-family:Cinzel,serif;
+ letter-spacing:1.3px;
+ font-weight:800;
+}
+.tab-content .sectiontitle{
+ color:#6d1d18;
+ font-family:Cinzel,serif;
+ font-weight:700;
+ border-bottom:1.5px solid rgba(114,78,34,.35);
+ padding-bottom:5px;
+ margin:16px 0 10px;
+}
+.sectiontitle::after{
+ opacity:.85;
+ filter:sepia(.5) contrast(1.2);
+}
+.tab-content .paragraph,.inspector .paragraph,.smallnote{
+ color:#3d2a1c!important;
+ font-size:13px;
+ line-height:1.5;
+}
+.divider{background:rgba(114,78,34,.3)}
+
+/* Parchment Cards, Rules & Collapsibles */
+.rule,.tab-content .rule,.inspector .rule,.realm-overview,.province-section,.dispatch-card,.war-compare>div,.fact,.dynasty-node,.acceptance-box,.family-generation,.finder-row{
+ background:rgba(248,238,214,.72)!important;
+ border:1.5px solid rgba(126,90,42,.52)!important;
+ box-shadow:inset 0 1px 0 rgba(255,250,235,.75),0 2px 6px rgba(60,36,14,.14);
+ color:var(--ink);
+ border-radius:4px;
+}
+.dispatch-deck{
+ background:linear-gradient(180deg,rgba(124,31,27,.11),rgba(170,130,66,.14));
+ border:2px solid #8f6b35;
+ color:var(--ink);
+}
+.dispatch-head{color:#6d1d18}
+.dispatch-head small,.dispatch-cat{color:#6f4f28}
+.dispatch-card b{color:#26160e;font-family:Cinzel,serif}
+.dispatch-card p{color:#3c291b}
+.dispatch-card.level-urgent{
+ border-left:4px solid #8b201b!important;
+ background:rgba(232,196,176,.72)!important;
+}
+.priority-detail{
+ background:rgba(246,236,210,.76);
+ border:1.5px solid #9a743b;
+ color:#2a1a10;
+}
+.priority-detail small{color:#5a402c}
+
+.province-section summary{
+ font-family:Cinzel,serif;
+ font-size:12px;
+ color:#3c2214;
+}
+.province-section summary:after{color:#7c211b;font-weight:800}
+.province-hero{
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ height:78px;
+ margin:10px 0 12px;
+ background:
+  linear-gradient(180deg,rgba(44,28,16,.28),rgba(28,18,10,.65)),
+  url('game-art/ui/panels-01.webp') center/cover;
+ border:2px solid #8d6a36;
+ box-shadow:inset 0 0 16px rgba(0,0,0,.45);
+ color:#fbe7b8;
+ text-shadow:0 2px 6px #000;
+ border-radius:4px;
+}
+.province-hero span{
+ font-family:Cinzel,serif;
+ color:#fff0cb;
+ background:rgba(28,17,10,.72);
+ padding:2px 7px;
+ border-radius:3px;
+}
+.fact label{color:#684b30;font-family:Cinzel,serif;font-size:9px;font-weight:700}
+.fact b{color:#25160e;font-size:15px}
+.statlist label{color:#523a27;font-weight:600}
+.statlist strong{color:#22140c}
+.up{color:#1f6138!important}
+.down{color:#8f211b!important}
+
+/* Interactive Buttons & Selectors on Parchment */
+.tab-content .rowbtn,.inspector .rowbtn,.building-grid button,.finder-row,.btnblock{
+ font-family:Cinzel,serif;
+ font-size:11px;
+ font-weight:700;
+ color:#fff2d4!important;
+ background:linear-gradient(180deg,#5b432b,#3d2b1b)!important;
+ border:1.5px solid #9f793d!important;
+ border-radius:3px;
+ box-shadow:inset 0 1px 0 rgba(255,232,175,.22),0 2px 5px rgba(0,0,0,.28);
+}
+.tab-content .rowbtn:hover:not(:disabled),.inspector .rowbtn:hover:not(:disabled),.building-grid button:hover:not(:disabled),.btnblock:hover:not(:disabled){
+ background:linear-gradient(180deg,#7c211c,#531411)!important;
+ border-color:#e8c474!important;
+}
+.rowbtn small,.building-grid small{color:#ecd4a1!important;font-family:'Crimson Text',Georgia,serif;font-size:11.5px;font-weight:400}
+.btnblock{
+ background:linear-gradient(180deg,#8b251f,#5d1613)!important;
+ border-color:#cfa65a!important;
+}
+.btnblock.secondary{
+ background:linear-gradient(180deg,#443325,#2a1e15)!important;
+}
+.rule select,.select,.policy-select,.directory-controls input,#campaign-query{
+ background:#f7eed9!important;
+ color:#23160e!important;
+ border:1.5px solid #8a6735!important;
+ font-family:'Crimson Text',Georgia,serif;
+ font-size:14px;
+ font-weight:600;
+}
+.character-link{
+ color:#7c1f1b;
+ font-weight:700;
+ text-decoration-color:rgba(124,31,27,.45);
+}
+.character-link:hover{color:#b02c25}
+
+/* CK2 Character Sheet & 5 Color-Coded Attributes */
+.character-hero{
+ background:
+  linear-gradient(rgba(239,225,193,.88),rgba(222,202,158,.92)),
+  url('ui/parchment/parchmentFolded.webp') center/cover!important;
+ border:2px solid #967138!important;
+ padding:12px!important;
+}
+.character-hero h2{color:#26160e!important;font-size:19px}
+.character-hero p{color:#493322!important}
+.character-hero>.portrait-mark{
+ width:96px;
+ height:118px;
+ border:3px solid #a88240;
+ box-shadow:0 4px 12px rgba(0,0,0,.4);
+}
+.trait-chip{
+ background:rgba(46,32,20,.1);
+ border:1px solid rgba(114,78,34,.35);
+ border-radius:12px;
+ padding:2px 6px;
+ font-size:11px;
+ color:#2a1a10;
+}
+.character-skills{
+ grid-template-columns:repeat(5,minmax(0,1fr));
+ gap:4px;
+ margin:8px 0;
+}
+.character-skills>div{
+ padding:6px 4px;
+ text-align:center;
+ border:1.5px solid #7d5d30;
+ border-radius:4px;
+ color:#fff4d8;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 4px rgba(0,0,0,.25);
+ background:#3c2d20;
+}
+.character-skills>div[data-skill="diplomacy"]{background:linear-gradient(180deg,#2d5b84,#1c3b57);border-color:#72a4d0}
+.character-skills>div[data-skill="martial"]{background:linear-gradient(180deg,#8b2b27,#591916);border-color:#d4776d}
+.character-skills>div[data-skill="stewardship"]{background:linear-gradient(180deg,#2f6b43,#1d452a);border-color:#75b58a}
+.character-skills>div[data-skill="intrigue"]{background:linear-gradient(180deg,#623673,#3d2049);border-color:#ab7ec0}
+.character-skills>div[data-skill="learning"]{background:linear-gradient(180deg,#876a2f,#57431b);border-color:#dec078}
+.character-skills small{font-size:9px;color:#f4e6c8;justify-content:center;display:flex;align-items:center;gap:2px}
+.character-skills b{font-family:Cinzel,serif;font-size:14px;color:#fff}
+
+/* County Sub-Holdings Cards with CK2 Brass Level Pips */
+.subholding-summary{
+ background:rgba(124,31,27,.09)!important;
+ border:1px solid rgba(124,31,27,.3)!important;
+ color:#3c2214!important;
+}
+.holding-pips{display:inline-flex;gap:3px;margin-left:auto}
+.holding-pips i{
+ display:inline-block;
+ width:8px;
+ height:8px;
+ border-radius:2px;
+ border:1px solid #785525;
+}
+.holding-pips i.built{background:linear-gradient(180deg,#e9c675,#b28538);box-shadow:0 0 4px rgba(212,170,80,.6)}
+.holding-pips i.empty{background:rgba(95,69,36,.18)}
+.subholding-head .badge{
+ background:#3b291a;
+ color:#f4dcb0;
+ border:1px solid #9d773c;
+ font-family:Cinzel,serif;
+}
+
+/* ==========================================================================
+   4. CK2 ILLUMINATED PARCHMENT EVENT SCROLL MODAL
+   ========================================================================== */
+.event-modal{background:rgba(10,6,4,.76);backdrop-filter:blur(3px)}
+.event-card{
+ position:relative;
+ width:min(640px,100%);
+ background:
+  linear-gradient(rgba(241,229,197,.95),rgba(224,203,157,.96)),
+  url('ui/parchment/parchmentAncient.webp') center/cover;
+ border:3px solid #8a642e;
+ box-shadow:0 0 0 3px #281b12,0 0 0 5px #b9914b,0 26px 80px rgba(0,0,0,.92);
+ border-radius:6px;
+ padding:20px 24px;
+ color:var(--ink);
+}
+.event-modal-head{
+ border-bottom:2px solid rgba(124,84,38,.4);
+ padding-bottom:10px;
+}
+.event-badge{
+ font-family:Cinzel,serif;
+ background:linear-gradient(180deg,#8b231e,#5d1512);
+ color:#ffeec7;
+ border:1.5px solid #d4aa5a;
+ padding:4px 10px;
+ letter-spacing:1.4px;
+}
+.event-date{color:#5e3e24;font-weight:700}
+.event-card h2{
+ font-family:Cinzel,serif;
+ color:#351910;
+ font-size:21px;
+ text-shadow:0 1px 0 rgba(255,250,235,.65);
+}
+.event-illustration{
+ border:2px solid #86622f;
+ box-shadow:0 4px 14px rgba(38,22,8,.38);
+}
+.event-actors{
+ background:rgba(250,242,221,.68);
+ border:1.5px solid #967038;
+ color:var(--ink);
+}
+.event-actors strong{color:#6e1d18;font-family:Cinzel,serif;font-size:13px}
+.event-actors small{color:#553b27}
+.event-body{
+ color:#24170f;
+ font-size:15px;
+ line-height:1.6;
+}
+.event-choice-btn{
+ position:relative;
+ padding:10px 14px 10px 44px;
+ background:linear-gradient(95deg,#5a3e28,#3b281a)!important;
+ border:2px solid #b58d4b!important;
+ color:#fff2d4!important;
+ border-radius:4px;
+ box-shadow:0 3px 8px rgba(0,0,0,.35);
+}
+.event-choice-btn::before{
+ content:"";
+ position:absolute;
+ left:10px;
+ top:50%;
+ transform:translateY(-50%);
+ width:24px;
+ height:24px;
+ background:url('game-art/ui/ornaments-13.webp') center/contain no-repeat;
+ filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));
+}
+.event-choice-btn:hover:not(:disabled),.event-choice-btn:focus-visible{
+ background:linear-gradient(95deg,#83231e,#4d1714)!important;
+ border-color:#f3d285!important;
+}
+.event-effect-chip{
+ background:rgba(246,236,210,.92);
+ border:1px solid #967038;
+ color:#2d1d12;
+ font-family:Inter,sans-serif;
+ font-weight:600;
+}
+.event-effect-chip.pos{background:#d7ead9;border-color:#3a794c;color:#184a28}
+.event-effect-chip.neg{background:#f3d4cf;border-color:#9e3c34;color:#6c1b15}
+.event-modal-foot{color:#5e422c}
+
+/* ==========================================================================
+   5. TACTICAL BATTLEFIELD HUD — Heraldic Unit Cards & Real Sprite Thumbnails
+   ========================================================================== */
+body.in-battle .topbar,body.in-battle .mobile-thumb-bar{pointer-events:none}
+.battle-screen{z-index:30}
+.battle-screen .battle-top{
+ background:linear-gradient(180deg,rgba(25,17,12,.96) 0%,rgba(25,17,12,.86) 78%,rgba(25,17,12,0) 100%);
+ border-bottom:1px solid rgba(190,148,75,.32);
+}
+.battle-top h2,.battle-top .eyebrow{color:#f4da9c;font-family:Cinzel,serif}
+.battle-bottom{
+ background:linear-gradient(180deg,rgba(20,14,10,0) 0%,rgba(25,18,13,.94) 18%,rgba(16,11,8,.98) 100%);
+ border-top:2px solid #8f6b35;
+}
+.battle-commands select{
+ font-family:Cinzel,serif;
+ background:#251a12;
+ border:1.5px solid #9d783d;
+ color:#f4e2b8;
+}
+.battle-units .unitcard{
+ background:linear-gradient(180deg,#3d2d20,#211710);
+ border:2px solid #8a6835;
+ border-radius:6px;
+ box-shadow:inset 0 1px 0 rgba(255,228,170,.16),0 4px 10px rgba(0,0,0,.6);
+ color:#f7e9c9;
+ flex:0 0 124px;
+ min-height:94px;
+}
+.battle-units .unitcard.active{
+ background:linear-gradient(180deg,#7a231e,#421512);
+ border-color:#f2ce7c;
+ outline:2px solid #f7dc92;
+}
+.battle-units .unitcard.reserve{
+ background:linear-gradient(180deg,#2c4355,#1a2935);
+ border-color:#74a2c4;
+}
+.regiment-icon{
+ position:relative;
+ width:36px;
+ height:36px;
+ border-radius:4px;
+ background:rgba(15,11,8,.65);
+ border:1px solid rgba(212,175,95,.45);
+ overflow:hidden;
+}
+.regiment-sprite-thumb{
+ position:absolute;
+ inset:0;
+ background-size:400% 100%;
+ background-position:0% 50%;
+ background-repeat:no-repeat;
+ image-rendering:auto;
+ z-index:2;
+}
+.regiment-icon svg{
+ position:relative;
+ width:100%;
+ height:100%;
+ opacity:.24;
+ z-index:1;
+}
+.battle-units .unitcard b{font-family:Cinzel,serif;font-size:10.5px;color:#fff0cb}
+.battle-units .unitcard small{color:#cbb488}
+.resultcard{
+ background:
+  linear-gradient(rgba(239,225,193,.96),rgba(220,199,153,.96)),
+  url('ui/parchment/parchmentAncient.webp') center/cover;
+ border:3px solid #9c753a;
+ color:var(--ink);
+ box-shadow:0 0 0 4px #241810,0 24px 65px rgba(0,0,0,.9);
+}
+.resultcard h2{color:#351910}
+.resultcard p,.resultcard .smallnote{color:#3b281a}
+.battle-report>div{background:rgba(248,238,214,.75);border-color:#967038;color:var(--ink)}
+
+/* ==========================================================================
+   6. TITLE CODEX, PORTRAIT FRAMES & RESPONSIVE MOBILE POLISH
+   ========================================================================== */
+#start-screen .startcard{
+ background:linear-gradient(170deg,rgba(32,22,16,.93),rgba(19,13,9,.96));
+ border:3px solid #a88244;
+ box-shadow:0 0 0 3px #1d140e,0 0 0 5px #6f5228,0 24px 70px rgba(0,0,0,.92);
+ border-radius:6px;
+}
+#start-screen .startselectors select,#start-screen #realm-search{
+ background:#211711;
+ border:1.5px solid #8c6a36;
+ color:#f5e6c5;
+}
+.portrait-frame{
+ border:2px solid #b58d4b;
+ box-shadow:inset 0 0 0 1px rgba(255,235,180,.25),0 3px 10px rgba(0,0,0,.5);
+}
+.portrait-frame.rank-legend{box-shadow:0 0 0 2px #f2cf78,0 4px 14px rgba(235,188,78,.5)}
+
+/* Toast & Tooltips */
+.toast{
+ font-family:Cinzel,serif;
+ background:linear-gradient(180deg,#3d2b1d,#231810);
+ border:2px solid #cfa65a;
+ color:#fff0cb;
+}
+.ui-tooltip{
+ background:linear-gradient(rgba(240,227,196,.97),rgba(223,204,162,.97));
+ border:2px solid #8a642e;
+ color:#24170f;
+ box-shadow:0 8px 24px rgba(0,0,0,.78);
+}
+.quick-action-popover{
+ background:linear-gradient(180deg,#2d2017,#1b120d);
+ border:2px solid #a88244;
+}
+.quick-action-popover button{
+ font-family:Cinzel,serif;
+ background:#38281c;
+ border-color:#7d5e32;
+ color:#f4e2bc;
+}
+.quick-action-popover button:hover{background:#73201b;border-color:#ecc978}
+
+/* Mobile Dock & Responsive Guardrails */
 .mobile-thumb-bar{display:none}
-@media(max-width:900px){body.in-campaign:not(.in-battle) .mobile-thumb-bar{position:fixed;left:0;right:0;bottom:0;z-index:18;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:4px 4px max(4px,env(safe-area-inset-bottom));background:linear-gradient(#12191e,#090f12);border-top:1px solid #8c6e42;box-shadow:0 -4px 18px rgba(0,0,0,.6)}
-.mobile-thumb-bar button{min-height:44px;border:1px solid transparent;background:transparent;color:#e7d4ae;font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:3px 2px;border-radius:4px}
-.mobile-thumb-bar button span{font-size:9px;letter-spacing:.4px}
-.mobile-thumb-bar button:active{background:#3c2326;border-color:#c6a361}
-body.in-campaign:not(.in-battle) .app{padding-bottom:calc(54px + env(safe-area-inset-bottom))}}
-button:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid #f7d894;outline-offset:2px}
-@media(max-width:650px){.tab-content .paragraph{font-size:12px}.tab-content .rowbtn{min-height:40px}.hero-crest{height:74px;width:65px}.hero-crest.sovereign-brand-banner,.hero-crest.sovereign-brand-banner img{max-height:92px}}
-@media(prefers-reduced-motion:reduce){.startcard,.tab-content,.leftbar,.rightbar,.goldbtn,.rowbtn{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-.portrait-frame{position:relative;display:inline-flex;border-radius:8px;overflow:hidden;border:2px solid #8a6d3b;box-shadow:0 2px 8px rgba(0,0,0,.45)}
-.portrait-frame.portrait-tone-0{border-color:#c89d4c}
-.portrait-frame.portrait-tone-1{border-color:#7c5b3e}
-.portrait-frame.portrait-tone-2{border-color:#8b2635}
-.portrait-frame.portrait-tone-3{border-color:#4c6e7a}
-.portrait-frame.rank-legend{box-shadow:0 0 0 2px #d4af37,0 4px 12px rgba(212,175,55,.4)}
-.portrait-frame.rank-ward::after{content:'Ward';position:absolute;bottom:2px;right:2px;font:600 9px/1 sans-serif;background:rgba(12,14,19,.85);color:#e9d6a7;padding:2px 4px;border-radius:4px}
-.crossroads-card,.reign-chapter-card{border-left:3px solid #d4af37;padding-left:8px;margin-bottom:8px}
+@media(max-width:900px){
+ .quick-nav{top:46px}
+ body.in-campaign:not(.in-battle) .mobile-thumb-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:18;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:2px;padding:4px 4px max(4px,env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,#2d2017,#160f0b);
+  border-top:2px solid #96723b;
+  box-shadow:0 -4px 18px rgba(0,0,0,.75);
+ }
+ .mobile-thumb-bar button{
+  min-height:44px;border:1px solid transparent;background:transparent;
+  color:#f2dfba;font-family:Cinzel,serif;font-size:10px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+ }
+ .mobile-thumb-bar button span{font-size:8.5px;letter-spacing:.4px}
+ .mobile-thumb-bar button:active{background:#6e1d18;border-color:#dfb96e}
+ body.in-campaign:not(.in-battle) .app{padding-bottom:calc(54px + env(safe-area-inset-bottom))}
+}
+@media(max-width:650px){
+ .topbar{padding:4px 8px;gap:4px;min-height:0}
+ .hud-ruler{border-radius:18px 4px 4px 18px;padding:3px 6px 3px 3px}
+ .hud-ruler .portrait-mark{width:30px;height:30px}
+ .resource{padding:2px 6px}
+ .date{padding:5px 8px;font-size:10px}
+ .maptop{padding:3px 6px;gap:4px;flex-wrap:nowrap;overflow:visible}
+ .map-home{flex-wrap:nowrap;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;gap:4px}
+ .map-home .goldbtn,.map-home .smallbtn,.map-options summary{min-height:36px;padding:5px 8px;white-space:nowrap}
+ .quick-nav{padding:3px 6px}
+ .quick-nav>button,.quick-nav summary{min-height:38px;padding:3px 6px}
+ .character-skills{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .mapmodes{right:8px;left:8px;bottom:48px;max-width:none}
+}
+@media(max-width:420px){
+ .mapfooter{display:none}
+ body.in-campaign:not(.in-battle) .app{padding-bottom:calc(48px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){
+ *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
