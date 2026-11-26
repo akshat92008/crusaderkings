@@ -1,4 +1,4 @@
-import {homeRealm,queueHome,tickHometown,hometownModifiers} from './hometown.js';
+import {homeRealm,queueHome,tickHometown,hometownModifiers,homeFoodOutput,homeRecruitmentRequirement} from './hometown.js';
 import {invasionReserved} from './invasion-reservations.js';
 import {allocateCommanderName} from './name-pools.js';
 import {humanControlsRealm,reconcileCareer} from './player-career.js';
@@ -67,8 +67,8 @@ export function empireStats(g,owner,cache=null){
  let rawUpkeep=0,rawFoodDrain=0,troops=0;
  for(const a of ownArmies){const sz=armySize(a);rawUpkeep+=sz*.08;rawFoodDrain+=sz*.025;troops+=sz;}
  const upkeep=Math.round(rawUpkeep)+navalUpkeep(g,owner);
- const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)*homeMod.food-rawFoodDrain);
- return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops,population:p.reduce((s,a)=>s+a.population,0)};
+ const grossFood=p.reduce((s,pr)=>s+homeFoodOutput(g,pr),0);const food=Math.round(grossFood-rawFoodDrain);
+ return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,grossFood:Math.round(grossFood),foodUpkeep:Math.round(rawFoodDrain),troops,population:p.reduce((s,a)=>s+a.population,0)};
 }
 export function setPolicy(g,key,value){
  if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
@@ -99,14 +99,15 @@ export function build(g,provinceId,kind){
 export function recruitmentQuote(g,provinceId,type='infantry'){
  const p=g.provinces[provinceId],f=g.factions[g.player],prices={infantry:110,archers:150,cavalry:240};if(!p||!f||!Object.hasOwn(prices,type))return null;
  const doctrine=militaryDoctrine(f),primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
- const prosMod=prosperityModifiers(g,g.player).levy*greatWorkModifiers(g,g.player).levy;
- return {cost:Math.round(prices[type]*(type===primary?.82:1)*Math.max(.4,1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost*hometownModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy*prosMod*hometownModifiers(g,g.player).recruit)),doctrine};
+ const prosMod=prosperityModifiers(g,g.player).levy*greatWorkModifiers(g,g.player).levy,reason=homeRecruitmentRequirement(g,provinceId,type);
+ return {available:!reason,reason,cost:Math.round(prices[type]*(type===primary?.82:1)*Math.max(.4,1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost*hometownModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy*prosMod*hometownModifiers(g,g.player).recruit)),doctrine};
 }
 export function recruit(g,provinceId,type='infantry'){
  if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  const p=g.provinces[provinceId],f=g.factions[g.player];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  const quote=recruitmentQuote(g,provinceId,type);if(!quote)return {ok:false,msg:'Unknown troop type'};const {cost,doctrine,count:recruited}=quote;
+ if(!quote.available)return {ok:false,msg:quote.reason};
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];

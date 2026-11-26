@@ -275,6 +275,7 @@ try:
   assert ht.locator('.ht-resources > div').count()==5
   assert ht.locator('.ht-landscape').count()==1
   assert ht.locator('.ht-town-ornament').count()==1
+  assert ht.locator('.ht-food-summary').count()==1
   if (ROOT/'assets/hometown/manifest.json').is_file():
    page.wait_for_function("document.querySelector('#hometown-screen .ht-compiled img')?.naturalWidth > 0",timeout=15000)
   ht.locator('[data-ht="tab"][data-key="buildings"]').click();assert ht.locator('.ht-grid .ht-card').count()==40
@@ -286,6 +287,13 @@ try:
   ht.locator('[data-ht="advance"]').click()
   if page.locator('#event-modal').is_visible():page.locator('#event-modal-defer').click()
   assert ht.locator('.ht-job').count()==0
+  ht.locator('[data-ht-change="selection"]').select_option('farm')
+  assert ht.get_by_text('Local gross food:',exact=False).count()>0
+  ht.locator('[data-ht="tab"][data-key="provinces"]').click()
+  assert ht.locator('.ht-yields').count()>0
+  ht.locator('[data-ht="tab"][data-key="military"]').click()
+  assert ht.get_by_text('Raise troops at the capital',exact=True).is_visible()
+  ht.locator('[data-ht="tab"][data-key="town"]').click()
   assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).hometown.realms.england.level")>=1
   page.screenshot(path=str(OUT/'hometown.png'));ht.locator('[data-ht="close"]').click();assert ht.is_hidden()
   assert not ht_errors,ht_errors
