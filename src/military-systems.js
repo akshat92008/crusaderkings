@@ -1,3 +1,4 @@
+import {homeMilitaryUnlocked,hometownModifiers} from './hometown.js';
 import {effectiveCharacterSkill} from './character-agency.js';
 import {humanControlsRealm} from './player-career.js';
 import {fieldContingentSupports,mayEnterWithAccess} from './diplomacy-systems.js';
@@ -80,7 +81,7 @@ export const COMMANDER_TRAITS={
 
 const specialties={longbow:['longbow','pikes'],chivalry:['guard','lancers'],pike:['pikes','crossbow'],gunpowder:['handgun','crossbow'],steppe:['horsebow','lancers'],janissary:['guard','handgun'],elephant:['elephants','guard'],samurai:['guard','skirmishers'],archery:['longbow','skirmishers'],river:['skirmishers','crossbow'],highland:['pikes','guard'],woodland:['skirmishers','longbow'],maritime:['crossbow','guard'],warrior:['guard','skirmishers'],generic:['pikes','skirmishers']};
 
-export function regimentOptions(g,realm){return [...new Set(['skirmishers','swordsmen','spearmen','shieldmen','bowmen','scouts',...(specialties[militaryDoctrine(g.factions[realm]).id]||[])])];}
+export function regimentOptions(g,realm){return [...new Set(['skirmishers','swordsmen','spearmen','shieldmen','bowmen','scouts',...(specialties[militaryDoctrine(g.factions[realm]).id]||[])])].filter(k=>homeMilitaryUnlocked(g,realm,k));}
 
 function note(g,realm,msg){
  const m=g.military;
@@ -217,10 +218,10 @@ export function armyReadiness(g,a){
  const eliteShare=cap(((r.sources?.retinues||0)+(r.sources?.religiousOrders||0))/total,0,1);
  const basePower=(.65+r.supply*.0035)*(1-r.fatigue*.003)*(1+skill*.035)*(1+cap(traitEff.power,-0.12,0.18)+eliteShare*0.08);
  return {
-  power:cap(basePower,0.35,2.2),
+  power:cap(basePower*hometownModifiers(g,a.owner).power,0.35,2.2),
   speed:cap((.72+r.supply*.0028)*(1-r.fatigue*.002)*(1+traitEff.supply*.3),0.4,1.6),
   morale:cap((a.morale||75)-r.fatigue*.25+(skill-1)*3+traitEff.morale,15,100),
-  siege:Object.entries(r.engines).reduce((n,[k,v])=>n+ENGINES[k].power*v,0),
+  siege:Object.entries(r.engines).reduce((n,[k,v])=>n+ENGINES[k].power*v,0)*hometownModifiers(g,a.owner).siege,
   commander:c?.name??null,
   traits:c?.traits?[...c.traits]:[],
   retreatSave:cap(traitEff.retreatSave,-0.15,0.25),
@@ -485,7 +486,7 @@ export function militaryAction(g,world,action,id,extra){
   return ok(`${spec.count} ${extra} added to standing retinue.`);
  }
  if(action==='specialize'){const d=REGIMENTS[extra];if(!d||!regimentOptions(g,g.player).includes(extra))return no('Regiment unavailable to this military tradition.');const used=Object.entries(r.regiments).filter(([k])=>REGIMENTS[k].type===d.type).reduce((n,[,v])=>n+v,0),n=Math.min(30,(a[d.type]||0)-used);if(n<10||f.treasury<d.cost||(p?.owner!==g.player||controller(g,a.province)!==g.player))return no('Need 10 untrained troops, gold and a friendly holding.');f.treasury-=d.cost;r.regiments[extra]=(r.regiments[extra]||0)+n;return ok(n+' troops trained as '+d.name+'.');}
- if(action==='engine'){const d=ENGINES[extra];if(!d||r.engines[extra]>=3||p?.owner!==g.player||controller(g,a.province)!==g.player||!local||f.treasury<d.cost||local.stock.tools<d.tools||local.stock.timber<d.timber)return no('Need a friendly settlement, gold, tools and timber; maximum three of each engine.');if(extra==='bombard'&&!['gunpowder','janissary','pike','chivalry'].includes(militaryDoctrine(f).id))return no('Bombards unavailable to this doctrine.');f.treasury-=d.cost;local.stock.tools-=d.tools;local.stock.timber-=d.timber;r.engines[extra]++;return ok(d.name+' constructed.');}
+ if(action==='engine'){if(!homeMilitaryUnlocked(g,g.player,extra))return no('Research this siege technology in Hometown first.');const d=ENGINES[extra];if(!d||r.engines[extra]>=3||p?.owner!==g.player||controller(g,a.province)!==g.player||!local||f.treasury<d.cost||local.stock.tools<d.tools||local.stock.timber<d.timber)return no('Need a friendly settlement, gold, tools and timber; maximum three of each engine.');if(extra==='bombard'&&!['gunpowder','janissary','pike','chivalry'].includes(militaryDoctrine(f).id))return no('Bombards unavailable to this doctrine.');f.treasury-=d.cost;local.stock.tools-=d.tools;local.stock.timber-=d.timber;r.engines[extra]++;return ok(d.name+' constructed.');}
  if(action==='dismiss-commander'){r.commander=null;return ok('Commander relieved of duty.');}
  if(action==='commander'){const c=g.politics.people[extra];if(!eligibleCommander(g,a,extra)||Object.entries(g.military.armies).some(([key,v])=>key!==id&&v.commander===extra&&g.armies[key]))return no('Select an available adult character from your court.');r.commander=extra;return ok(c.name+' appointed commander. Martial skill '+c.skills.martial+'.');}
  if(action==='resupply'){if(size(a)<=0||p?.owner!==g.player||controller(g,a.province)!==g.player||!local||f.treasury<65||local.stock.grain<8||g.turn-r.lastResupply<1)return no('Need friendly land, 65 gold and 8 grain; once per month.');f.treasury-=65;local.stock.grain-=8;r.supply=cap(r.supply+35,0,100);r.fatigue=cap(r.fatigue-15,0,100);r.lastResupply=g.turn;return ok('Army resupplied.');}

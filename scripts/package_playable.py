@@ -5,9 +5,11 @@ This package is the current playable prototype, not the finished strategy game.
 """
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
+import runpy
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'dist' / 'Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip'
 OUT.parent.mkdir(exist_ok=True)
+runpy.run_path(str(ROOT/'scripts/build_hometown_art.py'))
 keep = [
   'index.html','styles.css','package.json','LICENSE','README.md',
   'START_GAME_MAC.command','START_GAME_WINDOWS.bat'
@@ -17,6 +19,8 @@ keep += ['assets/icons/Strategy_game_trait_icon_sheet_807567b6.jpg','assets/icon
 keep += ['assets/favicon.svg','assets/court-theme.css','assets/court-compass.svg','assets/monarch-crest.svg','docs/HISTORICAL_CONTEXT.md']
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/battle/characters').rglob('*') if p.is_file()]
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/game-art').rglob('*') if p.is_file()]
+keep += ['assets/hometown.css','assets/archery_range.png','assets/barracks.png','assets/blacksmith.png','assets/castle.png','assets/stable.png','assets/watchtower_wooden_full_size.png','assets/house1.png','assets/house1b.png','assets/house1c.png','docs/HOMETOWN.md']
+keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/hometown').glob('*') if p.is_file()]
 keep += ['assets/characters_3d/ashigaru-foot-soldier-806707.glb','assets/characters_3d/daimyo-lord-78364a.glb','assets/characters_3d/LICENSE-Polyfork.txt']
 text = ('CROWN OF NATIONS: 1450 — CULTURAL WARFARE PLAYTEST\n'
         'This is a playable development preview, not a finished game.\n\n'

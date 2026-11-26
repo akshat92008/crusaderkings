@@ -1,3 +1,4 @@
+import {homeRealm,queueHome,tickHometown,hometownModifiers} from './hometown.js';
 import {invasionReserved} from './invasion-reservations.js';
 import {allocateCommanderName} from './name-pools.js';
 import {humanControlsRealm,reconcileCareer} from './player-career.js';
@@ -62,11 +63,11 @@ export function empireStats(g,owner,cache=null){
  const gw=greatWorkModifiers(g,owner),bl=bloodlineModifiers(g,owner),dlcMod=dlcModifiers(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
  const taxIncome=Math.round(dlcMod.tax*economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
- const income=taxIncome+trade+tradePosts;
+ const homeMod=hometownModifiers(g,owner);const income=Math.round(taxIncome*homeMod.tax)+trade+tradePosts;
  let rawUpkeep=0,rawFoodDrain=0,troops=0;
  for(const a of ownArmies){const sz=armySize(a);rawUpkeep+=sz*.08;rawFoodDrain+=sz*.025;troops+=sz;}
  const upkeep=Math.round(rawUpkeep)+navalUpkeep(g,owner);
- const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-rawFoodDrain);
+ const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)*homeMod.food-rawFoodDrain);
  return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops,population:p.reduce((s,a)=>s+a.population,0)};
 }
 export function setPolicy(g,key,value){
@@ -84,6 +85,7 @@ export function build(g,provinceId,kind){
  const p=g.provinces[provinceId],f=g.factions[g.player],b=BUILDINGS[kind];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  if(!b)return {ok:false,msg:'Unknown building'};
+ if(homeRealm(g))return queueHome(g,null,'building',kind,provinceId);
  const level=p.buildings[kind]||0;
  if(level>=3)return {ok:false,msg:'Maximum building level reached'};
  const price=Math.round(b.cost*(level+1)*civicModifiers(g,g.player).build*economyModifiers(g,g.player).cost);
@@ -98,7 +100,7 @@ export function recruitmentQuote(g,provinceId,type='infantry'){
  const p=g.provinces[provinceId],f=g.factions[g.player],prices={infantry:110,archers:150,cavalry:240};if(!p||!f||!Object.hasOwn(prices,type))return null;
  const doctrine=militaryDoctrine(f),primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
  const prosMod=prosperityModifiers(g,g.player).levy*greatWorkModifiers(g,g.player).levy;
- return {cost:Math.round(prices[type]*(type===primary?.82:1)*(1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy*prosMod)),doctrine};
+ return {cost:Math.round(prices[type]*(type===primary?.82:1)*Math.max(.4,1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost*hometownModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy*prosMod*hometownModifiers(g,g.player).recruit)),doctrine};
 }
 export function recruit(g,provinceId,type='infantry'){
  if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
@@ -240,11 +242,11 @@ export function advanceMonth(g,world){
   const s=empireStats(g,f.id,{provs:land,armies:armiesByOwner.get(f.id)||[]});
   f.treasury=Math.round(f.treasury+s.balance);
   f.food=clamp(Math.round(f.food+s.foodDelta),-1000,50000);
-  let avgUnrest=0;
+  let avgUnrest=0;const homeOrder=hometownModifiers(g,f.id).order;
   for(const p of land){
    p.population=clamp(p.population+(p.buildings.farm>0&&g.turn%4===0?1:0),4,800);
    const adjust= (f.policies.tax===2?2:f.policies.tax===0?-2:0)+(f.policies.levy===2?1:0)-(f.policies.tolerance===2?2:f.policies.tolerance===0?-1:0)-(p.buildings.farm>0?1:0);
-   p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
+   p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)-homeOrder+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
    if(!occupation(g,p.id)&&p.unrest>=93 && rand(g)<.13){transferProvince(g,p.id,'independent');makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
   }
   const provinces=Math.max(1,s.provinces);f.stability=clamp(f.stability+Math.sign(52-avgUnrest/provinces)*.6-(f.treasury<0?3:0)-(f.food<0?2:0),0,100);
@@ -328,6 +330,7 @@ export function advanceMonth(g,world){
  advanceKingdomSystems(g,world);
  tickDeepSystems(g,world);
  tickDlcSystems(g,world);
+ tickHometown(g,world);
  return g;
 }
 function compactPersonForSave(p,realmCivic){
