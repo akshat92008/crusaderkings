@@ -1,0 +1,402 @@
+###############################################
+OpenGameArt.org automatically generated credits file notice:
+
+THIS FILE IS FOR INFORMATIONAL PURPOSES ONLY.  NO WARRANTY OF ANY KIND IS EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL OPENGAMEART.ORG BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE USE OF THIS FILE OR THE INFORMATION IN IT.
+
+In plain English:  This credits file is automatically generated to the best of our ability, but it remains YOUR RESPONSIBILITY as a game developer to ensure that the art you use is attributed properly.  That is, we can't be held liable even if all of the information in this file is completely wrong.   In addition, some of the art listed in this file may have SPECIAL ATTRIBUTION INSTRUCTIONS that ask that you credit the artist in a particular way, rather than a verbatim copyright notice.  In those cases, you will probably need to hand-edit this file to comply with their instructions.  In some older art, attribution instructions may be included in the art description itself.  Please check the art page to be sure.
+
+We recommend that you delete this notice when you're sure the information here is correct and the attribution instructions are properly followed.  If you aren't the game developer and you're seeing this notice here in the credits, it probably means that the developer hasn't properly verified the attribution information contained herein even though it said they were supposed to do it right on the page where they downloaded this file.  
+###############################################
+
+Title:
+    Medieval Cart Prop
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/medieval-cart-prop
+
+License(s):
+    * CC-BY 4.0 ( https://creativecommons.org/licenses/by/4.0/legalcode )
+
+Copyright/Attribution Notice:
+    Bleed&#039;s Game Art - https://www.patreon.com/bleed
+
+File(s):
+    * cart_isometric.zip
+    * cart_top-down.zip
+
+----------------------------------------
+
+Title:
+    Simple Isometric Hovel
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/simple-isometric-hovel
+
+License(s):
+    * CC-BY 4.0 ( https://creativecommons.org/licenses/by/4.0/legalcode )
+
+Copyright/Attribution Notice:
+    "Bleed - http://remusprites.carbonmade.com/"
+
+File(s):
+    * Simple-Hovel_isometric.zip
+
+----------------------------------------
+
+Title:
+    Medieval Building 06
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/medieval-building-06
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    "Bleed -http://remusprites.carbonmade.com/"
+
+File(s):
+    * Medieval_Building_06.zip
+
+----------------------------------------
+
+Title:
+    Medieval Catapult - Free Version
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/medieval-catapult-free-version
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    Bleed&#039;s Game Art - http://remusprites.carbonmade.com
+
+File(s):
+    * Catapult (free) - Isometric.zip
+    * Catapult (free) - TopDown.zip
+
+----------------------------------------
+
+Title:
+    Isometric Medieval Tavern
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/isometric-medieval-tavern
+
+License(s):
+    * CC-BY 4.0 ( https://creativecommons.org/licenses/by/4.0/legalcode )
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    Bleed&#039;s Game Art - https://www.patreon.com/bleed
+
+File(s):
+    * Medieval-Tavern.zip
+
+----------------------------------------
+
+Title:
+    Animated Isometric Tree - Bleed&#039;s Game Art
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/animated-isometric-tree-bleeds-game-art
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    "Bleed - http://remusprites.carbonmade.com/"
+
+File(s):
+    * Animated Swietenia.zip
+
+----------------------------------------
+
+Title:
+    Tree Collection - Bleed&#039;s Game Art
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/tree-collection-bleeds-game-art
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+SPECIAL ATTRIBUTION INSTRUCTIONS:
+    Credit is not necessary but appreciated. You can use my name "Bleed" and if you&#039;re feeling extra generous here&#039;s a link to my portfolio that you can include "http://remusprites.carbonmade.com/" Again, all this is optional.
+
+File(s):
+    * _01.zip
+    * _02.zip
+    * _03.zip
+    * _04.zip
+    * _05.zip
+
+----------------------------------------
+
+Title:
+    Tree Collection v2.6 - Bleed&#039;s Game Art
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/tree-collection-v26-bleeds-game-art
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    "Bleed - http://remusprites.carbonmade.com/"
+
+File(s):
+    * _tree_01.zip
+    * _tree_02.zip
+    * _tree_03.zip
+    * _tree_04.zip
+    * _tree_05.zip
+    * _tree_06.zip
+    * _tree_07.zip
+    * _tree_08.zip
+    * _tree_09.zip
+    * _tree_10.zip
+    * _tree_11.zip
+    * _tree_12.zip
+    * _tree_13.zip
+    * _tree_14.zip
+
+----------------------------------------
+
+Title:
+    isometric medieval buildings
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-medieval-buildings
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * building_pack_02_sheets.zip
+    * building_pack_02_single.zip
+    * building_pack_02_source_updated.zip
+
+----------------------------------------
+
+Title:
+    Medieval Archery Range (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-archery-range-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * archery_range.png
+
+----------------------------------------
+
+Title:
+    Medieval Stable (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-stable-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * stable.png
+    * stables-exp_sm.psd
+
+----------------------------------------
+
+Title:
+    Medieval Barracks (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-barracks-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * barracks.png
+
+----------------------------------------
+
+Title:
+    Western-European Castle (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/western-european-castle-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * castle.png
+    * castle-exp_sm.psd
+
+----------------------------------------
+
+Title:
+    Western-European Medieval Houses (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/western-european-medieval-houses-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * house1.png
+    * house1b.png
+    * house1c.png
+
+----------------------------------------
+
+Title:
+    Old Well - Bleed&#039;s Game Art
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/old-well-bleeds-game-art
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    Credit is Optional but Appreciated. You can use : "Bleed - http://remusprites.carbonmade.com/"
+
+File(s):
+    * Well.zip
+
+----------------------------------------
+
+Title:
+    6 Isometric buildings
+
+Author:
+    Scribe
+
+URL:
+    https://opengameart.org/content/6-isometric-buildings
+
+License(s):
+    * CC-BY-SA 3.0 ( http://creativecommons.org/licenses/by-sa/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    Please credit me as &#039;Daniel Stephens&#039; and link to http://www.unknown-horizons.org/. Individual licensing instructions are included with each model as many have small models from other artists so please check those to credit the appropriate people!
+
+File(s):
+    * Isometric Building Pack.zip
+    * barracks.zip
+    * church.zip
+    * firestation.zip
+    * herbary.zip
+    * signal_fire.zip
+    * weaponsmith.zip
+
+----------------------------------------
+
+Title:
+    Grassland Tileset
+
+Author:
+    Clint Bellanger
+
+URL:
+    https://opengameart.org/content/grassland-tileset
+
+License(s):
+    * CC-BY-SA 3.0 ( http://creativecommons.org/licenses/by-sa/3.0/legalcode )
+
+File(s):
+    * grassland_tiles.png
+    * grassland_blend.zip
+
+----------------------------------------
+
+Title:
+    Animated fish swarm - Ready for isometric rendering
+
+Author:
+    WeaponGuy
+
+URL:
+    https://opengameart.org/content/animated-fish-swarm-ready-for-isometric-rendering
+
+License(s):
+    * CC-BY 3.0 ( http://creativecommons.org/licenses/by/3.0/legalcode )
+
+File(s):
+    * animated_rainbowtrout.blend
+
+----------------------------------------
+
+Title:
+    400+ Items - BaseHumanMale / Orc / Skeleton
+
+Author:
+    SKYZ0R
+
+URL:
+    https://opengameart.org/content/400-items-basehumanmale-orc-skeleton
+
+License(s):
+    * CC-BY 4.0 ( https://creativecommons.org/licenses/by/4.0/legalcode )
+
+File(s):
+    * part-1.7z
+    * part-2.7z
+    * part-3.7z
+    * part-4.7z
+    * part-5.7z
+    * part-6.7z
+
+----------------------------------------
+
+

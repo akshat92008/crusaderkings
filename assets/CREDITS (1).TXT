@@ -1,0 +1,1028 @@
+###############################################
+OpenGameArt.org automatically generated credits file notice:
+
+THIS FILE IS FOR INFORMATIONAL PURPOSES ONLY.  NO WARRANTY OF ANY KIND IS EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL OPENGAMEART.ORG BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE USE OF THIS FILE OR THE INFORMATION IN IT.
+
+In plain English:  This credits file is automatically generated to the best of our ability, but it remains YOUR RESPONSIBILITY as a game developer to ensure that the art you use is attributed properly.  That is, we can't be held liable even if all of the information in this file is completely wrong.   In addition, some of the art listed in this file may have SPECIAL ATTRIBUTION INSTRUCTIONS that ask that you credit the artist in a particular way, rather than a verbatim copyright notice.  In those cases, you will probably need to hand-edit this file to comply with their instructions.  In some older art, attribution instructions may be included in the art description itself.  Please check the art page to be sure.
+
+We recommend that you delete this notice when you're sure the information here is correct and the attribution instructions are properly followed.  If you aren't the game developer and you're seeing this notice here in the credits, it probably means that the developer hasn't properly verified the attribution information contained herein even though it said they were supposed to do it right on the page where they downloaded this file.  
+###############################################
+
+Title:
+    DawnBlocker
+
+Author:
+    surt
+
+URL:
+    https://opengameart.org/content/dawnblocker
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * dawnblocker.png
+
+----------------------------------------
+
+Title:
+    stylized grassland tileset
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/stylized-grassland-tileset
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * grassland_tileset_sheets.zip
+    * sources_part_1.zip
+    * sources_part_2.zip
+
+----------------------------------------
+
+Title:
+    isometric trees
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-trees-1
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * trees_01.png
+    * trees_source.blend.zip
+
+----------------------------------------
+
+Title:
+    isometric log cabins
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-log-cabins
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * wooden_buildings_01.png
+    * wooden_buildings_source.blend.zip
+
+----------------------------------------
+
+Title:
+    updated grassland tileset (stylized)
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/updated-grassland-tileset-stylized
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * grassland_tileset_updated.zip
+    * sources_water.zip
+    * sources_ground.zip
+    * cliffs_source.zip
+
+----------------------------------------
+
+Title:
+    isometric props and tents
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-props-and-tents
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * props_tilesets.zip
+    * props_tilesets_source.zip
+
+----------------------------------------
+
+Title:
+    Isometric ground tiles
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-ground-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * ground_tiles_sheets.zip
+    * ground_tiles_source_blend_packed.zip
+    * ground_tiles_source_textures_xcf.zip
+
+----------------------------------------
+
+Title:
+    grassland tileset
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/grassland-tileset-1
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * grassland_sheets.zip
+    * tiles_single.zip
+    * grassland_source_files.zip
+
+----------------------------------------
+
+Title:
+    isometric trees
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-trees-0
+
+License(s):
+    * CC-BY-SA 3.0 ( http://creativecommons.org/licenses/by-sa/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    see included license file
+
+File(s):
+    * isometric_trees_pack.zip
+    * isometric_trees_source.zip
+
+----------------------------------------
+
+Title:
+    isometric plant pack
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-plant-pack
+
+License(s):
+    * CC-BY 4.0 ( https://creativecommons.org/licenses/by/4.0/legalcode )
+    * CC-BY-SA 4.0 (  )
+
+Copyright/Attribution Notice:
+    see included license.txt
+
+File(s):
+    * plant_pack.zip
+    * plant_pack_source_packed.blend
+
+----------------------------------------
+
+Title:
+    isometric medieval buildings #2
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-medieval-buildings-2
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * building_pack_03_sheets.zip
+    * building_pack_03_single.zip
+    * building_pack_03_source.zip
+
+----------------------------------------
+
+Title:
+    isometric medieval buildings
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-medieval-buildings
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * building_pack_02_sheets.zip
+    * building_pack_02_single.zip
+    * building_pack_02_source_updated.zip
+
+----------------------------------------
+
+Title:
+    isometric medieval props
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-medieval-props
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * medieval_props_sheets.zip
+    * medieval_props_single.zip
+    * medieval_props_final_source_blend.zip
+
+----------------------------------------
+
+Title:
+    isometric spikes
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-spikes
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * isometric_spikes.zip
+    * spikes_source.blend
+
+----------------------------------------
+
+Title:
+    isometric render resource pack
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-render-resource-pack
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    none - CC0, it contains CC0 art from other artists, see credits.txt
+
+File(s):
+    * IRR.zip
+
+----------------------------------------
+
+Title:
+    isometric buildings
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-buildings
+
+License(s):
+    * CC-BY-SA 3.0 ( http://creativecommons.org/licenses/by-sa/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    see CREDITS.txt
+
+File(s):
+    * isometric_buildings.zip
+    * buildings_source.blend
+
+----------------------------------------
+
+Title:
+    old ruins tileset
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/old-ruins-tileset
+
+License(s):
+    * CC-BY-SA 3.0 ( http://creativecommons.org/licenses/by-sa/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    see CREDITS.txt
+
+File(s):
+    * old_ruins_tileset.zip
+    * old_ruins_tileset_source_blend.zip
+
+----------------------------------------
+
+Title:
+    3D Castle / Dungeon Tileset Extended
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/3d-castle-dungeon-tileset-extended
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * dungeon-tileset-extended.zip
+
+----------------------------------------
+
+Title:
+    Free 3D Castle / Dungeon Tileset
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/free-3d-castle-dungeon-tileset
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * 3D-Castle-tileset-1.zip
+
+----------------------------------------
+
+Title:
+    Isometric snow tileset (flare)
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-snow-tileset-flare
+
+License(s):
+    * CC-BY-SA 3.0 ( http://creativecommons.org/licenses/by-sa/3.0/legalcode )
+
+Copyright/Attribution Notice:
+    my tileset is based on Clint Bellangers grassland tileset, which is cc-by-sa 3.0, for more information about each included art please read the credits.txt
+
+File(s):
+    * snow_tilesets.zip
+    * snow_tilesets_source.zip
+    * snowplains_tileset_final.png
+
+----------------------------------------
+
+Title:
+    25 special effects rendered with blender
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/25-special-effects-rendered-with-blender
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * blender-volumetric-particles-effects.zip
+
+----------------------------------------
+
+Title:
+    10 free isometric graphics from 3D Models
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/10-free-isometric-graphics-from-3d-models
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * stones+mushrooms.zip
+    * iso-objects.blend
+
+----------------------------------------
+
+Title:
+    more isometric parts
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/more-isometric-parts
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * isometric-parts-02.zip
+
+----------------------------------------
+
+Title:
+    Free isometric plants-pack
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/free-isometric-plants-pack
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * isometric-plant-pack.zip
+
+----------------------------------------
+
+Title:
+    Medieval Blacksmith (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-blacksmith-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * blacksmith.png
+    * blacksmith_bldg_exp_sm.psd
+
+----------------------------------------
+
+Title:
+    Western-European Medieval Houses (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/western-european-medieval-houses-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * house1.png
+    * house1b.png
+    * house1c.png
+
+----------------------------------------
+
+Title:
+    Medieval Stable (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-stable-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * stable.png
+    * stables-exp_sm.psd
+
+----------------------------------------
+
+Title:
+    Medieval Stone Guard Tower (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-stone-guard-tower-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * watchtower_lvl2-exp_full_size.png
+    * watchtower_lvl2-exp.psd
+
+----------------------------------------
+
+Title:
+    Medieval Wooden Guard Tower (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-wooden-guard-tower-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * watchtower_wooden_full_size.png
+    * watchtower_lvl1-exp.psd
+
+----------------------------------------
+
+Title:
+    Western-European Castle (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/western-european-castle-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * castle.png
+    * castle-exp_sm.psd
+
+----------------------------------------
+
+Title:
+    Medieval Barracks (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-barracks-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * barracks.png
+
+----------------------------------------
+
+Title:
+    Medieval Archery Range (Isometric 2.5D)
+
+Author:
+    feudalwars
+
+URL:
+    https://opengameart.org/content/medieval-archery-range-isometric-25d
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * archery_range.png
+
+----------------------------------------
+
+Title:
+    Isometric Painted Game Assets
+
+Author:
+    laetissima
+
+URL:
+    https://opengameart.org/content/isometric-painted-game-assets
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * isometric_painted_game_assets.zip
+
+----------------------------------------
+
+Title:
+    Dark Ruins Tilesets - Isometric
+
+Author:
+    Cethiel
+
+URL:
+    https://opengameart.org/content/dark-ruins-tilesets-isometric
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * Isometric - Dark Ruins.zip
+
+----------------------------------------
+
+Title:
+    Gargoyle
+
+Author:
+    yd
+
+URL:
+    https://opengameart.org/content/gargoyle
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * gargyle.png
+    * Gargoyle.blend
+
+----------------------------------------
+
+Title:
+    Isometric demon statue
+
+Author:
+    yd
+
+URL:
+    https://opengameart.org/content/isometric-demon-statue
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * demon01.png
+    * demon02.png
+    * demon03.png
+    * demon04.png
+    * demon05.png
+
+----------------------------------------
+
+Title:
+    1800+ Isometric Wall Tiles
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/1800-isometric-wall-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Screaming Brain Studios if you feel so inclined, but credit is not required :)
+
+File(s):
+    * sbs_-_isometric_wall_pack_-_large.zip
+    * sbs_-_isometric_wall_pack_-_small.zip
+
+----------------------------------------
+
+Title:
+    300+ Isometric Object Tiles
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/300-isometric-object-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Screaming Brain Studios if you feel so inclined, but credit is not required :)
+
+File(s):
+    * sbs_-_isometric_object_tiles.zip
+
+----------------------------------------
+
+Title:
+    400+ Isometric Town Tiles
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/400-isometric-town-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Screaming Brain Studios if you feel inclined, but credit is never required :)
+
+File(s):
+    * sbs_-_isometric_town_pack.zip
+    * sbs_-_isometric_town_examples.zip
+
+----------------------------------------
+
+Title:
+    300+ Isometric Overworld Tiles
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/300-isometric-overworld-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Screaming Brain Studios if you feel inclined, but credit is never required :)
+
+File(s):
+    * sbs_-_isometric_overworld_pack_-_large.zip
+    * sbs_-_isometric_overworld_pack_-_small.zip
+
+----------------------------------------
+
+Title:
+    2D Dominoes Pack
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/2d-dominoes-pack
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Screaming Brain Studios if you feel so inclined, but credit is not required :)
+
+File(s):
+    * sbs_-_2d_dominoes_pack.zip
+
+----------------------------------------
+
+Title:
+    1000+ Isometric Floor Tiles
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/1000-isometric-floor-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Screaming Brain Studios if you feel so inclined, but credit is not required :)
+
+File(s):
+    * sbs_-_isometric_floor_tiles_-_large_256x128.zip
+    * sbs_-_isometric_floor_tiles_-_small_128x64.zip
+    * sbs_-_floor_tile_update_1_-_autotiles.zip
+    * sbs_-_floor_tile_update_2_-_water.zip
+
+----------------------------------------
+
+Title:
+    2D Chess Pack
+
+Author:
+    Screaming Brain Studios
+
+URL:
+    https://opengameart.org/content/2d-chess-pack
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Credit is always appreciated, but never required :)
+
+File(s):
+    * sbs_-_2d_chess_pack.zip
+
+----------------------------------------
+
+Title:
+    Simple wBank
+
+Author:
+    Bleed
+
+URL:
+    https://opengameart.org/content/simple-wbank
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    "Bleed - http://remusprites.carbonmade.com/"
+
+File(s):
+    * Isometric_Western-Bank.zip
+
+----------------------------------------
+
+Title:
+    Sci-Fi Strategy Mech Buildings Isometric Asset Pack
+
+Author:
+    acdrnx
+
+URL:
+    https://opengameart.org/content/sci-fi-strategy-mech-buildings-isometric-asset-pack
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * sci-fi.zip
+
+----------------------------------------
+
+Title:
+    Oldschool Isometric Vehicles Set
+
+Author:
+    Yevhen Ishchenko
+
+URL:
+    https://opengameart.org/content/oldschool-isometric-vehicles-set
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Please tag me on Instagram - @yevhen.ishchenko when using this assets in your games.
+
+File(s):
+    * isometric_vehicles.zip
+
+----------------------------------------
+
+Title:
+    4 Cars Isometric PixelArt Set
+
+Author:
+    Yevhen Ishchenko
+
+URL:
+    https://opengameart.org/content/4-cars-isometric-pixelart-set
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Please tag me on Instagram - @yevhen.ishchenko when using this assets in your games.
+
+File(s):
+    * 4_cars_set.zip
+
+----------------------------------------
+
+Title:
+    Dungeon isometric tiles
+
+Author:
+    IKSLM
+
+URL:
+    https://opengameart.org/content/dungeon-isometric-tiles
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * tileset.png
+
+----------------------------------------
+
+Title:
+    Watch tower platform
+
+Author:
+    nicubunu
+
+URL:
+    https://opengameart.org/content/watch-tower-platform
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * watch_tower.svg
+
+----------------------------------------
+
+Title:
+    Isometric Road Blocks
+
+Author:
+    devilsworkshop
+
+URL:
+    https://opengameart.org/content/isometric-road-blocks
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+Copyright/Attribution Notice:
+    Credits  
+Ajay Karat | Devil&#039;s Work.shop
+www.devilswork.shop
+
+File(s):
+    * Pixel_2D_Isometric_Road_Devils_WorkShop_v01.zip
+
+----------------------------------------
+
+Title:
+    Cracked Tiles FLARE Tileset
+
+Author:
+    artisticdude
+
+URL:
+    https://opengameart.org/content/cracked-tiles-flare-tileset
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * sd.psd
+
+----------------------------------------
+
+Title:
+    alien-building/base set
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/alien-buildingbase-set
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * alien-buildings-set.zip
+
+----------------------------------------
+
+Title:
+    alien-builings extension pack
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/alien-builings-extension-pack
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * alien_objects_extended.zip
+
+----------------------------------------
+
+Title:
+    Isometric mug and torch pack (flare)
+
+Author:
+    rubberduck
+
+URL:
+    https://opengameart.org/content/isometric-mug-and-torch-pack-flare
+
+License(s):
+    * CC0 ( http://creativecommons.org/publicdomain/zero/1.0/legalcode )
+
+File(s):
+    * isometric-mugs-and-torches.zip
+    * mugs-and-torches.blend
+
+----------------------------------------
+
+
