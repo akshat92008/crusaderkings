@@ -1,4 +1,4 @@
-import {openHometown,homeRealm,homeMax} from './hometown.js';
+import {openHometown,homeRealm,homeMax,hometownModifiers} from './hometown.js';
 import {renderHometown,bindHometown} from './hometown-ui.js';
 import {regimentCardIcon} from './banner-renderer.js';
 import {fieldActiveCount,cardFormationChoices,cardRoleHint} from './simple-card-battle.js';
@@ -347,7 +347,7 @@ function openIncomingBattle(){
  const stationed=armiesAt(game,threat.province,game.player),guests=fieldContingentsAt(game,game.player,threat.province,threat.by);
  const defenders=[...stationed,...guests],defense=game.provinces[threat.province];
  const enemyArmy=game.armies[threat.army];if(!enemyArmy)return false;
- const garrison=45+defense.development*12+(defense.buildings.fort||0)*45;
+ const garrison=Math.round((45+defense.development*12+(defense.buildings.fort||0)*45)*hometownModifiers(game,game.player).defense);
  const opposingContingents=fieldContingentsAt(game,threat.by,enemyArmy.province,game.player),invaders=[...nativeInvasionArmies(game,threat),...opposingContingents];
  return openBattle({defenseMode:true,attacker:stationed[0]?.id||null,playerArmies:defenders.map(a=>a.id),alliedTroops:guests.reduce((n,a)=>n+armySize(a),0),
   enemyArmy:threat.army,enemyArmies:invaders.map(a=>a.id),enemy:threat.by,from:enemyArmy.province,
@@ -389,8 +389,8 @@ el('atlas-expand').addEventListener('click',()=>{
 el('toggle-relief').addEventListener('click',()=>{map.setRelief(!map.useRelief);el('toggle-relief').textContent=map.useRelief?'◈ 3D ON':'▤ 3D OFF';el('toggle-relief').setAttribute('aria-pressed',String(map.useRelief));});
 el('map-modes').addEventListener('click',e=>{const button=e.target.closest('[data-mapmode]');if(!button)return;const mode=button.dataset.mapmode;map.setMode(mode);el('mapmode').textContent=mode==='historical'?'1450 REFERENCE':mode==='dejure'?'DE JURE':mode.toUpperCase();for(const b of el('map-modes').querySelectorAll('[data-mapmode]')){const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}updateMapLegend();if(mode==='historical')message('Reference map: 1450 borders prioritize balanced campaign districts.');});
 const closeHometown=()=>{el('hometown-screen').hidden=true;};
-el('open-hometown').addEventListener('click',()=>{if(!game||battle)return;const r=openHometown(game,world);if(!r.ok){message(r.msg);return;}cancelMarch();setDrawer(null);el('hometown-screen').hidden=false;renderHometown(game,world,el('hometown-screen'));save(false);});
-bindHometown(el('hometown-screen'),()=>game,()=>world,message,save,render,closeHometown);
+el('open-hometown').addEventListener('click',()=>{if(!game||battle)return;const r=openHometown(game,world);if(!r.ok){message(r.msg);return;}if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}cancelMarch();setDrawer(null);el('hometown-screen').hidden=false;renderHometown(game,world,el('hometown-screen'));save(false);});
+bindHometown(el('hometown-screen'),()=>game,()=>world,message,save,render,closeHometown,advanceWithInvasions);
 el('open-management').addEventListener('click',()=>setDrawer(el('management-panel').hidden?'management':null));
 el('open-province').addEventListener('click',()=>setDrawer(el('province-drawer').hidden?'province':null));
 el('open-priorities').addEventListener('click',()=>navigateTab('realm'));

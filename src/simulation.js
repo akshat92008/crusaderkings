@@ -62,8 +62,8 @@ export function empireStats(g,owner,cache=null){
  const tradePosts=tradePostIncome(g,owner)+independentPolityTradeIncome(g,owner);
  const gw=greatWorkModifiers(g,owner),bl=bloodlineModifiers(g,owner),dlcMod=dlcModifiers(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(dlcMod.tax*economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
- const homeMod=hometownModifiers(g,owner);const income=Math.round(taxIncome*homeMod.tax)+trade+tradePosts;
+ const homeMod=hometownModifiers(g,owner);const taxIncome=Math.round(homeMod.tax*dlcMod.tax*economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const income=taxIncome+trade+tradePosts;
  let rawUpkeep=0,rawFoodDrain=0,troops=0;
  for(const a of ownArmies){const sz=armySize(a);rawUpkeep+=sz*.08;rawFoodDrain+=sz*.025;troops+=sz;}
  const upkeep=Math.round(rawUpkeep)+navalUpkeep(g,owner);
@@ -147,7 +147,7 @@ export function startMarch(g,world,fromId,toId){
  const allies=fieldContingentsAt(g,g.player,fromId,opponent),alliedTroops=allies.reduce((n,a)=>n+armySize(a),0);
  const defenders=[...armiesAt(g,toId,opponent),...fieldContingentsAt(g,opponent,toId,g.player)];
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
- const garrison=campaignGarrison(target)+defenseSupport(g,opponent,g.player);
+ const garrison=Math.round(campaignGarrison(target)*hometownModifiers(g,opponent).defense)+defenseSupport(g,opponent,g.player);
  return {ok:true,type:'battle',campaignTurn:g.turn,attacker:army.id,playerArmies:[...forces,...allies].map(a=>a.id),attackTroops:total+alliedTroops,alliedTroops,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
 // A live field result is tied to the deployment that created it. Legacy
@@ -289,7 +289,7 @@ export function advanceMonth(g,world){
    for(const v of forces)acted.add(v.id);
    const defending=[...armiesAt(g,target.id,previous),...fieldContingentsAt(g,previous,target.id,a.owner)];
    const terrMod=terrainCombatModifiers(byProv.get(target.id)?.terrain||target.terrain||'plains');
-   const defense=campaignGarrison(target)*terrMod.defense+defenseSupport(g,previous,a.owner)+defending.reduce((sum,v)=>sum+campaignArmyPower(v,armyReadiness(g,v))*terrMod.defense,0);
+   const defense=campaignGarrison(target)*hometownModifiers(g,previous).defense*terrMod.defense+defenseSupport(g,previous,a.owner)+defending.reduce((sum,v)=>sum+campaignArmyPower(v,armyReadiness(g,v))*terrMod.defense,0);
    const attack=forces.reduce((n,v)=>n+campaignArmyPower(v,armyReadiness(g,v)),0)+aidStrength(g,a.owner,previous);
    const outcome=borderBattleOutcome(attack,defense,rand(g));
    for(const v of forces){proportionalLoss(v,outcome.attackerLoss);syncRegiments(g,v);}
