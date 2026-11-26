@@ -276,6 +276,12 @@ try:
   assert ht.locator('.ht-landscape').count()==1
   assert ht.locator('.ht-town-ornament').count()==1
   assert ht.locator('.ht-food-summary').count()==1
+  assert ht.locator('.ht-complex').count()>0
+  assert ht.locator('.ht-scene-scroll').get_attribute('data-zoom')=='fit'
+  assert ht.locator('.ht-stage').bounding_box()['width']<=ht.locator('.ht-scene-scroll').bounding_box()['width']+1
+  ht.locator('[data-ht="zoom"][data-key="detail"]').click()
+  assert ht.locator('.ht-stage').bounding_box()['width']>1000
+  ht.locator('[data-ht="zoom"][data-key="fit"]').click()
   if (ROOT/'assets/hometown/manifest.json').is_file():
    page.wait_for_function("document.querySelector('#hometown-screen .ht-compiled img')?.naturalWidth > 0",timeout=15000)
   ht.locator('[data-ht="tab"][data-key="buildings"]').click();assert ht.locator('.ht-grid .ht-card').count()==40
@@ -284,18 +290,26 @@ try:
   ht.locator('[data-ht="tab"][data-key="provinces"]').click();assert ht.locator('.ht-provinces .ht-card').count()>0
   ht.locator('[data-ht="tab"][data-key="town"]').click();ht.locator('[data-ht-change="selection"]').select_option('house')
   ht.locator('[data-ht="queue"]').click();assert ht.locator('.ht-job').count()==1
+  assert ht.locator('.ht-under-construction').count()==1
   ht.locator('[data-ht="advance"]').click()
   if page.locator('#event-modal').is_visible():page.locator('#event-modal-defer').click()
   assert ht.locator('.ht-job').count()==0
   ht.locator('[data-ht-change="selection"]').select_option('farm')
   assert ht.get_by_text('Local gross food:',exact=False).count()>0
+  before=page.evaluate("""()=>{const s=JSON.parse(localStorage.getItem('crown-of-nations.save'));return s.provinces[s.hometown.realms.england.capital].buildings.farm;}""")
+  ht.locator('[data-ht="queue"]').click();assert ht.locator('.ht-job').count()==1
+  ht.locator('[data-ht="advance"]').click()
+  if page.locator('#event-modal').is_visible():page.locator('#event-modal-defer').click()
+  after=page.evaluate("""()=>{const s=JSON.parse(localStorage.getItem('crown-of-nations.save'));return s.provinces[s.hometown.realms.england.capital].buildings.farm;}""")
+  assert after==before+1
+  assert ht.locator('.ht-farm-estate').count()==1
   ht.locator('[data-ht="tab"][data-key="provinces"]').click()
   assert ht.locator('.ht-yields').count()>0
   ht.locator('[data-ht="tab"][data-key="military"]').click()
   assert ht.get_by_text('Raise troops at the capital',exact=True).is_visible()
   ht.locator('[data-ht="tab"][data-key="town"]').click()
   assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).hometown.realms.england.level")>=1
-  page.screenshot(path=str(OUT/'hometown.png'));ht.locator('[data-ht="close"]').click();assert ht.is_hidden()
+  page.screenshot(path=str(OUT/'hometown.png'));ht.locator('.ht-scene-shell').screenshot(path=str(OUT/'hometown-settlement.png'));ht.locator('[data-ht="close"]').click();assert ht.is_hidden()
   assert not ht_errors,ht_errors
   context.close();print('Hometown PASS: 40 buildings, 20 research branches, 5 resources, queue, month and save')
   browser.close()

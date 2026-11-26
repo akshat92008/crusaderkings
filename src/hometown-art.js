@@ -35,3 +35,29 @@ export function hydrateTownArt(root){
   for(const node of root.querySelectorAll('.ht-scene')){if(pack.extras?.ground)node.style.setProperty('--ht-grass','url("'+pack.extras.ground+'")');}
  });
 }
+
+// Composite visual stages use the licensed runtime sprites already checked into main.
+// Annexes are architectural decoration, not additional economic buildings.
+const HALL_STAGES=[
+ ['village_hall',[]],['village_hall',['round_cottage']],['village_hall',['timber_frame_house']],
+ ['longhouse',[]],['longhouse',['watchtower']],['longhouse',['gatehouse']],
+ ['castle',[]],['castle',['watchtower']],['castle',['watchtower','watchtower']],
+ ['castle',['gatehouse','watchtower']]
+];
+export function buildingAppearance(key,base,level){
+ const rank=Math.max(1,Math.min(10,Math.floor(level)||1));
+ if(key==='town'){const [main,annexes]=HALL_STAGES[rank-1];return {main,annexes:[...annexes],rank};}
+ let main=base,annexes=[];
+ if(key==='house')main=rank>=7?'longhouse':rank>=4?'timber_frame_house':base;
+ if(key==='farm'){if(rank>=4)annexes.push('granary_staddle');if(rank>=7)annexes.push('windmill');}
+ else if(key==='iron'||key==='goldmine'){main='goldmine';if(rank>=4)annexes.push('lumber_shed');if(rank>=7)annexes.push('blacksmith_forge');}
+ else if(key==='quarry'){main='lumber_shed';if(rank>=4)annexes.push('stone_well');if(rank>=7)annexes.push('watchtower');}
+ else if(key==='market'||key==='tradehall'||key==='guild'){if(rank>=4)annexes.push('market_stall');if(rank>=7)annexes.push('timber_frame_house');}
+ else if(key==='fort'||key==='citadel'||key==='palace'){if(rank>=4)annexes.push('watchtower');if(rank>=7)annexes.push('gatehouse');}
+ else {if(rank>=4)annexes.push('lumber_shed');if(rank>=7)annexes.push('timber_frame_house');}
+ return {main,annexes,rank};
+}
+export function buildingComplex(key,base,level){
+ const v=buildingAppearance(key,base,level);
+ return '<span class="ht-complex ht-rank-'+v.rank+(key==='iron'?' ht-iron':'')+'"><span class="ht-complex-main">'+townArt(v.main)+'</span>'+v.annexes.map((part,i)=>'<span class="ht-annex ht-annex-'+i+'">'+townArt(part)+'</span>').join('')+'</span>';
+}
