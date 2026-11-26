@@ -1882,6 +1882,7 @@ export function declareCrusade(g, targetRegionOrFaction, callerRealm = g.player)
   ends: (g.turn || 0) + 48,
   status: 'active',
   warChest: 350,
+  beneficiaries: {},
   pledged: {
    [callerRealm]: { realm: callerRealm, joinedTurn: g.turn || 0, contribution: 25, troopsCommitted: callerPower }
   },
@@ -1943,6 +1944,19 @@ export function pledgeCrusade(g, factionId = g.player) {
  return ok(`${f.name} pledged to the ${c.kind}.`, { summary: crusadeSummary(g) });
 }
 
+export function setCrusadeBeneficiary(g, realm = g.player, personId = '') {
+ const c = g.deepSystems?.crusade;
+ if (!c || c.status !== 'active') return no('No active Crusade or Great Holy War.');
+ const person = g.politics?.people?.[personId];
+ if (!person?.alive || person.realm !== realm || person.age < 16) {
+  return no('Choose a living adult dynastic or court candidate in your realm.');
+ }
+ c.beneficiaries ??= {};
+ c.beneficiaries[realm] = person.id;
+ addLog(g, realm, `${person.name} designated as Crusade beneficiary for ${g.factions?.[realm]?.name || realm}.`);
+ return ok(`${person.name} designated as ${c.kind} beneficiary.`);
+}
+
 export function contributeToCrusade(g, factionId, points = 15) {
  const c = g.deepSystems?.crusade;
  if (!c || c.status !== 'active' || !c.pledged?.[factionId]) return false;
@@ -1953,12 +1967,14 @@ export function contributeToCrusade(g, factionId, points = 15) {
 
 export function crusadeSummary(g) {
  const c = g.deepSystems?.crusade;
- if (!c) return { active: false, participants: [], leaderboard: [], warChest: 0 };
+ if (!c) return { active: false, participants: [], leaderboard: [], warChest: 0, beneficiaries: {} };
  const entries = Object.values(c.pledged || {});
  const totalContrib = Math.max(1, entries.reduce((s, e) => s + (e.contribution || 0), 0));
  const leaderboard = entries
   .map(e => {
    const share = (e.contribution || 0) / totalContrib;
+   const benId = c.beneficiaries?.[e.realm] || null;
+   const ben = benId ? g.politics?.people?.[benId] : null;
    return {
     realm: e.realm,
     name: g.factions?.[e.realm]?.name || e.realm,
@@ -1966,7 +1982,9 @@ export function crusadeSummary(g) {
     sharePct: Math.round(share * 100),
     warChestShare: Math.round(c.warChest * share),
     pietyReward: Math.round(25 + share * 60),
-    prestigeReward: Math.round(20 + share * 50)
+    prestigeReward: Math.round(20 + share * 50),
+    beneficiaryId: ben?.id || null,
+    beneficiaryName: ben?.name || null
    };
   })
   .sort((a, b) => b.contribution - a.contribution || a.realm.localeCompare(b.realm));
@@ -1983,6 +2001,7 @@ export function crusadeSummary(g) {
   ends: c.ends,
   endsIn: Math.max(0, (c.ends || 0) - (g.turn || 0)),
   participants: [...c.participants],
+  beneficiaries: { ...(c.beneficiaries || {}) },
   leaderboard
  };
 }
@@ -2010,6 +2029,16 @@ export function resolveCrusadeIfReady(g, forceSuccess = false) {
    if (r) {
     r.piety = num(r.piety) + row.pietyReward;
     r.prestige = num(r.prestige) + row.prestigeReward;
+    r.traits = [...new Set([...(r.traits || []), 'crusader'])];
+   }
+   const ben = row.beneficiaryId ? g.politics?.people?.[row.beneficiaryId] : null;
+   if (ben?.alive) {
+    ben.wealth = num(ben.wealth) + Math.round(row.warChestShare * 0.45);
+    ben.prestige = num(ben.prestige) + Math.round(row.prestigeReward * 1.4);
+    ben.piety = num(ben.piety) + Math.round(row.pietyReward * 1.2);
+    ben.traits = [...new Set([...(ben.traits || []), 'crusader'])];
+    ben.memories ??= [];
+    ben.memories.push(`Ennobled as ${c.kind} Beneficiary in ${g.year || 1450}.`);
    }
   }
   adjustMoralAuthority(g, c.callerSystem, 10, `${c.kind} victory`);
@@ -2636,7 +2665,10 @@ export function tradePostIncome(g, realm) {
   if (tp.owner !== realm) continue;
   const p = g.provinces?.[tp.provinceId];
   if (!p) continue;
-  sum += Math.round((12 + num(p.development) * 1.5) * (tp.level || 1));
+  const dev = g.economy?.provinces?.[tp.provinceId]?.devastation || 0;
+  const blocked = Object.values(g.naval?.blockades || {}).some(b => b && b.province === tp.provinceId && (b.until || 0) > (g.turn || 0));
+  const mult = Math.max(0.25, (1 - dev / 150) * (blocked ? 0.35 : 1));
+  sum += Math.round((12 + num(p.development) * 1.5) * (tp.level || 1) * mult);
  }
  return sum;
 }

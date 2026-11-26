@@ -348,7 +348,7 @@ export function expandHistoricalWorld(atlas){
 // v4 refines large gameplay polygons. These subdivisions are not historical counties.
 export const DENSE_MAP_VERSION='atlas-1450-v4';
 function splitRing(ring,axis,line,high){const inside=p=>high?p[axis]>=line:p[axis]<=line,out=[];let a=ring[ring.length-2];for(const b of ring.slice(0,-1)){if(inside(a)!==inside(b)){const t=(line-a[axis])/(b[axis]-a[axis]),q=[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])];q[axis]=line;out.push(q);}if(inside(b))out.push(b.slice());a=b;}if(out.length)out.push(out[0].slice());return out;}
-function splitDistrict(p){const poly=p.geometry.coordinates;if(poly.length!==1||p.population<8||area(poly)<0.4)return null;const b=bounds(poly);if(b[1]-b[0]>180)return null;const order=(b[1]-b[0])*Math.cos(p.centroid[1]*Math.PI/180)>b[3]-b[2]?[0,1]:[1,0],ring=poly[0],total=area(poly);
+function splitDistrict(p,minArea=.4){const poly=p.geometry.coordinates;if(poly.length!==1||p.population<8||area(poly)<minArea)return null;const b=bounds(poly);if(b[1]-b[0]>180)return null;const order=(b[1]-b[0])*Math.cos(p.centroid[1]*Math.PI/180)>b[3]-b[2]?[0,1]:[1,0],ring=poly[0],total=area(poly);
  for(const axis of order)for(const fraction of [.5,.4,.6]){const line=b[axis*2]+(b[axis*2+1]-b[axis*2])*fraction;if(ring.some(q=>Math.abs(q[axis]-line)<1e-7))continue;let crossings=0;for(let i=1;i<ring.length;i++)if((ring[i-1][axis]<line)!==(ring[i][axis]<line))crossings++;if(crossings!==2)continue;
  const parts=[[splitRing(ring,axis,line,false)],[splitRing(ring,axis,line,true)]],areas=parts.map(area);if(parts.some(q=>q[0].length<4)||areas.some(a=>a<total*.23)||Math.abs(areas[0]+areas[1]-total)>1e-6*Math.max(1,total))continue;
  const pts=parts.map(samples);if(pts.some(a=>!a.length))continue;const centers=parts.map((q,i)=>center(q,pts[i]));if(centers.some((q,i)=>!inPoly(...q,parts[i])))continue;
@@ -372,7 +372,11 @@ export function densifyHistoricalWorld(expanded){if(expanded.meta?.mapVersion!==
  nameAtlasDistricts(world);
  enrichHistoricalWorld(world);
  world.meta={...world.meta,mapVersion:DENSE_MAP_VERSION,provinceCount:world.provinces.length,subdividedParents:parents.size,coverage:atlasCoverage(world),landConnectivity:{components:components.length,largest:components[0]?.length||0},caveat:'Reference-informed starting realms with synthetic internal gameplay subdivisions. Inherited ownership is not fresh historical evidence; boundaries and district populations are approximate.'};return world;}
-export function worldForSave(raw,legacy,atlas,expanded=atlas,dense=expanded){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;if(version===EXPANDED_MAP_VERSION&&expanded.meta.mapVersion===EXPANDED_MAP_VERSION)return expanded;if(version===DENSE_MAP_VERSION&&dense.meta.mapVersion===DENSE_MAP_VERSION)return dense;throw Error('Saved map version is unavailable');}
+export function worldForSave(raw,legacy,atlas,expanded=atlas,dense=expanded,globalV5=dense){const version=JSON.parse(raw).mapVersion||'legacy';if(version==='legacy')return legacy;if(version===MAP_VERSION&&atlas.meta.mapVersion===MAP_VERSION)return atlas;if(version===EXPANDED_MAP_VERSION&&expanded.meta.mapVersion===EXPANDED_MAP_VERSION)return expanded;if(version===DENSE_MAP_VERSION&&dense.meta.mapVersion===DENSE_MAP_VERSION)return dense;if(version==='atlas-1450-v5'&&globalV5.meta.mapVersion==='atlas-1450-v5')return globalV5;throw Error('Saved map version is unavailable');}
+export const splitDistrictPublic=splitDistrict;
+export const areaOfPoly=area;
+export const boundsOfPoly=bounds;
+export const insideBoxPublic=insideBox;
 
 // Phase 13: 1450 Historical World metadata enrichment (deterministic, preserves geometry/neighbors/ownership).
 export const REALM_METADATA_1450={

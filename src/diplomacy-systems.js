@@ -608,6 +608,7 @@ export function tickDiplomacy(g,world){
   const f=g.factions[r];
   const w=Object.values(g.conflict.wars).find(w=>w.status==='active'&&[w.attacker,w.defender].includes(r));
   if(w){
+   if(w.defender===r)triggerDefensiveCallToArms(g,world,w);
    const expedition=fieldAidOptions(g,world,r,w).find(o=>!humanControlsRealm(g,o.donor));
    if(expedition)dispatchFieldAid(g,r,w,expedition);
    else{
@@ -625,6 +626,12 @@ export function tickDiplomacy(g,world){
    }
   }
   if(f.treasury<450||g.turn%12!==0)continue;
+  // Multi-decade marriage alliances when sovereign lacks treaties
+  const treatyCount=Object.keys(f.treaties||{}).length;
+  if(treatyCount<2&&['diplomacy','defend','prosper'].includes(plan?.goal||'prosper')){
+   const partner=neighbors.find(id=>relation(g,id,r)>=20&&!allied(g,r,id)&&!nonAggression(g,r,id));
+   if(partner){signMarriageTreaty(g,r,partner);continue;}
+  }
   if(['recover','defend','diplomacy'].includes(plan?.goal)){
    const id=neighbors.find(id=>relation(g,id,r)>=15&&!nonAggression(g,r,id)&&!allied(g,r,id));
    if(id)sign(g,r,id);

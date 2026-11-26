@@ -26,7 +26,26 @@ required=[
  'crown-of-nations/assets/battle/characters/Knight.glb',
  'crown-of-nations/assets/battle/characters/Rogue_Hooded.glb',
  'crown-of-nations/assets/battle/characters/LICENSE.txt',
- 'crown-of-nations/data/world.json','crown-of-nations/data/historical-polities-1450.json'
+ 'crown-of-nations/data/world.json','crown-of-nations/data/historical-polities-1450.json',
+ 'crown-of-nations/manifest.webmanifest','crown-of-nations/sw.js',
+ 'crown-of-nations/src/crossroads-eras.js','crown-of-nations/src/reign-chapters.js',
+ 'crown-of-nations/src/mod-ui.js','crown-of-nations/src/world-kingdoms-1450.js',
+ 'crown-of-nations/src/dispatch-ui.js','crown-of-nations/src/mobile-storage.js',
+ 'crown-of-nations/src/content/mandates-decisions.js',
+ 'crown-of-nations/assets/branding/sovereign-logo.webp',
+ 'crown-of-nations/assets/branding/icon-192.png',
+ 'crown-of-nations/assets/branding/icon-512.png',
+ 'crown-of-nations/assets/audio/music/main_theme.mp3',
+ 'crown-of-nations/assets/audio/music/main_theme_alt.mp3',
+ 'crown-of-nations/assets/audio/music/campaign_europe.mp3',
+ 'crown-of-nations/assets/audio/music/campaign_india.mp3',
+ 'crown-of-nations/assets/audio/music/campaign_east_asia.mp3',
+ 'crown-of-nations/assets/audio/music/warfare_1.mp3',
+ 'crown-of-nations/assets/audio/music/warfare_2.mp3',
+ 'crown-of-nations/assets/audio/music/intrigue_1.mp3',
+ 'crown-of-nations/assets/audio/music/intrigue_2.mp3',
+ 'crown-of-nations/assets/audio/music/succession_1.mp3',
+ 'crown-of-nations/assets/audio/music/succession_2.mp3'
 ]
 with ZipFile(zip_path) as z:
  missing=[x for x in required if x not in z.namelist()]

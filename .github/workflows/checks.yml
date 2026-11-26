@@ -1,4 +1,4 @@
-name: Crown of Nations checks
+name: Sovereign 1450 checks
 on:
   push:
     branches: [main, "feature/**"]
@@ -12,5 +12,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm run verify:guard
       - run: npm test
       - run: npm run check

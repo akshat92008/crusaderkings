@@ -88,7 +88,7 @@ export function regionalPoliticalAction(g,r,cmd,id){
 }
 export function tickRegionalPolitics(g,r,land){
  const k=type(g,r);if(!supported.includes(k))return;
- const f=g.factions[r],s=state(g,r);
+ const f=g.factions[r],s=state(g,r,true);
  if(s&&k==='regional'){
   for(const [id,x] of Object.entries(s.grants)){
    if(!validGrant(g,r,id,x)){delete s.grants[id];continue;}
@@ -111,6 +111,14 @@ export function tickRegionalPolitics(g,r,land){
   const head=g.politics.people[g.politics.realms[r]?.ruler],piety=head?.piety??30;
   const delta=(s.scholar||piety>=45?-2:0)+(piety<25?2:1);
   s.decadence=clamp((s.decadence??20)+delta,0,100);
+  if(s.decadence>=75&&(g.turn-(s.lastDecadenceCrisis??-120))>=24){
+   s.lastDecadenceCrisis=g.turn;
+   s.decadence=clamp(s.decadence-12,0,100);
+   f.stability=clamp((f.stability??50)-12,0,100);
+   for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===r)h.loyalty=clamp((h.loyalty??50)-8,0,100);
+   for(const p of land.slice(0,2))if(Number.isFinite(p.unrest))p.unrest=clamp(p.unrest+12,0,100);
+   note(g,r,s,'Dynastic decadence sparked a frontier zealot revolt (-12 stability, +12 unrest).');
+  }
  }
  if(k==='shogunate'&&g.turn>0&&g.turn%6===0){
   const v=regionalPoliticalView(g,r,land);

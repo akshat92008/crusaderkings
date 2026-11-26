@@ -1,35 +1,27 @@
-# Crown of Nations — 1450
+# Sovereign: 1450 (Grand Strategy & Tactical Battle Command)
 
-**A playable, zero-dependency browser grand-strategy prototype** with a worldwide 1450-themed campaign, customizable royal policies, territorial conquest, recruitment, construction, diplomacy, economic simulation, AI rivals, and controllable real-time 3D tactical battles.
+**An original, offline-capable PWA & Capacitor-ready grand-strategy game** set across a global 1450–1600 crossroads map (`980+` playable districts, `115+` historical kingdoms across six continents), featuring **Crossroads Eras**, **Monarch Reign Chapters & Epithets**, **The Crown Dispatch**, `1,500+` branching narrative events, `300+` sovereign mandates, full **JSON Mod Studio**, asymmetric 14-DLC government & religious depth, strategic/character AI, and real-time Banner Lines 3D tactical battles.
 
 ![World map preview](docs/world-preview.png)
 
-> **State of development: playable development build.** The default atlas has 56 starting realms and 576 approximate gameplay districts. Historical-reference alignment is incomplete; the game is fictional alternate history, not an exact 1450 reconstruction. See [release acceptance](docs/RELEASE_ACCEPTANCE.md) and [known limitations](docs/KNOWN_LIMITATIONS.md). Earlier milestone descriptions below describe legacy versions.
+> **Release status & docs:** See [Release Acceptance](docs/RELEASE_ACCEPTANCE.md), [Known Limitations](docs/KNOWN_LIMITATIONS.md), and [Commercial Licensing](docs/COMMERCIAL_LICENSING.md). Note: `100+` automated tests verify core mechanics and endurance; physical mobile hardware store testing remains a manual pre-launch step.
 
-## Play locally — no dependency installation
+## Play locally or install as Mobile PWA — zero server required
 
 1. Download/extract the project ZIP (or clone the Git repository). On a Mac, you can double-click `START_GAME_MAC.command` (if Python 3 is installed). Windows users can launch `START_GAME_WINDOWS.bat`.
 2. Open a terminal in the project directory.
 3. Run `python3 -m http.server 8080` (Mac/Linux), or `py -m http.server 8080` on Windows.
 4. Visit **http://localhost:8080** in Chrome, Edge, Firefox, or Safari.
-5. Choose a historical polity and click **Begin Your Reign**.
+5. Choose a historical polity and click **Begin Your Reign** (or tap **Add to Home Screen** on Android/iOS for offline PWA play, or run `node scripts/build_mobile_www.mjs` + `npx cap sync` via `capacitor.config.json`).
 
-The game runs locally after the files load; it does not need a game server, npm packages, cloud accounts, or a paid API. Google Fonts may load if online; system fonts are the fallback. Local saves are tied to the browser and origin (`localhost:8080`).
+The game runs locally after the files load; it does not need a game server, npm packages, cloud accounts, or a paid API. Saves persist durably via **IndexedDB (`sovereign1450-db`)** plus portable `.json` export/import.
 
-## What works today
+## Core pillars & what works today
 
-- 576 approximate gameplay districts across six continents; 56 starting playable realms. Pan/zoom/inspect, political and historical layers, mobile touch gestures.
-- Map-first interface with five on-demand management workspaces, searchable realm selection and portable save import/export.
-- Monthly calendar progression, treasury, revenue, upkeep, food, unrest, stability, legitimacy, prestige, and population growth.
-- Three classes of **royal decrees**: taxation, recruitment laws, and tolerance.
-- Four **province buildings**: farms, markets, barracks, and forts; each upgrades three times.
-- Recruitment of infantry, archers, and cavalry, with budget and unrest consequences.
-- Adjacent land movement, manual battles against rival provinces, capture, casualties, and territory transfer to campaign.
-- Real-time battlefield with 12 formations, soldier formations (infantry, archers, cavalry), rally banners, ranged attacks, morale, routs, basic enemy behavior, movement orders, and win/lose outcomes.
-- Native instanced **WebGL2 renderer**, with an alternate Canvas 2D renderer projecting 3D cuboids when WebGL2 is unavailable. Does not rely on external 3D engines or CDNs.
-- Rival AI invests, recruits, and fights limited autonomous border conflicts. Not full diplomatic/strategic AI.
-- Diplomatic gifts, improved relations, alliance proposals, insults, an event chronicle, manual and automatic time progression.
-- Browser localStorage save/continue, automatic monthly saves, portable JSON export/import; deterministic campaign simulation core.
+- **Global 1450 World Map (`atlas-1450-v5`):** `980+` playable districts across Europe, Middle East, Africa, India, East Asia, Southeast Asia, Steppe, Americas & Oceania with `115+` historical 1450 kingdoms (`<15%` independent pockets), while preserving `v1`–`v4` save compatibility.
+- **Original Identity Systems:** **Crossroads Eras (1450–1600)** (*Gunpowder Foundries*, *Oceanic Navigation*, *Printing Press*, *Chartered Finance*, *Global First Contact*), **Monarch Reign Chapters & Legacy Epithets**, and **The Crown Dispatch** mobile priority deck.
+- **Massive Content & Asymmetric Government Depth:** `1,500+` modular events, `300+` mandates, Merchant Republic 5-house Doge elections & trade zones, Nomad multi-clan pastures, Eastern Empire stance shifts, Sultanate decadence crises, Dharmic sects & monsoons, Crusader beneficiaries & saintly canonization.
+- **Complete JSON Mod Studio:** Author, validate, toggle, import, and export custom kingdoms, characters, start years (`400–2000`), declarative JSON events, traits, and religions persisted in IndexedDB.
 
 ## Controls
 

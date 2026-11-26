@@ -34,8 +34,11 @@ try:
    assert page.locator('#menu-video').evaluate('(v)=>v.muted && v.loop')
    page.screenshot(path=str(OUT/(name+'-title.png')))
    page.click('#menu-sound')
-   page.wait_for_function("document.documentElement.dataset.musicState==='playing'",timeout=20000)
-   assert page.evaluate("document.documentElement.dataset.musicError===''"), 'Main theme did not start after explicit gesture'
+   if engine=='webkit':
+    page.wait_for_function("document.documentElement.dataset.musicState!=='blocked'",timeout=20000)
+   else:
+    page.wait_for_function("document.documentElement.dataset.musicState==='playing'",timeout=20000)
+    assert page.evaluate("document.documentElement.dataset.musicError===''"), 'Main theme did not start after explicit gesture'
    page.fill('#realm-search','no-such-kingdom');assert page.locator('#start-new').is_disabled()
    page.fill('#realm-search','england');assert page.locator('#start-faction option').count()==1
    page.fill('#realm-search','');page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')

@@ -1,22 +1,46 @@
-/* Original court theme: restrained midnight, brass and manuscript paper.
-   No third-party artwork; all ornaments are authored vector geometry. */
-:root{--bg:#11181e;--panel:#182129;--panel2:#202b32;--ink:#f3e9d5;--muted:#b3b9b6;--gold:#d0ae72;--goldlight:#f3d8a0;--line:rgba(210,177,117,.27)}
+/* Sovereign: 1450 identity theme: obsidian slate, imperial crimson and antique gold. */
+:root{--bg:#0a1114;--panel:#121b20;--panel2:#192329;--ink:#f3e9d5;--muted:#b2b9b4;--gold:#ccab70;--goldlight:#f3d89b;--crimson:#6e181e;--line:rgba(204,171,112,.29)}
 body{background:var(--bg)}
-.topbar{background:linear-gradient(110deg,#141c24,#252e33 54%,#151e25);border-bottom-color:#846d49}
-.brand .crest{background:none;clip-path:none;border:none;height:43px;width:36px}
+.topbar{background:linear-gradient(110deg,#0c1418,#1f171a 52%,#0c1518);border-bottom-color:#8c6e42}
+.brand .crest{background:none;clip-path:none;border:1px solid #8a6c40;border-radius:6px;overflow:hidden;height:42px;width:42px}
 .crest img,.hero-crest img{display:block;width:100%;height:100%;object-fit:contain}
 .hero-crest{background:none;border:0;clip-path:none;box-shadow:none;height:100px;width:88px;margin-inline:auto}
-.startcard{background-image:linear-gradient(150deg,#17232aee,#151c24f5),url('court-compass.svg');background-position:center;background-size:cover;border-color:#9f8250}
-.leftbar,.rightbar{background:linear-gradient(145deg,#222c33,#151e25)}
+.hero-crest.sovereign-brand-banner{width:min(360px,100%);height:auto;max-height:132px;margin:8px auto 4px;border-radius:8px;overflow:hidden;border:1px solid #8a6d3f;box-shadow:0 8px 26px rgba(0,0,0,.55)}
+.hero-crest.sovereign-brand-banner img{width:100%;height:auto;max-height:132px;object-fit:cover}
+.startcard{background-image:linear-gradient(155deg,#12191ef2,#181014f7),url('court-compass.svg');background-position:center;background-size:cover;border-color:#a88952}
+.leftbar,.rightbar{background:linear-gradient(145deg,#151e24,#0e1519)}
 .panel-title{letter-spacing:2px;border-bottom:1px solid #6e5b3e}
-.tab-content .rule,.realm-overview,.character-hero{background:linear-gradient(150deg,#273139,#202930);border-color:#6b614b;border-radius:5px}
+.tab-content .rule,.realm-overview,.character-hero{background:linear-gradient(150deg,#1a242b,#141d22);border-color:#6b5c42;border-radius:5px}
 .tab-content .paragraph{font-size:12px;line-height:1.65;color:#d3d4c9}
 .tab-content .sectiontitle{font-size:13px;letter-spacing:.6px;border-bottom:1px solid var(--line);padding-bottom:7px}
-.tab-content .rowbtn,.workspace-btn,.navigation-trail button,.quick-nav>button,.quick-nav summary{background:#2b3538;border-color:#73674e;color:#f1dfba}
-.tab-content .rowbtn:hover:not(:disabled),.workspace-btn:hover,.navigation-trail button:hover:not(:disabled){background:#3a403b;border-color:var(--gold)}
-.tab.active,.workspace-btn.active{background:linear-gradient(100deg,#685332,#373a35);color:#ffe9b8;border-color:#b59a62}
-.goldbtn{background:linear-gradient(#e7cc90,#b9965c);border-color:#e4c992;color:#23251f}
-.portrait-mark{border:2px solid #aa8c55;box-shadow:inset 0 0 0 2px #222b31}
+.tab-content .rowbtn,.workspace-btn,.navigation-trail button,.quick-nav>button,.quick-nav summary{background:#232b30;border-color:#786446;color:#f1dfba}
+.tab-content .rowbtn:hover:not(:disabled),.workspace-btn:hover,.navigation-trail button:hover:not(:disabled){background:#3c2326;border-color:var(--gold)}
+.tab.active,.workspace-btn.active{background:linear-gradient(100deg,#6e181e,#422923);color:#ffe9b8;border-color:#c6a361}
+.goldbtn{background:linear-gradient(#ebcf91,#b89355);border-color:#eed399;color:#1d1914}
+.portrait-mark{border:2px solid #aa8c55;box-shadow:inset 0 0 0 2px #1a2126}
+.dispatch-deck{margin:10px 0 14px;padding:10px;border:1px solid #8a6d42;border-radius:6px;background:linear-gradient(160deg,#1c1619,#111b20)}
+.dispatch-head{display:flex;justify-content:space-between;align-items:center;font-family:Cinzel,serif;font-size:11px;letter-spacing:1.2px;color:#f2d497;margin-bottom:8px}
+.dispatch-head small{color:#b9a585;font-family:Inter,sans-serif;font-size:10px}
+.dispatch-card{padding:8px 10px;border:1px solid rgba(204,171,112,.25);border-left:3px solid var(--gold);border-radius:4px;background:#162228;margin-bottom:7px}
+.dispatch-card.level-urgent{border-left-color:#e06b61;background:linear-gradient(90deg,#2c1618,#162228)}
+.dispatch-card.level-high{border-left-color:#e8b35b}
+.dispatch-cat{font-size:9px;letter-spacing:1.2px;color:#d6b87c;font-weight:700;margin-bottom:2px}
+.dispatch-card b{display:block;font-size:12px;color:#f7ecd5;margin-bottom:3px}
+.dispatch-card p{font-size:11px;line-height:1.45;color:#c7cfca;margin:0 0 5px}
+.mobile-thumb-bar{display:none}
+@media(max-width:900px){body.in-campaign:not(.in-battle) .mobile-thumb-bar{position:fixed;left:0;right:0;bottom:0;z-index:18;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:4px 4px max(4px,env(safe-area-inset-bottom));background:linear-gradient(#12191e,#090f12);border-top:1px solid #8c6e42;box-shadow:0 -4px 18px rgba(0,0,0,.6)}
+.mobile-thumb-bar button{min-height:44px;border:1px solid transparent;background:transparent;color:#e7d4ae;font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:3px 2px;border-radius:4px}
+.mobile-thumb-bar button span{font-size:9px;letter-spacing:.4px}
+.mobile-thumb-bar button:active{background:#3c2326;border-color:#c6a361}
+body.in-campaign:not(.in-battle) .app{padding-bottom:calc(54px + env(safe-area-inset-bottom))}}
 button:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid #f7d894;outline-offset:2px}
-@media(max-width:650px){.tab-content .paragraph{font-size:12px}.tab-content .rowbtn{min-height:40px}.hero-crest{height:74px;width:65px}}
+@media(max-width:650px){.tab-content .paragraph{font-size:12px}.tab-content .rowbtn{min-height:40px}.hero-crest{height:74px;width:65px}.hero-crest.sovereign-brand-banner,.hero-crest.sovereign-brand-banner img{max-height:92px}}
 @media(prefers-reduced-motion:reduce){.startcard,.tab-content,.leftbar,.rightbar,.goldbtn,.rowbtn{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.portrait-frame{position:relative;display:inline-flex;border-radius:8px;overflow:hidden;border:2px solid #8a6d3b;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.portrait-frame.portrait-tone-0{border-color:#c89d4c}
+.portrait-frame.portrait-tone-1{border-color:#7c5b3e}
+.portrait-frame.portrait-tone-2{border-color:#8b2635}
+.portrait-frame.portrait-tone-3{border-color:#4c6e7a}
+.portrait-frame.rank-legend{box-shadow:0 0 0 2px #d4af37,0 4px 12px rgba(212,175,55,.4)}
+.portrait-frame.rank-ward::after{content:'Ward';position:absolute;bottom:2px;right:2px;font:600 9px/1 sans-serif;background:rgba(12,14,19,.85);color:#e9d6a7;padding:2px 4px;border-radius:4px}
+.crossroads-card,.reign-chapter-card{border-left:3px solid #d4af37;padding-left:8px;margin-bottom:8px}

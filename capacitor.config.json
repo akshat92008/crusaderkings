@@ -1,0 +1,21 @@
+{
+  "appId": "com.sovereign1450.grandstrategy",
+  "appName": "Sovereign: 1450",
+  "webDir": "dist/mobile-www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0c1015",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0c1015"
+    }
+  }
+}

@@ -126,9 +126,10 @@ function stepCrises(g,world){const e=g.economy,active=Object.values(e.crises);
  if(g.turn%6===0&&Object.keys(e.crises).length<12){const candidates=world.provinces.filter(p=>!e.crises[p.id]&&g.provinces[p.id]?.owner!=='independent');if(candidates.length&&random(e)<.65){const p=candidates[Math.floor(random(e)*candidates.length)],k=['epidemic','drought','fire','flood'][Math.floor(random(e)*4)];crisis(g,p.id,k,30+Math.floor(random(e)*25));}}
 }
 function produce(g,id){const p=g.provinces[id],l=local(g,id);if(!p||!l)return;const x=g.economy.crises[id];l.output={};
- const devFactor=1-(l.devastation||0)/200;
- const factor=(x&&['drought','flood','epidemic'].includes(x.kind)?1-x.severity/150:1)*devFactor;
+ const devFactor=1-(l.devastation||0)/160;
+ const factor=(x&&['drought','flood','epidemic'].includes(x.kind)?1-x.severity/150:1)*devFactor*(portBlocked(g,id)?0.8:1);
  for(const good of RAW){let qty=good==='grain'?3+p.buildings.farm*2:1; if(l.resources.includes(good))qty+=4;qty=Math.max(0,Math.floor(qty*factor));add(l,good,qty);l.output[good]=qty;}
+ if(controller(g,id)!==p.owner||portBlocked(g,id)){add(l,'grain',-2);}
  for(const [kind,rule] of Object.entries(INDUSTRIES)){const level=l.industries[kind];if(!level||!rule.output)continue;let n=level;if(rule.input){n=Math.min(n,Math.floor(l.stock[rule.input]/rule.use));if(rule.second)n=Math.min(n,Math.floor(l.stock[rule.second]));add(l,rule.input,-n*rule.use);if(rule.second)add(l,rule.second,-n);}
  const qty=Math.floor(n*rule.amount*factor);add(l,rule.output,qty);l.output[rule.output]=(l.output[rule.output]||0)+qty;}
  const demand=Math.max(3,Math.ceil(p.population/35));if(l.stock.grain<demand){const missing=demand-l.stock.grain;add(l,'grain',-l.stock.grain);const supplied=Math.min(missing,l.stock.provisions);add(l,'provisions',-supplied);l.shortage=supplied<missing?l.shortage+1:Math.max(0,l.shortage-1);}else{add(l,'grain',-demand);l.shortage=Math.max(0,l.shortage-1);}

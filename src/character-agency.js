@@ -52,7 +52,7 @@ export function ensureCharacterSchema(g,p,landedSet=null,commanderSet=null){
  else{const def=defaultPersonality(p);for(const ax of PERSONALITY_AXES)if(!Number.isFinite(p.personality[ax]))p.personality[ax]=def[ax];}
  p.friends??=[];p.rivals??=[];p.lovers??=[];p.mentors??=[];p.wards??=[];
  p.grievances??=[];p.memories??=[];
- const ax=g.agency?.people?.[p.id];
+ const ax=game?.agency?.people?.[p.id];
  if(ax){if(!Number.isFinite(p.influence))p.influence=ax.influence;else ax.influence=cap(num(ax.influence),0,100);}
  else if(!Number.isFinite(p.influence))p.influence=landed?20:10;
  p.role=deriveSocialRole(g,p,landedSet,commanderSet);
@@ -112,7 +112,7 @@ export function initAgency(g){const existed=!!g.agency;const s=g.agency??={versi
 function record(g,id){const s=initAgency(g);const x=s.people[id]??={influence:10,agenda:null,lastAction:-120,lastIncome:-120};x.goals??={};x.bonds??={};x.memories??=[];x.lastAction??=-120;x.lastIncome??=-120;x.influence=cap(num(x.influence),0,100);const p=live(g,id);if(p)p.influence=x.influence;return x;}
 export function characterInfluence(g,id){return cap(num(g.agency?.people?.[id]?.influence??g.politics?.people?.[id]?.influence??10),0,100);}
 export function characterAgenda(g,id){return g.agency?.people?.[id]?.agenda||null;}
-function note(g,p,text,kind='action',target=null){const s=initAgency(g),x=record(g,p.id);const entry={realm:p.realm,person:p.id,turn:g.turn,text,kind,target};s.history.unshift(entry);s.history=s.history.slice(0,320);x.memories.unshift(entry);x.memories=x.memories.slice(0,20);p.memories??=[];p.memories.push(text);p.memories=p.memories.slice(-40);}
+function note(g,p,text,kind='action',target=null){const s=initAgency(g),x=record(g,p.id);const isPlayer=p.realm===g.player;const entry={realm:p.realm,person:p.id,turn:g.turn,text,kind,target};s.history.unshift(entry);s.history=s.history.slice(0,200);if(x.memories[0]?.text!==text){x.memories.unshift(entry);x.memories=x.memories.slice(0,isPlayer?14:6);}p.memories??=[];if(p.memories.at(-1)!==text){p.memories.push(text);p.memories=p.memories.slice(isPlayer?-16:-6);}}
 function motive(p){const t=p.traits||[],ax=p.personality||{};if(t.includes('ambitious')||(ax.boldness||0)>=45)return 'seek influence';if(t.includes('greedy')||(ax.greed||0)>=45)return 'accumulate wealth';if(t.includes('gregarious')||t.includes('generous')||(ax.sociability||0)>=45)return 'build friendships';if(t.includes('wrathful')||t.includes('deceitful')||(ax.compassion||0)<=-45)return 'undermine rival';if(t.includes('diligent')||(ax.diligence||0)>=45)return 'develop ability';return 'secure household';}
 function transfer(g,p,q,amount,source){if(source.wealth<amount)return false;source.wealth-=amount;q.wealth=num(q.wealth)+amount;return true;}
 export function characterInteraction(g,r,id,action){return characterInteractionAs(g,r,g.politics?.realms?.[r]?.ruler,id,action);}
@@ -290,6 +290,40 @@ function advancePersonal(g,p,peers,rows,council,head){
     createFaction(g,null,r,'claimant',allyEst,{leader:allyLord.id,claimant:p.id,pressure:40});
    }
    note(g,p,p.name+' rallied disaffected nobles around a claim to the throne of '+r+'.','claimant',head.id);
+   return true;
+  }
+ }
+ // Multi-turn autonomous conspiracy state machine for envious/ambitious rivals & claimants (runs before generic agendas).
+ if(head&&head.id!==p.id&&(has(p,'ambitious')||has(p,'deceitful')||(p.personality?.boldness||0)>=45)&&(personalOpinion(g,p.id,head.id)<=-10||claimantCandidates(g,r).some(cl=>cl.person===p.id)||p.house===head.house)){
+  const stage=x.conspiracy?.stage||'scouting';
+  const hasClaimNow=claimantCandidates(g,r).some(cl=>cl.person===p.id);
+  x.conspiracy??={stage:'scouting',started:g.turn,target:head.id,allies:[]};
+  if(stage==='scouting'&&num(p.wealth)>=30){
+   const disgruntled=peers.find(q=>q.id!==head.id&&q.id!==p.id&&canInteract(g,p,q)&&(personalOpinion(g,q.id,head.id)<15||localEstate(g,rows,q).some(([,v])=>v.loyalty<65)))||peers.find(q=>q.id!==head.id&&q.id!==p.id&&canInteract(g,p,q));
+   if(disgruntled){p.wealth-=20;disgruntled.wealth=num(disgruntled.wealth)+20;relation(g,p,disgruntled,16);if(!x.conspiracy.allies.includes(disgruntled.id))x.conspiracy.allies.push(disgruntled.id);x.conspiracy.stage='recruiting';note(g,p,p.name+' sounded out '+disgruntled.name+' for a court conspiracy.','conspiracy',disgruntled.id);return true;}
+  }else if(stage==='recruiting'){
+   const factionMembers=[...estate.map(([pid])=>pid),...x.conspiracy.allies.flatMap(aid=>localEstate(g,rows,live(g,aid)).map(([pid])=>pid))];
+   const kind=hasClaimNow?'claimant':'liberty';
+   const fx=Object.values(g.conflict?.factions||{}).find(f=>f.realm===r&&ACTIVE_FACTION_STATUSES.includes(f.status)&&f.kind===kind)||createFaction(g,null,r,kind,factionMembers,{leader:p.id,claimant:hasClaimNow?p.id:null,pressure:32});
+   if(fx){for(const pid of factionMembers)joinFaction(g,fx.id,pid);fx.pressure=cap((fx.pressure||20)+15,0,100);fx.discontent=fx.pressure;}
+   x.conspiracy.stage='foreign_pact';
+   note(g,p,p.name+' organized conspirators into a '+kind+' cabal.','faction',head.id);
+   return true;
+  }else if(stage==='foreign_pact'){
+   const hostileForeign=Object.entries(g.factions[r]?.relations||{}).filter(([fid,rel])=>fid!==r&&fid!=='independent'&&rel<0&&g.factions[fid]).sort((a,b)=>a[1]-b[1])[0]?.[0];
+   if(hostileForeign){
+    x.conspiracy.foreignBacker=hostileForeign;
+    p.prestige=num(p.prestige)+6;
+    for(const fx of Object.values(g.conflict?.factions||{}))if(fx.realm===r&&ACTIVE_FACTION_STATUSES.includes(fx.status)){fx.pressure=cap((fx.pressure||20)+16,0,100);fx.discontent=fx.pressure;}
+    x.conspiracy.stage='striking';
+    note(g,p,p.name+' secured secret backing from '+g.factions[hostileForeign].name+'.','conspiracy',head.id);
+    return true;
+   }
+   x.conspiracy.stage='striking';
+  }else if(stage==='striking'&&(head.age<18||num(g.factions?.[r]?.stability)<65||Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(r)))){
+   for(const fx of Object.values(g.conflict?.factions||{}))if(fx.realm===r&&ACTIVE_FACTION_STATUSES.includes(fx.status)){fx.pressure=cap((fx.pressure||20)+22,0,100);fx.discontent=fx.pressure;}
+   x.conspiracy.stage='recruiting';
+   note(g,p,p.name+' escalated faction demands during crown weakness.','conspiracy',head.id);
    return true;
   }
  }

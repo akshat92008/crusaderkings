@@ -14,9 +14,14 @@ import {characterLink,contextualButton,realmWarContext,sectionLink} from './camp
 import {marriageCandidates} from './dynastic-politics.js';
 import {freshBattleCanvas} from './battle-lifecycle.js';
 import {SAVE_KEY,MAX_SAVE_BYTES,validatePortableSave,saveFilename,persistCampaign} from './portable-save.js';
+import {saveCampaignDurable,loadCampaignDurable,readBestLocalSave,saveModPacksDurable,loadModPacksDurable} from './mobile-storage.js';
+import {exportModTemplate,applyModPack,removeModPack} from './mod-loader.js';
+import {renderModStudio} from './mod-ui.js';
+import {renderCrownDispatch} from './dispatch-ui.js';
 import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
 import {currentExpandedEvents,currentEmergentEvent,expandedAction} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
+import {populateGlobalKingdoms} from './world-kingdoms-1450.js';
 import {livingAction} from './living-systems.js';
 import {diplomacyAction,mayEnterWithAccess,fieldContingentsAt} from './diplomacy-systems.js';
 import {governmentAction} from './government-institutions.js';
@@ -27,6 +32,8 @@ import {feudalAction} from './feudal-systems.js';
 import {chronicleAction} from './chronicle-systems.js';
 import {strategyAction,defenseSupport} from './strategic-ai.js';
 import {dlcAction} from './ck2-dlc-systems.js';
+import {crossroadsAction} from './crossroads-eras.js';
+import {reignAction} from './reign-chapters.js';
 import {CampaignMap} from './map.js';
 import {BattleGame} from './battle.js';
 import {militaryDoctrine,availableFormations} from './military-doctrines.js';
@@ -56,7 +63,7 @@ const fmt=n=>Math.round(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const legacyWorld=await fetch('data/world.json').then(r=>{if(!r.ok)throw Error(`Map data unavailable (${r.status})`);return r.json();});
 const historicalReference=await fetch('data/historical-polities-1450.json').then(r=>r.ok?r.json():null).catch(()=>null);
-const atlasV2=buildHistoricalWorld(legacyWorld,historicalReference),atlasV3=expandHistoricalWorld(atlasV2),atlasWorld=densifyHistoricalWorld(atlasV3);let world=atlasWorld;
+const atlasV2=buildHistoricalWorld(legacyWorld,historicalReference),atlasV3=expandHistoricalWorld(atlasV2),atlasV4=densifyHistoricalWorld(atlasV3),atlasWorld=populateGlobalKingdoms(atlasV4);let world=atlasWorld;
 let staticById=Object.fromEntries(world.provinces.map(p=>[p.id,p]));
 const pageHistory=createPageHistory();
 let characterId=null,characterBackTab='realm',characterBackProvince=null;
@@ -70,9 +77,9 @@ const player=()=>game?.factions[game.player];
 const displayProvince=p=>p.name.replace(' Province ',' March ');
 function message(msg){const t=el('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3400);}
 function clickResult(r){if(!r?.ok){message(r?.msg||'Action unavailable');browserCampaignAudio.playSfx('alert');}else{message(r.msg);browserCampaignAudio.playSfx('seal');render();save(false);}}
-function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasWorld),restored=restoreGame(raw,next);if(portable){try{persistCampaign(localStorage,snapshot(restored));}catch{message('Backup opened, but browser storage is unavailable. Export another backup to keep progress.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();syncAudioState();if(!openIncomingBattle())message('Saved campaign restored.');}
-function load(){try{loadRaw(localStorage.getItem(SAVE_KEY));}catch(e){message('Unable to load save: '+e.message);}}
-function save(notify=true){if(!game||battle)return false;try{persistCampaign(localStorage,snapshot(game));if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){if(notify!==false)message('Save failed: '+e.message);return false;}}
+function loadRaw(raw,portable=false){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();if(portable)validatePortableSave(raw);const next=worldForSave(raw,legacyWorld,atlasV2,atlasV3,atlasV4,atlasWorld),restored=restoreGame(raw,next);if(portable){saveCampaignDurable(snapshot(restored),{storage:localStorage}).catch(()=>{});try{persistCampaign(localStorage,snapshot(restored));}catch{message('Saved in durable browser storage.');}}clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';cancelMarch();setDrawer(null);useWorld(next);game=restored;el('start-screen').hidden=true;document.body.classList.add('in-campaign');document.body.classList.remove('in-battle');selected=capitalDistrict(world,game.player,game.provinces)?.id||null;map.setGame(game);map.select(selected);map.focus(...(staticById[selected]?.centroid||player().capital),3);render();syncAudioState();if(!openIncomingBattle())message('Saved campaign restored.');}
+function load(){try{const raw=readBestLocalSave(localStorage);if(raw){loadRaw(raw);return;}loadCampaignDurable({storage:localStorage}).then(res=>{if(res.raw)loadRaw(res.raw);else message('No saved campaign found.');});}catch(e){message('Unable to load save: '+e.message);}}
+function save(notify=true){if(!game||battle)return false;const raw=snapshot(game);saveCampaignDurable(raw,{storage:localStorage}).catch(()=>{});try{persistCampaign(localStorage,raw);if(notify!==false)message('Campaign saved to this browser.');return true;}catch(e){if(raw.length>=1500000){if(notify!==false)message('Campaign saved to IndexedDB storage.');return true;}if(notify!==false)message('Save failed: '+e.message);return false;}}
 const activeObjectUrls=new Set();
 function revokeObjectUrls(){for(const u of activeObjectUrls){try{URL.revokeObjectURL(u);}catch{}}activeObjectUrls.clear();}
 function exportSave(){if(!game||battle)return;const blob=new Blob([snapshot(game)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');activeObjectUrls.add(url);a.href=url;a.download=saveFilename(game);document.body.append(a);a.click();a.remove();setTimeout(()=>{if(activeObjectUrls.delete(url))try{URL.revokeObjectURL(url);}catch{}},1000);message('Campaign backup exported.');}
@@ -152,7 +159,8 @@ function renderTab(){if(!game)return;const career=vassalCareer(game);el('workspa
  const f=player(),s=empireStats(game,game.player);let html='';
  if(tab==='realm'){
   const priorities=realmPriorities(game,s,Boolean(currentRoyalEvent(game)),currentExpandedEvents(game).length);
-  const guide=campaignGuide(game,s);const onboarding='<details class="realm-overview first-steps"><summary>First steps · '+guide.filter(x=>x.done).length+'/'+guide.length+'</summary>'+guide.map(x=>'<button class="priority-detail" data-priority-tab="'+esc(x.tab)+'"><b>'+(x.done?'✓ ':'')+esc(x.label)+'</b><small>'+esc(x.detail)+'</small></button>').join('')+'</details>';const guidance=onboarding+'<div class="realm-overview"><h3>What needs your attention?</h3>'+(priorities.length?priorities.map(p=>'<button class="priority-detail '+p.level+'" data-priority-tab="'+esc(p.tab)+'"><b>'+esc(p.label)+'</b><small>'+esc(p.detail)+'</small></button>').join(''):'<p class="paragraph">No urgent issues. Select a province to develop it, or advance a month.</p>')+'</div>';
+  const dispatchHtml=renderCrownDispatch(game,liveWorld,esc,{pendingEvents:(currentRoyalEvent(game)?1:0)+currentExpandedEvents(game).length+(currentEmergentEvent(game)?1:0)});
+  const guide=campaignGuide(game,s);const onboarding='<details class="realm-overview first-steps"><summary>First steps · '+guide.filter(x=>x.done).length+'/'+guide.length+'</summary>'+guide.map(x=>'<button class="priority-detail" data-priority-tab="'+esc(x.tab)+'"><b>'+(x.done?'✓ ':'')+esc(x.label)+'</b><small>'+esc(x.detail)+'</small></button>').join('')+'</details>';const guidance=dispatchHtml+onboarding+'<div class="realm-overview"><h3>What needs your attention?</h3>'+(priorities.length?priorities.map(p=>'<button class="priority-detail '+p.level+'" data-priority-tab="'+esc(p.tab)+'"><b>'+esc(p.label)+'</b><small>'+esc(p.detail)+'</small></button>').join(''):'<p class="paragraph">No urgent issues. Select a province to develop it, or advance a month.</p>')+'</div>';
   const history=historicalContext(game.player);const historicalNote=history?'<details class="rule historical-context"><summary>'+esc(history.title)+'</summary><p class="paragraph">'+esc(history.context)+'</p><p class="smallnote">'+esc(HISTORICAL_LIMITATION)+'</p><a href="'+esc(history.url)+'" target="_blank" rel="noopener noreferrer">'+esc(history.source)+'</a></details>':'';html=renderLandless(game,liveWorld,esc)+renderCareerEntry(game,esc)+guidance+historicalNote+renderCampaignHub(game,esc)+`<div class="label">STATE OF THE REALM</div><div class="divider"></div><div class="statlist"><label>Controlled provinces</label><strong>${fmt(s.provinces)}</strong><label>Owned land groups</label><strong>${realmGeography(world,game.player,game.provinces).components}</strong><label>Population</label><strong>${fmt(s.population)}k</strong><label>Total revenue / mo.</label><strong class="up">+${fmt(s.income)}</strong><label>Trade / mo.</label><strong class="up">+${fmt(s.trade||0)}</strong><label>Army upkeep / mo.</label><strong class="down">−${fmt(s.upkeep)}</strong><label>Net treasury / mo.</label><strong class="${s.balance>=0?'up':'down'}">${s.balance>=0?'+':''}${fmt(s.balance)}</strong><label>Food reserve</label><strong>${fmt(f.food)}</strong><label>Food change / mo.</label><strong class="${s.foodDelta>=0?'up':'down'}">${s.foodDelta>=0?'+':''}${fmt(s.foodDelta)}</strong><label>Legitimacy</label><strong>${fmt(f.legitimacy)}%</strong><label>Prestige</label><strong>${fmt(f.prestige)}</strong></div><div class="divider"></div><div class="sectiontitle">MILITARY DOCTRINE</div><div class="rule"><b>⚔ ${esc(militaryDoctrine(f).name)}</b><div class="smallnote">Specialist: ${esc(militaryDoctrine(f).unique)} · Army mix ${militaryDoctrine(f).mix.map(x=>Math.round(x*100)).join(" / ")}% · ${militaryDoctrine(f).formations.map(id=>id.replaceAll("_"," ")).join(" · ")}. These formations affect movement, range, attack and defense in real battles.</div></div><div class="sectiontitle">COURT ADVICE</div><p class="paragraph">Expand with care. Taxes and conscription increase unrest. A depleted treasury or food reserve undermines public stability. Build markets to finance your armies.</p>`;
  }else if(tab==='search'){html=renderCampaignSearch(game,liveWorld,esc,campaignQuery);
  }else if(tab==='decrees'){
@@ -184,6 +192,8 @@ function renderTab(){if(!game)return;const career=vassalCareer(game);el('workspa
   html=renderTrade(game,liveWorld,esc);
  }else if(tab==='legacy'){
   html=renderLegacy(game,esc);
+ }else if(tab==='mods'){
+  html=renderModStudio(game,liveWorld,esc);
  }else if(tab==='chronicle'){
   html=`<div class="label">THE ROYAL CHRONICLE</div><div class="sectiontitle">COURT RECORDS</div>${game.log.map(l=>`<div class="rule"><div class="label">${esc(l.date)}</div><div class="smallnote">${esc(l.text)}</div></div>`).join('')}`;
  }
@@ -289,9 +299,9 @@ function maybePopupEventModal(prevKeys=new Set()){
  if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}
  renderEventModal(fresh);
 }
-function start(id){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);browserCampaignAudio.unlock();browserCampaignAudio.playSfx('seal');render();save(false);syncAudioState();}
+function start(id){pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;document.body.classList.add('in-campaign');document.body.classList.remove('in-battle');selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);browserCampaignAudio.unlock();browserCampaignAudio.playSfx('seal');render();save(false);syncAudioState();}
 function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pressed',String(battleSound));b.textContent=battleSound?'Sound on':'Sound off';}
-function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;desc.simpleField=true;desc.bannerView=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;
+function openBattle(desc){setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;desc.simpleField=true;desc.bannerView=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;document.body.classList.add('in-battle');
  el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='overview';el('battle-camera').hidden=true;el('battle-zoom-in').hidden=true;el('battle-zoom-out').hidden=true;if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
  el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
  el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
@@ -335,6 +345,7 @@ function onBattleFinished(result){
    else {const r=concludeBattle(game,battleDescriptor,result,world);if(r&&!r.ok)message(r.msg);}
   }
   battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;
+  document.body.classList.remove('in-battle');
   document.body.style.overflow='';render();syncAudioState();if(!practice)save();
  };
 }
@@ -367,7 +378,10 @@ function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('sta
 function filterStartRealms(preferred=el('start-faction').value){const list=searchRealms(atlasWorld.factions,el('realm-search').value);el('start-faction').innerHTML=list.map(f=>`<option value="${esc(f.id)}">${esc(f.name)} — ${esc(f.continent)}</option>`).join('');if(list.some(f=>f.id===preferred))el('start-faction').value=preferred;renderStartFaction();}
 el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-faction').addEventListener('change',renderStartFaction);filterStartRealms('ottomans');
 el('start-new').addEventListener('click',()=>{if(atlasWorld.factions.some(f=>f.id===el('start-faction').value))start(el('start-faction').value);});
-try{if(localStorage.getItem('crown-of-nations.save'))el('load-existing').hidden=false;}catch{}
+try{if(readBestLocalSave(localStorage))el('load-existing').hidden=false;}catch{}
+loadCampaignDurable({storage:localStorage}).then(res=>{if(res?.raw&&el('load-existing'))el('load-existing').hidden=false;}).catch(()=>{});
+el('mobile-thumb-bar')?.addEventListener('click',e=>{const b=e.target.closest('[data-thumb-nav]');if(!b||!game||battle)return;const nav=b.dataset.thumbNav;if(nav==='map')setDrawer(null);else if(nav==='dispatch')navigateTab('realm');else if(nav==='court')navigateTab('court');else if(nav==='diplomacy')navigateTab('diplomacy');else if(nav==='search')navigateTab('search');});
+if(typeof navigator!=='undefined'&&'serviceWorker'in navigator&&['http:','https:'].includes(location.protocol)){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 el('load-existing').addEventListener('click',load);
 el('import-save').addEventListener('click',()=>el('save-file').click());
 el('save-file').addEventListener('change',async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{if(f.size>MAX_SAVE_BYTES)throw Error('Save exceeds 20 MB.');loadRaw(await f.text(),true);}catch(err){el('import-status').textContent='Could not import: '+err.message;message('Could not import: '+err.message);}});
@@ -471,10 +485,56 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='institution'){const first=btn.dataset.input?el(btn.dataset.input):null,second=btn.dataset.second?el(btn.dataset.second):null;clickResult(governmentAction(game,campaignWorld(game,world),first?.value??btn.dataset.id,second?.value));}
  if(action==='civic'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(civicAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='dlc'){const input=btn.dataset.input?el(btn.dataset.input):null,extraEl=btn.dataset.extra?el(btn.dataset.extra):null;clickResult(dlcAction(game,campaignWorld(game,world),type,input?.value??btn.dataset.id,extraEl?.value??btn.dataset.extra));}
+ if(action==='crossroads'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(crossroadsAction(game,campaignWorld(game,world),type,input?.value??btn.dataset.id));}
+ if(action==='reign'){clickResult(reignAction(game,campaignWorld(game,world),type,btn.dataset.id));}
+ if(action==='mod'){
+  if(type==='export-template'){
+   const blob=new Blob([JSON.stringify(exportModTemplate(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+   activeObjectUrls.add(url);a.href=url;a.download='sovereign-1450-mod-template.json';document.body.append(a);a.click();a.remove();
+   setTimeout(()=>{if(activeObjectUrls.delete(url))try{URL.revokeObjectURL(url);}catch{}},1000);
+   message('Sample Mod Pack JSON downloaded.');return;
+  }
+  if(type==='upload-json'){el('mod-file-input')?.click();return;}
+  if(type==='apply-textarea'){
+   try{
+    const raw=el('mod-json-editor')?.value||'';
+    const r=applyModPack(game,campaignWorld(game,world),raw);
+    if(r.ok){
+     const parsed=JSON.parse(raw);
+     loadModPacksDurable({storage:localStorage}).then(prev=>{
+      const list=prev.filter(x=>x.id!==parsed.id);list.push(parsed);
+      saveModPacksDurable(list,{storage:localStorage}).catch(()=>{});
+     }).catch(()=>{});
+     selected=capitalDistrict(world,game.player,game.provinces)?.id||selected;
+     map.setGame(game);render();save(false);message(`Applied mod pack: ${r.name}`);
+    }else message(r.msg||'Could not apply mod pack.');
+   }catch(err){message(`Mod validation error: ${err.message}`);}
+   return;
+  }
+  if(type==='remove'){
+   const r=removeModPack(game,btn.dataset.id);
+   clickResult(r);return;
+  }
+ }
  if(action==='intrigue'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(intrigueAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='royal-choice')clickResult(resolveRoyalEvent(game,world,Number(btn.dataset.choice)));
  if(action==='show-diplomacy'){if(btn.dataset.target==='independent'){selected=btn.dataset.province||selected;setDrawer('province');const conn=el('province-panel').querySelector('[data-section="connections"]');if(conn)conn.open=true;message('Independent polity actions opened in Province drawer.');return;}diplomaticTarget=btn.dataset.target;navigateTab('diplomacy');}
+});
+document.addEventListener('change',async e=>{
+ if(e.target?.id==='mod-file-input'&&e.target.files?.[0]&&game){
+  try{
+   const text=await e.target.files[0].text();
+   const r=applyModPack(game,campaignWorld(game,world),text);
+   if(r.ok){
+    const parsed=JSON.parse(text);
+    const prev=await loadModPacksDurable({storage:localStorage}).catch(()=>[]);
+    await saveModPacksDurable([...prev.filter(x=>x.id!==parsed.id),parsed],{storage:localStorage}).catch(()=>{});
+    map.setGame(game);render();save(false);message(`Imported mod pack: ${r.name}`);
+   }else message(r.msg||'Mod import failed.');
+  }catch(err){message(`Mod import error: ${err.message}`);}
+  e.target.value='';
+ }
 });
 document.addEventListener('click',e=>{
  const deferBtn=e.target.closest('#event-modal-defer');
@@ -524,7 +584,7 @@ el('battle-sound').addEventListener('click',()=>{battleSound=!battleSound;campai
 el('battle-pause').addEventListener('click',()=>battle?.togglePause());
 el('battle-retreat').addEventListener('click',()=>battle?.retreat());
 el('battle-start').addEventListener('click',()=>battle?.startAssault());
-el('battle-cancel').addEventListener('click',()=>{if(!battle?.deployment||battleDescriptor?.defenseMode&&!battle.renderLost)return;battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.style.overflow='';render();syncAudioState();message('Deployment cancelled. No casualties or territory changes.');});
+el('battle-cancel').addEventListener('click',()=>{if(!battle?.deployment||battleDescriptor?.defenseMode&&!battle.renderLost)return;battle.stop();battle=null;battleDescriptor=null;el('battle-screen').hidden=true;document.body.classList.remove('in-battle');document.body.style.overflow='';render();syncAudioState();message('Deployment cancelled. No casualties or territory changes.');});
 el('battle-formation').addEventListener('change',e=>{
  if(battle&&!battle.setFormation(battle.selected,e.target.value))message('This formation is not available.');
 });

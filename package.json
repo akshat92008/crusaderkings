@@ -8,6 +8,7 @@
     "start": "python3 -m http.server 8080",
     "test": "node --test tests/*.test.mjs",
     "check": "node scripts/check-sources.mjs",
+    "verify:guard": "node scripts/verify_guard.mjs",
     "build:battle": "node scripts/build_3d_battle.mjs"
   },
   "license": "MIT",

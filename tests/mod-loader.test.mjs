@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createGame } from '../src/simulation.js';
+import { createGame, snapshot, restoreGame } from '../src/simulation.js';
+import { validatePortableSave } from '../src/portable-save.js';
 import { expandedDecisions } from '../src/expanded-content.js';
 import { exportModTemplate, validateModPack, applyModPack } from '../src/mod-loader.js';
 
@@ -14,8 +15,14 @@ test('Mod Loader validates, rejects unsafe payloads, and applies custom scenario
  assert.throws(() => validateModPack({ name: 'Missing id' }), /non-empty string id/);
 
  const g = createGame(world, 'england');
- const res = applyModPack(g, world, tmpl);
+ const res = applyModPack(g, world, { ...tmpl, startYear: 1066 });
  assert.equal(res.ok, true);
+ assert.equal(g.year, 1066);
  assert.equal(g.factions.england.name, 'Angevin Crown');
  assert.ok(expandedDecisions(g, world, 'england').some(d => d.id === 'mod_royal_charter'));
+
+ const raw = snapshot(g);
+ assert.equal(validatePortableSave(raw).year, 1066);
+ const restored = restoreGame(raw, world);
+ assert.equal(restored.year, 1066);
 });
