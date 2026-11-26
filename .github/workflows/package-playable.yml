@@ -21,6 +21,8 @@ jobs:
         run: |
           npm test
           npm run check
+      - name: Install sprite optimization dependency
+        run: python3 -m pip install pillow
       - name: Package runnable game without raw source assets
         run: python3 scripts/package_playable.py
       - name: Upload playtest ZIP artifact

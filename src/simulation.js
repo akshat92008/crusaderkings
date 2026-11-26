@@ -1,3 +1,4 @@
+import {homeRealm,queueHome,tickHometown,hometownModifiers,homeFoodOutput,homeRecruitmentRequirement} from './hometown.js';
 import {invasionReserved} from './invasion-reservations.js';
 import {allocateCommanderName} from './name-pools.js';
 import {humanControlsRealm,reconcileCareer} from './player-career.js';
@@ -66,13 +67,13 @@ export function empireStats(g,owner,cache=null){
  const tradePosts=tradePostIncome(g,owner)+independentPolityTradeIncome(g,owner);
  const gw=greatWorkModifiers(g,owner),bl=bloodlineModifiers(g,owner),dlcMod=dlcModifiers(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(xr.tax*dlcMod.tax*economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const homeMod=hometownModifiers(g,owner);const taxIncome=Math.round(xr.tax*homeMod.tax*dlcMod.tax*economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade+tradePosts;
  let rawUpkeep=0,rawFoodDrain=0,troops=0;
  for(const a of ownArmies){const sz=armySize(a);rawUpkeep+=sz*.08;rawFoodDrain+=sz*.025;troops+=sz;}
  const upkeep=Math.round(rawUpkeep)+navalUpkeep(g,owner);
- const food=Math.round(p.reduce((s,pr)=>s+pr.population*.085+pr.buildings.farm*8,0)-rawFoodDrain);
- return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,troops,population:p.reduce((s,a)=>s+a.population,0)};
+ const grossFood=p.reduce((s,pr)=>s+homeFoodOutput(g,pr),0);const food=Math.round(grossFood-rawFoodDrain);
+ return {provinces:p.length,income,trade,tradePosts,taxIncome,upkeep,balance:income-upkeep,foodDelta:food,grossFood:Math.round(grossFood),foodUpkeep:Math.round(rawFoodDrain),troops,population:p.reduce((s,a)=>s+a.population,0)};
 }
 export function setPolicy(g,key,value){
  if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
@@ -89,6 +90,7 @@ export function build(g,provinceId,kind){
  const p=g.provinces[provinceId],f=g.factions[g.player],b=BUILDINGS[kind];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  if(!b)return {ok:false,msg:'Unknown building'};
+ if(homeRealm(g))return queueHome(g,null,'building',kind,provinceId);
  const level=p.buildings[kind]||0;
  if(level>=3)return {ok:false,msg:'Maximum building level reached'};
  const price=Math.round(b.cost*(level+1)*civicModifiers(g,g.player).build*economyModifiers(g,g.player).cost);
@@ -102,14 +104,15 @@ export function build(g,provinceId,kind){
 export function recruitmentQuote(g,provinceId,type='infantry'){
  const p=g.provinces[provinceId],f=g.factions[g.player],prices={infantry:110,archers:150,cavalry:240};if(!p||!f||!Object.hasOwn(prices,type))return null;
  const doctrine=militaryDoctrine(f),primary=['infantry','archers','cavalry'].reduce((best,t,i,a)=>doctrine.mix[i]>doctrine.mix[a.indexOf(best)]?t:best,'infantry');
- const prosMod=prosperityModifiers(g,g.player).levy*greatWorkModifiers(g,g.player).levy;
- return {cost:Math.round(prices[type]*(type===primary?.82:1)*(1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy*prosMod)),doctrine};
+ const prosMod=prosperityModifiers(g,g.player).levy*greatWorkModifiers(g,g.player).levy,reason=homeRecruitmentRequirement(g,provinceId,type);
+ return {available:!reason,reason,cost:Math.round(prices[type]*(type===primary?.82:1)*Math.max(.4,1-(p.buildings.barracks*.06))*economyModifiers(g,g.player).cost*hometownModifiers(g,g.player).cost),count:Math.max(1,Math.round((type==='cavalry'?25:50)*politicalLevy(g,g.player)*civicModifiers(g,g.player).levy*heritageModifiers(g,g.player).levy*prosMod*hometownModifiers(g,g.player).recruit)),doctrine};
 }
 export function recruit(g,provinceId,type='infantry'){
  if(!humanControlsRealm(g,g.player))return {ok:false,msg:'This is a sovereign action, unavailable during a vassal career.'};
  const p=g.provinces[provinceId],f=g.factions[g.player];
  if(!p||p.owner!==g.player||controller(g,p.id)!==g.player)return {ok:false,msg:'Select your own province'};
  const quote=recruitmentQuote(g,provinceId,type);if(!quote)return {ok:false,msg:'Unknown troop type'};const {cost,doctrine,count:recruited}=quote;
+ if(!quote.available)return {ok:false,msg:quote.reason};
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
  let a=armiesAt(g,provinceId,g.player)[0];
@@ -150,7 +153,7 @@ export function startMarch(g,world,fromId,toId){
  const allies=fieldContingentsAt(g,g.player,fromId,opponent),alliedTroops=allies.reduce((n,a)=>n+armySize(a),0);
  const defenders=[...armiesAt(g,toId,opponent),...fieldContingentsAt(g,opponent,toId,g.player)];
  const defenseTroops=defenders.reduce((s,a)=>s+armySize(a),0);
- const garrison=campaignGarrison(target)+defenseSupport(g,opponent,g.player);
+ const garrison=Math.round(campaignGarrison(target)*hometownModifiers(g,opponent).defense)+defenseSupport(g,opponent,g.player);
  return {ok:true,type:'battle',campaignTurn:g.turn,attacker:army.id,playerArmies:[...forces,...allies].map(a=>a.id),attackTroops:total+alliedTroops,alliedTroops,defendingArmy:defenders[0]?.id||null,enemyArmy:defenders[0]?.id||null,enemyArmies:defenders.map(a=>a.id),defenseTroops,defenseGarrison:garrison,from:fromId,to:toId,enemy:opponent};
 }
 // A live field result is tied to the deployment that created it. Legacy
@@ -245,11 +248,11 @@ export function advanceMonth(g,world){
   const s=empireStats(g,f.id,{provs:land,armies:armiesByOwner.get(f.id)||[]});
   f.treasury=Math.round(f.treasury+s.balance);
   f.food=clamp(Math.round(f.food+s.foodDelta),-1000,50000);
-  let avgUnrest=0;
+  let avgUnrest=0;const homeOrder=hometownModifiers(g,f.id).order;
   for(const p of land){
    p.population=clamp(p.population+(p.buildings.farm>0&&g.turn%4===0?1:0),4,800);
    const adjust= (f.policies.tax===2?2:f.policies.tax===0?-2:0)+(f.policies.levy===2?1:0)-(f.policies.tolerance===2?2:f.policies.tolerance===0?-1:0)-(p.buildings.farm>0?1:0);
-   p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
+   p.unrest=clamp(p.unrest+adjust+civicProvinceUnrest(g,f.id,p.id)-homeOrder+(f.food<0?4:0),0,100);avgUnrest+=p.unrest;
    if(!occupation(g,p.id)&&p.unrest>=93 && rand(g)<.13){transferProvince(g,p.id,'independent');makeLog(g,`Revolt! Province ${p.id} broke from ${f.name}.`);}
   }
   const provinces=Math.max(1,s.provinces);f.stability=clamp(f.stability+Math.sign(52-avgUnrest/provinces)*.6-(f.treasury<0?3:0)-(f.food<0?2:0),0,100);
@@ -292,7 +295,7 @@ export function advanceMonth(g,world){
    for(const v of forces)acted.add(v.id);
    const defending=[...armiesAt(g,target.id,previous),...fieldContingentsAt(g,previous,target.id,a.owner)];
    const terrMod=terrainCombatModifiers(byProv.get(target.id)?.terrain||target.terrain||'plains');
-   const defense=campaignGarrison(target)*terrMod.defense+defenseSupport(g,previous,a.owner)+defending.reduce((sum,v)=>sum+campaignArmyPower(v,armyReadiness(g,v))*terrMod.defense,0);
+   const defense=campaignGarrison(target)*hometownModifiers(g,previous).defense*terrMod.defense+defenseSupport(g,previous,a.owner)+defending.reduce((sum,v)=>sum+campaignArmyPower(v,armyReadiness(g,v))*terrMod.defense,0);
    const attack=forces.reduce((n,v)=>n+campaignArmyPower(v,armyReadiness(g,v)),0)+aidStrength(g,a.owner,previous);
    const outcome=borderBattleOutcome(attack,defense,rand(g));
    for(const v of forces){proportionalLoss(v,outcome.attackerLoss);syncRegiments(g,v);}
@@ -335,6 +338,7 @@ export function advanceMonth(g,world){
  tickDlcSystems(g,world);
  tickCrossroads(g,world);
  tickReignChapters(g);
+ tickHometown(g,world);
  return g;
 }
 const SKILL_KEYS=['diplomacy','martial','stewardship','intrigue','learning'];
