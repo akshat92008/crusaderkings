@@ -26,6 +26,7 @@ import {identityAction} from './identity-systems.js';
 import {feudalAction} from './feudal-systems.js';
 import {chronicleAction} from './chronicle-systems.js';
 import {strategyAction,defenseSupport} from './strategic-ai.js';
+import {dlcAction} from './ck2-dlc-systems.js';
 import {CampaignMap} from './map.js';
 import {BattleGame} from './battle.js';
 import {militaryDoctrine,availableFormations} from './military-doctrines.js';
@@ -469,6 +470,7 @@ document.addEventListener('click',e=>{const unit=e.target.closest('[data-unit]')
  if(action==='casus-belli'){clickResult(declareCasusBelliWar(game,campaignWorld(game,world),game.player,btn.dataset.id,type,btn.dataset.extra||null));}
  if(action==='institution'){const first=btn.dataset.input?el(btn.dataset.input):null,second=btn.dataset.second?el(btn.dataset.second):null;clickResult(governmentAction(game,campaignWorld(game,world),first?.value??btn.dataset.id,second?.value));}
  if(action==='civic'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(civicAction(game,world,type,btn.dataset.id,input?.value??btn.dataset.extra));}
+ if(action==='dlc'){const input=btn.dataset.input?el(btn.dataset.input):null,extraEl=btn.dataset.extra?el(btn.dataset.extra):null;clickResult(dlcAction(game,campaignWorld(game,world),type,input?.value??btn.dataset.id,extraEl?.value??btn.dataset.extra));}
  if(action==='intrigue'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(intrigueAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='conflict'){const input=btn.dataset.input?el(btn.dataset.input):null;clickResult(conflictAction(game,campaignWorld(game,world),type,btn.dataset.id,input?.value??btn.dataset.extra));}
  if(action==='royal-choice')clickResult(resolveRoyalEvent(game,world,Number(btn.dataset.choice)));

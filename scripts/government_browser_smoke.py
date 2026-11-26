@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots'; OUT.mkdir(exist_ok=True)
 CHROME=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+ThreadingHTTPServer.request_queue_size=128
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
 server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -45,7 +46,8 @@ try:
   if CHROME.exists():kw['executable_path']=str(CHROME)
   browser=p.chromium.launch(**kw)
   for realm,summary in [('england','Estate assembly'),('ming','Provincial administration'),('horde','Clan assembly and herds'),('vijayanagara','Provincial charters'),('france','Royal inspectors'),('haudenosaunee','Member assembly')]:
-   page=browser.new_page(viewport={'width':1440,'height':900},device_scale_factor=1)
+   context=browser.new_context(viewport={'width':1440,'height':900},device_scale_factor=1)
+   page=context.new_page()
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    load(page,realm);government(page,summary)
    if realm=='england':
@@ -90,7 +92,7 @@ try:
     s=save_state(page);assert s['institutions']['realms'][realm]['pastureUntil']==12
    assert not errors,errors
    print(realm,'PASS: government actions and persisted campaign state')
-   page.close()
+   context.close()
   browser.close()
 finally:
  server.server_close()

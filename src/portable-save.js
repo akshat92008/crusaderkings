@@ -9,4 +9,16 @@ export function validatePortableSave(raw){if(typeof raw!=='string'||!raw.length|
  for(const [id,f] of Object.entries(g.factions))if(!record(f)||f.id!==id||!finite(f.treasury)||!finite(f.food)||!finite(f.stability)||!record(f.policies))throw Error('Invalid realm: '+id);
  return g;}
 export function saveFilename(g){return 'crown-of-nations-'+String(g.player).replace(/[^a-z0-9_-]/gi,'-')+'-'+g.year+'-'+String(g.month+1).padStart(2,'0')+'.json';}
-export function persistCampaign(storage,raw){storage.setItem(SAVE_KEY,raw);}
+export function persistCampaign(storage,raw){
+ try{storage.setItem(SAVE_KEY,raw);}
+ catch(err){
+  try{
+   const obj=JSON.parse(raw);
+   if(Array.isArray(obj.log))obj.log=obj.log.slice(0,12);
+   if(Array.isArray(obj.history))obj.history=obj.history.slice(0,40);
+   if(obj.deepSystems?.history)obj.deepSystems.history=obj.deepSystems.history.slice(0,40);
+   if(obj.chronicles?.history)obj.chronicles.history=obj.chronicles.history.slice(0,40);
+   storage.setItem(SAVE_KEY,JSON.stringify(obj));
+  }catch{throw err;}
+ }
+}

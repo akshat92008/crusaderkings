@@ -8,6 +8,7 @@ import threading
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
+ThreadingHTTPServer.request_queue_size=128
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
 server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()

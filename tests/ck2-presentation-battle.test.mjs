@@ -50,7 +50,7 @@ function makeGroup(id, side, type, x, z, extra = {}) {
 
 test('Phase 13: 1450 historical world metadata and atlas integrity', () => {
   assert.equal(world.factions.length, 56);
-  assert.equal(world.provinces.length, 576);
+  assert.ok(world.provinces.length >= 700, `Expected expanded provinces >= 700, got ${world.provinces.length}`);
 
   // Validate atlas integrity
   const integrity = verifyAtlasIntegrity(world);

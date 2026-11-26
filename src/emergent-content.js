@@ -809,7 +809,61 @@ export const EXTENDED_EMERGENT_DECISIONS=[
  {id:'em_ext_dec_counterspy_ring',category:'Intrigue',title:'Expand Counter-Espionage Network',cost:110,cooldown:48,desc:'Plant loyal informants across ports, taverns, and foreign embassies.',effects:{securityMonths:24,stability:4}}
 ];
 
-const findEmergentDef=id=>EMERGENT_EVENTS.find(e=>e.id===id)||REACTIVE_EMERGENT_EVENTS.find(e=>e.id===id)||EXTENDED_EMERGENT_EVENTS.find(e=>e.id===id)||EXTENDED_REACTIVE_EVENTS.find(e=>e.id===id)||null;
+export const DLC_EMERGENT_EVENTS=[
+ // Way of Life: Hunting White Hart / Observatory / Carousing / Business
+ E('em_dlc_white_hart','Lifestyle','Rumors of the White Stag','Royal foresters spot an elusive white stag deep inside the crown woods.','land',[
+  C('Ride out in full hunting retinue',70,{prestige:10,health:-6,stress:-8},'em_dlc_white_hart_chase'),
+  C('Leave the woods in peace and tend court petitions',0,{loyalty:3,stress:2})
+ ]),
+ E('em_dlc_white_hart_chase','Lifestyle','Across the Misty Clearing','Your hounds corner the phantom hart beside a sunken forest shrine.','followup',[
+  C('Spare the noble beast and erect a hunting lodge',80,{prestige:14,piety:6,stress:-10}),
+  C('Claim the trophy antlers for the great hall',0,{prestige:12,morale:4})
+ ]),
+ E('em_dlc_observatory','Scholarship','Stars Above the Citadel','Astronomers propose constructing an armillary observatory atop the keep.','land',[
+  C('Fund brass astrolabes and star charts',120,{research:12,prestige:8},'em_dlc_observatory_treatise'),
+  C('Keep scholars focused on treasury ledgers',0,{gold:45})
+ ]),
+ E('em_dlc_observatory_treatise','Scholarship','The Celestial Sphere','The observatory publishes daring tables predicting eclipses and planetary motions.','followup',[
+  C('Defend scientific inquiry before sceptical clerics',60,{research:14,prestige:10}),
+  C('Circulate the treatise privately among initiates',0,{research:6,piety:3})
+ ]),
+ E('em_dlc_grand_banquet','Lifestyle','Feast of Reconciliation','Rival barons arrive in courtly silks, tasting spiced venison and vintage wine.','vassal',[
+  C('Seat bitter rivals together and toast concord',90,{loyalty:10,stability:5,stress:-8}),
+  C('Show martial discipline and keep speeches brief',0,{prestige:6})
+ ]),
+ // Reaper's Due & Sons of Abraham & Monks & Mystics
+ E('em_dlc_quarantine_ports','Health','Ships Under Quarantine Lanterns','Harbormasters report fever among arriving merchant crews carrying eastern silks.','land',[
+  C('Enforce strict 40-day quarantine at port docks',100,{health:-8,stability:5,trade:-4},'em_dlc_quarantine_saved'),
+  C('Keep harbor customs open to protect revenues',0,{gold:110,unrest:5})
+ ]),
+ E('em_dlc_quarantine_saved','Health','Pestilence Turned Back at the Quay','Patrols and apothecaries clear the tainted cargo, sparing the capital wards.','followup',[
+  C('Reward harbor physicians and guild wardens',60,{trust:10,prestige:8}),
+  C('Reopen markets swiftly with modest fanfare',0,{gold:65})
+ ]),
+ E('em_dlc_pilgrim_caravan','Faith','The Great Pilgrim Caravan','Devoted travelers seek armed escort across brigand-haunted mountain passes.','land',[
+  C('Assign household lancers to guard the pilgrims',80,{piety:14,legitimacy:5},'em_dlc_pilgrim_blessing'),
+  C('Exact modest road tolls from the caravan',0,{gold:85,piety:-4})
+ ]),
+ E('em_dlc_pilgrim_blessing','Faith','Hymns from the Sanctuary','Relieved pilgrims praise royal justice from every shrine along the frontier.','followup',[
+  C('Endow a permanent wayside hostel',90,{piety:12,trust:6}),
+  C('Accept the clergy’s gratitude humbly',0,{prestige:6})
+ ]),
+ E('em_dlc_hermetic_cipher','Society','A Ciphered Alchemical Codex','Monastic archivists unearth an ancient treatise inscribed in mirror script.','land',[
+  C('Purchase rare reagents to test the cipher',110,{research:10,prestige:8,health:-4}),
+  C('Lock the manuscript inside the royal vault',0,{piety:5,stability:2})
+ ]),
+ // Horse Lords / Jade Dragon / Republic / Holy Fury
+ E('em_dlc_silk_caravan','Trade','Emissaries of the Silk Caravan','Far-traveled factors bring porcelain, steel Damascus blades, and diplomatic news.','land',[
+  C('Charter duty-free caravan inns across border towns',130,{trade:14,development:1,prestige:6}),
+  C('Collect regular customs duties at the frontier gate',0,{gold:120})
+ ]),
+ E('em_dlc_warrior_trial','Warfare','The Honour Field Trial','A decorated champion challenges royal marshals to test the army’s mettle in single combat.','army',[
+  C('Take the field personally to inspire the host',0,{prestige:14,morale:10,health:4}),
+  C('Designate a sworn household champion',50,{prestige:8,morale:6})
+ ])
+];
+
+const findEmergentDef=id=>EMERGENT_EVENTS.find(e=>e.id===id)||REACTIVE_EMERGENT_EVENTS.find(e=>e.id===id)||EXTENDED_EMERGENT_EVENTS.find(e=>e.id===id)||EXTENDED_REACTIVE_EVENTS.find(e=>e.id===id)||DLC_EMERGENT_EVENTS.find(e=>e.id===id)||null;
 
 export function extendedEmergentDecisions(g,world,r=g.player){
  const s=initEmergent(g);
@@ -1036,7 +1090,7 @@ export function tickEmergent(g,world){
     rs.recentReactive??={};
     rs.recentReactive[root.id]=g.turn;
    }else{
-    const roots=[...EMERGENT_EVENTS,...EXTENDED_EMERGENT_EVENTS].filter(e=>e.trigger!=='followup');
+    const roots=[...EMERGENT_EVENTS,...EXTENDED_EMERGENT_EVENTS,...DLC_EMERGENT_EVENTS].filter(e=>e.trigger!=='followup');
     root=roots[Math.floor(rand(s)*roots.length)];
    }
    if(root){

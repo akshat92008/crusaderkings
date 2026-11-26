@@ -472,10 +472,10 @@ export function politicsAction(g,world,action,id,extra){
  if(action==='law'){
   const norm=normalizeSuccessionLaw(id);
   const profile=governmentSuccessionProfile(g,g.player);
-  if(g.civic?.realms[g.player]?.government==='republic'&&norm!=='elective')return {ok:false,msg:'The republic requires elective succession.'};
+  if(g.civic?.realms[g.player]?.government==='republic'&&!['elective','patrician_elective'].includes(norm))return {ok:false,msg:'The republic requires elective or patrician succession.'};
   if(!profile.allowed.includes(id)&&!profile.allowed.includes(norm))return {ok:false,msg:'Current government forbids this succession law.'};
   if(!councilPermission(g,g.player,'law'))return {ok:false,msg:'The council or regent rejected the succession reform.'};
-  if(!['eldest','youngest','elective','partition','seniority'].includes(norm)||norm===s.law||g.turn-s.lastLaw<120||f.legitimacy<65||f.treasury<250)return {ok:false,msg:'Reform needs 250 gold, 65 legitimacy and ten years between changes.'};
+  if(!['eldest','youngest','elective','partition','seniority','turkish_open','tanistry','patrician_elective'].includes(norm)||norm===s.law||g.turn-s.lastLaw<120||f.legitimacy<65||f.treasury<250)return {ok:false,msg:'Reform needs 250 gold, 65 legitimacy and ten years between changes.'};
   f.treasury-=250;s.law=norm;delete s.nominee;s.lastLaw=g.turn;
   if(g.feudal?.titleLaws?.['k:'+g.player])g.feudal.titleLaws['k:'+g.player].successionLaw=norm;
   for(const h of Object.values(p.holdings))if(h.realm===g.player)h.loyalty=clamp(h.loyalty-8,0,100);

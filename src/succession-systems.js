@@ -19,19 +19,21 @@ export const FAITH_LAWS={any:'Any faith',same_faith:'Crown faith required'};
 export const SUCCESSION_LAWS={
  eldest:'Primogeniture (eldest)',
  primogeniture:'Primogeniture',
+ turkish_open:'Open (strongest landed child)',
  youngest:'Ultimogeniture (youngest)',
  ultimogeniture:'Ultimogeniture',
  partition:'Gavelkind / Partition',
  gavelkind:'Gavelkind / Partition',
  seniority:'House seniority',
- elective:'Elective succession'
+ elective:'Elective succession',
+ tanistry:'Tanistry (senior house electors)',
+ patrician_elective:'Patrician Elective (merchant houses)'
 };
 
 export function normalizeSuccessionLaw(law){
- if(law==='primogeniture'||law==='turkish_open')return 'eldest';
+ if(law==='primogeniture')return 'eldest';
  if(law==='ultimogeniture')return 'youngest';
  if(law==='gavelkind')return 'partition';
- if(law==='patrician_elective'||law==='tanistry')return 'elective';
  return Object.hasOwn(SUCCESSION_LAWS,law)?law:'eldest';
 }
 
@@ -43,10 +45,10 @@ export function normalizeGenderLaw(law){
 
 export function governmentSuccessionProfile(g,realm){
  const gov=g.civic?.realms?.[realm]?.government||'feudal';
- if(gov==='republic'||gov==='city')return {defaultLaw:'elective',allowed:['elective']};
- if(['steppe','confederation','kinship'].includes(gov))return {defaultLaw:'elective',allowed:['elective','seniority','partition','gavelkind','eldest','primogeniture']};
- if(gov==='sultanate')return {defaultLaw:'eldest',allowed:['eldest','primogeniture','seniority','elective','partition','gavelkind']};
- return {defaultLaw:'eldest',allowed:['eldest','primogeniture','youngest','ultimogeniture','partition','gavelkind','seniority','elective']};
+ if(gov==='republic'||gov==='city')return {defaultLaw:'patrician_elective',allowed:['patrician_elective','elective']};
+ if(['steppe','confederation','kinship'].includes(gov))return {defaultLaw:'tanistry',allowed:['tanistry','elective','seniority','partition','gavelkind','eldest','primogeniture']};
+ if(gov==='sultanate')return {defaultLaw:'turkish_open',allowed:['turkish_open','eldest','primogeniture','seniority','elective','partition','gavelkind']};
+ return {defaultLaw:'eldest',allowed:['eldest','primogeniture','youngest','ultimogeniture','partition','gavelkind','seniority','elective','tanistry']};
 }
 
 export function crownPolicy(g,realm){
@@ -146,13 +148,20 @@ export function electionView(g,realm,titleId=null){
  if(!titleId||t?.tier==='crown'||t?.tier==='empire'){
   for(const id of council){add(people[id]);if(id!==head.id)addVote(id,1);}
  }
+ const rawLaw=(titleId?(g.feudal?.titleLaws?.[titleId]?.successionLaw||g.feudal?.titles?.[titleId]?.successionLaw):null)||g.politics?.realms?.[realm]?.law||'eldest';
+ if(rawLaw==='tanistry'){
+  for(const x of Object.values(people))if(x.house===head.house)add(x);
+ }
+ const directChildIds=new Set(children(g,head).map(c=>c.id));
  const nominee=candidates.has(s.nominee)?s.nominee:null;
  const heirs=new Set(hereditaryLine(g,head,'eldest',realm,null,policy).map(p=>p.id));
  const electors=[],votes=new Map();
  for(const [id,raw] of weights){
   const voter=people[id],weight=Math.min(raw,8);
   if(!voter||!candidates.size)continue;
-  const score=p=>num(p.skills?.diplomacy)*3+num(p.skills?.martial)*2+num(p.skills?.stewardship)+characterInfluence(g,p.id)*.12+opinion(g,id,p.id)*.45+personalPoliticalSupport(g,id,p.id)+(heirs.has(p.id)?6:0)+(voter.house===p.house?8:0)+(p.traits?.includes('just')?4:0)-(p.traits?.includes('deceitful')?3:0)+(p.id===id?5:0)+(p.id===nominee?(id===head.id?100:Math.max(0,opinion(g,id,head.id)*.12+4)):0);
+  const tanistryMod=p=>rawLaw==='tanistry'?((!directChildIds.has(p.id)&&p.age>=28?28:p.age<22?-10:0)+(p.house===head.house?12:0)+num(p.age)*.35):0;
+  const patricianMod=p=>rawLaw==='patrician_elective'?(Math.min(40,Math.floor(num(p.wealth)/15))+num(p.prestige)*.6+num(p.skills?.stewardship)*4+num(p.age)*.8+num(g.dlcSystems?.patricianFunds?.[p.id])/12):0;
+  const score=p=>num(p.skills?.diplomacy)*3+num(p.skills?.martial)*2+num(p.skills?.stewardship)+characterInfluence(g,p.id)*.12+opinion(g,id,p.id)*.45+personalPoliticalSupport(g,id,p.id)+(heirs.has(p.id)?6:0)+(voter.house===p.house?8:0)+(p.traits?.includes('just')?4:0)-(p.traits?.includes('deceitful')?3:0)+(p.id===id?5:0)+tanistryMod(p)+patricianMod(p)+(p.id===nominee?(id===head.id?100:Math.max(0,opinion(g,id,head.id)*.12+4)):0);
   const ranked=[...candidates.values()].map(p=>({id:p.id,score:score(p)})).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
   const pick=ranked[0];
   votes.set(pick.id,(votes.get(pick.id)||0)+weight);
@@ -195,7 +204,16 @@ export function titleSuccessionCandidates(g,titleId){
  const law=titleSuccessionLaw(g,titleId);
  const policy=titlePolicy(g,titleId);
  const residence=personalUnion(g,realm)?.junior===realm?head.realm:realm;
- if(law==='elective')return electionView(g,realm,titleId).candidates.map(x=>g.politics.people[x.id]).filter(Boolean);
+ if(['elective','tanistry','patrician_elective'].includes(law))return electionView(g,realm,titleId).candidates.map(x=>g.politics.people[x.id]).filter(Boolean);
+ if(law==='turkish_open'){
+  const openScore=p=>{
+   const held=Object.values(g.politics?.holdings||{}).filter(h=>h.realm===realm&&h.lord===p.id).length;
+   return held*40+num(p.prestige)*1.2+num(p.skills?.martial)*6+num(p.skills?.stewardship)*4+(p.age>=18?20:0)+(children(g,head).some(c=>c.id===p.id)?15:0);
+  };
+  return Object.values(g.politics.people)
+   .filter(p=>p.id!==head.id&&p.realm===residence&&p.house===head.house&&free(g,p)&&!crownExcluded(p,realm)&&crownPolicyEligible(g,realm,p,policy))
+   .sort((a,b)=>openScore(b)-openScore(a)||byAge(a,b));
+ }
  if(law==='seniority'){
   return Object.values(g.politics.people)
    .filter(p=>p.id!==head.id&&p.realm===residence&&p.house===head.house&&free(g,p)&&!crownExcluded(p,realm)&&crownPolicyEligible(g,realm,p,policy))
@@ -216,7 +234,16 @@ export function successionCandidates(g,realm){
  if(g.feudal?.titleLaws?.[kId]?.successionLaw)return titleSuccessionCandidates(g,kId);
  const law=normalizeSuccessionLaw(s.law);
  const residence=personalUnion(g,realm)?.junior===realm?head.realm:realm;
- if(law==='elective')return electionView(g,realm).candidates.map(x=>g.politics.people[x.id]);
+ if(['elective','tanistry','patrician_elective'].includes(law))return electionView(g,realm).candidates.map(x=>g.politics.people[x.id]);
+ if(law==='turkish_open'){
+  const openScore=p=>{
+   const held=Object.values(g.politics?.holdings||{}).filter(h=>h.realm===realm&&h.lord===p.id).length;
+   return held*40+num(p.prestige)*1.2+num(p.skills?.martial)*6+num(p.skills?.stewardship)*4+(p.age>=18?20:0)+(children(g,head).some(c=>c.id===p.id)?15:0);
+  };
+  return Object.values(g.politics.people)
+   .filter(p=>p.id!==head.id&&p.realm===residence&&p.house===head.house&&free(g,p)&&!crownExcluded(p,realm)&&crownPolicyEligible(g,realm,p))
+   .sort((a,b)=>openScore(b)-openScore(a)||byAge(a,b));
+ }
  if(law==='seniority'){
   return Object.values(g.politics.people)
    .filter(p=>p.id!==head.id&&p.realm===residence&&p.house===head.house&&free(g,p)&&!crownExcluded(p,realm)&&crownPolicyEligible(g,realm,p))
@@ -233,7 +260,7 @@ export function successionCandidates(g,realm){
 
 export function nominateSuccessor(g,realm,id){
  const s=g.politics?.realms?.[realm];
- if(normalizeSuccessionLaw(s?.law)!=='elective')return {ok:false,msg:'Nomination requires elective succession.'};
+ if(!['elective','tanistry','patrician_elective'].includes(normalizeSuccessionLaw(s?.law)))return {ok:false,msg:'Nomination requires an elective succession law.'};
  if(!electionView(g,realm).candidates.some(x=>x.id===id))return {ok:false,msg:'Choose an eligible adult candidate.'};
  s.nominee=id;
  return {ok:true,msg:'Nomination recorded. Other electors retain their own votes.'};

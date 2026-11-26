@@ -149,8 +149,8 @@ test('Phase 3: per-title succession laws, government profiles, gavelkind claims,
  const s=g.politics.realms.england,r=g.politics.people[s.ruler];
  const duchy=titleList(g,'england').find(t=>t.tier==='regional');
  duchy.holder=r.id;
- // Republic restricts succession to elective; feudal allows all
- assert.deepEqual(governmentSuccessionProfile(g,'novgorod').allowed,['elective']);
+ // Republic restricts succession to elective / patrician elective; feudal allows all
+ assert.deepEqual(governmentSuccessionProfile(g,'novgorod').allowed,['patrician_elective','elective']);
  assert.ok(setTitleSuccessionLaw(g,'england',duchy.id,'ultimogeniture').ok);
  assert.equal(titleSuccessionLaw(g,duchy.id),'youngest');
  assert.equal(titleSuccessionLaw(g,'k:england'),'eldest');

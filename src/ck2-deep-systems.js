@@ -3266,7 +3266,8 @@ export function tickDeJureDrift(g, world = null, opts = {}) {
   } else {
    rec.months += step;
   }
-  if (d.deJureDrift[pid].months >= 60) {
+  const reqMonths = num(opts.requiredMonths) || 120;
+  if (d.deJureDrift[pid].months >= reqMonths) {
    d.deJureOverrides[pid] = owner;
    if (g.feudal) {
     g.feudal.countyDeJure ??= {};

@@ -9,6 +9,10 @@ import {
 import { recordGrievance, tickAgency } from '../src/character-agency.js';
 import { claimantCandidates } from '../src/feudal-systems.js';
 import { evaluateWarViability, strategicTargetScore } from '../src/strategic-ai.js';
+import { dlcAction, dlcView } from '../src/ck2-dlc-systems.js';
+import { DLC_EMERGENT_EVENTS } from '../src/emergent-content.js';
+import { successionCandidates } from '../src/succession-systems.js';
+import { buildHistoricalWorld, expandHistoricalWorld, densifyHistoricalWorld } from '../src/historical-world.js';
 import {
  EMERGENT_EVENTS, EMERGENT_DECISIONS, EXTENDED_EMERGENT_EVENTS, EXTENDED_REACTIVE_EVENTS,
  EXTENDED_EMERGENT_DECISIONS, allEmergentEventCount, allEmergentDecisionCount,
@@ -257,4 +261,58 @@ test('100% CK2 Parity: geopolitical AI crisis targeting, civil war guard, and ep
  }
  assert.ok((g.provinces[frCap].unrest || 0) > beforeUnrest, 'Severe non-isolated epidemic should raise provincial unrest');
  assert.ok(totalInfected > 0 || Object.keys(g.living?.health || {}).length > 0, 'Severe non-isolated epidemic should sicken exposed courtiers/rulers');
+});
+
+test('100% CK2 Parity: expanded 700+ district atlas, compact WebKit save, distinct succession laws & all DLC actions', () => {
+ const polities1450 = JSON.parse(fs.readFileSync(new URL('../data/historical-polities-1450.json', import.meta.url), 'utf8'));
+ const dense = densifyHistoricalWorld(expandHistoricalWorld(buildHistoricalWorld(world, polities1450)));
+ assert.ok(dense.provinces.length >= 700, `Expanded province count must exceed 700, got ${dense.provinces.length}`);
+
+ const g = createGame(dense, 'ottomans');
+ const snap = snapshot(g);
+ assert.ok(snap.length < 2000000, `Compacted save must stay well under browser quota (${snap.length} bytes)`);
+ const restored = restoreGame(snap, dense);
+ assert.equal(Object.keys(restored.feudal.titles).length, Object.keys(g.feudal.titles).length, 'syncTitles must restore full feudal title tree on load');
+
+ // Distinct succession rules: turkish_open vs eldest
+ g.politics.realms.ottomans.law = 'turkish_open';
+ const ottoRuler = g.politics.people[g.politics.realms.ottomans.ruler];
+ const weakOld = Object.values(g.politics.people).find(x => x.alive && x.realm === 'ottomans' && x.id !== ottoRuler.id && x.house === ottoRuler.house && x.sex === 'male');
+ const strongYoung = { ...weakOld, id: 'c_open_strong', age: 25, prestige: 120, skills: { diplomacy: 3, martial: 5, stewardship: 5, intrigue: 3, learning: 3 }, children: [], parents: [ottoRuler.id] };
+ g.politics.people[strongYoung.id] = strongYoung;
+ if (weakOld) { weakOld.age = 38; weakOld.prestige = 0; }
+ const openOrder = successionCandidates(g, 'ottomans');
+ assert.equal(openOrder[0].id, strongYoung.id, 'Turkish Open succession must elevate most prestigious/capable son over mere age');
+
+ // Tanistry prefers senior mature non-child dynast
+ const ge = createGame(dense, 'england');
+ ge.politics.realms.england.law = 'tanistry';
+ const er = ge.politics.people[ge.politics.realms.england.ruler];
+ const uncle = { ...er, id: 'c_tanist_uncle', age: 44, parents: [], children: [], skills: { diplomacy: 5, martial: 5, stewardship: 4, intrigue: 3, learning: 3 } };
+ ge.politics.people[uncle.id] = uncle;
+ assert.ok(successionCandidates(ge, 'england').some(c => c.id === uncle.id), 'Tanistry must include mature collateral house members');
+
+ // Way of Life, Pilgrimage, Court Financiers, Custom Kingdom, Eastern Grace, Faith Reformation, Bloodline, Magnum Opus
+ assert.ok(DLC_EMERGENT_EVENTS.length >= 10);
+ ge.factions.england.treasury = 3500;
+ ge.factions.england.prestige = 80;
+ ge.politics.people[er.id].piety = 50;
+ ge.politics.people[er.id].skills.learning = 5;
+ assert.ok(dlcAction(ge, dense, 'set-focus', 'hunting').ok);
+ assert.ok(dlcAction(ge, dense, 'pilgrimage').ok);
+ assert.ok(dlcAction(ge, dense, 'borrow-loan').ok);
+ assert.ok(dlcAction(ge, dense, 'repay-loan').ok);
+ assert.ok(dlcAction(ge, dense, 'magnum-opus').ok);
+ assert.ok(dlcAction(ge, dense, 'forge-bloodline').ok);
+ assert.ok(dlcAction(ge, dense, 'eastern-grace', 'send_gift').ok);
+ assert.ok(dlcAction(ge, dense, 'eastern-grace', 'send_physician').ok);
+ assert.ok(dlcAction(ge, dense, 'eastern-grace', 'boon_trade').ok);
+ assert.ok(dlcView(ge, 'england').easternGrace >= 100);
+
+ // Holy Fury Reformation on traditional realm (kongo)
+ const gk = createGame(dense, 'kongo');
+ gk.factions.kongo.treasury = 500;
+ gk.politics.people[gk.politics.realms.kongo.ruler].piety = 40;
+ assert.ok(dlcAction(gk, dense, 'reform-faith', 'warmongering', 'meritocracy').ok);
+ assert.equal(dlcView(gk, 'kongo').reformedFaith.nature, 'warmongering');
 });

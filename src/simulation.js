@@ -6,7 +6,8 @@ import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
 import {nonAggression,aidStrength,diplomaticSupport,mayEnterWithAccess,fieldContingentsAt,hasHostageBar,addDiplomaticThreat} from './diplomacy-systems.js';
 import {campaignWorld} from './independence-systems.js';
-import {captureCommander} from './feudal-systems.js';
+import {captureCommander,syncTitles} from './feudal-systems.js';
+import {initDlcSystems,tickDlcSystems,dlcModifiers} from './ck2-dlc-systems.js';
 import {strategicTargetScore,raidThreshold,defenseSupport,localCampaignForces,recordStrategicBattle,evaluateWarViability,personalityProfile} from './strategic-ai.js';
 import {controller,occupation,occupationTax,captureProvince,transferProvince,availableCasusBelli,declareCasusBelliWar} from './campaign-war.js';
 import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
@@ -43,6 +44,7 @@ export function createGame(world,player='ottomans'){
  const game={version:1,mapVersion:world.meta?.mapVersion||'legacy',seed:1450,year:1450,month:0,player,paused:true,speed:1,factions,provinces,armies,nextId,log:[{date:'January 1450',text:'The world stands at a crossroads. Your reign begins.'}],wars:{},history:[],turn:0};
  initializeKingdomSystems(game,world);
  initDeepSystems(game,world);
+ initDlcSystems(game,world);
  for(const a of Object.values(game.armies))a.commander=allocateCommanderName(game,a.owner,a.id);
  return game;
 }
@@ -55,11 +57,11 @@ export function empireStats(g,owner,cache=null){
  const p=cache?.provs||controlled(g,owner); const f=g.factions[owner];
  const ownArmies=cache?.armies||Object.values(g.armies).filter(a=>a.owner===owner);
  const tax=[.65,1,1.5][f?.policies.tax??1];
- const trade=tradeIncome(g,owner);
+ const trade=Math.round((tradeIncome(g,owner))*dlcModifiers(g,owner).trade);
  const tradePosts=tradePostIncome(g,owner)+independentPolityTradeIncome(g,owner);
- const gw=greatWorkModifiers(g,owner),bl=bloodlineModifiers(g,owner);
+ const gw=greatWorkModifiers(g,owner),bl=bloodlineModifiers(g,owner),dlcMod=dlcModifiers(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
- const taxIncome=Math.round(economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
+ const taxIncome=Math.round(dlcMod.tax*economyModifiers(g,owner).tax*heritageModifiers(g,owner).tax*civicModifiers(g,owner).tax*politicalRevenue(g,owner)*gw.tax*bl.taxMod*p.reduce((sum,pr)=>sum+(pr.population*(1+pr.development*.14)+pr.buildings.market*28)*.35*tax*(1-pr.unrest/170)*occupationTax(g,pr.id)*(portBlocked(g,pr.id)?.75:1)*(1+getProvinceProsperity(g,pr.id)*.10),0)*(1+stewardship*.025+(Math.max(1,f?.tech||1)-1)*.018));
  const income=taxIncome+trade+tradePosts;
  let rawUpkeep=0,rawFoodDrain=0,troops=0;
  for(const a of ownArmies){const sz=armySize(a);rawUpkeep+=sz*.08;rawFoodDrain+=sz*.025;troops+=sz;}
@@ -325,14 +327,154 @@ export function advanceMonth(g,world){
  }
  advanceKingdomSystems(g,world);
  tickDeepSystems(g,world);
+ tickDlcSystems(g,world);
  return g;
 }
-export function snapshot(g){return JSON.stringify(g);}
+function compactPersonForSave(p,realmCivic){
+ if(!p||typeof p!=='object')return p;
+ const out={};
+ for(const [k,v] of Object.entries(p)){
+  if(v===null||v===undefined||v===false)continue;
+  if(k==='_congenitalApplied'||k==='_educationApplied'||k==='dna'||k==='role')continue;
+  if((k==='wealth'||k==='prestige'||k==='piety'||k==='influence')&&v===0)continue;
+  if(Array.isArray(v)&&v.length===0)continue;
+  if(k==='civic'&&v&&typeof v==='object'){
+   const cOut={};
+   for(const [ck,cv] of Object.entries(v)){
+    if(cv===null||cv===undefined||(Array.isArray(cv)&&cv.length===0)||(ck==='xp'&&cv===0)||(ck==='stress'&&cv===0)||(ck==='education'&&cv===0)||(ck==='lastFocus'&&cv===-60))continue;
+    if(ck==='culture'&&realmCivic?.culture===cv)continue;
+    cOut[ck]=cv;
+   }
+   out.civic=cOut;
+   continue;
+  }
+  out[k]=v;
+ }
+ return out;
+}
+const DEFAULT_INDUSTRY_KEYS=['granary','sawmill','mine','loom','smithy','saltery','infirmary','caravan','irrigation','warehouse'];
+const DEFAULT_HOLDING_KEYS={castle:['curtain_wall','keep','stables'],city:['guild_hall','trade_port','counting_house'],temple:['scriptorium','hospitium','sanctuary_precinct']};
+const DEFAULT_STOCK_KEYS={grain:24,timber:8,ore:8,fiber:8,salt:8,tools:8,cloth:8,provisions:8};
+function compactEconomyProvince(ep){
+ if(!ep||typeof ep!=='object')return ep;
+ const out={};
+ for(const [k,v] of Object.entries(ep)){
+  if(v===null||v===undefined)continue;
+  if((k==='shortage'||k==='devastation'||k==='tier')&&v===0)continue;
+  if(k==='lastRelief'&&v===-12)continue;
+  if(k==='output'&&v&&typeof v==='object'&&!Object.keys(v).length)continue;
+  if(k==='stock'&&v&&typeof v==='object'){
+   const snz={};
+   for(const [sk,sv] of Object.entries(v))if(sv!==DEFAULT_STOCK_KEYS[sk])snz[sk]=sv;
+   if(Object.keys(snz).length)out.stock=snz;
+   continue;
+  }
+  if(k==='industries'&&v&&typeof v==='object'){
+   const nz={};
+   for(const [ik,iv] of Object.entries(v))if(iv)nz[ik]=iv;
+   if(Object.keys(nz).length)out.industries=nz;
+   continue;
+  }
+  if(k==='holdings'&&v&&typeof v==='object'){
+   const hc={};
+   for(const [ht,hd] of Object.entries(v)){
+    if(!hd||typeof hd!=='object')continue;
+    const bnz={};
+    for(const [bk,bv] of Object.entries(hd.buildings||{}))if(bv)bnz[bk]=bv;
+    if((hd.level??1)!==1||Object.keys(bnz).length){
+     hc[ht]={...(hd.level!==1?{level:hd.level}:{}),...(Object.keys(bnz).length?{buildings:bnz}:{})};
+    }
+   }
+   if(Object.keys(hc).length)out.holdings=hc;
+   continue;
+  }
+  out[k]=v;
+ }
+ return out;
+}
+function rehydrateSaveDefaults(o){
+ const realmCiv=o.civic?.realms||{};
+ for(const p of Object.values(o.politics?.people||{})){
+  if(!p||typeof p!=='object')continue;
+  p.spouses??=[];p.concubines??=[];p.claims??=[];p.memories??=[];p.congenital??=[];
+  p.friends??=[];p.rivals??=[];p.lovers??=[];p.mentors??=[];p.wards??=[];p.grievances??=[];
+  p.parents??=[];p.children??=[];
+  p.wealth??=0;p.prestige??=0;p.piety??=0;p.influence??=0;
+  p.bastard=Boolean(p.bastard);p.legitimized=Boolean(p.legitimized);
+  if(p.guardianId===undefined)p.guardianId=null;
+  const origin=realmCiv[p.realm];
+  if(origin){
+   p.civic??={};
+   p.civic.culture??=origin.culture||'Local';
+   p.civic.faith??=origin.faith||'Local';
+  }
+  if(p.civic){p.civic.focus??=null;p.civic.xp??=0;p.civic.perks??=[];p.civic.stress??=0;p.civic.guardian??=null;p.civic.education??=0;if(p.civic.lastFocus===undefined)p.civic.lastFocus=-60;}
+ }
+ if(o.feudal?.baronies){
+  for(const b of Object.values(o.feudal.baronies)){
+   if(!b||typeof b!=='object')continue;
+   b.wealth??=0;b.tax??=1;b.levy??=1;
+  }
+ }
+ if(o.economy?.provinces){
+  for(const ep of Object.values(o.economy.provinces)){
+   if(!ep||typeof ep!=='object')continue;
+   ep.shortage??=0;ep.devastation??=0;ep.tier??=0;ep.lastRelief??=-12;ep.output??={};
+   ep.industries??={};
+   for(const ik of DEFAULT_INDUSTRY_KEYS)ep.industries[ik]??=0;
+   ep.stock??={};
+   for(const [sk,dv] of Object.entries(DEFAULT_STOCK_KEYS))ep.stock[sk]??=dv;
+   ep.holdings??={};
+   for(const [ht,bks] of Object.entries(DEFAULT_HOLDING_KEYS)){
+    ep.holdings[ht]??={level:1,buildings:{}};
+    ep.holdings[ht].level??=1;
+    ep.holdings[ht].buildings??={};
+    for(const bk of bks)ep.holdings[ht].buildings[bk]??=0;
+   }
+  }
+ }
+}
+export function snapshot(g){
+ if(!g||typeof g!=='object')return JSON.stringify(g);
+ const shallow={...g};
+ const realmCiv=g.civic?.realms||{};
+ if(g.politics?.people){
+  const people={};
+  for(const [id,p] of Object.entries(g.politics.people))people[id]=compactPersonForSave(p,realmCiv[p?.realm]);
+  shallow.politics={...g.politics,people};
+ }
+ if(g.feudal){
+  const feudalCopy={...g.feudal};
+  delete feudalCopy.titles;
+  if(g.feudal.baronies){
+   const baronies={};
+   for(const [id,b] of Object.entries(g.feudal.baronies)){
+    if(!b||typeof b!=='object'){baronies[id]=b;continue;}
+    const bc={...b};
+    if(bc.wealth===0)delete bc.wealth;
+    if(bc.tax===1)delete bc.tax;
+    if(bc.levy===1)delete bc.levy;
+    baronies[id]=bc;
+   }
+   feudalCopy.baronies=baronies;
+  }
+  shallow.feudal=feudalCopy;
+ }
+ if(g.economy?.provinces){
+  const eProvs={};
+  for(const [id,ep] of Object.entries(g.economy.provinces))eProvs[id]=compactEconomyProvince(ep);
+  shallow.economy={...g.economy,provinces:eProvs};
+ }
+ return JSON.stringify(shallow);
+}
 export function restoreGame(text,world){
  const o=JSON.parse(text);if(o.version!==1||!o.factions?.[o.player]||o.player==='independent'||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
  if((o.mapVersion||'legacy')!==(world.meta?.mapVersion||'legacy')||Object.keys(o.provinces).length!==world.provinces.length||world.provinces.some(p=>!o.provinces[p.id]))throw Error('Map version mismatch');
+ rehydrateSaveDefaults(o);
  initializeKingdomSystems(o,world);
+ syncTitles(o);
  initDeepSystems(o,world);
+ initDlcSystems(o,world);
  reconcilePoliticalHoldings(o);reconcileCareer(o);
  return o;
 }

@@ -343,7 +343,7 @@ test('7. Coronation, religious school, canonization, de jure drift, 50-vassal st
  assert.equal(can.ok, true, can.msg);
  assert.ok(deepSystemsView(g, 'england').bloodlines.some(b => b.kind === 'saint'), 'Saintly bloodline granted to ruler');
 
- // De Jure Drift: conquer/assign a Scottish province and hold continuously for 60 months
+ // De Jure Drift: conquer/assign a Scottish province and hold continuously for 120 months
  const scotProv = denseWorld.provinces.find(p => p.owner === 'scotland');
  assert.ok(scotProv);
  assert.equal(g.feudal.titles['c:' + scotProv.id].deJureRealm, 'scotland');
@@ -352,11 +352,11 @@ test('7. Coronation, religious school, canonization, de jure drift, 50-vassal st
  g.politics.holdings[scotProv.id].lord = r.id;
  syncTitles(g);
 
- for (let m = 1; m <= 59; m++) {
+ for (let m = 1; m <= 119; m++) {
   g.turn++;
   tickDeJureDrift(g, denseWorld);
  }
- assert.equal(g.feudal.titles['c:' + scotProv.id].deJureRealm, 'scotland', 'Must not drift before 60 months');
+ assert.equal(g.feudal.titles['c:' + scotProv.id].deJureRealm, 'scotland', 'Must not drift before 120 months');
 
  g.turn++;
  const drifted = tickDeJureDrift(g, denseWorld);

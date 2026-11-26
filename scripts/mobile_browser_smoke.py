@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'qa-screenshots';OUT.mkdir(exist_ok=True)
 CHROME=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+ThreadingHTTPServer.request_queue_size=128
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT)))
 server.daemon_threads=True
 threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -107,7 +108,7 @@ try:
     lord.get_by_text('Estate succession',exact=True).click()
     lord.locator('[id^="estate-law-province-"]').select_option('reversion')
     lord.get_by_role('button',name='Amend succession (75g)',exact=True).click()
-    page.wait_for_function("id=>JSON.parse(localStorage.getItem('crown-of-nations.save')).politics.holdings[id].successionLaw==='reversion'",arg=province)
+    page.wait_for_function("id=>{const r=localStorage.getItem('crown-of-nations.save');return !!r&&JSON.parse(r)?.politics?.holdings?.[id]?.successionLaw==='reversion';}",arg=province)
    page.locator('[data-action="pin"][data-type="province"]').click()
    assert page.locator('[data-action="pin"][data-type="province"]').get_attribute('aria-pressed')=='true'
    assert page.locator('[data-section="recruit"]').is_visible()
