@@ -23,7 +23,7 @@ export function hydrateTownArt(root){
   compiled().then(pack=>{
    const asset=pack?.sprites?.[name]||pack?.extras?.[name];
    if(asset&&node.isConnected){const img=node.querySelector('img');if(img)img.src=asset;node.classList.add('ht-compiled');return;}
-   if(!sheets[name])return;loadSheet(name).then(url=>{if(!url||!node.isConnected)return;node.style.aspectRatio=sheets[name][3]+'/'+sheets[name][4];node.style.backgroundImage='url("'+url+'")';node.style.backgroundSize='800% 400%';node.style.backgroundPosition='0 0';node.querySelector('img')?.remove();});
+   if(!sheets[name])return;loadSheet(name).then(url=>{if(!url||!node.isConnected)return;node.style.aspectRatio=sheets[name][3]+'/'+sheets[name][4];node.style.backgroundImage='url("'+url+'")';node.style.backgroundSize='800% 400%';node.style.backgroundPosition='57.142857% 0';node.querySelector('img')?.remove();});
   });
  }
  compiled().then(pack=>{

@@ -16,7 +16,7 @@ except ImportError:
     Image=None
 manifest={'version':2,'sprites':{},'extras':{},'sources':{}}
 credits=[
- 'City Builder: Village Buildings, polyy.ai, CC0 1.0; extracted first rotation.',
+ 'City Builder: Village Buildings, polyy.ai, CC0 1.0; extracted 45-degree rotation.',
  'Feudal Wars, isometric medieval set, CC0: https://opengameart.org/content/isometric-25d-medieval-set',
  "Bleed's Game Art, Medieval Cart Prop, CC BY 4.0: https://opengameart.org/content/medieval-cart-prop ; https://www.patreon.com/bleed",
  "Bleed's Game Art, Villager_01, CC BY 3.0: https://opengameart.org/content/villager01-bleeds-game-art",
@@ -64,7 +64,8 @@ for part in (1,2):
                 high=item.replace('/64sun/','/128sun/')
                 im=read_image(z,high)
                 if im.width%8 or im.height%4: raise ValueError('bad 8x4 sheet '+high)
-                frame=im.crop((0,0,im.width//8,im.height//4))
+                w,h=im.width//8,im.height//4
+                frame=im.crop((4*w,0,5*w,h))
                 manifest['sprites'][name]=save_sprite(frame,name)
                 manifest['sources'][name]=high
         (DEST/'VILLAGE-LICENSE.txt').write_bytes(z.read('LICENSE.txt'))
