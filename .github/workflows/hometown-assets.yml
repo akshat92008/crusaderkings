@@ -1,0 +1,58 @@
+name: Compile Hometown runtime art
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/build_hometown_art.py
+      - .github/workflows/hometown-assets.yml
+      - assets/packs/**
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hometown-runtime-art
+  cancel-in-progress: true
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pillow
+      - run: python scripts/build_hometown_art.py
+      - name: Validate generated files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from PIL import Image
+          p=Path('assets/hometown')
+          m=json.loads((p/'manifest.json').read_text())
+          assert len(m['sprites'])==23
+          for url in [*m['sprites'].values(),*m['extras'].values()]:
+              with Image.open(url) as im:
+                  im.verify()
+          assert sum(f.stat().st_size for f in (p/'sprites').glob('*.webp'))<5_000_000
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hometown-runtime-art
+          path: assets/hometown/
+      - name: Publish generated-only runtime sprites without overwriting concurrent work
+        run: |
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo 'Main advanced during generation; runtime art is available in the workflow artifact. No push attempted.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f assets/hometown/manifest.json assets/hometown/CREDITS.txt assets/hometown/VILLAGE-LICENSE.txt assets/hometown/sprites
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Publish optimized Hometown runtime sprites and attribution'
+          git push origin HEAD:main

@@ -19,6 +19,7 @@ required=[
  'crown-of-nations/assets/icons/Medieval_strategy_game_icon_sheet_8967b69f.jpg',
  'crown-of-nations/assets/video/Medieval_war_table_map_animation_ac51bb4b.mp4',
  'crown-of-nations/index.html','crown-of-nations/styles.css',
+ 'crown-of-nations/src/hometown.js','crown-of-nations/src/hometown-ui.js','crown-of-nations/src/hometown-scene.js','crown-of-nations/assets/hometown.css','crown-of-nations/assets/hometown/manifest.json','crown-of-nations/assets/hometown/CREDITS.txt','crown-of-nations/assets/hometown/sprites/village_hall.webp',
  'crown-of-nations/assets/court-theme.css','crown-of-nations/assets/court-compass.svg','crown-of-nations/assets/monarch-crest.svg','crown-of-nations/src/historical-context.js','crown-of-nations/src/interface-experience.js','crown-of-nations/src/roleplay-systems.js','crown-of-nations/src/supplemental-content.js','crown-of-nations/docs/HISTORICAL_CONTEXT.md',
  'crown-of-nations/src/battle.js','crown-of-nations/src/three-battle.bundle.js',
  'crown-of-nations/src/kingdom-depth.js','crown-of-nations/src/kingdom-ui.js',

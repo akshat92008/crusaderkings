@@ -3,7 +3,7 @@ const sheets={"thatched_cottage":[1,12516876,212186,67,68,8],"blacksmith_forge":
 const direct={barracks:'barracks.png',blacksmith:'blacksmith.png',archery_range:'archery_range.png',castle:'castle.png',stable:'stable.png',watchtower:'watchtower_wooden_full_size.png'};
 const fallback={village_hall:'house1b.png',thatched_cottage:'house1.png',timber_frame_house:'house1c.png',gatehouse:'castle.png',blacksmith_forge:'blacksmith.png'};
 const cache=new Map(),chunk=83886080;
-export function townArt(name){if(direct[name])return '<img class="ht-sprite" alt="" src="assets/'+direct[name]+'">';const d=sheets[name];if(!d)return '<img class="ht-sprite" alt="" src="assets/house1.png">';return '<span class="ht-sheet" data-town-art="'+name+'"><img alt="" src="assets/'+(fallback[name]||'house1.png')+'"></span>';}
+export function townArt(name){if(direct[name])return '<img class="ht-sprite" alt="" src="assets/'+direct[name]+'">';const d=sheets[name];if(!d)return '<span class="ht-sheet" data-town-art="'+name+'"><img alt="" src="assets/house1.png"></span>';return '<span class="ht-sheet" data-town-art="'+name+'"><img alt="" src="assets/'+(fallback[name]||'house1.png')+'"></span>';}
 async function loadSheet(name){if(cache.has(name))return cache.get(name);const promise=(async()=>{const [part,start,len]=sheets[name];const directURL='assets/hometown/'+name+'.png';
  // Packaged releases ship extracted sheets; static hosts may support HTTP range requests.
  const check=await fetch(directURL);if(check.ok&&check.headers.get('content-type')?.includes('image'))return directURL;
@@ -15,4 +15,22 @@ async function loadSheet(name){if(cache.has(name))return cache.get(name);const p
  if(res.status!==206){await res.body?.cancel();throw Error('Host does not support partial downloads');}
  const bytes=await res.arrayBuffer();if(bytes.byteLength!==n)throw Error('Wrong archive range');pieces.push(bytes);at+=n;left-=n;}
  const stream=new Blob(pieces).stream().pipeThrough(new DecompressionStream('deflate-raw'));const blob=await new Response(stream).blob();return URL.createObjectURL(new Blob([blob],{type:'image/png'}));})().catch(()=>null);cache.set(name,promise);return promise;}
-export function hydrateTownArt(root){for(const node of root.querySelectorAll('[data-town-art]')){const name=node.dataset.townArt;if(node.dataset.loading)continue;node.dataset.loading='yes';loadSheet(name).then(url=>{if(!url||!node.isConnected)return;node.style.aspectRatio=sheets[name][3]+'/'+sheets[name][4];node.style.backgroundImage='url("'+url+'")';node.style.backgroundSize='800% 400%';node.style.backgroundPosition='0 0';node.querySelector('img')?.remove();});}}
+let compiledPromise=null;
+function compiled(){return compiledPromise??=fetch('assets/hometown/manifest.json').then(r=>r.ok?r.json():null).catch(()=>null);}
+export function hydrateTownArt(root){
+ for(const node of root.querySelectorAll('[data-town-art]')){
+  const name=node.dataset.townArt;if(node.dataset.loading)continue;node.dataset.loading='yes';
+  compiled().then(pack=>{
+   const asset=pack?.sprites?.[name]||pack?.extras?.[name];
+   if(asset&&node.isConnected){const img=node.querySelector('img');if(img)img.src=asset;node.classList.add('ht-compiled');return;}
+   if(!sheets[name])return;loadSheet(name).then(url=>{if(!url||!node.isConnected)return;node.style.aspectRatio=sheets[name][3]+'/'+sheets[name][4];node.style.backgroundImage='url("'+url+'")';node.style.backgroundSize='800% 400%';node.style.backgroundPosition='0 0';node.querySelector('img')?.remove();});
+  });
+ }
+ compiled().then(pack=>{
+  if(!pack)return;
+  for(const node of root.querySelectorAll('[data-town-extra]')){
+   const key=node.dataset.townExtra,url=pack.extras?.[key];if(!url)continue;node.style.backgroundImage='url("'+url+'")';node.classList.add('has-art');if(key==='cart')node.textContent='';
+  }
+  for(const node of root.querySelectorAll('.ht-scene')){if(pack.extras?.ground)node.style.setProperty('--ht-grass','url("'+pack.extras.ground+'")');}
+ });
+}

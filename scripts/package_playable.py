@@ -20,7 +20,7 @@ keep += ['assets/favicon.svg','assets/court-theme.css','assets/court-compass.svg
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/battle/characters').rglob('*') if p.is_file()]
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/game-art').rglob('*') if p.is_file()]
 keep += ['assets/hometown.css','assets/archery_range.png','assets/barracks.png','assets/blacksmith.png','assets/castle.png','assets/stable.png','assets/watchtower_wooden_full_size.png','assets/house1.png','assets/house1b.png','assets/house1c.png','docs/HOMETOWN.md']
-keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/hometown').glob('*') if p.is_file()]
+keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/hometown').rglob('*') if p.is_file()]
 keep += ['assets/characters_3d/ashigaru-foot-soldier-806707.glb','assets/characters_3d/daimyo-lord-78364a.glb','assets/characters_3d/LICENSE-Polyfork.txt']
 text = ('CROWN OF NATIONS: 1450 — CULTURAL WARFARE PLAYTEST\n'
         'This is a playable development preview, not a finished game.\n\n'

@@ -20,7 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m pip install playwright
+      - run: python -m pip install playwright pillow
+      - run: python scripts/build_hometown_art.py
       - run: python -m playwright install --with-deps ${{ matrix.engine }}
       - run: python scripts/mobile_browser_smoke.py
         env:
