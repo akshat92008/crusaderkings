@@ -264,6 +264,27 @@ try:
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
    context.close()
+  # Independent Hometown campaign so previous campaign regression remains unchanged.
+  context=browser.new_context(viewport={'width':390 if chromium else 1440,'height':844 if chromium else 900})
+  page=context.new_page(); ht_errors=[];page.on('pageerror',lambda e:ht_errors.append(str(e)))
+  page.goto('http://127.0.0.1:'+str(server.server_port),wait_until='domcontentloaded',timeout=45000)
+  page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
+  page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
+  page.click('#open-hometown');ht=page.locator('#hometown-screen');assert ht.is_visible()
+  assert ht.locator('.ht-tabs button').count()==5
+  assert ht.locator('.ht-resources > div').count()==5
+  ht.locator('[data-ht="tab"][data-key="buildings"]').click();assert ht.locator('.ht-grid .ht-card').count()==40
+  ht.locator('[data-ht="tab"][data-key="research"]').click();assert ht.locator('.ht-grid .ht-card').count()==20
+  ht.locator('[data-ht="tab"][data-key="provinces"]').click();assert ht.locator('.ht-provinces .ht-card').count()>0
+  ht.locator('[data-ht="tab"][data-key="town"]').click();ht.locator('[data-ht-change="selection"]').select_option('house')
+  ht.locator('[data-ht="queue"]').click();assert ht.locator('.ht-job').count()==1
+  ht.locator('[data-ht="advance"]').click()
+  if page.locator('#event-modal').is_visible():page.locator('#event-modal-defer').click()
+  assert ht.locator('.ht-job').count()==0
+  assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).hometown.realms.england.level")>=1
+  page.screenshot(path=str(OUT/'hometown.png'));ht.locator('[data-ht="close"]').click();assert ht.is_hidden()
+  assert not ht_errors,ht_errors
+  context.close();print('Hometown PASS: 40 buildings, 20 research branches, 5 resources, queue, month and save')
   browser.close()
 finally:
  server.server_close()
