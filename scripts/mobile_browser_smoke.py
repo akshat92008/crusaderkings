@@ -273,8 +273,13 @@ try:
   page.click('#open-hometown');ht=page.locator('#hometown-screen');assert ht.is_visible()
   assert ht.locator('.ht-tabs button').count()==5
   assert ht.locator('.ht-resources > div').count()==5
+  assert ht.locator('.ht-landscape').count()==1
+  assert ht.locator('.ht-town-ornament').count()==1
+  if (ROOT/'assets/hometown/manifest.json').is_file():
+   page.wait_for_function("document.querySelector('#hometown-screen .ht-compiled img')?.naturalWidth > 0",timeout=15000)
   ht.locator('[data-ht="tab"][data-key="buildings"]').click();assert ht.locator('.ht-grid .ht-card').count()==40
   ht.locator('[data-ht="tab"][data-key="research"]').click();assert ht.locator('.ht-grid .ht-card').count()==20
+  assert ht.locator('.ht-tech-list li').count()==200
   ht.locator('[data-ht="tab"][data-key="provinces"]').click();assert ht.locator('.ht-provinces .ht-card').count()>0
   ht.locator('[data-ht="tab"][data-key="town"]').click();ht.locator('[data-ht-change="selection"]').select_option('house')
   ht.locator('[data-ht="queue"]').click();assert ht.locator('.ht-job').count()==1

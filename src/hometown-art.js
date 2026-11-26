@@ -31,6 +31,7 @@ export function hydrateTownArt(root){
   for(const node of root.querySelectorAll('[data-town-extra]')){
    const key=node.dataset.townExtra,url=pack.extras?.[key];if(!url)continue;node.style.backgroundImage='url("'+url+'")';node.classList.add('has-art');if(key==='cart')node.textContent='';
   }
+  for(const node of root.querySelectorAll('[data-town-svg-extra]')){const url=pack.extras?.[node.dataset.townSvgExtra];if(url){node.setAttribute('href',url);node.setAttribute('visibility','visible');}}
   for(const node of root.querySelectorAll('.ht-scene')){if(pack.extras?.ground)node.style.setProperty('--ht-grass','url("'+pack.extras.ground+'")');}
  });
 }

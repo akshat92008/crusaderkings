@@ -132,3 +132,5 @@ if Image:
 assert len(list(DEST.glob('*.png')))==23, 'Expected 23 licensed village sheets'
 if Image: assert len(manifest['sprites'])==23
 print('Hometown:',len(manifest['sprites']),'optimized individual sprites;',len(manifest['extras']),'environment extras')
+
+# The manifest is the sole allowlist for optional compiled images in the client.

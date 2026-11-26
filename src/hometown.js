@@ -74,6 +74,8 @@ export function tickHometown(g,world){const root=g.hometown;if(!root||root.lastT
  }}
 const unlocks={pikes:['infantry',2],guard:['infantry',4],longbow:['archery',2],crossbow:['archery',2],handgun:['gunpowder',1],lancers:['cavalry',2],horsebow:['cavalry',2],elephants:['cavalry',3],ram:['siege',1],catapult:['siege',2],bombard:['gunpowder',2]};
 export function homeMilitaryUnlocked(g,r,k){const h=active(g,r),d=unlocks[k];return !h||!d||researchLevel(h,d[0])>=d[1];}
-export function homeMilitaryRequirement(k){const d=unlocks[k];return d?HOME_RESEARCH[d[0]].name+' '+d[1]:'Basic training';}
+export function homeMilitaryRequirement(k){const d=unlocks[k];return d?technologyName(d[0],d[1])+' ('+HOME_RESEARCH[d[0]].name+' '+d[1]+')':'Basic training';}
+export function homeEngineQuote(g,r,definition){const h=active(g,r);if(!h||!definition)return null;const price={wood:definition.timber*4,iron:definition.tools*3};return {price,ok:permitted(g,h.capital,r)&&h.stock.wood>=price.wood&&h.stock.iron>=price.iron};}
+export function spendHomeEngineMaterials(g,r,definition){const q=homeEngineQuote(g,r,definition);if(!q?.ok)return false;const h=active(g,r);h.stock.wood-=q.price.wood;h.stock.iron-=q.price.iron;return true;}
 
 export function homeBuyMaterial(g,kind,amount=50){const h=active(g,g.player),f=g.factions[g.player];if(!h||!humanControlsRealm(g,g.player)||!materials.includes(kind)||!Number.isInteger(amount)||amount<1||amount>500||!permitted(g,h.capital,g.player))return no('Invalid material purchase.');const cap=1000+h.level*700+totals(g,g.player).storage*100;const qty=Math.min(amount,Math.max(0,cap-h.stock[kind]));const price=qty*({wood:3,stone:4,iron:5}[kind]);if(!qty||f.treasury<price)return no('Insufficient treasury or reserve capacity.');f.treasury-=price;h.stock[kind]+=qty;return ok(qty+' '+kind+' purchased for '+price+' gold.');}
