@@ -2,7 +2,7 @@ import {personalUnionAction,reconcilePersonalUnions,unionJuniorDomain} from './p
 import {allocateCharacterName,allocateHouseName} from './name-pools.js';
 import {humanControlsRealm,humanControlsCharacter,reconcileCareer} from './player-career.js';
 import {estateLaw,estateSuccession} from './estate-succession.js';
-import {characterInteraction,recordLifeEvent,rememberBereavement,personalPoliticalSupport} from './character-agency.js';
+import {characterInteraction,recordLifeEvent,rememberBereavement,personalPoliticalSupport,recordGrievance} from './character-agency.js';
 import {reconcileRegency,tickRegency,regencyAction} from './regency-systems.js';
 import {
  successionCandidates,nominateSuccessor,hereditaryLine,crownExcluded,crownExclusionTerms,
@@ -485,7 +485,7 @@ export function politicsAction(g,world,action,id,extra){
  if(!v||v.realm!==g.player||g.provinces[id]?.owner!==g.player||v.lord===r.id)return {ok:false,msg:'Select a loyal holding in your realm.'};
  if(action==='gift'){if(f.treasury<100)return {ok:false,msg:'Need 100 gold.'};f.treasury-=100;v.wealth+=100;v.loyalty=clamp(v.loyalty+15,0,100);}
  else if(action==='tax'||action==='levy'||action==='autonomy'){if(v.exemptions?.[action])return {ok:false,msg:'Revoke the estate exemption before changing this rate.'};const value=Number(extra);if(![0,1,2].includes(value)||v[action]===value)return {ok:false,msg:'Select a different contract level.'};const delta=value-v[action];v[action]=value;v.loyalty=clamp(v.loyalty+(action==='autonomy'?12:-12)*delta,0,100);}
- else if(action==='replace'){if(!councilPermission(g,g.player,'revoke')&&!(v.leverageUntil>g.turn))return {ok:false,msg:'Binding council refused revocation; investigate the estate or secure support.'};if(f.legitimacy<50)return {ok:false,msg:'Need 50 legitimacy.'};const previous=p.people[v.lord];v.lord=person(g,g.player,35,{house:'Appointed house of '+id}).id;v.loyalty=60;f.legitimacy-=10;previous.memories.push('Lost the holding of '+id);for(const h of Object.values(p.holdings))if(h.realm===g.player&&h!==v)h.loyalty=clamp(h.loyalty-5,0,100);}
+ else if(action==='replace'){if(!councilPermission(g,g.player,'revoke')&&!(v.leverageUntil>g.turn))return {ok:false,msg:'Binding council refused revocation; investigate the estate or secure support.'};if(f.legitimacy<50)return {ok:false,msg:'Need 50 legitimacy.'};const previous=p.people[v.lord];v.lord=person(g,g.player,35,{house:allocateHouseName(g,{realm:g.player,seed:`appointed:${id}:${g.turn}`})}).id;v.loyalty=60;f.legitimacy-=10;previous.memories.push('Lost the holding of '+id);for(const h of Object.values(p.holdings))if(h.realm===g.player&&h!==v)h.loyalty=clamp(h.loyalty-5,0,100);}
  else if(action==='concede'){if(v.loyalty>=45||g.turn<v.concessionUntil||f.treasury<150)return {ok:false,msg:'No active grievance, recent concession, or insufficient gold.'};f.treasury-=150;v.autonomy=2;v.loyalty=clamp(v.loyalty+30,0,100);v.concessionUntil=g.turn+24;}
  else return {ok:false,msg:'Unknown political action.'};
  syncTitles(g);log(g,'The crown negotiated '+action+' with '+p.people[v.lord].name+'.');
@@ -518,7 +518,7 @@ function death(g,world,c){
  let estateHeir=hereditaryLine(g,c)[0]||null;
  if(s?.ruler===c.id){
   let h=successor(p,realm,g);
-  if(!h)h=Object.values(p.people).filter(x=>x.alive&&x.realm===realm&&x.house===c.house&&x.id!==c.id&&!x.bastard&&!isImprisoned(g,x.id)&&!crownExcluded(x,realm)&&crownPolicyEligible(g,realm,x)).sort((a,b)=>b.age-a.age)[0]||person(g,realm,30,{house:'Successor house of '+g.factions[realm].name,...(crownPolicy(g,realm).gender==='female_only'?{sex:'female'}:crownPolicy(g,realm).gender==='male_only'?{sex:'male'}:{})});
+  if(!h)h=Object.values(p.people).filter(x=>x.alive&&x.realm===realm&&x.house===c.house&&x.id!==c.id&&!x.bastard&&!isImprisoned(g,x.id)&&!crownExcluded(x,realm)&&crownPolicyEligible(g,realm,x)).sort((a,b)=>b.age-a.age)[0]||person(g,realm,30,{house:allocateHouseName(g,{realm,seed:`successor:${realm}:${c.id}:${g.turn}`}),...(crownPolicy(g,realm).gender==='female_only'?{sex:'female'}:crownPolicy(g,realm).gender==='male_only'?{sex:'male'}:{})});
   estateHeir=estateHeir||h;
   s.ruler=h.id;delete s.nominee;
   partitionInheritance(g,realm,c,h);
@@ -526,12 +526,19 @@ function death(g,world,c){
   for(const cl of Object.values(g.feudal?.claimants||{})){
    if(cl.person===c.id&&cl.heritable&&cl.realm!==realm)addClaim(g,h.id,cl.realm,{titleId:cl.titleId,strength:'weak',from:c.id,heritable:false});
   }
-  for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;
+  for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:allocateHouseName(g,{realm,seed:`court:${role}:${c.id}:${g.turn}`})}).id;
   g.kingdom.courts[realm].successions++;
   g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy-12,0,100);
   for(const v of Object.values(p.holdings))if(v.realm===realm)v.loyalty=clamp(v.loyalty-12,0,100);
   // Post-succession claimant crisis / dispute flags.
   s.successionTurn=g.turn;
+  if(h.age<18||g.factions[realm].legitimacy<55){
+   const closePretenders=Object.values(p.people).filter(k=>k.alive&&k.realm===realm&&k.id!==h.id&&k.id!==c.id&&k.age>=18&&!isImprisoned(g,k.id)&&(k.house===h.house||c.parents?.some(pid=>k.parents?.includes(pid)))&&((k.traits||[]).includes('ambitious')||(k.personality?.boldness??0)>=50||(k.personality?.greed??0)>=50));
+   for(const k of closePretenders){
+    addClaim(g,k.id,realm,{titleId:'k:'+realm,strength:'weak',from:c.id,heritable:false});
+    changeOpinion(g,k.id,h.id,-18);
+   }
+  }
   const claimants=claimantCandidates(g,realm);
   const crisisReasons=[];
   if(h.age<18)crisisReasons.push('minority');
@@ -568,16 +575,23 @@ function death(g,world,c){
  for(const {id,h:v,law,heir:chosen} of inherited){
   let heir;
   if(law==='customary'){
-   estateHeir??=person(g,v.realm,32,{house:'Successor house of '+id});
+   estateHeir??=person(g,v.realm,32,{house:allocateHouseName(g,{realm:v.realm,seed:`estate:${id}:${g.turn}`})});
    heir=estateHeir;
   }else heir=chosen;
-  v.lord=(heir??person(g,v.realm,32,{house:'Successor house of '+id})).id;
+  v.lord=(heir??person(g,v.realm,32,{house:allocateHouseName(g,{realm:v.realm,seed:`estate:${id}:fallback:${g.turn}`})})).id;
   v.loyalty=law!=='customary'&&v.lord===p.realms[v.realm]?.ruler?100:clamp(v.loyalty-8,0,100);
   if(law!=='customary'&&v.realm===g.player)log(g,p.people[v.lord].name+' inherited '+id+' under its estate charter.');
  }
- for(const [role,id] of Object.entries(s?.council||{}))if(id===c.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;
+ for(const [role,id] of Object.entries(s?.council||{}))if(id===c.id)s.council[role]=person(g,realm,35,{house:allocateHouseName(g,{realm,seed:`council:${role}:${c.id}:${g.turn}`})}).id;
  const inheritance=Math.max(0,Number(c.wealth)||0);
- if(estateHeir){estateHeir.wealth=(Number(estateHeir.wealth)||0)+inheritance;}
+ if(estateHeir){
+  estateHeir.wealth=(Number(estateHeir.wealth)||0)+inheritance;
+  for(const gr of c.grievances||[]){
+   if((gr.severity||0)>=45&&(gr.permanent||c.deathReason==='executed'||gr.reason==='execution'||gr.reason==='executed kin')){
+    recordGrievance(g,estateHeir.id,gr.against,gr.reason,Math.round((gr.severity||45)*0.7),{permanent:true});
+   }
+  }
+ }
  else if(g.factions[realm])g.factions[realm].treasury+=inheritance;
  c.wealth=0;
 
@@ -684,7 +698,13 @@ export function tickPolitics(g,world){
    if(humanControlsRealm(g,realm)||humanControlsCharacter(g,r.id))continue;
    for(const a of [r,...children(p,r)]){
     if(a.realm!==realm||a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;
-    const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];
+    const geoScore=cand=>{
+     const base=cand.terms.score;
+     const allyProvinces=Object.values(g.provinces||{}).filter(pr=>pr.owner===cand.realm).length;
+     const sharedHostile=Object.keys(p.realms).some(riv=>riv!==realm&&riv!==cand.realm&&((g.factions[realm]?.relations?.[riv]??0)<=-25||Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm)&&[w.attacker,w.defender].includes(riv)))&&((g.factions[cand.realm]?.relations?.[riv]??0)<=-15));
+     return base+Math.min(20,allyProvinces*3)+(sharedHostile?25:0);
+    };
+    const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>geoScore(y)-geoScore(x)||y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];
     if(match&&marry(g,a,p.people[match.b]).ok){}
     else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:allocateHouseName(g,{realm,seed:`consort:${a.id}:${g.turn}`})});link(a,b);}
    }
@@ -742,7 +762,7 @@ export function tickPolitics(g,world){
     s.ruler=h.id;delete s.nominee;
     for(const hld of Object.values(p.holdings))if(hld.realm===realm&&hld.lord===previous.id){hld.lord=h.id;hld.loyalty=100;}
     syncTitles(g);g.kingdom.courts[realm].successions++;g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy+4,0,100);
-    for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:'Court of '+g.factions[realm].name}).id;
+    for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:allocateHouseName(g,{realm,seed:`republic_court:${role}:${h.id}:${g.turn}`})}).id;
     if(realm===g.player)log(g,previous.name+' left office. '+h.name+' won the republic’s election.');
    }
   }

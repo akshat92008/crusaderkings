@@ -151,10 +151,14 @@ export function evaluateWarViability(g,world,attacker,defender){
  const alreadyAtWar=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(attacker)&&![w.attacker,w.defender].includes(defender));
  if(alreadyAtWar)return {viable:false,ratio:0,reason:'Already committed to another war'};
  const minReserve=prof.id==='cautious'?200:100;
- if((f.treasury??500)<minReserve||(f.food??50)<0||(f.stability??60)<30){
-  return {viable:false,ratio:0,reason:'Insufficient reserves or domestic instability'};
+ const civilWarActive=Object.values(g.conflict?.factions||{}).some(fx=>fx.realm===attacker&&fx.status==='civil war');
+ if(civilWarActive||(f.treasury??500)<minReserve||(f.food??50)<0||(f.stability??60)<30){
+  return {viable:false,ratio:0,reason:'Insufficient reserves, civil war, or domestic instability'};
  }
  const ownPower=militaryStrength(g,attacker)+aidStrength(g,attacker,defender);
+ if(ownPower<Math.max(40,land(g,attacker).length*12)){
+  return {viable:false,ratio:0,reason:'Recovering exhausted manpower before new offensive wars'};
+ }
  const coal=coalitionAgainst(g,attacker);
  const coalitionMembers=coal?.members||[];
  const coalitionPower=coalitionMembers.includes(defender)
@@ -174,7 +178,8 @@ export function strategicTargetScore(g,world,army,p,combinedPower=null){
  const defense=campaignGarrison(p)+Object.values(g.armies).filter(a=>a.owner===other&&!a.contingent&&a.province===p.id&&!embarked(g,a.id)).concat(fieldContingentsAt(g,other,p.id,realm)).reduce((n,a)=>n+campaignArmyPower(a,armyReadiness(g,a)),0)+defenseSupport(g,other,realm);
  const ratio=((combinedPower??campaignArmyPower(army,armyReadiness(g,army)))+aidStrength(g,realm,other)+fieldContingentsAt(g,realm,army.province,other).reduce((n,a)=>n+campaignArmyPower(a,armyReadiness(g,a)),0))/Math.max(1,defense);
  const faithBonus=(t.profile==='zealous'&&realmFaith(g,realm)&&realmFaith(g,other)&&realmFaith(g,realm)!==realmFaith(g,other))?18:0;
- return Math.round((ratio-1)*70+p.development*2+(w?24:0)+(w?.goal===p.id?55:0)+(claim?22:0)+(p.owner===realm?65:0)+faithBonus-relation(g,realm,other)*.30+(t.aggression-50)*.7-(t.prudence-50)*.35-(g.strategy?.plans[realm]?.goal==='recover'?20:0)-(battleLesson(g,realm,other)?.streak||0)*12);
+ const crisisBonus=(g.politics?.realms?.[other]?.claimantCrisis?.active||(ruler(g,other)?.age??25)<18||Object.values(g.conflict?.factions||{}).some(fx=>fx.realm===other&&fx.status==='civil war'))?25:0;
+ return Math.round((ratio-1)*70+p.development*2+(w?24:0)+(w?.goal===p.id?55:0)+(claim?22:0)+(p.owner===realm?65:0)+faithBonus+crisisBonus-relation(g,realm,other)*.30+(t.aggression-50)*.7-(t.prudence-50)*.35-(g.strategy?.plans[realm]?.goal==='recover'?20:0)-(battleLesson(g,realm,other)?.streak||0)*12);
 }
 
 export function raidThreshold(g,realm,defender){
@@ -288,7 +293,9 @@ export function choosePlan(g,world,realm,old=null){
   }).sort((a,b)=>{
    const fa=(t.profile==='zealous'&&realmFaith(g,realm)&&realmFaith(g,a)&&realmFaith(g,realm)!==realmFaith(g,a))?-200:0;
    const fb=(t.profile==='zealous'&&realmFaith(g,realm)&&realmFaith(g,b)&&realmFaith(g,realm)!==realmFaith(g,b))?-200:0;
-   return (militaryStrength(g,a)+fa+(battleLesson(g,realm,a)?.streak||0)*150)-(militaryStrength(g,b)+fb+(battleLesson(g,realm,b)?.streak||0)*150)||a.localeCompare(b);
+   const ca=(g.politics?.realms?.[a]?.claimantCrisis?.active||(ruler(g,a)?.age??25)<18||Object.values(g.conflict?.factions||{}).some(fx=>fx.realm===a&&fx.status==='civil war'))?-180:0;
+   const cb=(g.politics?.realms?.[b]?.claimantCrisis?.active||(ruler(g,b)?.age??25)<18||Object.values(g.conflict?.factions||{}).some(fx=>fx.realm===b&&fx.status==='civil war'))?-180:0;
+   return (militaryStrength(g,a)+fa+ca+(battleLesson(g,realm,a)?.streak||0)*150)-(militaryStrength(g,b)+fb+cb+(battleLesson(g,realm,b)?.streak||0)*150)||a.localeCompare(b);
   });
   if(candidates.length){
    goal='conquer';target=candidates[0];

@@ -27,3 +27,47 @@ test('specialist cards preserve the exact campaign roster and do not create sold
  assert.equal(cards.filter(c=>c.specialistId==='pikes').reduce((n,c)=>n+c.troops,0),60);
  assert.ok(cards.some(c=>c.profile.name==='Bowmen'));
 });
+
+test('card battle: shield_wall reduces incoming ranged damage and morale shock',()=>{
+ const a1=unit('a1','attacker','archers',0,0,200),dPlain=unit('d1','defender','infantry',0,10,200);
+ const a2=unit('a2','attacker','archers',0,0,200),dWall=unit('d2','defender','infantry',0,10,200,{formationId:'shield_wall'});
+ stepField({simpleField:true,groups:[a1,dPlain]},.1);
+ stepField({simpleField:true,groups:[a2,dWall]},.1);
+ assert.ok(dWall.life>dPlain.life&&dWall.morale>dPlain.morale);
+});
+
+test('card battle: pike_square reflects counter-shock onto charging cavalry',()=>{
+ const cav1=unit('c1','attacker','cavalry',0,0,120,{formationId:'cavalry_wedge'}),inf1=unit('i1','defender','infantry',0,2,120);
+ const cav2=unit('c2','attacker','cavalry',0,0,120,{formationId:'cavalry_wedge'}),pike=unit('p1','defender','infantry',0,2,120,{formationId:'pike_square',kind:'pikemen'});
+ stepField({simpleField:true,groups:[cav1,inf1]},.1);
+ stepField({simpleField:true,groups:[cav2,pike]},.1);
+ assert.ok(cav2.life<cav1.life&&pike.statusFlags.includes('BRACED'));
+});
+
+test('card battle: flank bonus multiplies strikes against pinned enemies',()=>{
+ const pin=unit('a0','attacker','infantry',0,0,150),solo=unit('a1','attacker','cavalry',1.5,1.5,100),dSolo=unit('d1','defender','infantry',0,2,150);
+ const flanker=unit('a2','attacker','cavalry',1.5,1.5,100,{formationId:'flank'}),dPinned=unit('d2','defender','infantry',0,2,150);
+ stepField({simpleField:true,groups:[solo,dSolo]},.1);
+ stepField({simpleField:true,groups:[pin,flanker,dPinned]},.1);
+ assert.ok(flanker.statusFlags.includes('FLANK'));
+ assert.ok(dPinned.life<dSolo.life);
+});
+
+test('card battle: ambush gains forest cover bonus and skirmish kites rushing foot',()=>{
+ const amb=unit('a','attacker','infantry',0,0,120,{formationId:'ambush'}),plain=unit('p','attacker','infantry',0,0,120);
+ const d1=unit('d1','defender','infantry',0,2,120),d2=unit('d2','defender','infantry',0,2,120);
+ stepField({simpleField:true,terrainType:'forest',groups:[amb,d1]},.1);
+ stepField({simpleField:true,terrainType:'plains',groups:[plain,d2]},.1);
+ assert.ok(d1.life<d2.life);
+ const kiter=unit('k','attacker','archers',0,0,100,{formationId:'skirmish'}),rusher=unit('r','defender','infantry',0,3,100);
+ stepField({simpleField:true,groups:[kiter,rusher]},.1);
+ assert.equal(kiter.skirmishing,true);assert.ok(kiter.z<0);
+});
+
+test('card battle: higher commanderMartial wins an equal mirror match',()=>{
+ const strong=unit('a','attacker','infantry',0,0,200,{commanderMartial:18});
+ const weak=unit('b','defender','infantry',0,2,200,{commanderMartial:2});
+ const s={simpleField:true,groups:[strong,weak]};
+ for(let i=0;i<600&&!weak.routed&&!strong.routed;i++)stepField(s,.05);
+ assert.ok(weak.routed&&!strong.routed);
+});

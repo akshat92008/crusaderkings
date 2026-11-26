@@ -85,30 +85,50 @@ export function stepCardBattle(state,dt,terrainInfo=null){
   const score=e=>distance(pos,snapshot.get(e.id))+(g.lane!==e.lane?3:0)+(cardRole(g)==='mounted'&&cardRole(e)==='ranged'?-6:0)+Math.min(10,Math.max(0,(targetLoad.get(e.id)||0)/Math.max(1,soldiers(e))-1)*4);
   const best=enemies.slice().sort((a,b)=>score(a)-score(b)||byId(a,b))[0],old=enemies.find(e=>e.id===g.cardTargetId);
   const e=old&&score(old)<=score(best)+4?old:best;g.cardTargetId=e.id;targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
-  const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz),role=cardRole(g);
-  const terrain=terrainInfo?.(g),enemyTerrain=terrainInfo?.(e);
-  g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
-  const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1);
-  const step=Math.min(Math.max(0,d-reach*.88),speed*dt);
-  g.moving=step>0.01;g.vx=d?dx/d*step/dt:0;g.vz=d?dz/d*step/dt:0;
-  if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
-  if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,-46,46);}
-  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
-  for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,-46,46);}
-  g.targetX=target.x;g.targetZ=target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
-  g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.moving?'moving':'engaging';g.statusFlags=[];
-  if(d>reach||g.cooldown>1e-8)continue;
-  g.cooldown=role==='ranged'?1.15:.85;g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
-  const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65),protection=clamp(e.armor||1,.75,1.65);
-  const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
-  const cover=role==='ranged'?clamp(enemyTerrain?.rangedMitigation??1,.8,1):1;
-  const highGround=(terrain?.height??0)-(enemyTerrain?.height??0)>.75?1.1:1;
-  const loss=soldiers(g)*rate*quality*cardCounter(g,e)*cover*highGround/protection;
-  hits.set(e,(hits.get(e)||0)+loss);
-  if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
-  else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});
+ const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz),role=cardRole(g),form=g.formationId||'';
+ const terrain=terrainInfo?.(g),enemyTerrain=terrainInfo?.(e);
+ g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
+ const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1);
+ let step=Math.min(Math.max(0,d-reach*.88),speed*dt),moveDir=1;
+ if(form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
+ g.moving=step>0.01;g.vx=d?moveDir*dx/d*step/dt:0;g.vz=d?moveDir*dz/d*step/dt:0;
+ if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
+ if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,-46,46);g.distanceMoved=(g.distanceMoved||0)+step;}
+ // Soft friendly separation keeps regiment bodies legible without blocking attacks.
+ for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,-46,46);}
+ g.targetX=target.x;g.targetZ=target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
+ g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.skirmishing?'skirmishing':g.moving?'moving':'engaging';
+ g.statusFlags=[];
+ if(g.skirmishing)g.statusFlags.push('SKIRMISH');
+ if(form==='shield_wall'||form==='pike_square')g.statusFlags.push('BRACED');
+ if((form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6)g.statusFlags.push('CHARGE');
+ if(form==='ambush'&&terrain?.inForestCover)g.statusFlags.push('AMBUSH');
+ if(d>reach||g.cooldown>1e-8)continue;
+ g.cooldown=form==='longbow_line'?.95:form==='volley_line'?1.04:role==='ranged'?1.15:.85;
+ g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
+ const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65),protection=clamp(e.armor||1,.75,1.65);
+ const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
+ const cover=role==='ranged'?clamp(enemyTerrain?.rangedMitigation??1,.8,1):1;
+ const highGround=(terrain?.height??0)-(enemyTerrain?.height??0)>.75?(form==='longbow_line'||form==='volley_line'?1.16:1.1):1;
+ const chargeReady=(form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6;
+ const flanking=(form==='flank'||form==='encirclement')&&((targetLoad.get(e.id)||0)>soldiers(g)*1.05||Math.abs(pos.x-target.x)>=12);
+ const offMult=(chargeReady?(form==='elephant_push'?1.36:1.28):1)*(flanking?(form==='encirclement'?1.26:1.2):1)*(form==='ambush'&&terrain?.inForestCover?1.24:1)*(form==='longbow_line'&&cardRole(e)==='foot'?1.1:1)*(1+clamp(g.commanderMartial||0,0,25)*.015);
+ const defForm=e.formationId||'';
+ const defMult=(defForm==='shield_wall'&&role==='ranged'?.78:1)*(defForm==='ambush'&&enemyTerrain?.inForestCover?.84:1);
+ const moraleMult=(chargeReady?1.45:1)*(flanking?1.3:1)*(defForm==='shield_wall'?.78:1);
+ if(chargeReady)g.chargeSpent=true;
+ if(flanking)g.statusFlags.push('FLANK');
+ const loss=soldiers(g)*rate*quality*cardCounter(g,e)*cover*highGround*offMult*defMult/protection;
+ const prev=hits.get(e)||{loss:0,morale:0};
+ hits.set(e,{loss:prev.loss+loss,morale:prev.morale+loss*moraleMult});
+ if(defForm==='pike_square'&&role==='mounted'){
+  const selfPrev=hits.get(g)||{loss:0,morale:0};
+  hits.set(g,{loss:selfPrev.loss+loss*.28,morale:selfPrev.morale+loss*.38});
  }
- for(const [g,loss] of hits){const pct=100*loss/Math.max(1,g.troopCount);g.life=clamp(g.life-pct,0,100);g.morale=clamp((g.morale??75)-pct*.55,0,100);g.hitFlash=.18;}
+ if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
+ else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});
+ }
+ for(const [g,impact] of hits){const pct=100*impact.loss/Math.max(1,g.troopCount),mPct=100*impact.morale/Math.max(1,g.troopCount);const guard=1+clamp(g.commanderMartial||0,0,25)*.012;g.life=clamp(g.life-pct,0,100);g.morale=clamp((g.morale??75)-mPct*.55/guard,0,100);g.hitFlash=.18;}
  for(const g of live){
   if(g.life<=8||soldiers(g)<.5||(g.life<=35&&g.morale<=10)){g.routed=true;g.routAge=0;g.moving=true;g.attackPulse=0;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;state.effects.push({kind:'rout',x:g.x,z:g.z,age:0,duration:.6});}
   else g.troops=Math.round(soldiers(g));

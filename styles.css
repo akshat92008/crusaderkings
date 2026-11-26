@@ -299,10 +299,10 @@ html[data-music-state='playing'] #menu-sound{opacity:.78}
 
 /* Touch-first campaign and Banner Lines controls. */
 #mobile-battle-shortcut{display:none}
-@media(max-width:760px),(pointer:coarse) and (max-width:1100px){
+ @media(max-width:760px),(pointer:coarse) and (max-width:1100px){
  #mobile-battle-shortcut{display:block}
- .quick-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:4px;align-items:stretch}
- .quick-nav>button,.quick-nav summary{min-height:44px;font-size:10px;line-height:1.15;padding:4px 2px;white-space:normal}
+ .quick-nav{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;padding:3px 4px;align-items:stretch}
+ .quick-nav>button,.quick-nav summary{min-height:44px;min-width:56px;flex:0 0 auto;font-size:10px;line-height:1.15;padding:4px 6px;white-space:nowrap}
  .quick-nav>button span{display:block;font-size:10px}.quick-nav details summary{display:grid;place-content:center}
  #outliner-list{position:fixed;top:auto;right:6px;bottom:12px;max-height:55dvh;z-index:12}
  #menu-sound{min-height:44px;font-size:14px}
@@ -321,8 +321,8 @@ html[data-music-state='playing'] #menu-sound{opacity:.78}
  #battle-presets{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
  #battle-presets button{font-size:10px}
  #battle-formation-label{display:none}
- #battle-start{grid-column:1/-1;min-height:48px}
- #battle-cancel{grid-column:1/-1;min-height:44px}
+ #battle-start,.battle-commands #battle-start{grid-column:1/-1;min-height:48px}
+ #battle-cancel,.battle-commands #battle-cancel{grid-column:1/-1;min-height:44px}
  .battle-units{scroll-snap-type:x proximity;touch-action:pan-x;gap:6px}
  .battle-units .unitcard{scroll-snap-align:start;flex:0 0 106px;min-width:106px;min-height:78px}
  .battle-units .unitcard small{font-size:10px}.battle-guide{font-size:11px;letter-spacing:0}

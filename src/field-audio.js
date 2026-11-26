@@ -452,7 +452,7 @@ export class CampaignAudio {
     this.step = 0;
     this.closed = false;
     this.linked = new Set();
-    this.sampleLoader=opts.sampleLoader;this.samples=null;
+    this.sampleLoader=opts.sampleLoader;this.samples=null;this.onMusicState=opts.onMusicState;
     this.realm=null;this.scoreOverride=null;this.unlocked=false;this.score=opts.mediaFactory?new SoundtrackPlayer(opts.mediaFactory,{volume:.75,reuseMedia:true,onState:opts.onMusicState,onUnavailable:()=>this._startProceduralBgm(),onPlaying:()=>this._stopProceduralBgm()}):null;
   }
 
@@ -603,6 +603,7 @@ export class CampaignAudio {
     };
     this.timer = setInterval(tick, cfg.intervalMs);
     tick();
+    this.onMusicState?.('playing', '');
   }
 
   _pluckStep() {

@@ -24,7 +24,8 @@ try:
   if chromium:viewports.extend([('mobile',390,844,True),('small-phone',320,640,True)])
   for name,width,height,touch in viewports:
    options={'has_touch':True,'is_mobile':True} if touch else {}
-   page=browser.new_page(viewport={'width':width,'height':height},device_scale_factor=1,**options)
+   context=browser.new_context(viewport={'width':width,'height':height},device_scale_factor=1,**options)
+   page=context.new_page()
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    page.goto('http://127.0.0.1:'+str(server.server_port),wait_until='domcontentloaded',timeout=45000)
    page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
@@ -261,7 +262,7 @@ try:
     print('desktop PASS: playable vassal role, crown controls restricted, progression and save/reload')
    assert not errors,errors
    print(name,'PASS: map, workspaces, province, layers, zoom, campaign progression and save')
-   page.close()
+   context.close()
   browser.close()
 finally:
  server.server_close()

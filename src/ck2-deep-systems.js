@@ -3425,11 +3425,15 @@ export function spreadEpidemics(g, world = null) {
 
   const owner = prov.owner;
   const ownerIsolated = owner && owner !== 'independent' && isCourtIsolated(g, owner);
+  if (epi.severity >= 45 && !ownerIsolated) {
+   prov.unrest = clamp(num(prov.unrest) + 2, 0, 100);
+  }
   if (owner && owner !== 'independent' && !ownerIsolated && g.politics?.people) {
    const eco = g.economy?.provinces?.[pid];
    const localProt = num(eco?.industries?.infirmary) * 5 + num(eco?.holdings?.temple?.buildings?.hospitium) * 5;
    const hasPhysician = Boolean(g.royalCourt?.realms?.[owner]?.offices?.physician);
-   const risk = clamp(Math.round((epi.severity - localProt - (hasPhysician ? 14 : 0)) * 0.35), 2, 35);
+   const isCap = g.politics?.realms?.[owner]?.capital === pid;
+   const risk = clamp(Math.round((epi.severity - localProt - (hasPhysician ? 14 : 0)) * (isCap ? 0.5 : 0.35)), 2, 48);
    const courtiers = Object.values(g.politics.people).filter(p => p?.alive && p.realm === owner).sort((a, b) => a.id.localeCompare(b.id));
    for (const c of courtiers) {
     if (g.living?.health?.[c.id]?.severity) continue;

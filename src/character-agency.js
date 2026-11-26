@@ -273,6 +273,26 @@ function advancePersonal(g,p,peers,rows,council,head){
    if(h&&requestVassalPetition(g,r,p.id,h[0],'autonomy').ok){complete(g,p,'secure autonomy',head.id,1,2);note(g,p,p.name+' pressed the crown for autonomy.','political',head.id);return true;}
    if(num(p.wealth)>=40){p.wealth-=40;loyalty(rows,p,-8);bond(g,p,head,-10,10);complete(g,p,'organize opposition',head.id,1,3);note(g,p,p.name+' organized estate opposition to '+head.name+'.','political',head.id);return true;}
  }
+ // Ambitious adult claimants exploit child regencies or weak legitimacy by rallying disaffected lords.
+ const hasClaim=claimantCandidates(g,r).some(cl=>cl.person===p.id);
+ if(head&&head.id!==p.id&&hasClaim&&(head.age<18||num(g.factions?.[r]?.legitimacy)<55)&&(has(p,'ambitious')||(p.personality?.boldness||0)>=50)&&(personalOpinion(g,p.id,head.id)<15)){
+  const allyLord=peers.find(q=>q.id!==head.id&&q.id!==p.id&&canInteract(g,p,q)&&localEstate(g,rows,q).some(([,v])=>v.loyalty<55));
+  if(allyLord){
+   relation(g,p,allyLord,15);
+   const allyEst=localEstate(g,rows,allyLord).map(([pid])=>pid);
+   const existingClaimFx=Object.values(g.conflict?.factions||{}).find(fx=>fx.realm===r&&ACTIVE_FACTION_STATUSES.includes(fx.status)&&fx.kind==='claimant');
+   if(existingClaimFx){
+    for(const pid of allyEst)joinFaction(g,existingClaimFx.id,pid);
+    existingClaimFx.claimant=existingClaimFx.claimant||p.id;
+    existingClaimFx.pressure=cap((existingClaimFx.pressure||15)+14,0,100);
+    existingClaimFx.discontent=existingClaimFx.pressure;
+   }else if(allyEst.length){
+    createFaction(g,null,r,'claimant',allyEst,{leader:allyLord.id,claimant:p.id,pressure:40});
+   }
+   note(g,p,p.name+' rallied disaffected nobles around a claim to the throne of '+r+'.','claimant',head.id);
+   return true;
+  }
+ }
  if(x.agenda==='accumulate wealth'){
    const q=goal(g,p,'accumulate wealth');q.baseline??=num(p.wealth);q.progress=Math.max(0,num(p.wealth)-q.baseline);if(q.progress>=100)complete(g,p,'accumulate wealth',null,0,100);return false;
  }

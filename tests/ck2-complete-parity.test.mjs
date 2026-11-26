@@ -4,8 +4,11 @@ import fs from 'node:fs';
 import { createGame, advanceMonth, recruit, restoreGame, snapshot } from '../src/simulation.js';
 import { splitArmy } from '../src/military-systems.js';
 import {
- initDeepSystems, joinSociety, startGreatWork, buildTradePost, declareCrusade, initCardinals
+ initDeepSystems, joinSociety, startGreatWork, buildTradePost, declareCrusade, initCardinals, spreadEpidemics
 } from '../src/ck2-deep-systems.js';
+import { recordGrievance, tickAgency } from '../src/character-agency.js';
+import { claimantCandidates } from '../src/feudal-systems.js';
+import { evaluateWarViability, strategicTargetScore } from '../src/strategic-ai.js';
 import {
  EMERGENT_EVENTS, EMERGENT_DECISIONS, EXTENDED_EMERGENT_EVENTS, EXTENDED_REACTIVE_EVENTS,
  EXTENDED_EMERGENT_DECISIONS, allEmergentEventCount, allEmergentDecisionCount,
@@ -158,4 +161,100 @@ test('100% CK2 Parity: AI deep autonomy, Papal Conclave succession, and determin
   }
  }
  assert.ok(elected, 'Papal Conclave should elect a successor Pope with a unique name');
+});
+
+test('100% CK2 Parity: cross-generational vendettas & ambitious uncle claimant crises', () => {
+ const g = createGame(world, 'england');
+ const p = g.politics;
+ const kingId = p.realms.england.ruler;
+ const king = p.people[kingId];
+
+ // 1) Cross-generational blood feud from severe permanent grievance
+ const holdingEntry = Object.entries(p.holdings).find(([id, h]) => h.realm === 'england' && h.lord !== kingId);
+ assert.ok(holdingEntry, 'England should have a landed vassal holding');
+ const [provId, holding] = holdingEntry;
+ const duke = p.people[holding.lord];
+ duke.age = 95;
+ duke.spouse = duke.spouse || Object.values(p.people).find(x => x.alive && x.realm === 'england' && x.sex !== duke.sex && x.id !== kingId)?.id || null;
+ const heir = Object.values(p.people).find(x => x.alive && x.realm === 'england' && x.id !== duke.id && x.id !== kingId && (duke.children || []).includes(x.id))
+  || Object.assign(p.people[Object.keys(p.people).find(id => id !== kingId && id !== duke.id && p.people[id].realm === 'england' && p.people[id].alive)], { parents: [duke.id], children: [] });
+ if (!duke.children.includes(heir.id)) duke.children.push(heir.id);
+ heir.house = duke.house;
+ heir.age = 24;
+ recordGrievance(g, duke.id, kingId, 'executed kin', 60, { permanent: true });
+ g.turn = 11; // advanceMonth increments to turn 12 (annual tick)
+ advanceMonth(g, world);
+ assert.equal(duke.alive, false, 'Aged 95 duke should die on annual mortality tick');
+ assert.ok((heir.grievances || []).some(gr => gr.against === kingId && gr.severity >= 35 && gr.permanent), 'Estate heir must inherit permanent blood feud grievance');
+
+ // 2) Ambitious uncle vs minor child heir on succession
+ const g2 = createGame(world, 'france');
+ const rId = g2.politics.realms.france.ruler;
+ const ruler = g2.politics.people[rId];
+ ruler.age = 95;
+ const minorChild = Object.values(g2.politics.people).find(x => x.alive && x.realm === 'france' && x.id !== rId && !x.parents?.includes(rId));
+ assert.ok(minorChild);
+ minorChild.age = 9;
+ minorChild.sex = 'male';
+ minorChild.house = ruler.house;
+ minorChild.parents = [rId];
+ ruler.children = [minorChild.id];
+ g2.politics.realms.france.heir = minorChild.id;
+ const uncle = Object.values(g2.politics.people).find(x => x.alive && x.realm === 'france' && x.id !== rId && x.id !== minorChild.id && x.age >= 22);
+ assert.ok(uncle);
+ uncle.house = ruler.house;
+ uncle.traits = [...new Set([...(uncle.traits || []), 'ambitious'])];
+ uncle.personality = { ...(uncle.personality || {}), boldness: 85, greed: 75 };
+ g2.turn = 11; // advanceMonth increments to turn 12 (annual tick)
+ advanceMonth(g2, world);
+ assert.equal(g2.politics.realms.france.ruler, minorChild.id, 'Child heir should inherit throne');
+ assert.ok(g2.politics.realms.france.claimantCrisis?.active, 'Child succession with ambitious kin should open claimant crisis');
+ assert.ok(claimantCandidates(g2, 'france').some(c => c.person === uncle.id), 'Ambitious adult uncle must gain weak claim during child succession');
+
+ // Verify claimant uncle rallies disaffected noble via tickAgency
+ const disloyalHolding = Object.values(g2.politics.holdings).find(h => h.realm === 'france' && h.lord !== minorChild.id && h.lord !== uncle.id);
+ if (disloyalHolding) disloyalHolding.loyalty = 25;
+ g2.turn += 6;
+ for (let step = 0; step < 6; step++) {
+  g2.turn++;
+  tickAgency(g2);
+ }
+ assert.ok(
+  Object.values(g2.conflict?.factions || {}).some(fx => fx.realm === 'france' && fx.kind === 'claimant' && fx.claimant === uncle.id),
+  'Ambitious claimant uncle should launch/back a claimant faction in tickAgency'
+ );
+});
+
+test('100% CK2 Parity: geopolitical AI crisis targeting, civil war guard, and epidemic fallout', () => {
+ const g = createGame(world, 'ottomans');
+ const attackerArmy = Object.values(g.armies).find(a => a.owner === 'ottomans');
+ assert.ok(attackerArmy);
+ const targetProv = world.provinces.find(p => g.provinces[p.id]?.owner && g.provinces[p.id].owner !== 'ottomans' && g.politics.realms[g.provinces[p.id].owner]);
+ assert.ok(targetProv);
+ const targetRealm = g.provinces[targetProv.id].owner;
+ const scoreBaseline = strategicTargetScore(g, world, attackerArmy, targetProv);
+ g.politics.realms[targetRealm].claimantCrisis = { active: true, started: g.turn, until: g.turn + 12 };
+ const scoreCrisis = strategicTargetScore(g, world, attackerArmy, targetProv);
+ assert.ok(scoreCrisis > scoreBaseline, 'Strategic AI must score collapsing/crisis neighbors significantly higher');
+
+ // Civil war guard in evaluateWarViability
+ g.factions.ottomans.treasury = 2500;
+ g.conflict.factions.cwTest = { id: 'cwTest', realm: 'ottomans', kind: 'liberty', status: 'civil war' };
+ const cwCheck = evaluateWarViability(g, world, 'ottomans', targetRealm);
+ assert.equal(cwCheck.viable, false, 'Realm actively fighting a civil war cannot start opportunistic external offensive wars');
+ delete g.conflict.factions.cwTest;
+
+ // Severe non-isolated epidemic creates provincial unrest & health severity
+ const frCap = g.politics.realms.france.capital || Object.keys(g.provinces).find(id => g.provinces[id].owner === 'france');
+ g.economy ??= { provinces: {}, crises: {} };
+ g.economy.crises[frCap] = { province: frCap, kind: 'epidemic', severity: 72, started: g.turn, remaining: 8, reliefTurn: -12 };
+ const beforeUnrest = g.provinces[frCap].unrest || 0;
+ let totalInfected = 0;
+ for (let t = 0; t < 4; t++) {
+  g.turn++;
+  const res = spreadEpidemics(g, world);
+  totalInfected += res.infected.length;
+ }
+ assert.ok((g.provinces[frCap].unrest || 0) > beforeUnrest, 'Severe non-isolated epidemic should raise provincial unrest');
+ assert.ok(totalInfected > 0 || Object.keys(g.living?.health || {}).length > 0, 'Severe non-isolated epidemic should sicken exposed courtiers/rulers');
 });

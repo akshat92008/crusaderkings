@@ -689,6 +689,13 @@ export class BattleGame {
       ? packSpecialistRegiments(enemies, hostileFieldArmies, game.military?.armies, REGIMENTS, slotCount(enemies))
       : packActiveRegiments(enemies, enemySlots, enemyDoctrine);
 
+    const sideCommanderMartial = (armies, realmId) => {
+      const cmdId = armies?.find?.(x => x?.commander)?.commander || game?.politics?.houses?.[realmId]?.ruler;
+      return Math.max(0, game?.politics?.people?.[cmdId]?.stats?.martial ?? 0);
+    };
+    const atkMartial = descriptor.commanderMartial?.attacker ?? sideCommanderMartial(alliedFieldArmies, game?.player);
+    const defMartial = descriptor.commanderMartial?.defender ?? sideCommanderMartial(hostileFieldArmies, descriptor.enemy);
+
     for (const entry of packedAttacker) {
       const idx = entry.slotIndex;
       const home = descriptor.defenseMode ? -1 : 1;
@@ -715,6 +722,7 @@ export class BattleGame {
         g.readiness = armyReadiness(game, a);
       }
       g.simpleField=this.simpleField;
+      g.commanderMartial = atkMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
       attachTactics(g, playerFaction, this.simpleField ? (cardRole(g)==='ranged'?'volley_line':cardRole(g)==='mounted'?'cavalry_wedge':g.kind==='pikemen'||g.kind==='spearmen'?'pike_square':'shield_wall') : myDoctrine.formations[0]);
@@ -756,6 +764,7 @@ export class BattleGame {
         g.readiness = armyReadiness(game, enemyArmy || enemies);
       }
       g.simpleField=this.simpleField;
+      g.commanderMartial = defMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
       g.morale = this.simpleField ? Math.max(50, g.readiness.morale) : g.readiness.morale;
       attachTactics(g, enemy, this.simpleField ? (cardRole(g)==='ranged'?'volley_line':cardRole(g)==='mounted'?'cavalry_wedge':g.kind==='pikemen'||g.kind==='spearmen'?'pike_square':'shield_wall') : enemyDoctrine.formations[idx % enemyDoctrine.formations.length]);
