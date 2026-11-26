@@ -115,7 +115,54 @@ export function cancelHome(g,id){const h=active(g,g.player);if(!h||!humanControl
 export function homePositions(g,p,h){const pending=new Set(h.queue.filter(q=>q.type==='building'&&q.province===p).map(q=>q.key));const built=Object.keys(HOME_BUILDINGS).filter(k=>homeLevel(g,p,k)>0||pending.has(k)),used=new Set([27]),spots={};for(const k of built){const v=h.positions[k];if(Number.isInteger(v)&&v>=0&&v<64&&!used.has(v)){spots[k]=v;used.add(v);}}for(const k of built)if(spots[k]===undefined){const slot=Array.from({length:64},(_,i)=>i).find(i=>!used.has(i));if(slot!==undefined){spots[k]=slot;used.add(slot);}}return spots;}
 export function placeHome(g,world,key,slot){const h=active(g,g.player),p=homeCapital(g,world);slot=Number(slot);if(!h||!humanControlsRealm(g,g.player)||!HOME_BUILDINGS[key]||!Number.isInteger(slot)||slot<0||slot>=64||slot===27)return no('Select a valid building and empty plot.');if(Object.entries(homePositions(g,p,h)).some(([k,v])=>k!==key&&v===slot))return no('Plot occupied.');if(!homeLevel(g,p,key)&&!h.queue.some(q=>q.type==='building'&&q.key===key&&q.province===p)){const q=queueHome(g,world,'building',key,p);if(!q.ok)return q;}h.positions[key]=slot;return ok('Building plot reserved.');}
 export function moveHome(g,world,key,slot){const h=active(g,g.player),p=homeCapital(g,world);slot=Number(slot);if(!h||!humanControlsRealm(g,g.player)||!HOME_BUILDINGS[key]||!homeLevel(g,p,key)||!Number.isInteger(slot)||slot<0||slot>=64||slot===27)return no('Invalid building placement.');if(Object.entries(homePositions(g,p,h)).some(([k,v])=>k!==key&&v===slot))return no('Plot occupied.');h.positions[key]=slot;return ok('Building moved.');}
+const AI_BUILD_PRIORITY=['farm','house','well','lumber','quarry','market','granary','barracks','fort','library'];
+const AI_RESEARCH_PRIORITY=['farming','forestry','masonry','trade','infantry'];
+function aiPriceFor(cost,t){return {gold:Math.max(1,Math.round(cost*(1-Math.min(.2,(t.research||0)*.004)))),wood:Math.ceil(cost*.22),stone:Math.ceil(cost*.14),iron:Math.ceil(cost*.07),food:Math.ceil(cost*.03)};}
+function tickAiHometown(g,world,root){
+ if(g.turn<12||g.turn%12!==0)return;
+ const keys=Object.keys(g.factions||{}).filter(r=>r!=='independent'&&!humanControlsRealm(g,r)).sort();
+ let budgetOps=0;
+ for(const r of keys){
+  if(budgetOps>=18)break;
+  const f=g.factions[r],cap=homeCapital(g,world,r);
+  if(!f||!cap||f.treasury<650||(f.food||0)<80)continue;
+  let h=root.realms[r];
+  if(!h){
+   if(Object.keys(root.realms).length>=64)continue;
+   const level=clamp(Math.max(Math.ceil((g.provinces[cap].development||1)/3),...Object.values(g.provinces[cap].buildings||{}).map(v=>integer(v))),1,10);
+   h=root.realms[r]={level,capital:cap,stock:{wood:250,stone:180,iron:100},research:{},queue:[],positions:{},next:1,infrastructureMigrated:true};
+   budgetOps++;
+  }
+  if((h.queue?.length||0)>=2)continue;
+  const t=totals(g,r);
+  const queued=new Set((h.queue||[]).map(q=>q.type+':'+q.key));
+  const candB=AI_BUILD_PRIORITY.map(k=>({key:k,lv:homeLevel(g,cap,k),d:HOME_BUILDINGS[k]})).filter(x=>x.d&&h.level>=x.d.unlock&&x.lv<h.level&&x.lv<10&&!queued.has('building:'+x.key)).sort((a,b)=>a.lv-b.lv||a.key.localeCompare(b.key))[0];
+  if(candB){
+   const target=candB.lv+1,price=aiPriceFor(candB.d.cost*target,t);
+   if(f.treasury>=price.gold+220&&(f.food||0)>=price.food+40&&materials.every(m=>(h.stock[m]||0)>=price[m])){
+    const q={ok:true,type:'building',key:candB.key,province:cap,target,name:candB.d.name,price,months:1+Math.floor(target/3),id:h.next++,started:false};
+    q.remaining=q.months;changeFunds(g,r,q,-1);h.queue.push(q);budgetOps++;continue;
+   }
+  }
+  if(h.level<10&&!queued.has('town:town')){
+   const target=h.level+1,price=aiPriceFor(220*target,t);
+   if(f.treasury>=price.gold+260&&(f.food||0)>=price.food+40&&materials.every(m=>(h.stock[m]||0)>=price[m])){
+    const q={ok:true,type:'town',key:'town',province:cap,target,name:'Town Hall',price,months:2+Math.floor(target/2),id:h.next++,started:false};
+    q.remaining=q.months;changeFunds(g,r,q,-1);h.queue.push(q);budgetOps++;continue;
+   }
+  }
+  const candR=AI_RESEARCH_PRIORITY.map(k=>({key:k,lv:researchLevel(h,k),d:HOME_RESEARCH[k]})).filter(x=>x.d&&x.lv<10&&x.lv+1<=h.level&&homeLevel(g,cap,x.d.building)>=Math.ceil((x.lv+1)/2)&&!queued.has('research:'+x.key))[0];
+  if(candR){
+   const target=candR.lv+1,price=aiPriceFor(100*target,t);
+   if(f.treasury>=price.gold+220&&(f.food||0)>=price.food+40&&materials.every(m=>(h.stock[m]||0)>=price[m])){
+    const q={ok:true,type:'research',key:candR.key,province:cap,target,name:candR.d.name,price,months:Math.max(1,2+Math.floor(target/3)-Math.floor((t.research||0)/15)),id:h.next++,started:false};
+    q.remaining=q.months;changeFunds(g,r,q,-1);h.queue.push(q);budgetOps++;
+   }
+  }
+ }
+}
 export function tickHometown(g,world){const root=g.hometown;if(!root||root.lastTick===g.turn)return;root.lastTick=g.turn;
+ tickAiHometown(g,world,root);
  for(const [r,h] of Object.entries(root.realms)){const f=g.factions[r];if(!f)continue;const cap=homeCapital(g,world,r);if(!cap){for(const q of h.queue)if(!q.started)changeFunds(g,r,q,1);h.queue=[];continue;}if(h.capital!==cap){h.positions={};h.capital=cap;}const prod=homeProduction(g,r),t=totals(g,r);for(const k of materials)h.stock[k]=Math.min(1000+h.level*700+t.storage*100,integer(h.stock[k])+prod[k]);
  let slots=Math.min(4,1+Math.floor(h.level/3)),researchSlot=1;const finished=new Set();
  for(const q of h.queue){if(!permitted(g,q.province,r)||(q.type!=='building'&&q.province!==cap)){if(!q.started)changeFunds(g,r,q,1);finished.add(q.id);continue;}if(q.type==='research'){if(!researchSlot)continue;researchSlot--;}else{if(!slots)continue;slots--;}q.started=true;q.remaining--;if(q.remaining>0)continue;

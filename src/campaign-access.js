@@ -5,6 +5,7 @@ import {renderPinButton} from './campaign-outliner.js';
 import {characterInfluence} from './character-agency.js';
 import {controller} from './campaign-war.js';
 import {personalOpinion} from './chronicle-systems.js';
+import {renderCountySubholdings} from './subholdings.js';
 
 // The same navigation rules drive the tabs, finder, quick links and alerts.
 export const CAREER_TABS=['realm','search','characters','chronicle'];
@@ -30,7 +31,7 @@ export function renderCareerProvince(g,world,id,esc){
  const p=world.provinces.find(q=>q.id===id),pr=g.provinces[id],h=g.politics.holdings[id];
  if(!p||!pr)return '<p class="paragraph">Select a province to inspect.</p>';
  const lord=g.politics.people[h?.lord],own=h?.lord===vassalCareer(g)?.person;
- return '<div class="rule"><h3>'+esc(p.name)+'</h3>'+renderPinButton(g,'province',id,esc)+'<p>Legal owner: '+esc(g.factions[pr.owner]?.name||pr.owner)+'</p><p>Controller: '+esc(g.factions[controller(g,id)]?.name||controller(g,id))+'</p><p>Development '+pr.development+' · Unrest '+Math.round(pr.unrest)+'%</p><p>Local lord: '+characterLink(lord,esc)+'</p>'+(own?'<p>Your estate · '+Math.floor(h.wealth||0)+' estate gold</p>'+sectionLink('realm','Manage your estates',esc):'<p class="smallnote">This estate is not yours to manage.</p>')+'</div>';
+ return '<div class="rule"><h3>'+esc(p.name)+'</h3>'+renderPinButton(g,'province',id,esc)+'<p>Legal owner: '+esc(g.factions[pr.owner]?.name||pr.owner)+'</p><p>Controller: '+esc(g.factions[controller(g,id)]?.name||controller(g,id))+'</p><p>Development '+pr.development+' · Unrest '+Math.round(pr.unrest)+'%</p><p>Local lord: '+characterLink(lord,esc)+'</p>'+(own?'<p>Your estate · '+Math.floor(h.wealth||0)+' estate gold</p>'+sectionLink('realm','Manage your estates',esc):'<p class="smallnote">This estate is not yours to manage.</p>')+'</div><details class="province-section" data-section="subholdings" open><summary>County sub-holdings (Castle · City · Temple)</summary>'+renderCountySubholdings(g,id,esc,'career')+'</details>';
 }
 export function renderCareerLinks(g,world,esc){
  const v=careerView(g);if(!v)return '';

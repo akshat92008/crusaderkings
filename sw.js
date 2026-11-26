@@ -1,15 +1,30 @@
-const CACHE_NAME = 'sovereign-1450-v1';
+const CACHE_NAME = 'sovereign-1450-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
   './styles.css',
   './assets/court-theme.css',
+  './assets/hometown.css',
   './manifest.webmanifest',
   './assets/branding/sovereign-logo.webp',
   './assets/branding/icon-192.png',
   './assets/branding/icon-512.png',
+  './assets/hometown/manifest.json',
   './data/world.json',
-  './data/historical-polities-1450.json'
+  './data/historical-polities-1450.json',
+  './src/main.js',
+  './src/simulation.js',
+  './src/map.js',
+  './src/kingdom-ui.js',
+  './src/kingdom-depth.js',
+  './src/dynastic-politics.js',
+  './src/expanded-content.js',
+  './src/hometown.js',
+  './src/hometown-ui.js',
+  './src/feudal-systems.js',
+  './src/mobile-storage.js',
+  './src/portable-save.js',
+  './src/dispatch-ui.js'
 ];
 
 self.addEventListener('install', event => {

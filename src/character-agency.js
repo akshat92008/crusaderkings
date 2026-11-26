@@ -364,6 +364,17 @@ function advancePersonal(g,p,peers,rows,council,head){
  if(head&&head.id!==p.id&&g.feudal?.claimants?.[r+':'+p.id]&&(p.personality?.boldness||0)>=10&&num(p.wealth)>=70&&startPersonalScheme(g,p.id,head.id,'undermine').ok){
   complete(g,p,'press claim',head.id,1,2);note(g,p,p.name+' pressed a dynastic claim at court.','claim',head.id);return true;
  }
+ // Autonomous court mediation & alliances for living non-player characters
+ if(p.role==='councillor'||has(p,'just')||has(p,'gregarious')){
+  const feud=peers.find(q=>q.id!==p.id&&!controlled(g,q)&&personalOpinion(g,p.id,q.id)>=10&&peers.some(z=>z.id!==q.id&&z.id!==p.id&&personalOpinion(g,q.id,z.id)<=-35));
+  if(feud&&num(p.wealth)>=30&&hash(p.id+':mediate:'+g.turn)%4===0){
+   const rival=peers.find(z=>z.id!==feud.id&&z.id!==p.id&&personalOpinion(g,feud.id,z.id)<=-35);
+   if(rival){p.wealth-=30;relation(g,feud,rival,18);p.prestige=num(p.prestige)+4;note(g,p,p.name+' mediated a simmering court quarrel between '+feud.name+' and '+rival.name+'.','reconciliation',feud.id);return true;}
+  }
+ }
+ if(num(p.wealth)>=45&&opinion>=25&&!(x.bonds[target.id]?.kind==='alliance')&&hash(p.id+':ally:'+g.turn)%4===0){
+  p.wealth-=25;bond(g,p,target,'alliance');relation(g,p,target,12);p.prestige=num(p.prestige)+3;note(g,p,p.name+' formed a household compact with '+target.name+'.','alliance',target.id);return true;
+ }
  // Romantic attraction for high-sociability compatible peers
  if(opinion>=35&&target.sex!==p.sex&&!(p.lovers||[]).includes(target.id)&&(p.personality?.sociability||0)>=15&&hash(p.id+target.id+g.turn)%5===0){
    addRomance(g,p.id,target.id);return true;

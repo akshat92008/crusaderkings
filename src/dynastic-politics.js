@@ -89,6 +89,7 @@ function sync(g,realm){
  const p=g.politics,s=p.realms[realm],r=p.people[s.ruler],old=g.kingdom.courts[realm];
  if(!old||!r)return;
  const h=successor(p,realm,g);
+ s.heir=h?.id||null;
  old.dynasty=r.house;old.ruler={name:r.name,age:r.age,...r.skills};
  old.heir=h?{name:h.name,age:h.age}:{name:'No eligible child',age:0};
  old.steward=isImprisoned(g,s.council.steward)?1:live(p,s.council.steward)?.skills.stewardship||1;
@@ -693,18 +694,25 @@ export function tickPolitics(g,world){
  settleBetrothals(g);
  if(g.turn%12===0){
   arrangeAiBetrothals(g);
+  const provCount=new Map();for(const pr of Object.values(g.provinces||{}))provCount.set(pr.owner,(provCount.get(pr.owner)||0)+1);
+  const warPairs=new Set();for(const w of Object.values(g.conflict?.wars||{}))if(w.status==='active'){warPairs.add(w.attacker+'|'+w.defender);warPairs.add(w.defender+'|'+w.attacker);}
+  const realmIds=Object.keys(p.realms);
+  const allCand=marriageCandidates(g,null); // check per-realm safely via existing call below
   for(const [realm,s] of Object.entries(p.realms)){
    const r=p.people[s.ruler];
    if(humanControlsRealm(g,realm)||humanControlsCharacter(g,r.id))continue;
+   const candsForRealm=marriageCandidates(g,realm);
+   const realmRel=g.factions[realm]?.relations||{};
    for(const a of [r,...children(p,r)]){
     if(a.realm!==realm||a.age<18||a.spouse||isImprisoned(g,a.id)||activeBetrothal(g,a.id)||roll(p)>.45)continue;
     const geoScore=cand=>{
      const base=cand.terms.score;
-     const allyProvinces=Object.values(g.provinces||{}).filter(pr=>pr.owner===cand.realm).length;
-     const sharedHostile=Object.keys(p.realms).some(riv=>riv!==realm&&riv!==cand.realm&&((g.factions[realm]?.relations?.[riv]??0)<=-25||Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm)&&[w.attacker,w.defender].includes(riv)))&&((g.factions[cand.realm]?.relations?.[riv]??0)<=-15));
+     const allyProvinces=provCount.get(cand.realm)||0;
+     const candRel=g.factions[cand.realm]?.relations||{};
+     const sharedHostile=realmIds.some(riv=>riv!==realm&&riv!==cand.realm&&((realmRel[riv]??0)<=-25||warPairs.has(realm+'|'+riv))&&((candRel[riv]??0)<=-15));
      return base+Math.min(20,allyProvinces*3)+(sharedHostile?25:0);
     };
-    const match=marriageCandidates(g,realm).filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>geoScore(y)-geoScore(x)||y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];
+    const match=candsForRealm.filter(x=>x.a===a.id&&!humanControlsRealm(g,x.realm)&&x.realm!==realm).map(x=>({...x,terms:marriageTerms(g,a,p.people[x.b])})).filter(x=>x.terms.accepted).sort((x,y)=>geoScore(y)-geoScore(x)||y.terms.score-x.terms.score||x.b.localeCompare(y.b))[0];
     if(match&&marry(g,a,p.people[match.b]).ok){}
     else{const b=person(g,realm,Math.max(18,Math.min(35,a.age)),{sex:a.sex==='male'?'female':'male',house:allocateHouseName(g,{realm,seed:`consort:${a.id}:${g.turn}`})});link(a,b);}
    }
@@ -712,8 +720,10 @@ export function tickPolitics(g,world){
  }
  reconcileMarriageTreaties(g);
  if(g.turn%3===0){
-  const estates=Object.fromEntries(Object.keys(p.realms).map(r=>[r,politicalEstates(g,r)]));
-  const hierarchies=Object.fromEntries(Object.keys(p.realms).map(r=>[r,feudalHierarchy(g,r)]));
+  const holdingsByRealm=new Map();
+  for(const pair of Object.entries(p.holdings)){const hr=pair[1]?.realm;if(!hr)continue;let arr=holdingsByRealm.get(hr);if(!arr){arr=[];holdingsByRealm.set(hr,arr);}arr.push(pair);}
+  const estates=Object.fromEntries(Object.keys(p.realms).map(r=>[r,politicalEstates(g,r,holdingsByRealm.get(r)||[])]));
+  const hierarchies=Object.fromEntries(Object.keys(p.realms).map(r=>[r,feudalHierarchy(g,r,holdingsByRealm.get(r)||[])]));
   const deepBonuses=Object.fromEntries(Object.keys(p.realms).map(r=>[r,obligationLawModifiers(g,r).opinion+bloodlineModifiers(g,r).vassalOpinion+societyModifiers(g,r).vassalOpinion+greatWorkModifiers(g,r).vassalOpinion]));
   for(const [id,v] of Object.entries(p.holdings)){
    const f=g.factions[v.realm],lord=p.people[v.lord];

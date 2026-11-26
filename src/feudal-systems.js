@@ -9,6 +9,7 @@ import {changeOpinion} from './chronicle-systems.js';
 // 5-tier landed title hierarchy (empire, kingdom, duchy, county, barony) with de jure / de facto separation.
 // Provincial holders remain authoritative in g.politics.holdings.
 import {controller} from './campaign-war.js';
+import {SUBHOLDING_TYPES,syncSubholdingSeats,subholdingKey,subholdingAction,tickSubholdings} from './subholdings.js';
 
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),ok=(msg,extra={})=>({ok:true,msg,...extra}),no=(msg,extra={})=>({ok:false,msg,...extra});
 const ruler=(g,realm)=>g.politics.people[g.politics.realms[realm]?.ruler];
@@ -238,19 +239,27 @@ export function syncTitles(g){
      successionLaw:cLaws.successionLaw||null,genderLaw:cLaws.genderLaw||null,faithLaw:cLaws.faithLaw||null
     };
     rankByPerson.set(h.lord,Math.max(rankByPerson.get(h.lord)||0,2));
+    const seatsByKind=new Map(syncSubholdingSeats(g,p).map(s=>[s.kind,s]));
     // Subordinate barony holdings (b:<prov>:castle|city|temple)
     for(const kind of BARONY_TYPES){
      const bId='b:'+p+':'+kind;
-     const bRec=f.baronies[bId]??={id:bId,province:p,kind,realm,holder:h.lord,wealth:0,tax:1,levy:1};
+     const seat=seatsByKind.get(kind);
+     const bRec=f.baronies[bId]??={id:bId,province:p,kind,realm,holder:seat?.holder||h.lord,level:seat?.level??(kind==='castle'?1:0),wealth:0,tax:1,levy:1};
      bRec.realm=realm;
+     bRec.level=seat?.level??(kind==='castle'?1:0);
+     if(h.subholdings?.[kind]?.holder&&live(g,h.subholdings[kind].holder)&&g.politics.people[h.subholdings[kind].holder].realm===realm){
+      bRec.holder=h.subholdings[kind].holder;
+     }else if(!bRec.granted){
+      bRec.holder=h.lord;
+     }
      if(!live(g,bRec.holder)||g.politics.people[bRec.holder].realm!==realm)bRec.holder=h.lord;
      const bLaws=f.titleLaws[bId]||{};
      const bTransfer=f.vassalTransfers[bId];
      const bLiege=bTransfer&&bTransfer!==bRec.holder&&live(g,bTransfer)?.realm===realm&&(rankByPerson.get(bTransfer)||0)>1?bTransfer:(bRec.holder===h.lord?validLiege:h.lord);
      next[bId]={
-      id:bId,tier:'barony',feudalTier:'barony',rank:1,baronyType:kind,
+      id:bId,tier:'barony',feudalTier:'barony',rank:1,baronyType:kind,level:bRec.level,
       realm,deJureRealm:countyDeJure,deJureParent:cId,
-      deFactoLiege:bLiege,holder:bRec.holder,parent:cId,name:p+' '+kind,province:p,
+      deFactoLiege:bLiege,holder:bRec.holder,parent:cId,name:(SUBHOLDING_TYPES[kind]?.name||kind)+' of '+(g.provinces[p]?.name||p),province:p,
       successionLaw:bLaws.successionLaw||null,genderLaw:bLaws.genderLaw||null,faithLaw:bLaws.faithLaw||null
      };
     }
@@ -704,6 +713,7 @@ export function transferVassal(g,world,realm,vassalTitleId,newLiegeId){
 
 export function feudalAction(g,world,action,id,extra){
  const f=initFeudal(g,world),realm=g.player,nation=g.factions[realm],r=ruler(g,realm),t=resolveTitle(g,id),p=live(g,extra);
+ if(action.startsWith('subholding-')){const result=subholdingAction(g,realm,r.id,action,id,extra);if(result.ok){syncTitles(g);note(g,realm,result.msg);}return result;}
  if(action==='create-title')return createTitle(g,world,realm,id,typeof extra==='object'&&extra?extra:{});
  if(action==='usurp')return usurpTitle(g,world,realm,id,typeof extra==='object'&&extra?extra:{});
  if(action==='destroy-title')return destroyTitle(g,world,realm,id);
@@ -712,7 +722,7 @@ export function feudalAction(g,world,action,id,extra){
  if(action==='grant-barony'){
   if(t?.tier!=='barony'||t.realm!==realm||controller(g,t.province)!==realm)return no('Select a controlled barony.');
   if(!p||p.realm!==realm||p.age<18||isImprisoned(g,p.id))return no('Select a free adult subject.');
-  f.baronies[t.id].holder=p.id;
+  f.baronies[t.id].holder=p.id;f.baronies[t.id].granted=true;
   syncTitles(g);
   return ok('Barony granted to '+p.name+'.');
  }
@@ -774,4 +784,5 @@ export function tickFeudal(g,world){
   for(const r of Object.keys(f.tyranny))if(f.tyranny[r]>0)f.tyranny[r]=Math.max(0,f.tyranny[r]-2);
  }
  tickEstateCharters(g);
+ if(tickSubholdings(g))syncTitles(g);
 }

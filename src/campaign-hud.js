@@ -1,4 +1,5 @@
 // Presentation models share the authoritative campaign state.
+import {successionPreview} from './dynastic-politics.js';
 const total=a=>(a.infantry||0)+(a.archers||0)+(a.cavalry||0),num=n=>Number.isFinite(n)?n:0;
 export function characterDirectory(g,{scope='court',query='',sort='martial'}={}){const p=g.politics||{},r=g.playerCareer?.mode==='vassal'?g.playerCareer.person:p.realms?.[g.player]?.ruler,head=p.people?.[r],needle=query.trim().toLowerCase();const people=Object.values(p.people||{}).filter(c=>c.alive&&(scope==='foreign'?c.realm!==g.player:scope==='all'?true:c.realm===g.player)&&(scope!=='family'||c.house===head?.house||[head?.spouse,...(head?.children||[]),...(head?.parents||[])].includes(c.id))&&(!needle||[c.name,c.house,g.factions[c.realm]?.name,...(c.traits||[])].join(' ').toLowerCase().includes(needle)));return people.sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):sort==='age'?b.age-a.age||a.name.localeCompare(b.name):num(b.skills?.[sort])-num(a.skills?.[sort])||a.name.localeCompare(b.name));}
 export function vassalDirectory(g,sort='loyalty'){const p=g.politics||{},r=p.realms?.[g.player]?.ruler,groups=new Map();for(const [id,h] of Object.entries(p.holdings||{})){if(h.realm!==g.player||h.lord===r||g.provinces[id]?.owner!==g.player||!p.people[h.lord])continue;const x=groups.get(h.lord)||{id:h.lord,person:p.people[h.lord],holdings:[],wealth:0,loyalty:0,population:0,tax:0,levy:0};x.holdings.push(id);x.wealth+=num(h.wealth);x.loyalty+=num(h.loyalty);x.population+=num(g.provinces[id].population);x.tax+=num(h.tax);x.levy+=num(h.levy);groups.set(h.lord,x);}return [...groups.values()].map(x=>({...x,loyalty:x.loyalty/x.holdings.length,tax:x.tax/x.holdings.length,levy:x.levy/x.holdings.length})).sort((a,b)=>sort==='wealth'?b.wealth-a.wealth:sort==='holdings'?b.holdings.length-a.holdings.length:sort==='population'?b.population-a.population:a.loyalty-b.loyalty);}
@@ -10,7 +11,7 @@ export function pickArmyMarker(markers,x,y){let best=null,d=Infinity;for(const m
 
 export function successionWarningSummary(g){
  const r=g?.politics?.realms?.[g.player];if(!r)return null;
- const people=g.politics?.people||{},ruler=people[r.ruler],heir=r.heir?people[r.heir]:null;
+ const people=g.politics?.people||{},ruler=people[r.ruler],heir=r.heir===null?null:(r.heir&&people[r.heir]?.alive)?people[r.heir]:successionPreview(g,g.player);
  if(!heir||!heir.alive)return {level:'urgent',label:'No living heir',detail:'No surviving dynastic successor is designated. Arrange a marriage or reform succession.'};
  const regent=g.regency?.realms?.[g.player];
  if((ruler?.age??20)<18||regent?.active)return {level:'attention',label:'Regency active',detail:'A regency governs until the sovereign comes of age or reasserts authority.'};

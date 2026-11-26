@@ -36,7 +36,7 @@ export function unionTerms(g,senior,junior){
  return '';
 }
 
-function syncCourt(g,r){const p=ruler(g,r),s=realm(g,r),c=g.kingdom?.courts?.[r];if(!p||!c)return;const h=successionCandidates(g,r)[0];c.dynasty=p.house;c.ruler={name:p.name,age:p.age,...p.skills};c.heir=h?{name:h.name,age:h.age}:{name:'No eligible child',age:0};for(const [role,id] of Object.entries(s.council||{}))if(id===p.id){const assigned=new Set(Object.values(s.council));s.council[role]=Object.values(g.politics.people).filter(q=>adult(g,q)&&q.realm===r&&q.id!==p.id&&!assigned.has(q.id)).sort((a,b)=>a.id.localeCompare(b.id))[0]?.id??null;}c.steward=person(g,s.council.steward)?.skills?.stewardship||1;c.marshal=person(g,s.council.marshal)?.skills?.martial||1;reconcileRegency(g,r);}
+function syncCourt(g,r){const p=ruler(g,r),s=realm(g,r),c=g.kingdom?.courts?.[r];if(!p||!c)return;const h=successionCandidates(g,r)[0];s.heir=h?.id||null;c.dynasty=p.house;c.ruler={name:p.name,age:p.age,...p.skills};c.heir=h?{name:h.name,age:h.age}:{name:'No eligible child',age:0};for(const [role,id] of Object.entries(s.council||{}))if(id===p.id){const assigned=new Set(Object.values(s.council));s.council[role]=Object.values(g.politics.people).filter(q=>adult(g,q)&&q.realm===r&&q.id!==p.id&&!assigned.has(q.id)).sort((a,b)=>a.id.localeCompare(b.id))[0]?.id??null;}c.steward=person(g,s.council.steward)?.skills?.stewardship||1;c.marshal=person(g,s.council.marshal)?.skills?.martial||1;reconcileRegency(g,r);}
 function domain(g,r,old,next){for(const [id,h] of Object.entries(g.politics.holdings))if(h.realm===r&&g.provinces[id]?.owner===r&&h.lord===old){h.lord=next;h.loyalty=65;}}
 
 function found(g,senior,junior){

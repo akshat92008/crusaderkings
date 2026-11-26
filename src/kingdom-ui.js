@@ -1,4 +1,5 @@
 import {humanControlsCharacter} from './player-career.js';
+import {renderSubholdings} from './subholdings.js';
 import {renderPersonalUnions} from './personal-unions.js';
 import {ROLEPLAY_BRANCHES,COPING,roleplayView} from './roleplay-systems.js';
 import {ESTATE_LAWS,estateCharterTerms,estateLaw,estateSuccession} from './estate-succession.js';
@@ -26,7 +27,7 @@ import {COURT_OFFICES,courtCandidates,courtModifiers,courtLifeView,COURT_STANDAR
 import {currentExpandedEvents,expandedDecisions,expandedChoiceStatus,currentEmergentEvent,emergentDecisions,extendedEmergentDecisions} from './expanded-content.js';
 import {COMMUNITY_POLICIES,characterHealth,officeOptions,researchPatronBonus} from './living-systems.js';
 import {nonAggression,guaranteePartners,aidOptions,aidStrength,militaryAccess,militaryAccessTerms,fieldAidOptions,activeHostages,coalitionAgainst,coalitionPartners,tributaryOf,callToArmsOptions,diplomaticThreat} from './diplomacy-systems.js';
-import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers,tributeAccounts,estateReviewView} from './government-institutions.js';
+import {INSTITUTION_TYPES,institutionState,institutionTargets,institutionModifiers,tributeAccounts,estateReviewView,governmentSignatureActions} from './government-institutions.js';
 import {governmentMotionView} from './government-deliberations.js';
 import {civilServiceView} from './imperial-civil-service.js';
 import {merchantElectionView,steppePastureView} from './regional-institutions.js';
@@ -416,7 +417,7 @@ export function renderFeudal(g,world,esc){
  for(const t of duchies){const field='regional-'+t.id.replaceAll(':','-'),members=t.members||[],lords=adults.filter(p=>members.some(id=>g.politics.holdings[id]?.lord===p.id));html+='<details class="rule"><summary>'+esc(t.name)+' · '+esc(name(t.holder))+(t.deJureParent||t.deJureRealm?' · De Jure '+esc(g.factions[t.deJureRealm]?.name||t.deJureParent||''):'')+'</summary><p class="paragraph">Regional loyalty effect: '+(members.length?regionalLoyalty(g,members[0]).toFixed(1):'0.0')+'</p>'+(lords.length?'<select class="select" id="'+field+'">'+lords.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select>'+btn('regional',t.id,'Grant regional title (120g)',field):'')+(t.holder===r&&duchies.length>1?btn('destroy-title',t.id,'Destroy duchy'):'')+(t.holder!==r?btn('revoke',t.id,'Revoke duchy'):'');
  for(const id of members){const v=g.politics.holdings[id],p=titles.find(x=>x.province===id||x.id==='c:'+id),grant='grant-'+id,xfer='xfer-'+id,subBaronies=baronies.filter(b=>b.province===id||b.parent==='c:'+id||b.deFactoLiege==='c:'+id),drift=g.deepSystems?.deJureDrift?.[id];html+='<div class="rule"><b>'+provinceLink(id,world,esc)+' · '+characterLink(g.politics.people[v?.lord],esc)+'</b><div class="smallnote">Loyalty '+Math.round(v?.loyalty??50)+'%'+(isImprisoned(g,v?.lord)?' · imprisoned':'')+(subBaronies.length?' · Baronies: '+subBaronies.map(b=>esc(b.kind||b.name||b.id)).join(', '):'')+(drift?' · De Jure Drift '+drift.months+'/120 mo. → '+esc(g.factions[drift.realm]?.name||drift.realm):'')+'</div>';
  if(v?.lord===r&&adults.length&&p)html+='<select class="select" id="'+grant+'">'+adults.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+'</option>').join('')+'</select>'+btn('grant',p.id,'Grant province',grant);
- else if(v?.lord!==r&&p){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)')+btn('revoke',p.id,'Revoke county');if(t.holder!==r&&t.holder!==v?.lord&&g.politics.people[t.holder]?.alive)html+='<button class="rowbtn" data-action="feudal" data-type="transfer-vassal" data-id="'+esc(p.id)+'" data-extra="'+esc(t.holder)+'">Transfer vassal to '+esc(name(t.holder))+'</button>';if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');html+=renderEstateSuccession(g,id,esc,'titles');}html+='</div>';}html+='</details>';}
+ else if(v?.lord!==r&&p){html+=btn('reclaim',p.id,'Reclaim with evidence (8 legitimacy)')+btn('revoke',p.id,'Revoke county');if(t.holder!==r&&t.holder!==v?.lord&&g.politics.people[t.holder]?.alive)html+='<button class="rowbtn" data-action="feudal" data-type="transfer-vassal" data-id="'+esc(p.id)+'" data-extra="'+esc(t.holder)+'">Transfer vassal to '+esc(name(t.holder))+'</button>';if(!isImprisoned(g,v.lord))html+=btn('arrest',v.lord,'Arrest with evidence (3 legitimacy)');html+=renderEstateSuccession(g,id,esc,'titles');}html+=renderSubholdings(g,id,r,esc)+'</div>';}html+='</details>';}
  html+=section('CROWN CLAIMANTS')+'<p class="paragraph">Other eligible children inherit claims on succession. Discontented vassals may support an adult claimant when legitimacy is low.</p>';for(const c of claimantCandidates(g,realm))html+='<div class="rule"><b>'+esc(name(c.person))+'</b><div class="smallnote">Claim from '+esc(name(c.from))+' · expires in '+Math.max(0,180-g.turn+c.created)+' months</div></div>';
  html+=section('PRISONERS AND RANSOM');
  for(const x of Object.values(g.feudal.prisoners).filter(x=>x.status==='held'&&(x.captor===realm||x.realm===realm))){
@@ -632,6 +633,8 @@ export function renderInstitutions(g,world,esc){
  const available=v.electors.filter(e=>!e.lobbied);
  if(v.motion&&available.length)html+='<select class="select" id="institution-lobby-person">'+available.map(e=>'<option value="'+esc(e.id)+'">'+esc(e.name)+'</option>').join('')+'</select><button class="rowbtn" data-action="institution" data-id="motion:lobby" data-second="institution-lobby-person"'+(g.factions[realm].treasury<35?' disabled':'')+'>Seek support (35g)</button>';
  html+='</div>';}
+ const sigActions=governmentSignatureActions(g,realm);
+ if(sigActions.length){html+='<div class="rule"><b>Signature Crown Powers</b>';for(const a of sigActions){const wait=a.activeUntil>g.turn?' · Active ('+(a.activeUntil-g.turn)+'m)':'';html+='<div class="smallnote"><b>'+esc(a.label)+'</b>'+wait+' — '+esc(a.desc)+'</div><button class="rowbtn" data-action="institution" data-id="'+esc(a.id)+'"'+(a.ready?'':' disabled')+'>'+esc(a.label)+'</button>';}html+='</div>';}
 
  return html+'</details>';
 }

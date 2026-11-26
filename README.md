@@ -1,10 +1,10 @@
 # Sovereign: 1450 (Grand Strategy & Tactical Battle Command)
 
-**An original, offline-capable PWA & Capacitor-ready grand-strategy game** set across a global 1450–1600 crossroads map (`980+` playable districts, `115+` historical kingdoms across six continents), featuring **Crossroads Eras**, **Monarch Reign Chapters & Epithets**, **The Crown Dispatch**, `1,500+` branching narrative events, `300+` sovereign mandates, full **JSON Mod Studio**, asymmetric 14-DLC government & religious depth, strategic/character AI, and real-time Banner Lines 3D tactical battles.
+**An original, offline-capable PWA & Capacitor-ready grand-strategy game** set across a global 1450–1600 crossroads map (**`929` playable districts** across **`122` historical kingdoms & realms** across six continents), featuring **Crossroads Eras**, **Monarch Reign Chapters & Epithets**, **The Crown Dispatch**, **County Map Granular Sub-Holdings**, **`1,002` bespoke narrative events**, **`357` sovereign mandates**, full **JSON Mod Studio**, asymmetric government & religious depth, autonomous strategic/character AI, AI Hometown building, and real-time Banner Lines 3D tactical battles.
 
 ![World map preview](docs/world-preview.png)
 
-> **Release status & docs:** See [Release Acceptance](docs/RELEASE_ACCEPTANCE.md), [Known Limitations](docs/KNOWN_LIMITATIONS.md), and [Commercial Licensing](docs/COMMERCIAL_LICENSING.md). Note: `100+` automated tests verify core mechanics and endurance; physical mobile hardware store testing remains a manual pre-launch step.
+> **Release status & docs:** See [Release Acceptance](docs/RELEASE_ACCEPTANCE.md), [Known Limitations](docs/KNOWN_LIMITATIONS.md), and [Commercial Licensing](docs/COMMERCIAL_LICENSING.md). Note: **`115` automated test files** verify core mechanics, subholdings, saves, and multi-century endurance; physical iOS/Android store hardware testing remains a manual pre-launch step.
 
 ## Play locally or install as Mobile PWA — zero server required
 
@@ -14,13 +14,14 @@
 4. Visit **http://localhost:8080** in Chrome, Edge, Firefox, or Safari.
 5. Choose a historical polity and click **Begin Your Reign** (or tap **Add to Home Screen** on Android/iOS for offline PWA play, or run `node scripts/build_mobile_www.mjs` + `npx cap sync` via `capacitor.config.json`).
 
-The game runs locally after the files load; it does not need a game server, npm packages, cloud accounts, or a paid API. Saves persist durably via **IndexedDB (`sovereign1450-db`)** plus portable `.json` export/import.
+The game runs locally after the files load; it does not need a game server, npm packages, cloud accounts, or a paid API. Saves persist durably via **IndexedDB (`sovereign1450-db`)** with compacted `localStorage` fallback plus portable `.json` export/import.
 
 ## Core pillars & what works today
 
-- **Global 1450 World Map (`atlas-1450-v5`):** `980+` playable districts across Europe, Middle East, Africa, India, East Asia, Southeast Asia, Steppe, Americas & Oceania with `115+` historical 1450 kingdoms (`<15%` independent pockets), while preserving `v1`–`v4` save compatibility.
+- **Global 1450 World Map (`atlas-1450-v5`):** `929` playable districts across Europe, Middle East, Africa, India, East Asia, Southeast Asia, Steppe, Americas & Oceania across `122` historical 1450 kingdoms (`<7%` independent pockets), while preserving legacy save compatibility.
+- **County Map Sub-Holdings & Hometowns:** Inspect and develop Castle, Town, and Temple baronies directly in every county inspector or vassal view, appoint barons/mayors/bishops, and watch AI realms expand their own Hometown infrastructure.
 - **Original Identity Systems:** **Crossroads Eras (1450–1600)** (*Gunpowder Foundries*, *Oceanic Navigation*, *Printing Press*, *Chartered Finance*, *Global First Contact*), **Monarch Reign Chapters & Legacy Epithets**, and **The Crown Dispatch** mobile priority deck.
-- **Massive Content & Asymmetric Government Depth:** `1,500+` modular events, `300+` mandates, Merchant Republic 5-house Doge elections & trade zones, Nomad multi-clan pastures, Eastern Empire stance shifts, Sultanate decadence crises, Dharmic sects & monsoons, Crusader beneficiaries & saintly canonization.
+- **Bespoke Multi-Choice Narrative & Asymmetric Government Depth:** `1,002` bespoke events (with 3–4 branching choices across Sovereign stories, Alchemist/Hermetic quests, Secret Cults, Crusades, Crossroads shocks, and global civilizational arcs), `357` mandates, Merchant Republic 5-house Doge elections & convoys, Nomad multi-clan pastures & sky-oaths, Eastern Empire themes & censorship purges, Shogunate sword hunts & hostage accords, Sultanate decadence & iqta cadastres, and Dharmic sects & monsoons.
 - **Complete JSON Mod Studio:** Author, validate, toggle, import, and export custom kingdoms, characters, start years (`400–2000`), declarative JSON events, traits, and religions persisted in IndexedDB.
 
 ## Controls
@@ -40,14 +41,17 @@ index.html                     Main application shell and accessible controls
 styles.css                     Dark parchment-themed strategy UI
 src/main.js                    Screens, event handling, game orchestration
 src/map.js                     Interactive Canvas2D cartographic renderer
-src/simulation.js              Deterministic economic, political & war simulation
+src/simulation.js              Deterministic economic, political, & war simulation
+src/subholdings.js             County-level Castle/Town/Temple sub-holdings & inspector UI
+src/content/                   Modular 3-4 choice bespoke Sovereign & Crossroads event packs
 src/battle.js                  WebGL2 / perspective 2D tactical renderer and AI
-data/world.json                Generated provinces, connections, 44 factions
+data/world.json                Base province & adjacency graph (expanded to 929 districts in runtime atlas)
+data/historical-polities-1450.json  Historical 1450 polity polygons & metadata
 assets/naturalearth/           Bundled Natural Earth public-domain shapefile
 assets/favicon.svg             Original icon
 scripts/build_world.py         Rebuild province layout from bundled data
-scripts/render_smoke_test.py   Optional Linux Playwright UI integration test
-tests/simulation.test.mjs      7 Node.js simulation regression tests
+scripts/verify_guard.mjs       Syntax check & battle-code exclusion guard
+tests/*.test.mjs               115 Node.js simulation, UI, storage & endurance test suites
 docs/GAME_BLUEPRINT.md         Architecture and extended design specification
 docs/ASSET_MANIFEST.md         Verified CC0/public-domain assets and import priorities
 docs/IMPLEMENTATION_PLAN.md    Concrete next implementation milestones

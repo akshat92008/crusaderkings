@@ -332,3 +332,9 @@ html[data-music-state='playing'] #menu-sound{opacity:.78}
 }
 @media(max-width:360px){.quick-nav>button span{font-size:9px}.battle-buttons{width:88px;max-width:88px}.battle-top .eyebrow{font-size:8px}.battle-guide{font-size:10px}.battle-units .unitcard{flex-basis:98px;min-width:98px}}
 @media(max-height:500px) and (orientation:landscape){.battle-screen .battle-top{padding:4px 8px}.battle-top .battle-meta,#battle-focus,#battle-strength{display:none}.battle-screen .battle-bottom{max-height:43dvh;overflow-y:auto}.battle-commands{display:flex;flex-wrap:wrap}.battle-commands button,.battle-commands select{width:auto;min-height:44px}.battle-units .unitcard{min-height:64px}.battle-commands #battle-start{flex:1 1 auto}.battle-buttons{width:auto;max-width:none;display:flex}}
+.subholding-summary{padding:6px 8px;background:rgba(212,175,95,.08);border:1px solid rgba(212,175,95,.22);border-radius:6px;margin-bottom:8px}
+.subholding-card{margin-top:8px;padding:8px}
+.subholding-head{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.subholding-head .badge{font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(212,175,95,.18);color:#ebd28b}
+.subholding-holder{display:flex;align-items:center;gap:8px;margin:6px 0}
+.portrait-mark.small{width:28px;height:28px;min-width:28px;font-size:11px}

@@ -94,21 +94,30 @@ export function tickVassalCourts(g){
  if(root.lastTick===g.turn)return;
  root.lastTick=g.turn;
  if(g.turn%6!==0)return;
+ const holdingsByRealm=new Map(),holdingsByRealmLord=new Map();
+ for(const [k,h] of Object.entries(g.politics?.holdings||{})){
+  if(!h?.realm||g.provinces?.[k]?.owner!==h.realm)continue;
+  let rArr=holdingsByRealm.get(h.realm);if(!rArr){rArr=[];holdingsByRealm.set(h.realm,rArr);}rArr.push([k,h]);
+  if(controller(g,k)===h.realm&&h.lord){
+   const rlKey=h.realm+'|'+h.lord;
+   let lArr=holdingsByRealmLord.get(rlKey);if(!lArr){lArr=[];holdingsByRealmLord.set(rlKey,lArr);}lArr.push([k,h]);
+  }
+ }
  for(const [id,x] of Object.entries(root.petitions)){
   if(x.status!=='pending'){if(g.turn-x.ended>72)delete root.petitions[id];continue;}
   if(!pendingVassalPetitions(g,x.realm).some(q=>q.id===id)){x.status='lapsed';x.ended=g.turn;continue;}
   if(!humanControlsRealm(g,x.realm)){
-   const f=g.factions[x.realm],p=live(g,x.person),est=politicalEstates(g,x.realm),row=est.byLord[p.id];
+   const f=g.factions[x.realm],p=live(g,x.person),est=politicalEstates(g,x.realm,holdingsByRealm.get(x.realm)||[]),row=est.byLord[p.id];
    const choice=row?.powerful||row?.loyalty<35?'accept':f.treasury>300?'compromise':'reject';
    if(!resolveVassalPetition(g,x.realm,id,choice).ok)resolveVassalPetition(g,x.realm,id,'reject');
   }else if(g.turn>=x.deadline)resolveVassalPetition(g,x.realm,id,'reject');
  }
  for(const r of Object.keys(g.politics.realms)){
-  const est=politicalEstates(g,r);
+  const est=politicalEstates(g,r,holdingsByRealm.get(r)||[]);
   for(const row of est.rows){
    const p=live(g,row.id);
    if(!eligible(g,p))continue;
-   const holdings=local(g,r,p.id);
+   const holdings=holdingsByRealmLord.get(r+'|'+p.id)||[];
    if(!holdings.length)continue;
    const court=root.courts[p.id]??={realm:r,agenda:'maintain estates',lastInvestment:-120,lastPetition:-120};
    court.realm=r;

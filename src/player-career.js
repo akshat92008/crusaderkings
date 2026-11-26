@@ -1,4 +1,5 @@
 // Player perspective is distinct from legal realm ownership. Supports playable barons, counts, dukes, kings, and emperors.
+import {subholdingAction,renderSubholdings} from './subholdings.js';
 import {controller} from './campaign-war.js';
 import {syncTitles,isImprisoned,characterTitles,characterRank,transferVassal,createTitle} from './feudal-systems.js';
 import {requestVassalPetition} from './vassal-courts.js';
@@ -90,6 +91,7 @@ export function careerAction(g,action,id,extra,world=null){
  if(!free(g,p)||p.realm!==x.realm)return no('Your character must be a free adult in this realm.');
  const h=g.politics.holdings[id],pr=g.provinces[id],owned=h&&h.lord===p.id&&h.realm===x.realm&&pr?.owner===x.realm&&controller(g,id)===x.realm;
  if(action==='personal-gift'||action==='personal-rebuke')return characterInteractionAs(g,x.realm,p.id,id,action);
+ if(action.startsWith('subholding-')){const result=subholdingAction(g,x.realm,p.id,action,action==='subholding-build'?id:extra,action==='subholding-appoint'?id:null);if(result.ok)syncTitles(g);return result;}
  if(action==='retinue')return estateRetinueAction(g,x.realm,p.id,id,extra);
  if(action==='estate-claim'){
   if(!owned||!estateClaimTargets(g,world,x.realm,p.id,id).includes(extra))return no('Select a controlled estate and an eligible neighboring vassal holding.');
@@ -162,6 +164,7 @@ export function renderCareer(g,world,esc){
     h+='<details><summary>Assert a neighboring estate claim (60 estate gold)</summary><p class="smallnote">Crown arbitration may prevent an internal feud.</p>'+claims.map(target=>btn('estate-claim',id,target,'Claim '+name(target))).join('')+'</details>';
    }
    h+=Object.entries(INVESTMENTS).filter(([k])=>pr.buildings[k]<3).map(([k,r])=>btn('invest',id,k,r.label+' upgrade ('+r.cost+' estate gold)')).join('')+btn('withdraw',id,'','Withdraw 40 estate gold')+(estate.tax>0?btn('petition',id,'tax','Petition for lower taxes'):'')+(estate.autonomy<2?btn('petition',id,'autonomy','Petition for autonomy'):'')+btn('petition',id,'council','Petition for council office');
+   h+=renderSubholdings(g,id,p.id,esc,'career');
   }else h+='<p class="smallnote">Occupied: estate actions unavailable.</p>';
   h+='</div>';
  }

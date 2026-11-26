@@ -27,14 +27,29 @@ export function estatePower(g,id){
  return p&&h?Math.round(30+Math.max(0,num(p.development))*9+Math.sqrt(Math.max(0,num(p.population)))*3+Math.min(150,Math.max(0,num(h.wealth))*.08)):0;
 }
 function rulerRank(g,r,rulerId){
- const titles=Object.values(g.feudal?.titles||{}).filter(t=>t.realm===r&&t.holder===rulerId);
- let best=4; // Default kingdom rank if titles haven't synced yet
- if(titles.length)best=Math.max(...titles.map(t=>t.rank||TIER_RANK[t.feudalTier||t.tier]||2));
- return best;
+ if(!rulerId)return 4;
+ const titles=g.feudal?.titles||{};
+ const crown=titles['k:'+r];
+ if(crown&&crown.holder===rulerId)return crown.rank||4;
+ let best=0;
+ for(const t of Object.values(titles)){
+  if(!t||t.realm!==r||t.holder!==rulerId||t.tier==='holding')continue;
+  const rk=t.rank||TIER_RANK[t.feudalTier||t.tier]||2;
+  if(rk>best)best=rk;
+ }
+ return best||4;
 }
 export function domainLimit(g,r,personId=g.politics?.realms?.[r]?.ruler){
  const head=g.politics?.people?.[personId];
- const rank=personId===g.politics?.realms?.[r]?.ruler?rulerRank(g,r,personId):Math.max(1,...Object.values(g.feudal?.titles||{}).filter(t=>t.holder===personId).map(t=>t.rank||TIER_RANK[t.feudalTier||t.tier]||1));
+ let rank=1;
+ if(personId===g.politics?.realms?.[r]?.ruler)rank=rulerRank(g,r,personId);
+ else{
+  for(const t of Object.values(g.feudal?.titles||{})){
+   if(t.holder!==personId||t.tier==='holding')continue;
+   const rk=t.rank||TIER_RANK[t.feudalTier||t.tier]||1;
+   if(rk>rank)rank=rk;
+  }
+ }
  const rankBase=rank>=5?3:rank===4?2:rank===3?1:0;
  const gov=g.civic?.realms?.[r]?.government;
  const govBonus=gov==='imperial'||gov==='centralized'?1:0;
@@ -47,10 +62,11 @@ export function vassalLimit(g,r){
  const rank=rulerRank(g,r,realm?.ruler);
  return 6+rank*4+Math.floor(num(head?.skills?.diplomacy)/2)*2;
 }
-export function politicalEstates(g,r){
- const realm=g.politics?.realms?.[r],head=g.politics?.people?.[realm?.ruler],council=new Set(Object.values(realm?.council||{})),rows=new Map();
+export function politicalEstates(g,r,prefilteredHoldings=null){
+ const realm=g.politics?.realms?.[r],council=new Set(Object.values(realm?.council||{})),rows=new Map();
  let domain=0,domainPower=0;
- for(const [id,h] of Object.entries(g.politics?.holdings||{})){
+ const entries=prefilteredHoldings||Object.entries(g.politics?.holdings||{});
+ for(const [id,h] of entries){
   if(h.realm!==r||g.provinces?.[id]?.owner!==r)continue;
   const p=g.politics.people[h.lord];
   if(!p?.alive)continue;
@@ -94,9 +110,14 @@ export function tickAuthority(g){
  if(root.lastTick===g.turn)return;
  root.lastTick=g.turn;
  if(g.turn%12!==0)return;
+ const holdingsByRealm=new Map();
+ for(const pair of Object.entries(g.politics?.holdings||{})){
+  const rId=pair[1]?.realm;if(!rId)continue;
+  let arr=holdingsByRealm.get(rId);if(!arr){arr=[];holdingsByRealm.set(rId,arr);}arr.push(pair);
+ }
  for(const [r,s] of Object.entries(root.realms)){
   if(humanControlsRealm(g,r))continue;
-  const f=g.factions[r],realm=g.politics.realms[r],head=g.politics.people[realm?.ruler],est=politicalEstates(g,r);
+  const f=g.factions[r],realm=g.politics.realms[r],head=g.politics.people[realm?.ruler],est=politicalEstates(g,r,holdingsByRealm.get(r)||[]);
   if(!f||!head?.alive||!est.total)continue;
   const danger=est.rows.reduce((n,x)=>n+(x.loyalty<40?x.power:0),0)/est.total;
   if(s.level>0&&danger>.40)authorityAction(g,r,s.level-1);

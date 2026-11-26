@@ -2,6 +2,7 @@
  * Mobile-first Monthly Crown Dispatch: distills grand-strategy state into
  * 3-6 crisp actionable priority cards with direct tab/action links.
  */
+import {successionPreview} from './dynastic-politics.js';
 const num = n => (Number.isFinite(n) ? n : 0);
 
 export function buildMonthlyDispatch(g, world, opts = {}) {
@@ -58,7 +59,8 @@ export function buildMonthlyDispatch(g, world, opts = {}) {
  }
 
  // 3. Succession, Marriage & Claimants
- if (pol && !pol.heir) {
+ const resolvedHeir = pol?.heir === null ? null : (pol?.heir && g.politics?.people?.[pol.heir]?.alive) ? g.politics.people[pol.heir] : successionPreview(g, realm);
+ if (pol && !resolvedHeir) {
   cards.push({
    id: 'dispatch-heir',
    level: 'urgent',

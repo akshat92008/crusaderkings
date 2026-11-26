@@ -1,20 +1,36 @@
 // Financial obligations follow the persistent 5-tier feudal title hierarchy without double-counting.
 import {authorityModifiers} from './realm-authority.js';
 import {controller} from './campaign-war.js';
+import {subholdingProfile,paySubholdingIncome} from './subholdings.js';
 
 const cap=(n,a,b)=>Math.max(a,Math.min(b,n)),num=n=>Number.isFinite(n)?n:0;
+const regionalCache=new WeakMap();
+function regionalTitlesByRealm(titles){
+ if(!titles||typeof titles!=='object')return new Map();
+ let byRealm=regionalCache.get(titles);
+ if(!byRealm){
+  byRealm=new Map();
+  for(const t of Object.values(titles)){
+   if(t?.tier!=='regional'||!t.realm)continue;
+   let arr=byRealm.get(t.realm);if(!arr){arr=[];byRealm.set(t.realm,arr);}arr.push(t);
+  }
+  regionalCache.set(titles,byRealm);
+ }
+ return byRealm;
+}
 
-export function feudalHierarchy(g,r){
+export function feudalHierarchy(g,r,prefilteredHoldings=null){
  const ruler=g.politics?.realms?.[r]?.ruler,people=g.politics?.people||{};
  const titles=g.feudal?.titles||{};
- const regions=Object.values(titles).filter(t=>t.realm===r&&t.tier==='regional'&&people[t.holder]?.alive&&g.feudal?.prisoners?.[t.holder]?.status!=='held');
+ const regions=(regionalTitlesByRealm(titles).get(r)||[]).filter(t=>people[t.holder]?.alive&&g.feudal?.prisoners?.[t.holder]?.status!=='held');
  const regionalLords=new Set(regions.map(t=>t.holder));
  const byHolding={},byLord={};
  let directCount=0,subCount=0,baronyCount=0;
  const regionByProvince=new Map();
  for(const t of regions)for(const id of t.members||[])regionByProvince.set(id,t);
 
- for(const [id,h] of Object.entries(g.politics?.holdings||{})){
+ const entries=prefilteredHoldings||Object.entries(g.politics?.holdings||{});
+ for(const [id,h] of entries){
   if(h.realm!==r||g.provinces?.[id]?.owner!==r)continue;
   const cTitle=titles['c:'+id];
   const transferred=g.feudal?.vassalTransfers?.['c:'+id];
@@ -76,10 +92,11 @@ export function obligationProfile(g,r,hierarchy=feudalHierarchy(g,r)){
   const layer=x.kind==='indirect'?.92:1;
   const t=x.kind==='domain'?1:h.exemptions?.tax?0:([.8,1,1.15][h.tax]??1)*loyalty*layer;
   const l=x.kind==='domain'?1:h.exemptions?.levy?0:([.75,1,1.2][h.levy]??1)*loyalty*layer;
-  weight+=w;tax+=w*t;levy+=w*l;
-  if(x.kind==='domain')domain+=w*t;
-  else if(x.kind==='direct')direct+=w*t;
-  else indirect+=w*t;
+  const seats=subholdingProfile(g,id),localTax=t*seats.tax,localLevy=l*seats.levy;
+  weight+=w;tax+=w*localTax;levy+=w*localLevy;
+  if(x.kind==='domain')domain+=w*localTax;
+  else if(x.kind==='direct')direct+=w*localTax;
+  else indirect+=w*localTax;
  }
  const mod=authorityModifiers(g,r);
  return {
@@ -109,9 +126,12 @@ export function creditEstateIncome(g,id,amount,hierarchy){
   }
  }
  let remainder=amount-tribute;
- // If distinct sub-barons hold city/temple baronies in this county, split a modest share to their purses.
+ const delegated=paySubholdingIncome(g,id,remainder);
+ remainder-=delegated;
+ // If distinct sub-barons hold city/temple baronies in this county (not already paid above), split a modest share to their purses.
  if(remainder>0&&g.feudal?.baronies){
-  const subBarons=(hierarchy?.subBaronsByProv?.[id])||Object.values(g.feudal.baronies).filter(b=>b.province===id&&b.holder!==h.lord&&g.politics.people[b.holder]?.alive);
+  const rawSub=(hierarchy?.subBaronsByProv?.[id])||Object.values(g.feudal.baronies).filter(b=>b.province===id&&b.holder!==h.lord&&g.politics.people[b.holder]?.alive);
+  const subBarons=rawSub.filter(b=>h.subholdings?.[b.kind]?.holder!==b.holder);
   if(subBarons.length){
    const share=Math.floor(remainder*0.12/subBarons.length);
    if(share>0){

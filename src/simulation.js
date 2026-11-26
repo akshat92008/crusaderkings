@@ -2,6 +2,7 @@ import {homeRealm,queueHome,tickHometown,hometownModifiers,homeFoodOutput,homeRe
 import {invasionReserved} from './invasion-reservations.js';
 import {allocateCommanderName} from './name-pools.js';
 import {humanControlsRealm,reconcileCareer} from './player-career.js';
+import {defaultPersonality,PERSONALITY_AXES} from './character-agency.js';
 import {borderBattleOutcome,proportionalLoss,campaignArmyPower,campaignGarrison,terrainCombatModifiers} from './border-battle.js';
 import {participatingArmies,applyFieldForceLosses} from './field-forces.js';
 import {capitalDistrict} from './historical-world.js';
@@ -364,6 +365,10 @@ function compactPersonForSave(p,realmCivic,playerRealm){
    continue;
   }
   if(k==='personality'&&v&&typeof v==='object'&&!Array.isArray(v)){
+   if(!isPlayer){
+    const def=defaultPersonality(p);
+    if(PERS_KEYS.every(pk=>(v[pk]??0)===(def[pk]??0)))continue;
+   }
    out.personality=PERS_KEYS.map(pk=>v[pk]??0);
    continue;
   }
@@ -385,14 +390,15 @@ function compactPersonForSave(p,realmCivic,playerRealm){
 const DEFAULT_INDUSTRY_KEYS=['granary','sawmill','mine','loom','smithy','saltery','infirmary','caravan','irrigation','warehouse'];
 const DEFAULT_HOLDING_KEYS={castle:['curtain_wall','keep','stables'],city:['guild_hall','trade_port','counting_house'],temple:['scriptorium','hospitium','sanctuary_precinct']};
 const DEFAULT_STOCK_KEYS={grain:24,timber:8,ore:8,fiber:8,salt:8,tools:8,cloth:8,provisions:8};
-function compactEconomyProvince(ep){
+const TECH_SAVE_KEYS=['agriculture','commerce','military','fortification','navigation','administration','scholarship'];
+function compactEconomyProvince(ep,includeOutput=true){
  if(!ep||typeof ep!=='object')return ep;
  const out={};
  for(const [k,v] of Object.entries(ep)){
-  if(v===null||v===undefined)continue;
+  if(v===null||v===undefined||k==='homeStorage')continue;
+  if(k==='output'&&(!includeOutput||!v||typeof v!=='object'||!Object.keys(v).length))continue;
   if((k==='shortage'||k==='devastation'||k==='tier')&&v===0)continue;
   if(k==='lastRelief'&&v===-12)continue;
-  if(k==='output'&&v&&typeof v==='object'&&!Object.keys(v).length)continue;
   if(k==='stock'&&v&&typeof v==='object'){
    const snz={};
    for(const [sk,sv] of Object.entries(v))if(sv!==DEFAULT_STOCK_KEYS[sk])snz[sk]=sv;
@@ -434,6 +440,7 @@ function rehydrateSaveDefaults(o){
   if(p.guardianId===undefined)p.guardianId=null;
   if(Array.isArray(p.skills)){const sk={};SKILL_KEYS.forEach((k,i)=>{sk[k]=p.skills[i]??0;});p.skills=sk;}
   if(Array.isArray(p.personality)){const pr={};PERS_KEYS.forEach((k,i)=>{pr[k]=p.personality[i]??0;});p.personality=pr;}
+  else if(!p.personality&&p.id){p.personality=defaultPersonality(p);}
   const origin=realmCiv[p.realm];
   if(origin){
    p.civic??={};
@@ -442,6 +449,24 @@ function rehydrateSaveDefaults(o){
   }
   if(p.civic){p.civic.focus??=null;p.civic.xp??=0;p.civic.perks??=[];p.civic.stress??=0;p.civic.guardian??=null;p.civic.education??=0;if(p.civic.lastFocus===undefined)p.civic.lastFocus=-60;}
  }
+ if(o.politics?.dynasties){
+  for(const [houseKey,d] of Object.entries(o.politics.dynasties)){
+   if(!d||typeof d!=='object')continue;
+   d.house??=houseKey;d.founded??=0;d.extinct=Boolean(d.extinct);
+   if(d.parentHouse===undefined)d.parentHouse=null;
+   d.cadetBranches??=[];d.prestige??=0;
+  }
+ }
+ if(o.identity?.provinceTech){
+  for(const [id,t] of Object.entries(o.identity.provinceTech)){
+   if(!t||typeof t!=='object')continue;
+   if(Array.isArray(t.l)&&Array.isArray(t.p)){
+    const levels={},progress={};
+    TECH_SAVE_KEYS.forEach((tk,i)=>{levels[tk]=t.l[i]??1;progress[tk]=t.p[i]??0;});
+    o.identity.provinceTech[id]={levels,progress};
+   }
+  }
+ }
  if(o.agency?.people){
   for(const ax of Object.values(o.agency.people)){
    if(!ax||typeof ax!=='object')continue;
@@ -449,8 +474,13 @@ function rehydrateSaveDefaults(o){
   }
  }
  if(o.feudal?.baronies){
-  for(const b of Object.values(o.feudal.baronies)){
+  for(const [bKey,b] of Object.entries(o.feudal.baronies)){
    if(!b||typeof b!=='object')continue;
+   if(!b.id)b.id=bKey;
+   if(!b.province||!b.kind){
+    const parts=bKey.split(':');
+    if(parts[0]==='b'&&parts.length>=3){b.province??=parts[1];b.kind??=parts[2];}
+   }
    b.wealth??=0;b.tax??=1;b.levy??=1;b.level??=1;
    if(b.province&&!b.parent)b.parent='c:'+b.province;
    if(b.province&&!b.deFactoLiege)b.deFactoLiege='c:'+b.province;
@@ -482,7 +512,28 @@ export function snapshot(g){
  if(g.politics?.people){
   const people={};
   for(const [id,p] of Object.entries(g.politics.people))people[id]=compactPersonForSave(p,realmCiv[p?.realm],g.player);
-  shallow.politics={...g.politics,people};
+  const dynasties={};
+  for(const [hk,dv] of Object.entries(g.politics.dynasties||{})){
+   if(!dv||typeof dv!=='object')continue;
+   const dc={};
+   if(dv.realm)dc.realm=dv.realm;
+   if(dv.founded)dc.founded=dv.founded;
+   if(dv.extinct)dc.extinct=true;
+   if(dv.extinctTurn!==undefined)dc.extinctTurn=dv.extinctTurn;
+   if(dv.parentHouse)dc.parentHouse=dv.parentHouse;
+   if(Array.isArray(dv.cadetBranches)&&dv.cadetBranches.length)dc.cadetBranches=dv.cadetBranches;
+   if(dv.prestige)dc.prestige=dv.prestige;
+   dynasties[hk]=dc;
+  }
+  shallow.politics={...g.politics,people,dynasties};
+ }
+ if(g.identity?.provinceTech){
+  const pTech={};
+  for(const [id,t] of Object.entries(g.identity.provinceTech)){
+   if(!t?.levels||!t?.progress){pTech[id]=t;continue;}
+   pTech[id]={l:TECH_SAVE_KEYS.map(tk=>t.levels[tk]??1),p:TECH_SAVE_KEYS.map(tk=>t.progress[tk]??0)};
+  }
+  shallow.identity={...g.identity,provinceTech:pTech};
  }
  if(g.reignChapters?.active){
   const activeCopy={};
@@ -499,30 +550,40 @@ export function snapshot(g){
    const isPlayer=pers.realm===g.player;
    const compacted={};
    if(Number.isFinite(ax.influence)&&ax.influence!==10)compacted.influence=ax.influence;
-   if(ax.agenda)compacted.agenda=ax.agenda;
-   if(Number.isFinite(ax.lastAction)&&ax.lastAction>-120)compacted.lastAction=ax.lastAction;
-   if(Number.isFinite(ax.lastIncome)&&ax.lastIncome>-120)compacted.lastIncome=ax.lastIncome;
+   if(isPlayer&&ax.agenda)compacted.agenda=ax.agenda;
+   if(isPlayer&&Number.isFinite(ax.lastAction)&&ax.lastAction>-120)compacted.lastAction=ax.lastAction;
+   if(isPlayer&&Number.isFinite(ax.lastIncome)&&ax.lastIncome>-120)compacted.lastIncome=ax.lastIncome;
    if(ax.goal&&(isPlayer||ax.goal.progress>0))compacted.goal=ax.goal;
    if(ax.conspiracy)compacted.conspiracy=ax.conspiracy;
    if(ax.goals&&Object.keys(ax.goals).length)compacted.goals=ax.goals;
    if(ax.bonds){
-    const bEntries=Object.entries(ax.bonds).filter(([,bv])=>bv&&(bv.trust||bv.grievance));
-    if(bEntries.length)compacted.bonds=Object.fromEntries(isPlayer?bEntries:bEntries.slice(0,3));
+    const bEntries=Object.entries(ax.bonds).filter(([,bv])=>bv&&(isPlayer?(bv.trust||bv.grievance):(Math.abs(bv.trust||0)>=10||(bv.grievance||0)>=10)));
+    if(bEntries.length)compacted.bonds=Object.fromEntries(isPlayer?bEntries:bEntries.slice(0,2));
    }
    if(isPlayer&&Array.isArray(ax.memories)&&ax.memories.length)compacted.memories=ax.memories.slice(0,8);
    if(Object.keys(compacted).length)aPeople[id]=compacted;
   }
-  shallow.agency={...g.agency,people:aPeople,history:(g.agency.history||[]).slice(0,80)};
+  shallow.agency={...g.agency,people:aPeople,history:(g.agency.history||[]).slice(0,60)};
  }
  if(g.chronicles?.relationships){
   const rels={};
   const ppl=g.politics?.people||{};
   for(const [rk,rv] of Object.entries(g.chronicles.relationships)){
    if(!rv||!ppl[rv.a]?.alive||!ppl[rv.b]?.alive)continue;
+   const involvesPlayer=ppl[rv.a].realm===g.player||ppl[rv.b].realm===g.player;
+   if(!involvesPlayer&&Math.abs(rv.opinion||0)<15&&rv.kind==='acquaintance')continue;
    if(rv.opinion===0&&rv.kind==='acquaintance')continue;
    rels[rk]=rv;
   }
-  shallow.chronicles={...g.chronicles,relationships:rels,history:(g.chronicles.history||[]).slice(0,120)};
+  shallow.chronicles={...g.chronicles,relationships:rels,history:(g.chronicles.history||[]).slice(0,90)};
+ }
+ if(g.vassalCourts?.courts){
+  const vCourts={};
+  for(const [vid,vc] of Object.entries(g.vassalCourts.courts)){
+   if(!vc||(vc.realm!==g.player&&vc.lastInvestment===-120&&vc.lastPetition===-120))continue;
+   vCourts[vid]=vc;
+  }
+  shallow.vassalCourts={...g.vassalCourts,courts:vCourts,history:(g.vassalCourts.history||[]).slice(0,60)};
  }
  if(g.feudal){
   const feudalCopy={...g.feudal};
@@ -539,6 +600,7 @@ export function snapshot(g){
     if(bc.parent==='c:'+bc.province)delete bc.parent;
     if(bc.deFactoLiege==='c:'+bc.province)delete bc.deFactoLiege;
     if(bc.holdingType===bc.kind)delete bc.holdingType;
+    delete bc.id;delete bc.province;delete bc.kind;
     baronies[id]=bc;
    }
    feudalCopy.baronies=baronies;
@@ -547,7 +609,7 @@ export function snapshot(g){
  }
  if(g.economy?.provinces){
   const eProvs={};
-  for(const [id,ep] of Object.entries(g.economy.provinces))eProvs[id]=compactEconomyProvince(ep);
+  for(const [id,ep] of Object.entries(g.economy.provinces))eProvs[id]=compactEconomyProvince(ep,g.provinces?.[id]?.owner===g.player);
   shallow.economy={...g.economy,provinces:eProvs};
  }
  return JSON.stringify(shallow);

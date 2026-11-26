@@ -12,18 +12,26 @@ export function validatePortableSave(raw){if(typeof raw!=='string'||!raw.length|
 export function saveFilename(g){return 'sovereign-1450-'+String(g.player).replace(/[^a-z0-9_-]/gi,'-')+'-'+g.year+'-'+String(g.month+1).padStart(2,'0')+'.json';}
 export function persistCampaign(storage,raw){
  const writeAll=val=>{
-  storage.setItem(SAVE_KEY,val);
-  if(val.length<1800000){try{storage.setItem(BRAND_SAVE_KEY,val);}catch{}}
-  else{try{storage.removeItem?.(BRAND_SAVE_KEY);}catch{}}
+  if(val.length<1800000){
+   storage.setItem(SAVE_KEY,val);
+   try{storage.setItem(BRAND_SAVE_KEY,val);}catch{}
+  }else{
+   try{storage.removeItem?.(BRAND_SAVE_KEY);}catch{}
+   storage.setItem(SAVE_KEY,val);
+  }
  };
  try{writeAll(raw);}
  catch(err){
   try{
+   try{storage.removeItem?.(BRAND_SAVE_KEY);}catch{}
    const obj=JSON.parse(raw);
    if(Array.isArray(obj.log))obj.log=obj.log.slice(0,12);
    if(Array.isArray(obj.history))obj.history=obj.history.slice(0,40);
    if(obj.deepSystems?.history)obj.deepSystems.history=obj.deepSystems.history.slice(0,40);
    if(obj.chronicles?.history)obj.chronicles.history=obj.chronicles.history.slice(0,40);
+   if(obj.agency?.history)obj.agency.history=obj.agency.history.slice(0,30);
+   if(obj.expanded?.history)obj.expanded.history=obj.expanded.history.slice(0,30);
+   if(obj.politics?.dispatchHistory)obj.politics.dispatchHistory={};
    storage.setItem(SAVE_KEY,JSON.stringify(obj));
   }catch{throw err;}
  }
