@@ -29,9 +29,9 @@ export function hydrateTownArt(root){
  compiled().then(pack=>{
   if(!pack)return;
   for(const node of root.querySelectorAll('[data-town-extra]')){
-   const key=node.dataset.townExtra,url=pack.extras?.[key];if(!url)continue;node.style.backgroundImage='url("'+url+'")';node.classList.add('has-art');if(key==='cart')node.textContent='';
+   const key=node.dataset.townExtra,url=pack.extras?.[key]||pack.sprites?.[key];if(!url)continue;node.style.backgroundImage='url("'+url+'")';node.classList.add('has-art');if(key==='cart')node.textContent='';
   }
-  for(const node of root.querySelectorAll('[data-town-svg-extra]')){const url=pack.extras?.[node.dataset.townSvgExtra];if(url){node.setAttribute('href',url);node.setAttribute('visibility','visible');}}
+  for(const node of root.querySelectorAll('[data-town-svg-extra]')){const key=node.dataset.townSvgExtra,url=pack.extras?.[key]||pack.sprites?.[key];if(url){node.setAttribute('href',url);node.setAttribute('visibility','visible');}}
   for(const node of root.querySelectorAll('.ht-scene')){if(pack.extras?.ground)node.style.setProperty('--ht-grass','url("'+pack.extras.ground+'")');}
  });
 }
@@ -57,7 +57,25 @@ export function buildingAppearance(key,base,level){
  else {if(rank>=4)annexes.push('lumber_shed');if(rank>=7)annexes.push('timber_frame_house');}
  return {main,annexes,rank};
 }
-export function buildingComplex(key,base,level){
+function renderVisualSprite(key,main,rank,underConstruction){
+ if(underConstruction&&rank<=1)return 'house_foundation';
+ if(key==='town'){
+  if(rank<=2)return 'hall_stage1';
+  if(rank<=4)return 'hall_stage2';
+  if(rank<=6)return 'hall_stage3';
+ }
+ if(key==='house'){
+  if(rank<=2)return 'house_stage1';
+  if(rank<=5)return 'house_stage2';
+  if(rank<=7)return 'house_stage3';
+ }
+ if(key==='market'&&rank<=3)return 'colony_market';
+ if(key==='well'&&rank<=3)return 'colony_well';
+ if((key==='shrine'||key==='temple')&&rank<=3)return 'colony_chapel';
+ return main;
+}
+export function buildingComplex(key,base,level,underConstruction=false){
  const v=buildingAppearance(key,base,level);
- return '<span class="ht-complex ht-rank-'+v.rank+(key==='iron'?' ht-iron':'')+'"><span class="ht-complex-main">'+townArt(v.main)+'</span>'+v.annexes.map((part,i)=>'<span class="ht-annex ht-annex-'+i+'">'+townArt(part)+'</span>').join('')+'</span>';
+ const displayMain=renderVisualSprite(key,v.main,level||0,underConstruction);
+ return '<span class="ht-complex ht-rank-'+v.rank+(key==='iron'?' ht-iron':'')+'"><span class="ht-complex-main">'+townArt(displayMain)+'</span>'+v.annexes.map((part,i)=>'<span class="ht-annex ht-annex-'+i+'">'+townArt(part)+'</span>').join('')+(underConstruction?'<span class="ht-build-puff" data-town-extra="fx_build_puff" aria-hidden="true"></span>':'')+'</span>';
 }

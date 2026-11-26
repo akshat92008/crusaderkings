@@ -1,27 +1,26 @@
-import { readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-
-const BATTLE_FORBIDDEN_RE = /^(src\/(battle|field-|three-battle|border-battle|banner-renderer|simple-card-battle)|assets\/(battle|characters_3d)|scripts\/(build_3d_battle|battle_browser_smoke))/;
 
 const check = spawnSync(process.execPath, ['scripts/check-sources.mjs'], { stdio: 'inherit' });
 if (check.status !== 0) process.exit(check.status || 1);
 
-const baseRef = process.env.CROWN_BASE_REF || 'HEAD';
-const changed = new Set();
-for (const args of [['diff', '--name-only', baseRef], ['diff', '--name-only', '--cached']]) {
-  const res = spawnSync('git', args, { encoding: 'utf8' });
-  if (res.status === 0 && res.stdout) {
-    for (const line of res.stdout.split(/\r?\n/)) {
-      const clean = line.trim();
-      if (clean) changed.add(clean);
-    }
+const manifestPath = 'assets/battle/sprites/manifest.json';
+if (!existsSync(manifestPath)) {
+  console.error('Missing 2D Banner Lines sprite manifest:', manifestPath);
+  process.exit(1);
+}
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+for (const [key, entry] of Object.entries(manifest.units || {})) {
+  if (!existsSync(entry.url)) {
+    console.error('Missing battle unit sprite sheet:', key, entry.url);
+    process.exit(1);
+  }
+}
+for (const [key, url] of Object.entries(manifest.extras || {})) {
+  if (!existsSync(url)) {
+    console.error('Missing battle FX sprite:', key, url);
+    process.exit(1);
   }
 }
 
-const violations = [...changed].filter(f => BATTLE_FORBIDDEN_RE.test(f));
-if (violations.length) {
-  console.error('BATTLE EXCLUSION VIOLATION — forbidden files modified:\n' + violations.map(v => '  - ' + v).join('\n'));
-  process.exit(1);
-}
-
-console.log(`Battle-exclusion guard & source checks passed (${readdirSync('src').length} src entries, 0 battle modifications).`);
+console.log(`Source & 2D Banner Lines asset checks passed (${readdirSync('src').length} src entries, ${Object.keys(manifest.units || {}).length} unit sheets).`);

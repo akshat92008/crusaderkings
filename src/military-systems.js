@@ -352,8 +352,19 @@ function faithGroupOf(g,realm){
  return 'any';
 }
 
-export function resolveBattleCommanders(g,winnerRealm,loserArmies,{loserRemaining=0.5,fieldBattle=true}={}){
+export function resolveBattleCommanders(g,winnerRealm,loserArmies,{loserRemaining=0.5,fieldBattle=true,winnerArmies=[]}={}){
  const m=initMilitary(g),events=[];
+ for(const a of winnerArmies||[]){
+  if(!a||a.owner!==winnerRealm)continue;
+  const cmdId=m.armies[a.id]?.commander;
+  const cmd=cmdId&&g.politics?.people?.[cmdId];
+  if(!cmd||cmd.alive===false)continue;
+  cmd.prestige=(cmd.prestige||0)+4;
+  cmd.influence=(cmd.influence||0)+3;
+  cmd.loyalty=cap((cmd.loyalty??55)+4,0,100);
+  cmd.battlesWon=(cmd.battlesWon||0)+1;
+  events.push({kind:'victory',commander:cmdId,realm:winnerRealm});
+ }
  const threshold=fieldBattle?0.35:0.45;
  if(loserRemaining>=threshold)return events;
  for(const a of loserArmies||[]){

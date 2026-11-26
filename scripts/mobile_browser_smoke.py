@@ -275,7 +275,7 @@ try:
   page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
   page.click('#open-hometown');ht=page.locator('#hometown-screen');assert ht.is_visible()
   assert ht.locator('.ht-tabs button').count()==5
-  assert ht.locator('.ht-resources > div').count()==5
+  assert ht.locator('.ht-resources > div').count()==6
   assert ht.locator('.ht-landscape').count()==1
   assert ht.locator('.ht-town-ornament').count()==1
   assert ht.locator('.ht-food-summary').count()==1
@@ -304,7 +304,7 @@ try:
   ht.locator('[data-ht="advance"]').click()
   if page.locator('#event-modal').is_visible():page.locator('#event-modal-defer').click()
   after=page.evaluate("""()=>{const s=JSON.parse(localStorage.getItem('crown-of-nations.save'));return s.provinces[s.hometown.realms.england.capital].buildings.farm;}""")
-  assert after==before+1
+  assert after==before+1, f'farm level before={before}, after={after}'
   assert ht.locator('.ht-farm-estate').count()==1
   ht.locator('[data-ht="tab"][data-key="provinces"]').click()
   assert ht.locator('.ht-yields').count()>0
@@ -314,7 +314,7 @@ try:
   assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).hometown.realms.england.level")>=1
   page.screenshot(path=str(OUT/'hometown.png'));ht.locator('.ht-scene-shell').screenshot(path=str(OUT/'hometown-settlement.png'));ht.locator('[data-ht="close"]').click();assert ht.is_hidden()
   assert not ht_errors,ht_errors
-  context.close();print('Hometown PASS: 40 buildings, 20 research branches, 5 resources, queue, month and save')
+  context.close();print('Hometown PASS: 40 buildings, 20 research branches, 6 resources, queue, month and save')
   browser.close()
 finally:
  server.server_close()

@@ -10,3 +10,22 @@ test('deadlock is explicit and does not grant victory to an invading army',()=>{
 test('deterministic result for identical armies',()=>assert.deepEqual(run(1000,1000,'archers','archers'),run(1000,1000,'archers','archers')));
 
 test('formation choices are role-appropriate',()=>{const choices=['shield_wall','pike_square','volley_line','cavalry_wedge'].map(id=>({id}));assert.deepEqual(cardFormationChoices(unit('a','attacker','archers',100),choices).map(x=>x.id),['volley_line']);assert.deepEqual(cardFormationChoices(unit('b','attacker','infantry',100),choices).map(x=>x.id),['shield_wall','pike_square']);assert.ok(cardRoleHint(unit('c','attacker','cavalry',100)).includes('ranged'));});
+test('1000 deterministic tactical matchups settle cleanly without NaN or infinite deadlock',()=>{
+ const types=['infantry','archers','cavalry'];
+ let resolved=0,pikesVsCav=0,cavVsArch=0;
+ for(let seed=0;seed<1000;seed++){
+  const ta=types[seed%3],tb=types[(seed+1+(seed%2))%3];
+  const a=unit('a'+seed,'attacker',ta,180+(seed%7)*35),b=unit('b'+seed,'defender',tb,180+((seed*3)%7)*35);
+  if(seed%5===0&&ta==='infantry')a.kind='pikemen';
+  if(seed%7===0&&tb==='cavalry')b.specialistId='elephants';
+  arrangeCardArmy([a],'attacker',1);arrangeCardArmy([b],'defender',-1);
+  const s={groups:[a,b],fieldTime:0};
+  let out=null;
+  for(let step=0;step<900;step++){stepCardBattle(s,1/15);out=cardBattleOutcome([a,b],s.fieldTime);if(out)break;}
+  assert.ok(out&&Number.isFinite(a.life)&&Number.isFinite(b.life));
+  resolved++;
+  if(a.kind==='pikemen'&&tb==='cavalry'&&a.troopCount>=b.troopCount&&out.victory)pikesVsCav++;
+  if(ta==='cavalry'&&tb==='archers'&&a.troopCount>=b.troopCount&&out.victory)cavVsArch++;
+ }
+ assert.equal(resolved,1000);assert.ok(pikesVsCav>0&&cavVsArch>0);
+});

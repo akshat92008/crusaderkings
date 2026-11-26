@@ -555,6 +555,7 @@ export class BattleGame {
     this.running = true;
     this.paused = Boolean(descriptor.interactive);
     this.deployment = Boolean(descriptor.interactive);
+    this.lifecycle = this.deployment ? 'Deployment' : 'Active';
     this.done = false;
     this.elapsed = 0;
     this.selected = 0;
@@ -591,7 +592,7 @@ export class BattleGame {
       defenderRealm: descriptor.enemy
     };
 
-    const chosen = descriptor.bannerView && this.simpleField ? {canvas,renderer:new BannerRenderer(canvas,this.terrainType),mode:'banner'} : chooseBattleRenderer(canvas, {
+    const chosen = (descriptor.bannerView && this.simpleField) || descriptor.bannerView === true ? {canvas,renderer:new BannerRenderer(canvas,this.terrainType),mode:'banner'} : chooseBattleRenderer(canvas, {
       probe: c => c.getContext?.('webgl2'),
       three: c => new ThreeBattleScene(c, config),
       native: c => new Renderer(c),
@@ -817,6 +818,10 @@ export class BattleGame {
     this._onKeyUp = e => this.keys.delete(e.key.toLowerCase());
     this._onWheel = e => {
       e.preventDefault();
+      if (this.ctx?.isBannerRenderer) {
+        this.ctx.setZoom(this.ctx.zoom + (e.deltaY < 0 ? 0.12 : -0.12));
+        return;
+      }
       this.cameraGoal = null;
       this.camera.distance = clamp(this.camera.distance + e.deltaY * 0.065, 35, 165);
     };
@@ -858,10 +863,14 @@ export class BattleGame {
         this.drag.x = e.clientX;
         this.drag.y = e.clientY;
         this.drag.moved += Math.hypot(dx, dy);
-        if (this.drag.moved > 3 && !this.ctx?.isBannerRenderer) {
-          this.cameraGoal = null;
-          this.camera.target[0] -= dx * 0.08;
-          this.camera.target[2] -= dy * 0.08;
+        if (this.drag.moved > 3) {
+          if (this.ctx?.isBannerRenderer) {
+            this.ctx.panBy(dx, dy);
+          } else {
+            this.cameraGoal = null;
+            this.camera.target[0] -= dx * 0.08;
+            this.camera.target[2] -= dy * 0.08;
+          }
         }
       }
     };
@@ -1266,6 +1275,7 @@ export class BattleGame {
     if (!this.deployment || this.renderLost) return false;
     if (this.simpleField) for (const g of this.groups) if (!g.routed) {issueFieldOrder(g, 'advance');g.cardTargetId=null;}
     this.deployment = false;
+    this.lifecycle = 'Active';
     this.paused = false;
     this.frameRemainder = 0;
     browserCampaignAudio.setMode('silent');
@@ -1784,7 +1794,8 @@ export class BattleGame {
     const fraction = roster.attacker.fraction;
     const enemies = roster.defender.fraction;
     const tacticalStats = { ...ensureTacticalStats(this) };
-    const summaryReasons = this.simpleField ? [this.finishReason==='withdrawal'?'The commander withdrew the army':this.finishReason==='deadlock'?'Neither force secured a decisive advantage':this.finishReason==='time limit'?'Remaining active soldiers decided the battle':victory?'Your army secured the battlefield':'The enemy secured the battlefield'] : buildBattleSummaryReasons({
+    this.lifecycle = 'Resolved';
+    const computedReasons = buildBattleSummaryReasons({
       victory,
       roster,
       tacticalStats,
@@ -1794,6 +1805,11 @@ export class BattleGame {
       elapsed: this.elapsed,
       groups: this.groups
     });
+    const finishPrefix = this.finishReason === 'withdrawal' ? 'The commander withdrew the army in good order'
+      : this.finishReason === 'deadlock' ? 'Exhaustion halted both lines before a breakthrough'
+      : this.finishReason === 'time limit' ? 'Field strength at dusk decided the engagement'
+      : null;
+    const summaryReasons = finishPrefix ? [finishPrefix, ...computedReasons].slice(0, 4) : computedReasons;
     this.summaryReasons = summaryReasons;
     this.report();
     this.onFinish({
@@ -1806,8 +1822,10 @@ export class BattleGame {
       reason: this.finishReason || null,
       seconds: Math.round(this.elapsed),
       tacticalStats,
-      summaryReasons
+      summaryReasons,
+      lifecycle: 'Applied'
     });
+    this.lifecycle = 'Recovery';
   }
 
   retreat() {

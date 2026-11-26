@@ -109,9 +109,12 @@ function assignChapterForRuler(g, realm, ruler) {
 
 export function initReignChapters(g) {
  if (!g || typeof g !== 'object') return null;
- const rc = (g.reignChapters ??= { version: 1, lastTick: -1, active: {}, legacyLog: [] });
+ const rc = (g.reignChapters ??= { version: 1, lastTick: -1, active: {}, legacyLog: [], permanentEffects: {}, monuments: {}, grievances: {} });
  rc.active ??= {};
  rc.legacyLog ??= [];
+ rc.permanentEffects ??= {};
+ rc.monuments ??= {};
+ rc.grievances ??= {};
 
  for (const [realm, rs] of Object.entries(g.politics?.realms || {})) {
   const ruler = rs?.ruler ? g.politics?.people?.[rs.ruler] : null;
@@ -120,6 +123,22 @@ export function initReignChapters(g) {
   if (!cur || cur.rulerId !== ruler.id) {
    if (cur && cur.rulerId) {
     const doneCount = (cur.objectives || []).filter(o => o.completed).length;
+    const f = g.factions?.[realm];
+    const inDebt = (f?.treasury || 0) < 0 || (f?.stability || 50) < 35;
+    if (inDebt) {
+     const list = (rc.grievances[realm] ??= []);
+     list.unshift(`${cur.rulerName} left ${(f?.treasury || 0) < 0 ? 'crown debts' : 'realm unrest'} (${g.year || 1450})`);
+     if (list.length > 8) list.length = 8;
+    }
+    if (doneCount >= 1) {
+     const eff = (rc.permanentEffects[realm] ??= { taxBonus: 0, tradeBonus: 0, orderBonus: 0, chapters: 0 });
+     eff.chapters += 1;
+     eff.taxBonus = Math.min(0.15, Number((eff.taxBonus + 0.015 * doneCount).toFixed(3)));
+     eff.tradeBonus = Math.min(0.15, Number((eff.tradeBonus + 0.012 * doneCount).toFixed(3)));
+     const mons = (rc.monuments[realm] ??= []);
+     mons.unshift({ year: g.year || 1450, title: `Memorial of ${cur.rulerName}${cur.epithet ? ' ' + cur.epithet : ''}`, bonus: `+${Math.round(doneCount * 1.5)}% tax & trade tradition` });
+     if (mons.length > 10) mons.length = 10;
+    }
     rc.legacyLog.unshift({
      realm,
      rulerId: cur.rulerId,
@@ -128,6 +147,7 @@ export function initReignChapters(g) {
      startYear: cur.startYear,
      endYear: g.year || 1450,
      objectivesCompleted: doneCount,
+     debtNote: inDebt ? 'Inherited crown strain' : null,
      score: doneCount * 150 + Math.max(1, (g.year || 1450) - cur.startYear) * 15
     });
     if (rc.legacyLog.length > 60) rc.legacyLog.length = 60;
@@ -190,6 +210,16 @@ export function tickReignChapters(g) {
  }
 }
 
+export function reignLegacyModifiers(g, realm) {
+ const eff = g?.reignChapters?.permanentEffects?.[realm];
+ if (!eff) return { tax: 1, trade: 1, chapters: 0 };
+ return {
+  tax: 1 + Math.min(0.15, num(eff.taxBonus)),
+  trade: 1 + Math.min(0.15, num(eff.tradeBonus)),
+  chapters: num(eff.chapters)
+ };
+}
+
 export function reignChaptersView(g, realm = g?.player) {
  const rc = initReignChapters(g);
  if (!rc || !realm) return null;
@@ -202,7 +232,10 @@ export function reignChaptersView(g, realm = g?.player) {
  });
  return {
   chapter: ch ? { ...ch, objectives } : null,
-  legacyLog: rc.legacyLog.filter(x => x.realm === realm).slice(0, 12)
+  legacyLog: rc.legacyLog.filter(x => x.realm === realm).slice(0, 12),
+  monuments: (rc.monuments?.[realm] || []).slice(0, 6),
+  grievances: (rc.grievances?.[realm] || []).slice(0, 4),
+  permanentEffects: reignLegacyModifiers(g, realm)
  };
 }
 

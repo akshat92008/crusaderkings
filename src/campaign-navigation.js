@@ -4,11 +4,11 @@ import {pendingVassalPetitions} from './vassal-courts.js';
 import {politicalEstates} from './realm-authority.js';
 // Five workspaces retain every existing panel and its original action handlers.
 export const WORKSPACES=[
- {id:'realm',name:'Realm',tabs:['realm','decrees','economy','trade','search']},
+ {id:'realm',name:'Reign',tabs:['realm','decrees','economy','trade','search']},
  {id:'court',name:'Court',tabs:['court','characters','dynasty','council','vassals','political','titles','stories']},
  {id:'foreign',name:'Diplomacy',tabs:['diplomacy','strategy']},
  {id:'war',name:'Military',tabs:['military','naval']},
- {id:'people',name:'Society',tabs:['society','identity','heritage','legacy','chronicle']}
+ {id:'people',name:'Chronicle',tabs:['society','identity','heritage','legacy','chronicle']}
 ];
 export function workspaceFor(tab){return WORKSPACES.find(g=>g.tabs.includes(tab))||WORKSPACES[0];}
 export function workspaceTab(id,remembered={}){const g=WORKSPACES.find(w=>w.id===id);return g?(g.tabs.includes(remembered[id])?remembered[id]:g.tabs[0]):null;}

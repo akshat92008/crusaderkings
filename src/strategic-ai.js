@@ -409,6 +409,7 @@ function positionArmy(g,world,realm,plan){
 function applyAiPersonalityDecisions(g,world,realm,plan){
  const f=g.factions[realm],prof=PERSONALITY_PROFILES[plan.profile]||PERSONALITY_PROFILES.cautious;
  const obj=plan.objective;
+ if(f.food<15||f.treasury<60){plan.goal='recover';}
  const canSpend=cost=>f.treasury>=cost+120&&(!obj||obj.spent+cost<=obj.budget+150);
  const spend=cost=>{f.treasury-=cost;if(obj)obj.spent+=cost;};
 
@@ -465,7 +466,7 @@ function applyAiPersonalityDecisions(g,world,realm,plan){
   const activeOther=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(realm));
   const coal=coalitionAgainst(g,realm);
   const deterredByCoalition=coal&&coal.members.length>=2&&diplomaticThreat(g,realm)>=45;
-  if(!activeOther&&!deterredByCoalition&&f.treasury>=reserveFloor&&f.stability>=38&&f.food>=0){
+  if(!activeOther&&!deterredByCoalition&&f.treasury>=reserveFloor&&f.stability>=38&&f.food>=20){
    const v=evaluateWarViability(g,world,realm,plan.target);
    if(v.viable){
     const cbs=availableCasusBelli(g,world,realm,plan.target);

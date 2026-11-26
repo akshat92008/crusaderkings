@@ -250,7 +250,7 @@ const rows=[
  ],
  [
   "vijayanagara_patronage",
-  "Vijayanagara provincial patronage",
+  "Amara-Nayaka & Tungabhadra Patronage",
   [
    "vijayanagara"
   ],
@@ -258,8 +258,8 @@ const rows=[
   45,
   70,
   155,
-  "Hear provincial chiefs",
-  "Regional authority relies on negotiated local cooperation."
+  "Convene Nayaka lords & temple trusts",
+  "Vijayanagara authority rests on Amara-Nayaka military fiefs, Virupaksha temple endowments, and Tungabhadra anicut irrigation."
  ],
  [
   "bahmani_households",

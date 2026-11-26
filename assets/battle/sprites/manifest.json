@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "units": {
+    "infantry": {
+      "url": "assets/battle/sprites/infantry.webp",
+      "frames": 4,
+      "frameW": 64,
+      "frameH": 64
+    },
+    "heavy_infantry": {
+      "url": "assets/battle/sprites/heavy_infantry.webp",
+      "frames": 4,
+      "frameW": 64,
+      "frameH": 64
+    },
+    "pikemen": {
+      "url": "assets/battle/sprites/pikemen.webp",
+      "frames": 4,
+      "frameW": 64,
+      "frameH": 64
+    },
+    "archers": {
+      "url": "assets/battle/sprites/archers.webp",
+      "frames": 4,
+      "frameW": 64,
+      "frameH": 64
+    },
+    "gunpowder": {
+      "url": "assets/battle/sprites/gunpowder.webp",
+      "frames": 4,
+      "frameW": 64,
+      "frameH": 64
+    },
+    "commander": {
+      "url": "assets/battle/sprites/commander.webp",
+      "frames": 4,
+      "frameW": 64,
+      "frameH": 64
+    },
+    "cavalry": {
+      "url": "assets/battle/sprites/cavalry.webp",
+      "frames": 4,
+      "frameW": 88,
+      "frameH": 72
+    },
+    "elephants": {
+      "url": "assets/battle/sprites/elephants.webp",
+      "frames": 4,
+      "frameW": 96,
+      "frameH": 78
+    }
+  },
+  "extras": {
+    "fx_smoke": "assets/battle/sprites/fx_smoke.webp",
+    "fx_spark": "assets/battle/sprites/fx_spark.webp",
+    "fx_dirt": "assets/battle/sprites/fx_dirt.webp",
+    "fx_flash": "assets/battle/sprites/fx_flash.webp",
+    "levy_villager": "assets/battle/sprites/levy_villager.webp"
+  }
+}

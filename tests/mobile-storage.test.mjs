@@ -82,6 +82,60 @@ test('Mobile storage handles >4MB payloads via IndexedDB and migrates legacy Cro
   assert.equal(slots.length, 1);
   assert.equal(slots[0].player, 'england');
 
+  // Newer IndexedDB save MUST beat older stale localStorage save
+  const newerPayload = JSON.stringify({
+    version: 1, turn: 24, year: 1452, month: 0, player: 'england',
+    factions: { england: { id: 'england', treasury: 900, food: 80, stability: 85, policies: {} } },
+    provinces: {}, armies: {}
+  });
+  const staleLocal = JSON.stringify({
+    version: 1, turn: 3, year: 1450, month: 3, player: 'england',
+    factions: { england: { id: 'england', treasury: 100, food: 50, stability: 70, policies: {} } },
+    provinces: {}, armies: {}
+  });
+  const conflictStorage = fakeStorage({ [SAVE_KEY]: staleLocal, [BRAND_SAVE_KEY]: staleLocal });
+  await saveCampaignDurable(newerPayload, { slot: 'autosave', storage: null, idb });
+  const chosen = await loadCampaignDurable({ slot: 'autosave', storage: conflictStorage, idb });
+  assert.equal(chosen.source, 'indexeddb');
+  assert.equal(chosen.turn, 24);
+
+  // Automatic backup rotation and recovery when primary save is corrupted
+  const backupTest = await loadCampaignDurable({ slot: 'autosave-backup', idb });
+  assert.equal(backupTest.raw.length, hugePayload.length);
+  const corruptIdb = fakeIndexedDb();
+  const goodV1 = JSON.stringify({
+    version: 1, turn: 5, year: 1450, month: 5, player: 'england',
+    factions: { england: { id: 'england', treasury: 400, food: 50, stability: 80, policies: {} } },
+    provinces: {}, armies: {}
+  });
+  const goodV2 = JSON.stringify({
+    version: 1, turn: 9, year: 1450, month: 9, player: 'england',
+    factions: { england: { id: 'england', treasury: 550, food: 50, stability: 80, policies: {} } },
+    provinces: {}, armies: {}
+  });
+  await saveCampaignDurable(goodV1, { slot: 'autosave', storage: null, idb: corruptIdb });
+  await saveCampaignDurable(goodV2, { slot: 'autosave', storage: null, idb: corruptIdb });
+  // Manually corrupt primary autosave
+  await new Promise(resolve => {
+    const req = corruptIdb.open();
+    req.onsuccess = () => {
+      const tx = req.result.transaction('saves', 'readwrite');
+      tx.objectStore('saves').put({ slot: 'autosave', raw: '{corrupt!', checksum: 'bad' }, 'slot:autosave');
+      tx.oncomplete = resolve;
+    };
+  });
+  const recovered = await loadCampaignDurable({ slot: 'autosave', storage: null, idb: corruptIdb });
+  assert.equal(recovered.source, 'indexeddb-backup');
+  assert.equal(recovered.recovered, true);
+  assert.equal(recovered.turn, 5);
+
+  // Manual save slots work independently and failed storage returns ok:false
+  await saveCampaignDurable(goodV2, { slot: 'slot-1', storage: null, idb: corruptIdb });
+  const slot1 = await loadCampaignDurable({ slot: 'slot-1', idb: corruptIdb });
+  assert.equal(slot1.turn, 9);
+  const failSave = await saveCampaignDurable(goodV2, { slot: 'autosave', storage: null, idb: null });
+  assert.equal(failSave.ok, false);
+
   // Legacy migration
   const idb2 = fakeIndexedDb();
   const validLegacy = JSON.stringify({

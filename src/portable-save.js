@@ -11,6 +11,7 @@ export function validatePortableSave(raw){if(typeof raw!=='string'||!raw.length|
  return g;}
 export function saveFilename(g){return 'sovereign-1450-'+String(g.player).replace(/[^a-z0-9_-]/gi,'-')+'-'+g.year+'-'+String(g.month+1).padStart(2,'0')+'.json';}
 export function persistCampaign(storage,raw){
+ const toAscii=s=>s.replace(/[\u0080-\uffff]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
  const writeAll=val=>{
   if(val.length<1800000){
    storage.setItem(SAVE_KEY,val);
@@ -24,6 +25,7 @@ export function persistCampaign(storage,raw){
  catch(err){
   try{
    try{storage.removeItem?.(BRAND_SAVE_KEY);}catch{}
+   try{writeAll(toAscii(raw));return;}catch{}
    const obj=JSON.parse(raw);
    if(Array.isArray(obj.log))obj.log=obj.log.slice(0,12);
    if(Array.isArray(obj.history))obj.history=obj.history.slice(0,40);
@@ -32,7 +34,7 @@ export function persistCampaign(storage,raw){
    if(obj.agency?.history)obj.agency.history=obj.agency.history.slice(0,30);
    if(obj.expanded?.history)obj.expanded.history=obj.expanded.history.slice(0,30);
    if(obj.politics?.dispatchHistory)obj.politics.dispatchHistory={};
-   storage.setItem(SAVE_KEY,JSON.stringify(obj));
+   storage.setItem(SAVE_KEY,toAscii(JSON.stringify(obj)));
   }catch{throw err;}
  }
 }

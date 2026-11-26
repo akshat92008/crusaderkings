@@ -4,7 +4,16 @@
     "farmland": "assets/hometown/sprites/farmland.webp",
     "goldmine": "assets/hometown/sprites/goldmine.webp",
     "road": "assets/hometown/sprites/road.webp",
-    "villager": "assets/hometown/sprites/villager.webp"
+    "villager": "assets/hometown/sprites/villager.webp",
+    "crop_stage1": "assets/hometown/sprites/crop_stage1.webp",
+    "crop_stage2": "assets/hometown/sprites/crop_stage2.webp",
+    "crop_stage3": "assets/hometown/sprites/crop_stage3.webp",
+    "fx_build_puff": "assets/hometown/sprites/fx_build_puff.webp",
+    "fx_smoke": "assets/hometown/sprites/fx_smoke.webp",
+    "fx_coin": "assets/hometown/sprites/fx_coin.webp",
+    "villager_walk_strip": "assets/hometown/sprites/villager_walk_strip.webp",
+    "tree_oak": "assets/hometown/sprites/tree_oak.webp",
+    "tree_pine": "assets/hometown/sprites/tree_pine.webp"
   },
   "sources": {
     "apothecary": "sprite/128sun/1x1_apothecary_nopalette.png",
@@ -34,7 +43,14 @@
     "watchtower": "sprite/128sun/1x1_watchtower_nopalette.png",
     "watermill": "sprite/128sun/1x1_watermill_nopalette.png",
     "wayside_shrine": "sprite/128sun/1x1_wayside_shrine_nopalette.png",
-    "windmill": "sprite/128sun/1x1_windmill_nopalette.png"
+    "windmill": "sprite/128sun/1x1_windmill_nopalette.png",
+    "hall_stage1": "medieval-colony-hd-isometric-city-builder-tileset-free.zip:buildings/@128/hall_stage1.png",
+    "hall_stage2": "medieval-colony-hd-isometric-city-builder-tileset-free.zip:buildings/@128/hall_stage2.png",
+    "hall_stage3": "medieval-colony-hd-isometric-city-builder-tileset-free.zip:buildings/@128/hall_stage3.png",
+    "house_foundation": "medieval-colony-hd-isometric-city-builder-tileset-free.zip:buildings/@128/house_foundation.png",
+    "crop_stage1": "medieval-colony-hd-isometric-city-builder-tileset-free.zip:crops/@128/wheat_crop_1.png",
+    "villager_walk_strip": "Villager_01.zip:Walk/villager_walk_20000..20014",
+    "tree_oak": "Sprites.zip:oaktree.png"
   },
   "sprites": {
     "apothecary": "assets/hometown/sprites/apothecary.webp",
@@ -59,7 +75,17 @@
     "watchtower": "assets/hometown/sprites/watchtower.webp",
     "watermill": "assets/hometown/sprites/watermill.webp",
     "wayside_shrine": "assets/hometown/sprites/wayside_shrine.webp",
-    "windmill": "assets/hometown/sprites/windmill.webp"
+    "windmill": "assets/hometown/sprites/windmill.webp",
+    "hall_stage1": "assets/hometown/sprites/hall_stage1.webp",
+    "hall_stage2": "assets/hometown/sprites/hall_stage2.webp",
+    "hall_stage3": "assets/hometown/sprites/hall_stage3.webp",
+    "house_stage1": "assets/hometown/sprites/house_stage1.webp",
+    "house_stage2": "assets/hometown/sprites/house_stage2.webp",
+    "house_stage3": "assets/hometown/sprites/house_stage3.webp",
+    "house_foundation": "assets/hometown/sprites/house_foundation.webp",
+    "colony_market": "assets/hometown/sprites/colony_market.webp",
+    "colony_well": "assets/hometown/sprites/colony_well.webp",
+    "colony_chapel": "assets/hometown/sprites/colony_chapel.webp"
   },
-  "version": 2
+  "version": 3
 }

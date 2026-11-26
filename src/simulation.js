@@ -11,7 +11,7 @@ import {campaignWorld} from './independence-systems.js';
 import {captureCommander,syncTitles} from './feudal-systems.js';
 import {initDlcSystems,tickDlcSystems,dlcModifiers} from './ck2-dlc-systems.js';
 import {initCrossroads,tickCrossroads,crossroadsModifiers} from './crossroads-eras.js';
-import {initReignChapters,tickReignChapters} from './reign-chapters.js';
+import {initReignChapters,tickReignChapters,reignLegacyModifiers} from './reign-chapters.js';
 import {strategicTargetScore,raidThreshold,defenseSupport,localCampaignForces,recordStrategicBattle,evaluateWarViability,personalityProfile} from './strategic-ai.js';
 import {controller,occupation,occupationTax,captureProvince,transferProvince,availableCasusBelli,declareCasusBelliWar} from './campaign-war.js';
 import {embarked,navalUpkeep,portBlocked} from './naval-systems.js';
@@ -63,8 +63,8 @@ export function empireStats(g,owner,cache=null){
  const p=cache?.provs||controlled(g,owner); const f=g.factions[owner];
  const ownArmies=cache?.armies||Object.values(g.armies).filter(a=>a.owner===owner);
  const tax=[.65,1,1.5][f?.policies.tax??1];
- const xr=crossroadsModifiers(g,owner);
- const trade=Math.round((tradeIncome(g,owner))*dlcModifiers(g,owner).trade*xr.trade);
+ const xr=crossroadsModifiers(g,owner),lgMod=reignLegacyModifiers(g,owner);
+ const trade=Math.round((tradeIncome(g,owner))*dlcModifiers(g,owner).trade*xr.trade*lgMod.trade*(hometownModifiers(g,owner).trade||1));
  const tradePosts=tradePostIncome(g,owner)+independentPolityTradeIncome(g,owner);
  const gw=greatWorkModifiers(g,owner),bl=bloodlineModifiers(g,owner),dlcMod=dlcModifiers(g,owner);
  const stewardship=g.kingdom?.courts?.[owner]?.steward||0;
@@ -116,6 +116,7 @@ export function recruit(g,provinceId,type='infantry'){
  if(!quote.available)return {ok:false,msg:quote.reason};
  if(f.treasury<cost)return {ok:false,msg:`Need ${cost} gold`};
  f.treasury-=cost;p.unrest=clamp(p.unrest+(f.policies.levy===2?7:2),0,100);
+ if((p.population||0)>5)p.population=Math.max(5,Number((p.population-recruited/2000).toFixed(2)));
  let a=armiesAt(g,provinceId,g.player)[0];
  if(!a){a={id:'a'+g.nextId++,owner:g.player,province:provinceId,infantry:0,archers:0,cavalry:0,experience:0,morale:75,commander:allocateCommanderName(g,g.player,g.nextId)};g.armies[a.id]=a;}
  a[type]+=recruited;initMilitary(g);syncRegiments(g,a);
@@ -196,7 +197,7 @@ export function concludeBattle(g,battle,result,world=null){
   if(g.deepSystems?.crusade?.status==='active'&&was===g.deepSystems.crusade.targetFaction)contributeToCrusade(g,g.player,20);
   const enemyRem=clamp(result.enemyRemaining??.5,0,1);
   if(field){
-   resolveBattleCommanders(g,g.player,defenders,{loserRemaining:enemyRem,fieldBattle:true});
+   resolveBattleCommanders(g,g.player,defenders,{loserRemaining:enemyRem,fieldBattle:true,winnerArmies:forces});
    for(const a of defenders){if(armySize(a)>0&&retreatArmy(g,world,a,battle.to))continue;captureCommander(g,g.player,a);delete g.armies[a.id];}
   }else{
    const defending=armiesAt(g,battle.to,was).find(a=>a.id!==src.id);

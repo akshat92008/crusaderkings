@@ -4,6 +4,8 @@
  * Printing Press, Chartered Finance, First Contact) across 1450-1650 campaigns.
  * Deterministic, zero Math.random().
  */
+import {hometownModifiers} from './hometown.js';
+
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const num = n => (Number.isFinite(n) ? n : 0);
 const ok = (msg, extra = {}) => ({ ok: true, msg, ...extra });
@@ -16,7 +18,8 @@ export const CROSSROADS_ERAS = Object.freeze({
   unlockYear: 1450,
   cost: 160,
   desc: 'Bronze cannon foundries & siege trains transform bastion warfare and state armories.',
-  mod: { siege: 1.18, levy: 1.06, unrest: -0.5 }
+  tradeoff: 'Higher ordnance upkeep & aristocratic anxiety until chartered by royal writ.',
+  mod: { siege: 1.18, levy: 1.06, unrest: 0.4, vassalOpinion: -3 }
  },
  oceanic_navigation: {
   id: 'oceanic_navigation',
@@ -24,7 +27,8 @@ export const CROSSROADS_ERAS = Object.freeze({
   unlockYear: 1458,
   cost: 180,
   desc: 'Caravels, astrolabes, and monsoon charts open transoceanic spice and bullion corridors.',
-  mod: { trade: 1.16, prestigeMonthly: 0.4 }
+  tradeoff: 'Coastal merchant guilds demand admiralty privileges over inland magnates.',
+  mod: { trade: 1.16, prestigeMonthly: 0.4, vassalOpinion: -1 }
  },
  printing_press: {
   id: 'printing_press',
@@ -32,7 +36,8 @@ export const CROSSROADS_ERAS = Object.freeze({
   unlockYear: 1465,
   cost: 170,
   desc: 'Movable-type edicts standardize royal law, accelerate scholarship, and spread pamphlets.',
-  mod: { researchBonus: 1.5, tax: 1.05 }
+  tradeoff: 'Broadsheets stir doctrinal debate (+0.5 provincial unrest unless licensed).',
+  mod: { researchBonus: 1.5, tax: 1.06, unrest: 0.5 }
  },
  chartered_finance: {
   id: 'chartered_finance',
@@ -40,7 +45,8 @@ export const CROSSROADS_ERAS = Object.freeze({
   unlockYear: 1475,
   cost: 200,
   desc: 'Bills of exchange, maritime insurance, and sovereign credit lower borrowing friction.',
-  mod: { tax: 1.1, trade: 1.12 }
+  tradeoff: 'Traditional agrarian houses resent Crown reliance on merchant bankers.',
+  mod: { tax: 1.1, trade: 1.12, vassalOpinion: -2 }
  },
  first_contact: {
   id: 'first_contact',
@@ -48,7 +54,8 @@ export const CROSSROADS_ERAS = Object.freeze({
   unlockYear: 1490,
   cost: 220,
   desc: 'Embassy interpreters, botanical exchanges, and hemispheric silver redefine diplomacy.',
-  mod: { trade: 1.15, levy: 1.04, vassalOpinion: 4 }
+  tradeoff: 'Imported silver & customs disputes require constant chancery oversight.',
+  mod: { trade: 1.15, levy: 1.04, vassalOpinion: 4, unrest: 0.3 }
  }
 });
 
@@ -82,18 +89,19 @@ export function crossroadsModifiers(g, realm) {
  const c = g?.crossroads?.realms?.[realm];
  const out = { tax: 1, levy: 1, trade: 1, siege: 1, researchBonus: 0, vassalOpinion: 0, prestigeMonthly: 0, unrest: 0 };
  if (!c || !Array.isArray(c.adopted)) return out;
- for (const eid of c.adopted) {
-  const def = CROSSROADS_ERAS[eid];
-  if (!def?.mod) continue;
-  if (def.mod.tax) out.tax *= def.mod.tax;
-  if (def.mod.levy) out.levy *= def.mod.levy;
-  if (def.mod.trade) out.trade *= def.mod.trade;
-  if (def.mod.siege) out.siege *= def.mod.siege;
-  if (def.mod.researchBonus) out.researchBonus += def.mod.researchBonus;
-  if (def.mod.vassalOpinion) out.vassalOpinion += def.mod.vassalOpinion;
-  if (def.mod.prestigeMonthly) out.prestigeMonthly += def.mod.prestigeMonthly;
-  if (def.mod.unrest) out.unrest += def.mod.unrest;
- }
+  const chSet = new Set(c.chartered || []);
+  for (const eid of c.adopted) {
+   const def = CROSSROADS_ERAS[eid];
+   if (!def?.mod) continue;
+   if (def.mod.tax) out.tax *= def.mod.tax;
+   if (def.mod.levy) out.levy *= def.mod.levy;
+   if (def.mod.trade) out.trade *= def.mod.trade;
+   if (def.mod.siege) out.siege *= def.mod.siege;
+   if (def.mod.researchBonus) out.researchBonus += def.mod.researchBonus;
+   if (def.mod.vassalOpinion) out.vassalOpinion += chSet.has(eid) && def.mod.vassalOpinion < 0 ? 0 : def.mod.vassalOpinion;
+   if (def.mod.prestigeMonthly) out.prestigeMonthly += def.mod.prestigeMonthly;
+   if (def.mod.unrest) out.unrest += chSet.has(eid) && def.mod.unrest > 0 ? 0 : def.mod.unrest;
+  }
  return out;
 }
 
@@ -106,13 +114,14 @@ export function crossroadsView(g, realm = g?.player) {
   const unlocked = year >= e.unlockYear || c.globalUnlocked.includes(e.id) || num(rs.progress[e.id]) >= 50;
   const adopted = rs.adopted.includes(e.id);
   const progress = Math.min(100, num(rs.progress[e.id]));
-  return {
-   ...e,
-   unlocked,
-   adopted,
-   progress,
-   canAdopt: !adopted && unlocked && (g.factions?.[realm]?.treasury || 0) >= e.cost
-  };
+   return {
+    ...e,
+    unlocked,
+    adopted,
+    chartered: (rs.chartered || []).includes(e.id),
+    progress,
+    canAdopt: !adopted && unlocked && (g.factions?.[realm]?.treasury || 0) >= e.cost
+   };
  });
  return {
   eras,
@@ -160,6 +169,18 @@ export function crossroadsAction(g, world, type, id = '') {
   return ok(`Funded ${def.name} scholars (${rs.progress[id]}% readiness).`);
  }
 
+ if (type === 'charter') {
+  const def = CROSSROADS_ERAS[id];
+  if (!def || !rs.adopted.includes(id)) return no('Adopt that Crossroads institution first.');
+  rs.chartered ??= [];
+  if (rs.chartered.includes(id)) return no(`${def.name} estates are already reconciled by charter.`);
+  if ((f.prestige || 0) < 12) return no('Issuing a mitigating royal charter requires 12 prestige.');
+  f.prestige -= 12;
+  f.stability = clamp(num(f.stability) + 4, 0, 100);
+  rs.chartered.push(id);
+  return ok(`Royal charter eased estate pushback against ${def.name} (+4 stability).`);
+ }
+
  return no('Unknown Crossroads action.');
 }
 
@@ -181,10 +202,11 @@ export function tickCrossroads(g, world = null) {
   const rs = c.realms[realm];
   const r = g.politics?.people?.[g.politics?.realms?.[realm]?.ruler];
   const learning = r?.skills?.learning || 2;
+  const scholarBoost = Math.round((hometownModifiers(g, realm).knowledge || 1) * 2);
   for (const def of Object.values(CROSSROADS_ERAS)) {
    if (rs.adopted.includes(def.id)) continue;
    if (year >= def.unlockYear || c.globalUnlocked.includes(def.id)) {
-    rs.progress[def.id] = clamp(num(rs.progress[def.id]) + 3 + learning, 0, 100);
+    rs.progress[def.id] = clamp(num(rs.progress[def.id]) + 2 + learning + scholarBoost, 0, 100);
    }
   }
   // Autonomous AI adoption once wealthy & unlocked

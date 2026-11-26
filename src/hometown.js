@@ -6,6 +6,27 @@ import {humanControlsRealm} from './player-career.js';
 const ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg}),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const integer=(v,d=0)=>Number.isFinite(v)?Math.max(0,Math.floor(v)):d;
 export const TOWN_NAMES=['Settlement','Village','Large village','Township','Fortified town','Trade city','Royal city','Royal capital','Metropolitan capital','Imperial capital'];
+export const TOWN_STAGE_NOTES=[
+  'Founding timber outpost with hearth & palisade watch',
+  'Cleared ploughlands, common well, and woodcutters lane',
+  'Granary stores, smithy forge, and weekly market square',
+  'Chartered guild street, stone keep foundations, and ward',
+  'Curtain wall, gatehouse toll, and garrison parade ground',
+  'Caravan caravanserai, wharf warehouses, and mint',
+  'Cathedral/temple precinct, royal chancery, and foundry',
+  'High court, monumental plazas, and siege arsenal',
+  'Metropolitan aqueducts, printing guild, and academy quarter',
+  'Imperial seat of civilization — monument spires & treasury'
+];
+export const WORKFORCE_ROLES=[
+  {id:'farmers',label:'Farmers',effect:'Food & granary output'},
+  {id:'woodcutters',label:'Woodcutters',effect:'Timber & shipyard stock'},
+  {id:'miners',label:'Miners & Smiths',effect:'Stone, iron & weapon forging'},
+  {id:'builders',label:'Builders',effect:'Faster construction & repairs'},
+  {id:'merchants',label:'Merchants',effect:'Trade income & market yield'},
+  {id:'scholars',label:'Scholars',effect:'Knowledge & research speed'},
+  {id:'soldiers',label:'Garrison & Levies',effect:'Reserve training & rampart defense'}
+];
 const defs=[
 ['farm','Farmstead',1,180,'food','farmhouse_barn'],['house','Housing',1,100,'food','thatched_cottage'],['well','Well',1,80,'food','stone_well'],['lumber','Lumber camp',1,120,'wood','lumber_shed'],
 ['granary','Granary',2,140,'storage','granary_staddle'],['quarry','Stone quarry',2,150,'stone','lumber_shed'],['market','Market hall',2,260,'tax','market_stall'],['bakery','Bakery',2,140,'food','bakery'],
@@ -30,7 +51,7 @@ export function homeRealm(g,r=g.player){return g.hometown?.realms?.[r]||null;}
 export function homeLevel(g,p,k){const pr=g.provinces?.[p];return !pr?0:integer(LEGACY.has(k)?pr.buildings?.[k]:g.hometown?.buildings?.[p]?.[k]);}
 function capital(g,world,r){const list=Object.values(g.provinces||{}).filter(p=>p.owner===r&&controller(g,p.id)===r);const seat=g.kingdom?.courts?.[r]?.capital;const center=g.factions?.[r]?.capital;const ids=new Set(list.map(p=>p.id));const statics=new Map((world?.provinces||[]).filter(p=>ids.has(p.id)).map(p=>[p.id,p]));const distance=p=>{const xy=statics.get(p.id)?.centroid;return xy&&Array.isArray(center)?Math.hypot(xy[0]-center[0],xy[1]-center[1]):Infinity;};return list.find(p=>p.id===seat)?.id||list.sort((a,b)=>(distance(a)-distance(b))||(b.development||0)-(a.development||0)||a.id.localeCompare(b.id))[0]?.id||null;}
 export function openHometown(g,world){if(!humanControlsRealm(g,g.player))return no('Only the sovereign can manage crown construction.');const r=g.player,p=capital(g,world,r);if(!p)return no('A controlled homeland is required.');
- const root=g.hometown??={version:1,realms:{},buildings:{},lastTick:-1};root.realms??={};root.buildings??={};if(!root.realms[r]){const level=clamp(Math.max(Math.ceil((g.provinces[p].development||1)/3),...Object.values(g.provinces[p].buildings||{}).map(v=>integer(v))),1,10);root.realms[r]={level,capital:p,stock:{wood:250,stone:180,iron:100},research:{},queue:[],positions:{},next:1};}
+ const root=g.hometown??={version:1,realms:{},buildings:{},lastTick:-1};root.realms??={};root.buildings??={};if(!root.realms[r]){const level=clamp(Math.max(Math.ceil((g.provinces[p].development||1)/3),...Object.values(g.provinces[p].buildings||{}).map(v=>integer(v))),1,10);root.realms[r]={level,capital:p,stock:{wood:250,stone:180,iron:100},research:{},queue:[],positions:{},next:1,workers:null,knowledge:0,founded:[]};}
  const h=root.realms[r];h.stock??={wood:250,stone:180,iron:100};h.research??={};h.positions??={};h.queue??=[];h.next??=1;if(!h.infrastructureMigrated){for(const army of Object.values(g.armies||{})){if(army.owner!==r||!permitted(g,army.province,r))continue;const row=root.buildings[army.province]??={};if(army.archers>0)row.archery=Math.max(1,integer(row.archery));if(army.cavalry>0)row.stable=Math.max(1,integer(row.stable));}h.infrastructureMigrated=true;}return ok('Hometown opened.');}
 export function homeCapital(g,world,r=g.player){const h=homeRealm(g,r);return h&&g.provinces[h.capital]?.owner===r&&controller(g,h.capital)===r?h.capital:capital(g,world,r);}
 function permitted(g,p,r){return g.provinces?.[p]?.owner===r&&controller(g,p)===r;}
@@ -41,7 +62,72 @@ function totals(g,r){const h=active(g,r),out={food:0,wood:0,stone:0,iron:0,tax:0
  for(const d of Object.values(HOME_RESEARCH))out[d.effect]+=researchLevel(h,d.id)*2;
  const capitalId=h.capital;for(const [p,row] of Object.entries(g.hometown?.buildings||{})){if(!permitted(g,p,r))continue;for(const [key,level] of Object.entries(row)){const d=HOME_BUILDINGS[key];if(d&&!LEGACY.has(key)&&d.effect!=='food')out[d.effect]+=integer(level)*(p===capitalId?1:.25);}}
  return out;}
-export function hometownModifiers(g,r){const h=active(g,r);if(!h||!h.capital||!permitted(g,h.capital,r))return {tax:1,food:1,recruit:1,cost:1,power:1,siege:1,order:0,defense:1};const t=totals(g,r);return {tax:1+Math.min(.35,t.tax*.006),food:1+Math.min(.4,t.food*.007),recruit:1+Math.min(.3,t.recruit*.006),cost:1-Math.min(.2,t.research*.004),power:1+Math.min(.2,t.military*.004),siege:1+Math.min(.3,t.siege*.008),order:Math.min(2,t.order*.05),defense:1+Math.min(.25,t.defense*.006)};}
+export function workforceProfile(g,r){
+  const h=active(g,r);
+  const cap=h?.capital&&g?.provinces?.[h.capital];
+  const pop=Math.max(10,Number(cap?.population||40));
+  const total=Math.max(14,Math.min(180,Math.round(pop*0.35+(Object.values(h?.level||{}).reduce((a,b)=>a+Number(b||0),0)*0.4))));
+  const weights={farmers:.26,woodcutters:.14,miners:.12,builders:.14,merchants:.12,scholars:.08,soldiers:.14};
+  const auto=Object.fromEntries(WORKFORCE_ROLES.map(role=>[role.id,Math.max(1,Math.round(total*weights[role.id]))]));
+  const sumAuto=Object.values(auto).reduce((a,b)=>a+b,0);
+  auto.farmers+=total-sumAuto;
+  if(!h||!h.workers)return {total,manual:false,assigned:auto,baseline:auto,mult:{food:1,wood:1,iron:1,build:1,trade:1,knowledge:1,recruit:1}};
+  const cur={};
+  let used=0;
+  for(const role of WORKFORCE_ROLES){const v=Math.max(0,Math.floor(Number(h.workers[role.id]??auto[role.id])));cur[role.id]=v;used+=v;}
+  if(used!==total&&used>0){
+    const diff=total-used;
+    cur.farmers=Math.max(0,cur.farmers+diff);
+  }
+  const ratio=k=>cur[k]/Math.max(1,auto[k]);
+  return {
+    total,manual:true,assigned:cur,baseline:auto,
+    mult:{
+      food:Math.max(.6,Math.min(1.65,.7+.3*ratio('farmers'))),
+      wood:Math.max(.6,Math.min(1.65,.7+.3*ratio('woodcutters'))),
+      iron:Math.max(.6,Math.min(1.65,.7+.3*ratio('miners'))),
+      build:Math.max(.65,Math.min(1.75,.75+.25*ratio('builders'))),
+      trade:Math.max(.65,Math.min(1.6,.75+.25*ratio('merchants'))),
+      knowledge:Math.max(.5,Math.min(2,.6+.4*ratio('scholars'))),
+      recruit:Math.max(.7,Math.min(1.5,.75+.25*ratio('soldiers')))
+    }
+  };
+}
+export function assignWorker(g,r,role,delta=1){
+  const h=active(g,r);if(!h)return false;
+  if(role==='auto'){h.workers=null;return true;}
+  const wf=workforceProfile(g,r);
+  const cur={...wf.assigned};
+  if(!(role in cur))return false;
+  const d=Math.trunc(Number(delta)||0);
+  if(!d)return false;
+  if(d>0){
+    const donors=WORKFORCE_ROLES.map(x=>x.id).filter(id=>id!==role&&cur[id]>1).sort((a,b)=>cur[b]-cur[a]);
+    let rem=d;
+    for(const donor of donors){
+      if(rem<=0)break;
+      const take=Math.min(rem,cur[donor]-1);
+      cur[donor]-=take;cur[role]+=take;rem-=take;
+    }
+    if(rem===d)return false;
+  }else{
+    const give=Math.min(-d,cur[role]-1);
+    if(give<=0)return false;
+    cur[role]-=give;
+    const recv=role==='farmers'?'builders':'farmers';
+    cur[recv]+=give;
+  }
+  h.workers=cur;
+  return true;
+}
+export function recordCapitalMilestone(g,r,text){
+  const h=active(g,r);if(!h||!text)return;
+  if(!Array.isArray(h.founded))h.founded=[];
+  const year=Number(g?.year||1450);
+  h.founded.unshift({year,text:String(text)});
+  if(h.founded.length>16)h.founded.length=16;
+}
+export function hometownModifiers(g,r){const h=active(g,r);if(!h||!h.capital||!permitted(g,h.capital,r))return {tax:1,food:1,recruit:1,cost:1,power:1,siege:1,order:0,defense:1,trade:1,knowledge:1,buildSpeed:1};const t=totals(g,r);const wf=workforceProfile(g,r);return {tax:1+Math.min(.35,t.tax*.006),food:(1+Math.min(.4,t.food*.007))*wf.mult.food,recruit:(1+Math.min(.3,t.recruit*.006))*wf.mult.recruit,cost:1-Math.min(.2,t.research*.004),power:1+Math.min(.2,t.military*.004),siege:1+Math.min(.3,t.siege*.008),order:Math.min(2,t.order*.05),defense:1+Math.min(.25,t.defense*.006),trade:(1+Math.min(.35,(t.tax+t.wood)*.003))*wf.mult.trade,knowledge:Number(((1+t.research*.015)*wf.mult.knowledge).toFixed(2)),buildSpeed:wf.mult.build};}
 // Local agricultural infrastructure improves the province that built it.
 // Research travels with the realm, while buildings belong to their province.
 // Royal reserves and local merchant goods are distinct existing inventories.
@@ -53,7 +139,8 @@ export function homeFarmProfile(g,id){
  const localFactor=1+Math.min(.65,l('well')*.015+l('mill')*.035+l('watermill')*.04+l('bakery')*.025+l('reservoir')*.035);
  const researchFactor=1+Math.min(.4,(researchLevel(h,'farming')+researchLevel(h,'irrigation')+researchLevel(h,'milling'))*.014);
  const grainFactor=localFactor*researchFactor;
- return {farm,baseline,food:baseline*grainFactor,localFactor,researchFactor,grainFactor};
+ const owner=g.provinces?.[id]?.owner,wfFood=owner&&active(g,owner)?workforceProfile(g,owner).mult.food:1;
+ return {farm,baseline,food:baseline*grainFactor*wfFood,localFactor,researchFactor,grainFactor};
 }
 export function homeFoodOutput(g,p){return homeFarmProfile(g,p.id).food;}
 export function homeProvinceMaterials(g,id){
@@ -67,9 +154,10 @@ export function homeProvinceMaterials(g,id){
 export function homeProduction(g,r=g.player){
  const h=active(g,r),t=totals(g,r),land=Object.values(g.provinces||{}).filter(p=>permitted(g,p.id,r)),n=land.length;
  if(!h||!n)return {wood:0,stone:0,iron:0};
+ const wf=workforceProfile(g,r);
  const sum={wood:4+Math.min(25,n),stone:3+Math.min(20,n),iron:2+Math.min(15,n)};
  for(const p of land){const row=homeProvinceMaterials(g,p.id);for(const k of materials)sum[k]+=row[k];}
- return Object.fromEntries(materials.map(k=>[k,Math.floor(sum[k]*(1+t[k]*.025))]));
+ return Object.fromEntries(materials.map(k=>[k,Math.floor(sum[k]*(1+t[k]*.025)*(k==='wood'?wf.mult.wood:wf.mult.iron))]));
 }
 export function homeRecruitmentRequirement(g,id,type){
  const p=g.provinces?.[id],h=p&&active(g,p.owner);if(!h)return '';
@@ -161,12 +249,14 @@ function tickAiHometown(g,world,root){
   }
  }
 }
-export function tickHometown(g,world){const root=g.hometown;if(!root||root.lastTick===g.turn)return;root.lastTick=g.turn;
+ export function tickHometown(g,world){const root=g.hometown;if(!root||root.lastTick===g.turn)return;root.lastTick=g.turn;
  tickAiHometown(g,world,root);
- for(const [r,h] of Object.entries(root.realms)){const f=g.factions[r];if(!f)continue;const cap=homeCapital(g,world,r);if(!cap){for(const q of h.queue)if(!q.started)changeFunds(g,r,q,1);h.queue=[];continue;}if(h.capital!==cap){h.positions={};h.capital=cap;}const prod=homeProduction(g,r),t=totals(g,r);for(const k of materials)h.stock[k]=Math.min(1000+h.level*700+t.storage*100,integer(h.stock[k])+prod[k]);
+ for(const [r,h] of Object.entries(root.realms)){const f=g.factions[r];if(!f)continue;const cap=homeCapital(g,world,r);if(!cap){for(const q of h.queue)if(!q.started)changeFunds(g,r,q,1);h.queue=[];continue;}if(h.capital!==cap){h.positions={};h.capital=cap;}const prod=homeProduction(g,r),t=totals(g,r),wf=workforceProfile(g,r);for(const k of materials)h.stock[k]=Math.min(1000+h.level*700+t.storage*100,integer(h.stock[k])+prod[k]);
+ h.knowledge=Number(((h.knowledge||0)+(2+t.research*.35)*wf.mult.knowledge).toFixed(1));
+ const builderBoost=wf.mult.build>=1.25&&g.turn%2===0?1:0;
  let slots=Math.min(4,1+Math.floor(h.level/3)),researchSlot=1;const finished=new Set();
- for(const q of h.queue){if(!permitted(g,q.province,r)||(q.type!=='building'&&q.province!==cap)){if(!q.started)changeFunds(g,r,q,1);finished.add(q.id);continue;}if(q.type==='research'){if(!researchSlot)continue;researchSlot--;}else{if(!slots)continue;slots--;}q.started=true;q.remaining--;if(q.remaining>0)continue;
-  if(q.type==='town')h.level=Math.max(h.level,q.target);else if(q.type==='research')h.research[q.key]=Math.max(researchLevel(h,q.key),q.target);else {const p=g.provinces[q.province];if(LEGACY.has(q.key)){p.buildings[q.key]=Math.max(homeLevel(g,q.province,q.key),q.target);p.development=Math.min(20,(p.development||1)+1);if(q.key==='farm')p.unrest=Math.max(0,(p.unrest||0)-3);if(q.key==='fort')p.unrest=Math.max(0,(p.unrest||0)-2);}else{const row=root.buildings[q.province]??={};row[q.key]=Math.max(homeLevel(g,q.province,q.key),q.target);}}
+ for(const q of h.queue){if(!permitted(g,q.province,r)||(q.type!=='building'&&q.province!==cap)){if(!q.started)changeFunds(g,r,q,1);finished.add(q.id);continue;}if(q.type==='research'){if(!researchSlot)continue;researchSlot--;}else{if(!slots)continue;slots--;}q.started=true;q.remaining-=(q.type==='research'?(wf.mult.knowledge>=1.35&&g.turn%3===0?2:1):(1+builderBoost));if(q.remaining>0)continue;
+  if(q.type==='town'){h.level=Math.max(h.level,q.target);recordCapitalMilestone(g,r,'Chartered '+TOWN_NAMES[h.level-1]+' (Town Hall '+h.level+')');}else if(q.type==='research'){h.research[q.key]=Math.max(researchLevel(h,q.key),q.target);if(q.target>=5)recordCapitalMilestone(g,r,'Scholarly breakthrough: '+q.name+' '+q.target);}else {const p=g.provinces[q.province];if(LEGACY.has(q.key)){p.buildings[q.key]=Math.max(homeLevel(g,q.province,q.key),q.target);p.development=Math.min(20,(p.development||1)+1);if(q.key==='farm')p.unrest=Math.max(0,(p.unrest||0)-3);if(q.key==='fort')p.unrest=Math.max(0,(p.unrest||0)-2);}else{const row=root.buildings[q.province]??={};row[q.key]=Math.max(homeLevel(g,q.province,q.key),q.target);}if(['cathedral','citadel','palace','mint','observatory'].includes(q.key)&&q.target===1)recordCapitalMilestone(g,r,'Raised '+q.name);}
   finished.add(q.id);if(r===g.player&&g.log){g.log.unshift({date:g.year+' · month '+(g.month+1),text:q.name+' level '+q.target+' completed.'});g.log=g.log.slice(0,45);}
  }h.queue=h.queue.filter(q=>!finished.has(q.id));
  }}

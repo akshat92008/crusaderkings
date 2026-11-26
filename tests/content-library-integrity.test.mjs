@@ -81,6 +81,23 @@ test('Phase 6: Crossroads Eras and Reign Chapters drive gameplay, epithets, and 
  const restored = restoreGame(snapshot(g), world);
  assert.ok(restored.crossroads?.realms?.portugal?.adopted.includes('oceanic_navigation'));
  assert.ok(restored.reignChapters?.active?.portugal?.objectives?.length === 3);
+
+ // Multi-reign permanent legacy persistence & Crossroads charter reconciliation
+ g.factions.portugal.prestige = 50;
+ assert.ok(crossroadsAction(g, world, 'charter', 'oceanic_navigation').ok);
+ assert.equal(crossroadsModifiers(g, 'portugal').vassalOpinion, 0);
+ const curRulerId = g.politics.realms.portugal.ruler;
+ const heir = Object.values(g.politics.people).find(p => p.alive && p.realm === 'portugal' && p.id !== curRulerId);
+ if (heir) {
+  g.politics.people[curRulerId].alive = false;
+  g.politics.realms.portugal.ruler = heir.id;
+  g.year += 8;
+  initReignChapters(g);
+  const nextRc = reignChaptersView(g, 'portugal');
+  assert.ok(nextRc.legacyLog.length >= 1);
+  assert.ok(nextRc.monuments.length >= 1);
+  assert.ok(nextRc.permanentEffects.trade > 1);
+ }
 });
 
 test('Phase 6: Portraits resolve non-null for all playable realms including boys and girls + cultural frame badges', () => {
