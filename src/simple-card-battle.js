@@ -1,3 +1,4 @@
+import {siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
 // Banner Lines: deterministic, renderer-independent card battles.
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -54,12 +55,25 @@ export function arrangeCardArmy(groups,side,home,preset='balanced'){
 }
 const soldiers=g=>g.routed?0:Math.max(0,g.troopCount*clamp(g.life/100,0,1));
 export function fieldActiveCount(groups,side){return Math.round(groups.filter(g=>g.side===side&&!g.reserve&&!g.routed).reduce((n,g)=>n+soldiers(g),0));}
-export function cardBattleOutcome(groups,elapsed,defenseMode=false){
+export function cardBattleOutcome(groups,elapsed,defenseMode=false,siege=null){
  const strength=side=>groups.filter(g=>g.side===side).reduce((n,g)=>n+soldiers(g),0);
  const a=strength('attacker'),b=strength('defender');
- if(a>0&&b>0&&elapsed<CARD_BATTLE_LIMIT)return null;
+ const breached=!siege||siegeBreached(siege);
+ const assaultSide=siege?.assaultSide||'attacker';
+ const assaultAlive=assaultSide==='attacker'?a>0:b>0;
+ const holdAlive=assaultSide==='attacker'?b>0:a>0;
+ if(assaultAlive&&(holdAlive||!breached)&&elapsed<CARD_BATTLE_LIMIT)return null;
  const tie=Math.abs(a-b)<0.5;
- return {victory:tie?!!defenseMode:a>b,reason:tie?'deadlock':a<=0||b<=0?'field secured':'time limit',attacker:a,defender:b};
+ let victory=tie?!!defenseMode:a>b;
+ let reason=tie?'deadlock':a<=0||b<=0?'field secured':'time limit';
+ if(siege&&!breached){
+  victory=assaultSide!=='attacker';
+  reason=assaultAlive?'walls held':'assault repelled';
+ }else if(siege&&breached&&!holdAlive&&assaultAlive){
+  victory=assaultSide==='attacker';
+  reason='fortress breached';
+ }
+ return siege?{victory,reason,attacker:a,defender:b,fortBreached:breached}:{victory,reason,attacker:a,defender:b};
 }
 export function cardCounter(g,e){
  const a=cardRole(g),b=cardRole(e);
@@ -75,27 +89,68 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  state.effects=(state.effects||[]).filter(e=>(e.age+=dt)<e.duration);
  state.projectiles=(state.projectiles||[]).filter(p=>(p.t+=dt*2.3)<=1);
  const groups=state.groups.slice().sort(byId),live=groups.filter(g=>!g.reserve&&!g.routed&&g.life>0&&g.troopCount>0);
+ const siege=state.siege||null,siegeActive=!!siege&&!siegeBreached(siege),assaultSide=siege?.assaultSide||'attacker';
+ const engines=siege?(assaultSide==='attacker'?siege.attackerEngines:siege.defenderEngines):null;
+ const sharedEnginePower=engines?(engines.ram||0)*12+(engines.catapult||0)*20+(engines.bombard||0)*32:0;
+ const hasArtillery=!!(engines&&((engines.catapult||0)>0||(engines.bombard||0)>0));
+ const assaultCount=Math.max(1,live.filter(g=>g.side===assaultSide).length);
  const snapshot=new Map(live.map(g=>[g.id,{x:g.x,z:g.z,life:g.life}])),hits=new Map(),targetLoad=new Map();
  for(const g of groups){
   g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.hitFlash=Math.max(0,(g.hitFlash||0)-dt);g.deployFlash=Math.max(0,(g.deployFlash||0)-dt);g.skirmishing=false;
   if(g.reserve){g.moving=false;g.status='reserve';continue;}
   if(g.routed){g.routAge=(g.routAge||0)+dt;g.moving=true;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;const home=g.homeDirection||1;g.z=clamp(g.z+home*dt*5,-46,46);continue;}
   const enemies=live.filter(e=>e.side!==g.side),pos=snapshot.get(g.id);
-  if(!pos||!enemies.length){g.moving=false;continue;}
+  const structure=siegeActive&&g.side===assaultSide?siegeTarget(siege,g):null;
+  if(!pos||(!enemies.length&&!structure)){g.moving=false;continue;}
+  const role=cardRole(g),form=g.formationId||'';
+  const terrain=terrainInfo?.(g);
+  g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
+  const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1);
+  const regSiegePower=Number.isFinite(g.siegePower)?g.siegePower:Number.isFinite(g.readiness?.siege)?g.readiness.siege:(sharedEnginePower/assaultCount);
+  const isArtillery=hasArtillery||regSiegePower>=20;
+  // During an active siege before breach, assaulting regiments attack the gate/towers unless non-artillery archers have an enemy in range.
+  const rangedEnemy=structure&&role==='ranged'&&!isArtillery?enemies.filter(e=>distance(pos,snapshot.get(e.id))<=reach).sort((a,b)=>distance(pos,snapshot.get(a.id))-distance(pos,snapshot.get(b.id))||byId(a,b))[0]||null:null;
+  if(structure&&!rangedEnemy){
+   const dx=structure.x-pos.x,dz=structure.z-pos.z,d=Math.hypot(dx,dz);
+   const structReach=role==='ranged'?clamp(g.range||14,10,22):isArtillery?16:clamp(g.range||2.5,2.5,4.2);
+   const step=Math.min(Math.max(0,d-structReach*.85),speed*dt);
+   g.moving=step>0.01;g.vx=d?dx/d*step/dt:0;g.vz=d?dz/d*step/dt:0;
+   if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
+   if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,-16.5,46);g.distanceMoved=(g.distanceMoved||0)+step;}
+   for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,-16.5,46);}
+   g.targetX=structure.x;g.targetZ=structure.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
+   g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.moving?'advancing':'besieging';
+   g.statusFlags=['SIEGE'];
+   if(d<=structReach&&g.cooldown<=1e-8){
+    g.cooldown=role==='ranged'?1.15:.9;
+    g.attackPulse=role==='ranged'?.45:.35;g.attackSerial=(g.attackSerial||0)+1;
+    const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65);
+    const troopBattering=clamp(soldiers(g)*(role==='ranged'?.014:.044)*quality,.4,18);
+    const structDmg=troopBattering+regSiegePower*.34;
+    const destroyed=siegeDamage(siege,structure.id,structDmg);
+    if(isArtillery||role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:structure.x,tz:structure.z,t:0,kind:isArtillery?'shot':'arrow'});
+    state.effects.push({kind:'impact',x:structure.x,z:structure.z,age:0,duration:.35});
+    if(destroyed){
+     state.effects.push({kind:'breach',x:structure.x,z:structure.z,age:0,duration:1.2});
+     if(siegeBreached(siege)){siege.breachedAt=state.fieldTime;for(const u of groups)u.cardTargetId=null;}
+    }
+   }
+   continue;
+  }
+  if(!enemies.length){g.moving=false;continue;}
   const score=e=>distance(pos,snapshot.get(e.id))+(g.lane!==e.lane?3:0)+(cardRole(g)==='mounted'&&cardRole(e)==='ranged'?-6:0)+Math.min(10,Math.max(0,(targetLoad.get(e.id)||0)/Math.max(1,soldiers(e))-1)*4);
   const best=enemies.slice().sort((a,b)=>score(a)-score(b)||byId(a,b))[0],old=enemies.find(e=>e.id===g.cardTargetId);
-  const e=old&&score(old)<=score(best)+4?old:best;g.cardTargetId=e.id;targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
- const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz),role=cardRole(g),form=g.formationId||'';
- const terrain=terrainInfo?.(g),enemyTerrain=terrainInfo?.(e);
- g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
- const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1);
+  const e=rangedEnemy||(old&&score(old)<=score(best)+4?old:best);g.cardTargetId=e.id;targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
+ const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz);
+ const enemyTerrain=terrainInfo?.(e);
  let step=Math.min(Math.max(0,d-reach*.88),speed*dt),moveDir=1;
  if(form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
  g.moving=step>0.01;g.vx=d?moveDir*dx/d*step/dt:0;g.vz=d?moveDir*dz/d*step/dt:0;
  if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
- if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,-46,46);g.distanceMoved=(g.distanceMoved||0)+step;}
+ const minZ=siegeActive&&g.side===assaultSide?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
+ if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;}
  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
- for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,-46,46);}
+ for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,minZ,maxZ);}
  g.targetX=target.x;g.targetZ=target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
  g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.skirmishing?'skirmishing':g.moving?'moving':'engaging';
  g.statusFlags=[];
@@ -103,12 +158,14 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  if(form==='shield_wall'||form==='pike_square')g.statusFlags.push('BRACED');
  if((form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6)g.statusFlags.push('CHARGE');
  if(form==='ambush'&&terrain?.inForestCover)g.statusFlags.push('AMBUSH');
+ if(siegeActive&&g.side!==assaultSide)g.statusFlags.push('GARRISON');
  if(d>reach||g.cooldown>1e-8)continue;
  g.cooldown=form==='longbow_line'?.95:form==='volley_line'?1.04:role==='ranged'?1.15:.85;
  g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
  const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65),protection=clamp(e.armor||1,.75,1.65);
  const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
- const cover=role==='ranged'?clamp(enemyTerrain?.rangedMitigation??1,.8,1):1;
+ const wallCover=siegeActive&&e.side!==assaultSide?.72:1;
+ const cover=role==='ranged'?clamp((enemyTerrain?.rangedMitigation??1)*wallCover,.55,1):1;
  const highGround=(terrain?.height??0)-(enemyTerrain?.height??0)>.75?(form==='longbow_line'||form==='volley_line'?1.16:1.1):1;
  const chargeReady=(form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6;
  const flanking=(form==='flank'||form==='encirclement')&&((targetLoad.get(e.id)||0)>soldiers(g)*1.05||Math.abs(pos.x-target.x)>=12);

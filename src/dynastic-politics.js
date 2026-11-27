@@ -493,6 +493,49 @@ export function politicsAction(g,world,action,id,extra){
  return {ok:true,msg:'Vassal agreement updated.'};
 }
 
+function succeedRealmCrown(g,world,p,c,realm,estateHeir){
+ const s=p.realms[realm];
+ if(!s)return estateHeir;
+ let h=successor(p,realm,g);
+ if(!h)h=Object.values(p.people).filter(x=>x.alive&&x.realm===realm&&x.house===c.house&&x.id!==c.id&&!x.bastard&&!isImprisoned(g,x.id)&&!crownExcluded(x,realm)&&crownPolicyEligible(g,realm,x)).sort((a,b)=>b.age-a.age)[0]||person(g,realm,30,{house:allocateHouseName(g,{realm,seed:`successor:${realm}:${c.id}:${g.turn}`}),...(crownPolicy(g,realm).gender==='female_only'?{sex:'female'}:crownPolicy(g,realm).gender==='male_only'?{sex:'male'}:{})});
+ const nextEstateHeir=estateHeir||h;
+ const rulesElsewhere=Object.entries(p.realms).some(([rId,rs])=>rId!==realm&&rs?.ruler===h.id);
+ if(!rulesElsewhere&&h.realm!==realm)h.realm=realm;
+ s.ruler=h.id;delete s.nominee;
+ partitionInheritance(g,realm,c,h);
+ // Propagate heritable claims from deceased to primary heir as weak claims.
+ for(const cl of Object.values(g.feudal?.claimants||{})){
+  if(cl.person===c.id&&cl.heritable&&cl.realm!==realm)addClaim(g,h.id,cl.realm,{titleId:cl.titleId,strength:'weak',from:c.id,heritable:false});
+ }
+ for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:allocateHouseName(g,{realm,seed:`court:${role}:${c.id}:${g.turn}`})}).id;
+ g.kingdom.courts[realm].successions++;
+ g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy-12,0,100);
+ for(const v of Object.values(p.holdings))if(v.realm===realm)v.loyalty=clamp(v.loyalty-12,0,100);
+ // Post-succession claimant crisis / dispute flags.
+ s.successionTurn=g.turn;
+ if(h.age<18||g.factions[realm].legitimacy<55){
+  const closePretenders=Object.values(p.people).filter(k=>k.alive&&k.realm===realm&&k.id!==h.id&&k.id!==c.id&&k.age>=18&&!isImprisoned(g,k.id)&&(k.house===h.house||c.parents?.some(pid=>k.parents?.includes(pid)))&&((k.traits||[]).includes('ambitious')||(k.personality?.boldness??0)>=50||(k.personality?.greed??0)>=50));
+  for(const k of closePretenders){
+   addClaim(g,k.id,realm,{titleId:'k:'+realm,strength:'weak',from:c.id,heritable:false});
+   changeOpinion(g,k.id,h.id,-18);
+  }
+ }
+ const claimants=claimantCandidates(g,realm);
+ const crisisReasons=[];
+ if(h.age<18)crisisReasons.push('minority');
+ if(g.factions[realm].legitimacy<55)crisisReasons.push('low_legitimacy');
+ if(claimants.length)crisisReasons.push('pretenders');
+ if(crownPolicy(g,realm).gender==='male_preference'&&h.sex==='female')crisisReasons.push('contested_gender');
+ if(crisisReasons.length){
+  s.claimantCrisis={active:true,started:g.turn,until:g.turn+24,ruler:h.id,reasons:crisisReasons,pretenders:claimants.map(x=>x.person)};
+  if(realm===g.player)log(g,'Succession crisis: rival claimants contest '+h.name+'’s accession.');
+ }else{
+  delete s.claimantCrisis;
+ }
+ if(realm===g.player)log(g,c.name+' died. '+h.name+' inherited the crown.');
+ return nextEstateHeir;
+}
+
 function death(g,world,c){
  const p=g.politics;
  rememberBereavement(g,c);
@@ -517,42 +560,12 @@ function death(g,world,c){
 
  const realm=c.realm,s=p.realms[realm];
  let estateHeir=hereditaryLine(g,c)[0]||null;
- if(s?.ruler===c.id){
-  let h=successor(p,realm,g);
-  if(!h)h=Object.values(p.people).filter(x=>x.alive&&x.realm===realm&&x.house===c.house&&x.id!==c.id&&!x.bastard&&!isImprisoned(g,x.id)&&!crownExcluded(x,realm)&&crownPolicyEligible(g,realm,x)).sort((a,b)=>b.age-a.age)[0]||person(g,realm,30,{house:allocateHouseName(g,{realm,seed:`successor:${realm}:${c.id}:${g.turn}`}),...(crownPolicy(g,realm).gender==='female_only'?{sex:'female'}:crownPolicy(g,realm).gender==='male_only'?{sex:'male'}:{})});
-  estateHeir=estateHeir||h;
-  s.ruler=h.id;delete s.nominee;
-  partitionInheritance(g,realm,c,h);
-  // Propagate heritable claims from deceased to primary heir as weak claims.
-  for(const cl of Object.values(g.feudal?.claimants||{})){
-   if(cl.person===c.id&&cl.heritable&&cl.realm!==realm)addClaim(g,h.id,cl.realm,{titleId:cl.titleId,strength:'weak',from:c.id,heritable:false});
-  }
-  for(const [role,id] of Object.entries(s.council))if(id===h.id)s.council[role]=person(g,realm,35,{house:allocateHouseName(g,{realm,seed:`court:${role}:${c.id}:${g.turn}`})}).id;
-  g.kingdom.courts[realm].successions++;
-  g.factions[realm].legitimacy=clamp(g.factions[realm].legitimacy-12,0,100);
-  for(const v of Object.values(p.holdings))if(v.realm===realm)v.loyalty=clamp(v.loyalty-12,0,100);
-  // Post-succession claimant crisis / dispute flags.
-  s.successionTurn=g.turn;
-  if(h.age<18||g.factions[realm].legitimacy<55){
-   const closePretenders=Object.values(p.people).filter(k=>k.alive&&k.realm===realm&&k.id!==h.id&&k.id!==c.id&&k.age>=18&&!isImprisoned(g,k.id)&&(k.house===h.house||c.parents?.some(pid=>k.parents?.includes(pid)))&&((k.traits||[]).includes('ambitious')||(k.personality?.boldness??0)>=50||(k.personality?.greed??0)>=50));
-   for(const k of closePretenders){
-    addClaim(g,k.id,realm,{titleId:'k:'+realm,strength:'weak',from:c.id,heritable:false});
-    changeOpinion(g,k.id,h.id,-18);
-   }
-  }
-  const claimants=claimantCandidates(g,realm);
-  const crisisReasons=[];
-  if(h.age<18)crisisReasons.push('minority');
-  if(g.factions[realm].legitimacy<55)crisisReasons.push('low_legitimacy');
-  if(claimants.length)crisisReasons.push('pretenders');
-  if(crownPolicy(g,realm).gender==='male_preference'&&h.sex==='female')crisisReasons.push('contested_gender');
-  if(crisisReasons.length){
-   s.claimantCrisis={active:true,started:g.turn,until:g.turn+24,ruler:h.id,reasons:crisisReasons,pretenders:claimants.map(x=>x.person)};
-   if(realm===g.player)log(g,'Succession crisis: rival claimants contest '+h.name+'’s accession.');
-  }else{
-   delete s.claimantCrisis;
-  }
-  if(realm===g.player)log(g,c.name+' died. '+h.name+' inherited the crown.');
+ const ruledRealms=Object.entries(p.realms)
+  .filter(([rId,rs])=>rs?.ruler===c.id&&!unionJuniorDomain(g,rId,c.id))
+  .map(([rId])=>rId)
+  .sort((a,b)=>(a===realm?-1:b===realm?1:a.localeCompare(b)));
+ for(const ruledRealm of ruledRealms){
+  estateHeir=succeedRealmCrown(g,world,p,c,ruledRealm,estateHeir);
  }
 
  // Revert viceroyalties cleanly to the crown before hereditary title & holding distribution.
@@ -608,6 +621,15 @@ function death(g,world,c){
 
  if(s)reconcileRegency(g,realm);
  reconcilePersonalUnions(g);reconcileMarriageTreaties(g);
+ for(const [rId,rs] of Object.entries(p.realms)){
+  if(!p.people[rs.ruler]?.alive){
+   const deadRuler=p.people[rs.ruler]||c;
+   estateHeir=succeedRealmCrown(g,world,p,deadRuler,rId,estateHeir);
+   for(const [,vh] of Object.entries(p.holdings))if(vh.realm===rId&&vh.lord===deadRuler.id){vh.lord=rs.ruler;vh.loyalty=clamp(vh.loyalty-8,0,100);}
+   reconcileRegency(g,rId);sync(g,rId);
+  }
+ }
+ syncTitles(g);
 }
 
 export function removePoliticalCharacter(g,world,id){

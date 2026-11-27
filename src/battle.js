@@ -436,6 +436,7 @@ function buildBattleSummaryReasons({
   tacticalStats,
   tacticalBySide,
   fieldBattle,
+  hasSiege = false,
   fortBreached,
   elapsed,
   groups
@@ -463,7 +464,7 @@ function buildBattleSummaryReasons({
     add(82, victory ? 'Tactical execution overcame superior enemy numbers' : 'Enemy tactics overcame a numerical disadvantage');
   }
 
-  if (!fieldBattle) {
+  if (!fieldBattle || hasSiege) {
     if (victory && fortBreached) add(92, 'Breached fortifications opened the assault');
     else if (!victory && !fortBreached) add(92, 'Intact fortifications repelled the assault');
   }
@@ -546,7 +547,8 @@ export class BattleGame {
 
     this.canvas = canvas;
     this.descriptor = descriptor;
-    this.simpleField = !!descriptor.simpleField && !!descriptor.fieldBattle;
+    const isSiege = !!descriptor.siegeMode || (!descriptor.fieldBattle && !descriptor.showcase);
+    this.simpleField = !!descriptor.simpleField && (!!descriptor.fieldBattle || !!descriptor.siegeMode);
     this.game = game;
     this.onFinish = onFinish;
     this.onStatus = onStatus;
@@ -576,7 +578,8 @@ export class BattleGame {
     const coarse = win?.matchMedia?.('(pointer: coarse)')?.matches || false;
     const province = game?.provinces?.[descriptor.to];
     const staticProv = game?.world?.provinces?.find?.(p => p.id === descriptor.to);
-    const fortLevel = descriptor.fieldBattle ? 0 : province?.buildings?.fort || 0;
+    const rawFort = descriptor.fortLevel ?? (province?.buildings?.fort || 0);
+    const fortLevel = isSiege ? (descriptor.siegeMode ? Math.max(1, rawFort) : rawFort) : 0;
     const desertFactions = new Set(['mamluks', 'delhi', 'bahmani', 'gujarat', 'malwa', 'morocco', 'tunis', 'mali', 'songhai', 'arabia', 'timurids', 'persia', 'oman', 'yemen', 'safavids']);
     const biome = desertFactions.has(game?.player) || desertFactions.has(descriptor.enemy) ? 'desert' : 'temperate';
     this.biome = biome;
@@ -674,7 +677,28 @@ export class BattleGame {
         ? { ...enemyArmy, ...Object.fromEntries(['infantry', 'archers', 'cavalry'].map(t => [t, (enemyArmy[t] || 0) + (descriptor.defenseMode ? 0 : startingTroops(enemy, descriptor.defenseGarrison || 0)[t])])) }
         : startingTroops(enemy, Math.max(95, (descriptor.defenseTroops || 0) + (descriptor.defenseMode ? 0 : descriptor.defenseGarrison || 0)));
 
-    this.siege = descriptor.fieldBattle ? null : createSiegeState(game?.provinces?.[descriptor.to]?.buildings?.fort || 0, !!descriptor.defenseMode);
+    this.siege = isSiege ? createSiegeState(fortLevel, !!descriptor.defenseMode) : null;
+    if (this.siege) {
+      const sumEngines = armies => {
+        const out = { ram: 0, catapult: 0, bombard: 0 };
+        for (const arm of armies || []) {
+          const eng = game?.military?.armies?.[arm?.id]?.engines;
+          if (!eng) continue;
+          out.ram += Math.max(0, Number(eng.ram) || 0);
+          out.catapult += Math.max(0, Number(eng.catapult) || 0);
+          out.bombard += Math.max(0, Number(eng.bombard) || 0);
+        }
+        return out;
+      };
+      const atkArmies = alliedFieldArmies.length ? alliedFieldArmies : (fieldArmy ? [fieldArmy] : []);
+      const defArmies = hostileFieldArmies.length ? hostileFieldArmies : (enemyArmy ? [enemyArmy] : []);
+      this.siege.attackerEngines = descriptor.attackerEngines
+        ? { ram: 0, catapult: 0, bombard: 0, ...descriptor.attackerEngines }
+        : sumEngines(atkArmies);
+      this.siege.defenderEngines = descriptor.defenderEngines
+        ? { ram: 0, catapult: 0, bombard: 0, ...descriptor.defenderEngines }
+        : sumEngines(defArmies);
+    }
     this.groups = [];
 
     const slotCount = force => this.simpleField ? Math.min(12, Math.max(3, Math.ceil((force.infantry + force.archers + force.cavalry) / 100))) : 6;
@@ -786,6 +810,12 @@ export class BattleGame {
     if(this.simpleField){
       arrangeCardArmy(this.groups,'attacker',descriptor.defenseMode?-1:1);
       arrangeCardArmy(this.groups,'defender',descriptor.defenseMode?1:-1);
+      if (this.siege) {
+        const holdSide = this.siege.assaultSide === 'attacker' ? 'defender' : 'attacker';
+        for (const g of this.groups) {
+          if (g.side === holdSide) moveCard(g, { x: g.x, z: Math.min(-24, -Math.abs(g.z) - 8) });
+        }
+      }
       this.camera.distance=105;
     }
     this.selected = 0;
@@ -1302,9 +1332,9 @@ export class BattleGame {
 
     for (let step = 0; step < subSteps && !this.done; step++) {
       this.elapsed += sdt;
-      if (this.descriptor?.fieldBattle) {
+      if (this.descriptor?.fieldBattle || this.simpleField) {
         if (this.nextFieldPlan === undefined || this.elapsed >= this.nextFieldPlan) {
-          if (this.simpleField) this.enemyPosture = 'Advancing';
+          if (this.simpleField) this.enemyPosture = this.siege ? 'Holding Walls' : 'Advancing';
           else coordinateFieldAI(this);
           this.nextFieldPlan = this.elapsed + 4;
         }
@@ -1317,7 +1347,7 @@ export class BattleGame {
         }
         stepField(this, sdt);
         this.audio?.update(this.groups, this.elapsed, this.camera);
-        if(this.simpleField){const outcome=cardBattleOutcome(this.groups,this.elapsed,!!this.descriptor.defenseMode);if(outcome){this.finishReason=outcome.reason;this.finish(outcome.victory,outcome.attacker,outcome.defender);return;}continue;}
+        if(this.simpleField){const outcome=cardBattleOutcome(this.groups,this.elapsed,!!this.descriptor.defenseMode,this.siege);if(outcome){this.finishReason=outcome.reason;this.finish(outcome.victory,outcome.attacker,outcome.defender);return;}continue;}
         const activeAttackers = this.groups.some(g => g.side === 'attacker' && !g.routed && (g.life ?? 0) > 0 && (g.troopCount ?? g.maxTroops ?? 1) > 0);
         const activeDefenders = this.groups.some(g => g.side === 'defender' && !g.routed && (g.life ?? 0) > 0 && (g.troopCount ?? g.maxTroops ?? 1) > 0);
         const l = fieldStrength(this.groups, 'attacker');
@@ -1766,7 +1796,7 @@ export class BattleGame {
     }
     if(!this.ctx?.isBannerRenderer)this.updateCamera(Math.min(dt, 0.05));
     const before = this.elapsed;
-    if (this.descriptor.fieldBattle) {
+    if (this.descriptor?.fieldBattle || this.simpleField) {
       const next = fieldFrameSteps(this.frameRemainder, dt, !this.paused && !this.done);
       this.frameRemainder = next.remainder;
       for (let i = 0; i < next.steps && !this.done; i++) this.update(1 / 30);
@@ -1803,6 +1833,7 @@ export class BattleGame {
       tacticalStats,
       tacticalBySide: this.tacticalBySide,
       fieldBattle: !!this.descriptor?.fieldBattle,
+      hasSiege: !!this.siege,
       fortBreached: !!this.siege && siegeBreached(this.siege),
       elapsed: this.elapsed,
       groups: this.groups

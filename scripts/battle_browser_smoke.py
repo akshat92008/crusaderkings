@@ -6,17 +6,24 @@ import threading
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
+CHROME = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+ThreadingHTTPServer.request_queue_size = 128
 server = ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(ROOT)))
+server.daemon_threads = True
 threading.Thread(target=server.serve_forever, daemon=True).start()
 base = 'http://127.0.0.1:' + str(server.server_port)
 errors = []
 
 try:
     with sync_playwright() as p:
+        flags = ['--no-sandbox', '--disable-dev-shm-usage']
+        launch_kw = {'args': flags}
+        if CHROME.exists():
+            launch_kw['executable_path'] = str(CHROME)
         try:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
+            browser = p.chromium.launch(headless=True, **launch_kw)
         except Exception:
-            browser = p.chromium.launch(channel='chrome', headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
+            browser = p.chromium.launch(channel='chrome', headless=True, args=flags)
         page = browser.new_page(viewport={'width': 1600, 'height': 900}, device_scale_factor=1)
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(base, wait_until='domcontentloaded', timeout=45000)

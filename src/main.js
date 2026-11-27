@@ -10,7 +10,7 @@ import {historicalContext,HISTORICAL_LIMITATION} from './historical-context.js';
 import {createPageHistory,campaignGuide,speedDelay} from './interface-experience.js';
 import {landlessAction,renderLandless} from './landless-systems.js';
 import {councilTaskAction} from './council-tasks.js';
-import {battleComparison,portraitMark,successionWarningSummary,tooltipData} from './campaign-hud.js';
+import {battleComparison,formatStabilityTooltip,formatTreasuryTooltip,portraitMark,successionWarningSummary,tooltipData} from './campaign-hud.js';
 import {campaignOutliner,renderCampaignOutliner,renderPinButton,toggleCampaignPin} from './campaign-outliner.js';
 import {characterLink,contextualButton,realmWarContext,sectionLink} from './campaign-context.js';
 import {marriageCandidates} from './dynastic-politics.js';
@@ -138,7 +138,11 @@ function cancelMarch(){marchFrom=null;map.setMarchOrigin(null);el('cancel-march'
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);cancelMarch();if(r.ok&&r.type==='battle'){if(openBattle(r))return;message('Could not open battle. No campaign casualties were applied.');return;}clickResult(r);}
  selected=id;map.select(id);renderInspector();setDrawer('province');}
 function render(){if(!game)return;const f=player(),s=empireStats(game,game.player),career=careerView(game);
- el('resource-prestige').textContent=fmt(f.prestige||0);el('resource-legitimacy').textContent=fmt(f.legitimacy||0)+'%';el('resource-gold').parentElement.parentElement.title=career?'Personal gold; estate funds shown in career panel':'Treasury '+fmt(f.treasury)+' · monthly balance '+fmt(s.balance);el('resource-gold').textContent=fmt(career?career.person?.wealth||0:f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
+ const goldTip=career?`Personal wealth ${fmt(career.person?.wealth||0)}g · estate funds shown in career panel`:formatTreasuryTooltip(f,s);
+ const goldPill=el('resource-gold')?.closest('.resource');if(goldPill){goldPill.dataset.tooltip=goldTip;goldPill.title=goldTip;}
+ const stabPill=el('resource-stability')?.closest('.resource');if(stabPill)stabPill.dataset.tooltip=formatStabilityTooltip(f,s);
+ const armyPill=el('resource-army')?.closest('.resource');if(armyPill)armyPill.dataset.tooltip=`Total soldiers across ${fmt(s.provinces)} provinces: ${fmt(s.troops)}`;
+ el('resource-prestige').textContent=fmt(f.prestige||0);el('resource-legitimacy').textContent=fmt(f.legitimacy||0)+'%';el('resource-gold').textContent=fmt(career?career.person?.wealth||0:f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
  const ruler=career?career.person:game.politics?.people?.[game.politics?.realms?.[game.player]?.ruler],mark=portraitMark(ruler);el('hud-ruler').hidden=!ruler;el('hud-ruler-name').textContent=(ruler?.name||'—')+(ruler&&personalDilemmas(game,ruler.id).length?' · !':'');const succWarn=career?null:successionWarningSummary(game);const warnEl=el('hud-succession-warning');if(warnEl){warnEl.hidden=!succWarn;warnEl.textContent=succWarn?'⚠ '+succWarn.label:'';warnEl.title=succWarn?.detail||'';}el('hud-portrait').innerHTML=(portraitImage(ruler)||esc(mark.initials)).replace('loading="lazy"','loading="eager"');el('hud-portrait').style.background=mark.color;el('quick-nav').hidden=false;el('open-management').textContent=career?'Manage career':'Manage kingdom';for(const b of el('quick-nav').querySelectorAll('[data-priority-tab]'))b.hidden=!!career&&!CAREER_TABS.includes(b.dataset.priorityTab);const outliner=campaignOutliner(game,world);el('outliner-count').textContent=outliner.count;el('outliner-list').innerHTML=renderCampaignOutliner(outliner,esc);el('faction-name').textContent=f.name;el('faction-government').textContent=career?'Vassal career':f.government;
  el('faction-flag').style.background=f.color;el('faction-flag').innerHTML=(assetImage(realmArt(f.id),'realm-emblem')||'♛').replace('loading="lazy"','loading="eager"');
  el('world-counter').title=world.meta.caveat;el('world-counter').textContent=`${world.provinces.length} DISTRICTS · ${Object.values(game.factions).filter(q=>q.id!=='independent'&&Object.values(game.provinces).some(p=>p.owner===q.id)).length} REALMS`;
@@ -308,10 +312,14 @@ function maybePopupEventModal(prevKeys=new Set()){
 }
 function start(id){el('hometown-screen').hidden=true;pageHistory.reset();characterId=null;tab='realm';deferredModalEvents.clear();closeEventModal();useWorld(atlasWorld);game=createGame(world,id);game.kingdom.difficulty=el('start-difficulty').value;el('start-screen').hidden=true;document.body.classList.add('in-campaign');document.body.classList.remove('in-battle');selected=capitalDistrict(world,id)?.id||null;map.setGame(game);if(selected)map.select(selected);const f=player();map.focus(...(staticById[selected]?.centroid||f.capital),3.2);browserCampaignAudio.unlock();browserCampaignAudio.playSfx('seal');render();save(false);syncAudioState();}
 function updateSoundButton(){const b=el('battle-sound');b.setAttribute('aria-pressed',String(battleSound));b.textContent=battleSound?'Sound on':'Sound off';}
-function openBattle(desc){el('hometown-screen').hidden=true;setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();desc.interactive=true;desc.fieldBattle=true;desc.simpleField=true;desc.bannerView=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;document.body.classList.add('in-battle');
+function openBattle(desc){el('hometown-screen').hidden=true;setDrawer(null);closeEventModal();desc.soundEnabled=battleSound;updateSoundButton();
+ const fortLevel=desc.fortLevel??(game?.provinces?.[desc.to]?.buildings?.fort||0);
+ if(!desc.showcase&&!desc.openField&&fortLevel>0){desc.siegeMode=true;desc.fortLevel=fortLevel;}
+ const siege=Boolean(desc.siegeMode);
+ desc.interactive=true;desc.fieldBattle=!siege;desc.simpleField=true;desc.bannerView=true;el('battle-screen').hidden=false;el('battle-result').hidden=true;document.body.classList.add('in-battle');
  el('battle-move-tap').setAttribute('aria-pressed','false');el('battle-camera').value='overview';el('battle-camera').hidden=true;el('battle-zoom-in').hidden=false;el('battle-zoom-out').hidden=false;if(el('battle-speed'))el('battle-speed').textContent='1×';if(el('battle-rally')){el('battle-rally').disabled=true;el('battle-rally').textContent='⚑ RALLY';}
- el('battle-title').textContent=desc.showcase?'BATTLE SHOWCASE · FIELD BATTLE':desc.defenseMode?'DEFEND '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase();
- el('battle-meta').textContent=desc.showcase?'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN':`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE BATTLE':'FIELD BATTLE'}`;
+ el('battle-title').textContent=desc.showcase?(siege?'BATTLE SHOWCASE · FORTRESS SIEGE':'BATTLE SHOWCASE · FIELD BATTLE'):desc.defenseMode?(siege?'DEFEND FORT · '+desc.to.toUpperCase():'DEFEND '+desc.to.toUpperCase()):(siege?'SIEGE OF '+desc.to.toUpperCase():'ASSAULT '+desc.to.toUpperCase());
+ el('battle-meta').textContent=desc.showcase?(siege?`PRACTICE SIEGE · FORT LV. ${desc.fortLevel||2} · NO EFFECT ON CAMPAIGN`:'PRACTICE BATTLE · NO EFFECT ON CAMPAIGN'):`${player().name.toUpperCase()} VS ${ownerName(game,desc.enemy).toUpperCase()} · ${desc.defenseMode?'DEFENSIVE':siege?'SIEGE ASSAULT':'FIELD'} BATTLE`;
  if(desc.alliedTroops)el('battle-meta').textContent+=' · '+fmt(desc.alliedTroops)+' ALLIED TROOPS';
  el('battle-units').dataset.deckKey='';battleDescriptor=desc;try{battle=new BattleGame(freshBattleCanvas(el('battle-canvas')),desc,game,onBattleFinished,onBattleStatus,{overlayCanvas:el('battle-overlay')});document.body.style.overflow='hidden';syncAudioState();return true;}catch(e){battleDescriptor=null;el('battle-screen').hidden=true;syncAudioState();message(`Battle couldn't start: ${e.message}`);return false;}}
 function onBattleStatus(status){
@@ -581,16 +589,19 @@ el('campaign-sound')?.addEventListener('click',()=>{
 });
 el('battle-rally')?.addEventListener('click',()=>{if(battle&&!battle.deployment)browserCampaignAudio.playSfx('rally');});
 el('mobile-battle-shortcut')?.addEventListener('click',()=>el('battle-showcase').click());
-el('battle-showcase').addEventListener('click',()=>{
- if(!game){message('Begin your reign before opening a practice battle.');return;}
+function launchShowcaseBattle({siegeMode=false,fortLevel=0}={}){
+ if(!game){message(`Begin your reign before opening a practice ${siegeMode?'siege':'battle'}.`);return;}
  if(battle){message('A battle is already in progress.');return;}
  const armyEntry=Object.entries(game.armies).find(([,a])=>a.owner===game.player&&armySize(a)>0&&!game.naval?.voyages?.[a.id]);
- if(!armyEntry){message('Recruit at least one army to enter the battle showcase.');return;}
- const target=world.provinces.find(p=>{const owner=game.provinces[p.id]?.owner;return owner&&owner!==game.player&&game.factions[owner];});
+ if(!armyEntry){message(`Recruit at least one army to enter the ${siegeMode?'siege':'battle'} showcase.`);return;}
+ const isRivalProv=p=>{const owner=game.provinces[p.id]?.owner;return owner&&owner!==game.player&&game.factions[owner];};
+ const target=(siegeMode&&world.provinces.find(p=>isRivalProv(p)&&(game.provinces[p.id]?.buildings?.fort||0)>0))||world.provinces.find(isRivalProv);
  if(!target){message('No opposing provinces are available.');return;}
  const enemy=game.provinces[target.id].owner;
- openBattle({attacker:armyEntry[0],enemy,to:target.id,defenseTroops:110,defenseGarrison:80,showcase:true});
-});
+ openBattle({attacker:armyEntry[0],enemy,to:target.id,defenseTroops:110,defenseGarrison:siegeMode?90:80,showcase:true,openField:!siegeMode,siegeMode,fortLevel});
+}
+el('battle-showcase').addEventListener('click',()=>launchShowcaseBattle());
+el('battle-siege-showcase')?.addEventListener('click',()=>launchShowcaseBattle({siegeMode:true,fortLevel:2}));
 el('battle-move-tap').addEventListener('click',()=>{if(battle){battle.tapMove=!battle.tapMove;battle.report();}});
 for(const [id,delta] of [['battle-zoom-in',-12],['battle-zoom-out',12]])el(id).addEventListener('click',()=>{if(!battle)return;if(battle.ctx?.isBannerRenderer){battle.ctx.setZoom(battle.ctx.zoom+(delta<0?.18:-.18));return;}battle.cameraGoal=null;battle.camera.distance=Math.max(35,Math.min(165,battle.camera.distance+delta));});
 el('battle-camera').addEventListener('change',e=>{if(battle&&!battle.focusCamera(e.target.value))message('Select an active regiment.');});

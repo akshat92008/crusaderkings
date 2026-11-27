@@ -71,14 +71,24 @@ export function reconcilePersonalUnions(g){
   const primary=ruler(g,u.senior),secondary=ruler(g,u.junior),old=person(g,u.monarch);
   if(!primary||!secondary){delete root.unions[u.id];continue;}
   if(secondary.id!==u.monarch){split(g,u,'the junior crown installed a different sovereign');continue;}
-  if(!landed(g,u.senior)||!landed(g,u.junior)||!compatibleLaws(g,u.senior,u.junior)||war(g,u.senior,u.junior)){if(split(g,u,'incompatible crowns or loss of land'))continue;}
-  if(primary.id===u.monarch)continue;
+  if(!landed(g,u.senior)||!landed(g,u.junior)||!compatibleLaws(g,u.senior,u.junior)||war(g,u.senior,u.junior)){
+   if(!split(g,u,'incompatible crowns or loss of land'))delete root.unions[u.id];
+   continue;
+  }
+  if(primary.id===u.monarch){
+   if(!primary.alive)delete root.unions[u.id];
+   continue;
+  }
   const heir=successionCandidates(g,u.junior)[0];
   if(!old?.alive&&primary.alive&&heir?.id===primary.id&&compatibleLaws(g,u.senior,u.junior)){
    realm(g,u.junior).ruler=primary.id;domain(g,u.junior,u.monarch,primary.id);u.monarch=primary.id;u.successions++;g.kingdom.courts[u.junior].successions++;
    syncCourt(g,u.junior);syncTitles(g);note(g,u,primary.name+' inherited both crowns.');
-  }else if(!split(g,u,'the crowns have different succession outcomes')&&primary.alive){
-   realm(g,u.junior).ruler=primary.id;domain(g,u.junior,u.monarch,primary.id);u.monarch=primary.id;syncCourt(g,u.junior);syncTitles(g);
+  }else if(!split(g,u,'the crowns have different succession outcomes')){
+   if(primary.alive){
+    realm(g,u.junior).ruler=primary.id;domain(g,u.junior,u.monarch,primary.id);u.monarch=primary.id;syncCourt(g,u.junior);syncTitles(g);
+   }else{
+    delete root.unions[u.id];
+   }
   }
  }
  return root;

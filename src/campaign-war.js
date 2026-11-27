@@ -110,9 +110,14 @@ export function installRulerOnThrone(g,realm,nextId,reason='settlement'){
  if(!s||!next)return false;
  const oldId=s.ruler,old=g.politics.people[oldId];
  if(oldId===nextId)return false;
- next.realm=realm;
+ const rulesElsewhere=Object.entries(g.politics?.realms||{}).some(([r,rs])=>r!==realm&&rs?.ruler===nextId);
+ if(!rulesElsewhere)next.realm=realm;
  s.ruler=nextId;
  delete s.nominee;
+ if(g.feudal?.claimants){
+  delete g.feudal.claimants[realm+':'+nextId];
+  delete g.feudal.claimants['k:'+realm+':'+nextId];
+ }
  s.regent=next.age<18?(s.council?.chancellor||null):null;
  if(old){
   for(const [role,pid] of Object.entries(s.council||{}))if(pid===nextId)s.council[role]=oldId;

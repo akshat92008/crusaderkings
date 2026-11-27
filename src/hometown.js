@@ -159,6 +159,129 @@ export function homeProduction(g,r=g.player){
  for(const p of land){const row=homeProvinceMaterials(g,p.id);for(const k of materials)sum[k]+=row[k];}
  return Object.fromEntries(materials.map(k=>[k,Math.floor(sum[k]*(1+t[k]*.025)*(k==='wood'?wf.mult.wood:wf.mult.iron))]));
 }
+export function productionBreakdown(g,world=null,r=g?.player){
+ const round1=v=>Number((v||0).toFixed(1));
+ const h=r?active(g,r):null;
+ const cap=h?.capital&&permitted(g,h.capital,r)?h.capital:(g&&r?capital(g,world,r):null);
+ const t=r?totals(g,r):{food:0,wood:0,stone:0,iron:0,tax:0,recruit:0,military:0,siege:0,order:0,storage:0,research:0,defense:0};
+ const wf=r?workforceProfile(g,r):{total:0,manual:false,assigned:{farmers:0,woodcutters:0,miners:0,builders:0,merchants:0,scholars:0,soldiers:0},baseline:{},mult:{food:1,wood:1,iron:1,build:1,trade:1,knowledge:1,recruit:1}};
+ const mods=r?hometownModifiers(g,r):{tax:1,food:1,recruit:1,cost:1,power:1,siege:1,order:0,defense:1,trade:1,knowledge:1,buildSpeed:1};
+ const owned=r?Object.values(g?.provinces||{}).filter(p=>p.owner===r):[];
+ const land=owned.filter(p=>permitted(g,p.id,r));
+ const n=land.length;
+ const foodByBuilding={well:0,mill:0,watermill:0,bakery:0,reservoir:0};
+ let popFoodBase=0,farmFoodBase=0,localFoodBonus=0,researchFoodBonus=0,wfFoodDelta=0,grossFoodExact=0;
+ for(const p of owned){
+  const fp=homeFarmProfile(g,p.id);
+  const farmPart=fp.farm*8;
+  const popPart=Math.max(0,fp.baseline-farmPart);
+  popFoodBase+=popPart;
+  farmFoodBase+=farmPart;
+  grossFoodExact+=fp.food;
+  if(h&&permitted(g,p.id,r)){
+   const l=k=>homeLevel(g,p.id,k);
+   const weights={well:l('well')*.015,mill:l('mill')*.035,watermill:l('watermill')*.04,bakery:l('bakery')*.025,reservoir:l('reservoir')*.035};
+   const rawLocal=weights.well+weights.mill+weights.watermill+weights.bakery+weights.reservoir;
+   const afterLocal=fp.baseline*fp.localFactor;
+   const localDelta=afterLocal-fp.baseline;
+   localFoodBonus+=localDelta;
+   if(rawLocal>0&&localDelta>0){
+    for(const bk of Object.keys(foodByBuilding))foodByBuilding[bk]+=localDelta*(weights[bk]/rawLocal);
+   }
+   const afterResearch=afterLocal*fp.researchFactor;
+   researchFoodBonus+=afterResearch-afterLocal;
+   wfFoodDelta+=fp.food-afterResearch;
+  }
+ }
+ const ownArmies=r?Object.values(g?.armies||{}).filter(a=>a.owner===r):[];
+ let troops=0,rawFoodDrain=0;
+ for(const a of ownArmies){
+  const sz=a?Math.max(0,Math.round((a.infantry||0)+(a.archers||0)+(a.cavalry||0))):0;
+  troops+=sz;
+  rawFoodDrain+=sz*.025;
+ }
+ const food={
+  populationBase:round1(popFoodBase),
+  farms:round1(farmFoodBase),
+  localBuildings:round1(localFoodBonus),
+  localByBuilding:Object.fromEntries(Object.entries(foodByBuilding).map(([k,v])=>[k,round1(v)])),
+  research:round1(researchFoodBonus),
+  researchLevels:{farming:researchLevel(h,'farming'),irrigation:researchLevel(h,'irrigation'),milling:researchLevel(h,'milling')},
+  workforce:round1(wfFoodDelta),
+  workforceMult:Number(wf.mult.food.toFixed(2)),
+  farmers:wf.assigned.farmers,
+  grossExact:round1(grossFoodExact),
+  gross:Math.round(grossFoodExact),
+  consumption:Math.round(rawFoodDrain),
+  armyConsumption:Math.round(rawFoodDrain),
+  populationConsumption:0,
+  troops,
+  net:Math.round(grossFoodExact-rawFoodDrain),
+  stored:Math.floor(g?.factions?.[r]?.food||0)
+ };
+ const prod=r?homeProduction(g,r):{wood:0,stone:0,iron:0};
+ const storageCap=h?1000+h.level*700+t.storage*100:0;
+ const matBase={wood:4,stone:3,iron:2};
+ const matProvCap={wood:Math.min(25,n),stone:Math.min(20,n),iron:Math.min(15,n)};
+ const matOut={};
+ for(const k of materials){
+  const wfRole=k==='wood'?'woodcutters':'miners';
+  if(!h||!n){
+   matOut[k]={base:0,provincial:0,buildings:0,depositBonus:0,byBuilding:k==='wood'?{lumber:0}:k==='stone'?{quarry:0}:{iron:0,foundry:0},sources:[],researchMult:1,researchBonus:0,workforceMult:1,workforceRole:wfRole,workforceCount:wf.assigned[wfRole]||0,workforceDelta:0,exactTotal:0,total:0,stock:integer(h?.stock?.[k]),cap:storageCap};
+   continue;
+  }
+  const byBuilding=k==='wood'?{lumber:0}:k==='stone'?{quarry:0}:{iron:0,foundry:0};
+  const sources=[];
+  let buildings=0,depositBonus=0;
+  for(const p of land){
+   const l=b=>homeLevel(g,p.id,b);
+   const rich=g?.economy?.provinces?.[p.id]?.resources||[];
+   let rawB=0,dep=0;
+   if(k==='wood'){rawB=l('lumber')*4;byBuilding.lumber+=rawB;if(rich.includes('timber'))dep=rawB*.25;}
+   else if(k==='stone'){rawB=l('quarry')*3;byBuilding.quarry+=rawB;}
+   else{const ironRaw=l('iron')*2,foundryRaw=l('foundry')*3;byBuilding.iron+=ironRaw;byBuilding.foundry+=foundryRaw;rawB=ironRaw+foundryRaw;if(rich.includes('ore'))dep=rawB*.25;}
+   buildings+=rawB;depositBonus+=dep;
+   if(rawB>0)sources.push({provinceId:p.id,base:rawB,depositBonus:round1(dep),total:round1(rawB+dep)});
+  }
+  const base=matBase[k],provincial=matProvCap[k],rawSum=base+provincial+buildings+depositBonus;
+  const researchMult=1+t[k]*.025,researchBonus=rawSum*(t[k]*.025);
+  const workforceMult=k==='wood'?wf.mult.wood:wf.mult.iron;
+  const workforceDelta=rawSum*researchMult*(workforceMult-1);
+  const exactTotal=rawSum*researchMult*workforceMult;
+  matOut[k]={base,provincial,buildings:round1(buildings),depositBonus:round1(depositBonus),byBuilding,sources,researchMult:Number(researchMult.toFixed(3)),researchBonus:round1(researchBonus),workforceMult:Number(workforceMult.toFixed(2)),workforceRole:wfRole,workforceCount:wf.assigned[wfRole],workforceDelta:round1(workforceDelta),exactTotal:round1(exactTotal),total:prod[k],stock:integer(h.stock?.[k]),cap:storageCap};
+ }
+ const researchBuildingKeys=['school','library','university','archives'];
+ const researchBuildings=Object.fromEntries(researchBuildingKeys.map(bk=>[bk,{capitalLevel:cap?homeLevel(g,cap,bk):0,realmLevels:0,points:0}]));
+ let buildingResearchPoints=0;
+ if(h){
+  for(const p of land){
+   for(const bk of researchBuildingKeys){
+    const lv=homeLevel(g,p.id,bk);
+    if(lv>0){const pts=lv*(p.id===cap?1:.25);researchBuildings[bk].realmLevels+=lv;researchBuildings[bk].points+=pts;buildingResearchPoints+=pts;}
+   }
+  }
+ }
+ const eduLv=researchLevel(h,'education'),engLv=researchLevel(h,'engineering'),techResearchPoints=(eduLv+engLv)*2;
+ const baseKnowledge=h?2:0,buildingKnowledgeBonus=buildingResearchPoints*.35,researchKnowledgeBonus=techResearchPoints*.35;
+ const preWorkforceKnowledge=h?baseKnowledge+buildingKnowledgeBonus+researchKnowledgeBonus:0;
+ const scholarDelta=h?preWorkforceKnowledge*(wf.mult.knowledge-1):0;
+ const monthlyKnowledge=h?Number(((2+t.research*.35)*wf.mult.knowledge).toFixed(1)):0;
+ const knowledge={base:baseKnowledge,buildings:researchBuildings,buildingBonus:round1(buildingKnowledgeBonus),research:{education:eduLv,engineering:engLv},researchBonus:round1(researchKnowledgeBonus),scholars:wf.assigned.scholars,workforceMult:Number(wf.mult.knowledge.toFixed(2)),workforceDelta:round1(scholarDelta),monthly:monthlyKnowledge,stored:Number((h?.knowledge||0).toFixed(1)),modifier:mods.knowledge,costDiscountPct:Math.round(Math.min(.2,t.research*.004)*100)};
+ const milKeys=['barracks','archery','stable','forge','watchtower','gatehouse','workshop','academy','armory','fort','arsenal','citadel'];
+ const milInfra={};
+ for(const bk of milKeys){
+  const d=HOME_BUILDINGS[bk];
+  let realmLevels=0;
+  for(const p of land)realmLevels+=homeLevel(g,p.id,bk);
+  milInfra[bk]={id:bk,name:d.name,unlock:d.unlock,unlockedByTownHall:(h?.level||0)>=d.unlock,capitalLevel:cap?homeLevel(g,cap,bk):0,realmLevels};
+ }
+ const unlockedRegiments=['pikes','guard','longbow','crossbow','handgun','lancers','horsebow','elephants'].filter(k=>homeMilitaryUnlocked(g,r,k));
+ const unlockedEngines=['ram','catapult','bombard'].filter(k=>homeMilitaryUnlocked(g,r,k));
+ const military={infrastructure:milInfra,unlockedRegiments,unlockedEngines,siegeWorkshopReady:milInfra.workshop.capitalLevel>0||unlockedEngines.length>0,arsenalReady:milInfra.arsenal.capitalLevel>0,stableReady:milInfra.stable.capitalLevel>0,archeryReady:milInfra.archery.capitalLevel>0||milInfra.barracks.capitalLevel>=2,garrisonBase:cap?homeLevel(g,cap,'fort')*45:0,defenseMult:Number(mods.defense.toFixed(2)),powerMult:Number(mods.power.toFixed(2)),siegeMult:Number(mods.siege.toFixed(2)),recruitMult:Number(mods.recruit.toFixed(2)),soldiers:wf.assigned.soldiers,recruitWorkforceMult:Number(wf.mult.recruit.toFixed(2))};
+ const nextLevel=h&&h.level<10?h.level+1:null;
+ const townHall={level:h?.level||0,name:h?TOWN_NAMES[h.level-1]:TOWN_NAMES[0],nextLevel,nextName:nextLevel?TOWN_NAMES[nextLevel-1]:null,slots:h?Math.min(4,1+Math.floor(h.level/3)):1,nextUnlocks:nextLevel?Object.values(HOME_BUILDINGS).filter(b=>b.unlock===nextLevel).map(b=>({id:b.id,name:b.name,effect:b.effect})):[]};
+ return {realm:r,capital:cap,food,wood:matOut.wood,stone:matOut.stone,iron:matOut.iron,knowledge,military,workforce:wf,townHall,modifiers:mods};
+}
 export function homeRecruitmentRequirement(g,id,type){
  const p=g.provinces?.[id],h=p&&active(g,p.owner);if(!h)return '';
  if(type==='cavalry'&&homeLevel(g,id,'stable')<1)return 'Build a stable in this province to recruit cavalry.';

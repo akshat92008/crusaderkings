@@ -1,5 +1,6 @@
 import {cardRole} from './simple-card-battle.js';
 import {spriteCultureGroup} from './game-art.js';
+import {terrainForestCovers} from './field-tactics.js';
 
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 
@@ -41,13 +42,17 @@ export function regimentCardIcon(g){
 }
 
 const TERRAIN_THEMES={
- plains:{top:'#3c5234',mid:'#4a643d',bot:'#2d3e27',grid:'rgba(241,226,184,.13)',cover:'#324929'},
- forest:{top:'#2b4029',mid:'#375133',bot:'#21301f',grid:'rgba(205,224,185,.12)',cover:'#233b20'},
- hills:{top:'#515739',mid:'#636846',bot:'#3d422d',grid:'rgba(240,225,180,.14)',cover:'#494d35'},
- highlands:{top:'#4f4c3d',mid:'#615c4a',bot:'#39372c',grid:'rgba(232,220,192,.14)',cover:'#4d4a3d'},
- desert:{top:'#7e6440',mid:'#96794d',bot:'#614c30',grid:'rgba(252,234,186,.16)',cover:'#725734'},
- steppe:{top:'#5f653b',mid:'#747847',bot:'#484c2c',grid:'rgba(241,232,175,.14)',cover:'#585b34'},
- coast:{top:'#345149',mid:'#436559',bot:'#253c36',grid:'rgba(215,238,225,.14)',cover:'#2e4c44'}
+ plains:{sky:'#243227',top:'#3c5234',mid:'#4a643d',bot:'#2d3e27',grid:'rgba(241,226,184,.12)',cover:'#324929',ridge:'rgba(86,112,68,.38)',track:'rgba(128,108,74,.34)',accent:'#6c8754'},
+ forest:{sky:'#1a2a1e',top:'#283d27',mid:'#344e31',bot:'#1e2d1d',grid:'rgba(205,224,185,.10)',cover:'#1f371d',ridge:'rgba(46,74,43,.45)',track:'rgba(104,88,60,.36)',accent:'#3f6a39'},
+ hills:{sky:'#2e3326',top:'#52583a',mid:'#646a47',bot:'#3b402a',grid:'rgba(240,225,180,.13)',cover:'#494d35',ridge:'rgba(122,126,86,.44)',track:'rgba(132,114,82,.36)',accent:'#7e825a'},
+ highlands:{sky:'#2b2c2a',top:'#4c4a3d',mid:'#5f5c4a',bot:'#353329',grid:'rgba(232,220,192,.13)',cover:'#4a473a',ridge:'rgba(118,112,92,.46)',track:'rgba(122,110,88,.34)',accent:'#7f7a66'},
+ mountain:{sky:'#272b30',top:'#484c50',mid:'#5b5e5d',bot:'#323537',grid:'rgba(226,226,232,.12)',cover:'#474b4d',ridge:'rgba(136,140,144,.48)',track:'rgba(116,112,102,.32)',accent:'#8d9296'},
+ mountains:{sky:'#272b30',top:'#484c50',mid:'#5b5e5d',bot:'#323537',grid:'rgba(226,226,232,.12)',cover:'#474b4d',ridge:'rgba(136,140,144,.48)',track:'rgba(116,112,102,.32)',accent:'#8d9296'},
+ desert:{sky:'#3d2f22',top:'#806540',mid:'#997b4f',bot:'#614c30',grid:'rgba(252,234,186,.14)',cover:'#725734',ridge:'rgba(196,154,92,.42)',track:'rgba(164,132,84,.38)',accent:'#b88c52'},
+ steppe:{sky:'#343825',top:'#5f653b',mid:'#747847',bot:'#484c2c',grid:'rgba(241,232,175,.13)',cover:'#585b34',ridge:'rgba(146,144,82,.38)',track:'rgba(140,124,78,.36)',accent:'#939453'},
+ coast:{sky:'#1f3134',top:'#325049',mid:'#416357',bot:'#233934',grid:'rgba(215,238,225,.13)',cover:'#2c4a42',ridge:'rgba(76,114,102,.38)',track:'rgba(144,132,102,.34)',accent:'#4f7e72'},
+ coastal:{sky:'#1f3134',top:'#325049',mid:'#416357',bot:'#233934',grid:'rgba(215,238,225,.13)',cover:'#2c4a42',ridge:'rgba(76,114,102,.38)',track:'rgba(144,132,102,.34)',accent:'#4f7e72'},
+ marsh:{sky:'#1d2b26',top:'#2d4239',mid:'#385247',bot:'#203029',grid:'rgba(195,222,205,.11)',cover:'#263c33',ridge:'rgba(62,92,78,.38)',track:'rgba(92,88,68,.35)',accent:'#456b5c'}
 };
 
 const SPRITE_STATE={manifest:null,loading:false,images:new Map(),queued:new Set(),loaded:0,total:0};
@@ -109,6 +114,12 @@ function resolveUnitSprite(g,manifest){
    const img=SPRITE_STATE.images.get(cult+':'+altKey);
    if(img)return {img,meta:cultMap[altKey],key:cult+':'+altKey};
   }
+ }
+ if((g?.specialistId==='spearmen'||g?.kind==='spearmen')&&SPRITE_STATE.images.get('bronze_spear')){
+  return {img:SPRITE_STATE.images.get('bronze_spear'),meta:{frames:4,frameW:96,frameH:96},key:'bronze_spear'};
+ }
+ if((g?.specialistId==='guard'||g?.kind==='heavy_infantry')&&SPRITE_STATE.images.get('knight_elite')){
+  return {img:SPRITE_STATE.images.get('knight_elite'),meta:{frames:4,frameW:96,frameH:96},key:'knight_elite'};
  }
  const fallbackKey=baseKey==='horsebow'?'cavalry':baseKey==='crossbow'?'archers':baseKey;
  const meta=manifest?.units?.[fallbackKey]||manifest?.units?.infantry;
@@ -202,17 +213,50 @@ export class BannerRenderer{
  renderBattle(b){
   const {w,h,c}=this.resize();if(!c)return;
   const v=this.viewport(b),P=(x,z,y=0)=>bannerProject(v,x,z,y),home=v.home,selected=b.selectedGroup?.(),t=b.elapsed||0;
-  const theme=TERRAIN_THEMES[this.terrainType]||TERRAIN_THEMES.plains;
+  const kind=String(this.terrainType||'plains').toLowerCase();
+  const theme=TERRAIN_THEMES[kind]||TERRAIN_THEMES.plains;
 
-  // 1. Atmospheric terrain wash & field relief
+  // 1. Atmospheric terrain wash, layered elevation ridges & biome landscape
   const sky=c.createLinearGradient(0,0,0,h);
-  sky.addColorStop(0,'#222c24');sky.addColorStop(.18,theme.top);sky.addColorStop(.62,theme.mid);sky.addColorStop(1,theme.bot);
+  sky.addColorStop(0,theme.sky||'#222c24');sky.addColorStop(.18,theme.top);sky.addColorStop(.62,theme.mid);sky.addColorStop(1,theme.bot);
   c.fillStyle=sky;c.fillRect(0,0,w,h);
 
-  // Subtle ridge & river contours
+  // Layered elevation ridges along horizon & flanks
+  c.save();
+  for(let layer=0;layer<3;layer++){
+   const yBase=v.top+layer*14-6;
+   c.beginPath();
+   c.moveTo(0,yBase+28);
+   for(let x=0;x<=w;x+=Math.max(48,Math.round(w/8))){
+    const ridgeAmp=(kind==='hills'||kind==='highlands'||kind==='mountain'||kind==='mountains')?16:kind==='desert'?11:7;
+    const ry=yBase+Math.sin(x*0.012+layer*1.9)*ridgeAmp-layer*4;
+    c.lineTo(x,ry);
+   }
+   c.lineTo(w,yBase+40);c.lineTo(0,yBase+40);c.closePath();
+   c.fillStyle=theme.ridge;c.fill();
+  }
+  c.restore();
+
   const ridge=c.createRadialGradient(v.cx,v.cy-20*v.sy,12,v.cx,v.cy,85*v.s);
-  ridge.addColorStop(0,'rgba(250,235,180,.08)');ridge.addColorStop(1,'rgba(0,0,0,0)');
+  ridge.addColorStop(0,'rgba(250,235,180,.09)');ridge.addColorStop(1,'rgba(0,0,0,0)');
   c.fillStyle=ridge;c.fillRect(0,0,w,h);
+
+  // Coast / coastal shoreline & animated surf waves
+  if(kind==='coast'||kind==='coastal'){
+   c.save();
+   const [sx0,sy0]=P(32,-44),[sx1,sy1]=P(68,-44),[sx2,sy2]=P(68,44),[sx3,sy3]=P(36,44);
+   c.beginPath();c.moveTo(sx0,sy0);c.lineTo(sx1,sy1);c.lineTo(sx2,sy2);c.lineTo(sx3,sy3);c.closePath();
+   c.fillStyle='rgba(44,98,118,.52)';c.fill();
+   c.strokeStyle='rgba(222,238,220,.42)';c.lineWidth=clamp(v.s*.7,2,6);
+   c.beginPath();c.moveTo(sx0,sy0);c.quadraticCurveTo(P(38,0)[0],P(38,0)[1],sx3,sy3);c.stroke();
+   for(let wv=-32;wv<=32;wv+=16){
+    const phase=Math.sin(t*2.1+wv)*1.4;
+    const [wx0,wy0]=P(43+phase,wv-5),[wx1,wy1]=P(48+phase,wv+5);
+    c.strokeStyle='rgba(205,240,248,.34)';c.lineWidth=1.5;
+    c.beginPath();c.moveTo(wx0,wy0);c.lineTo(wx1,wy1);c.stroke();
+   }
+   c.restore();
+  }
 
   // Battlefield diamond perimeter
   const corners=[P(-64,-42),P(64,-42),P(64,42),P(-64,42)];
@@ -221,10 +265,64 @@ export class BannerRenderer{
   c.strokeStyle='rgba(235,214,154,.24)';c.lineWidth=1.5;c.stroke();
   c.restore();
 
+  // Textured dirt / cobbled road track linking deployment baselines
+  c.save();
+  const [r0x,r0y]=P(0,40),[r1x,r1y]=P(-6,12),[r2x,r2y]=P(5,-10),[r3x,r3y]=P(0,-40);
+  c.strokeStyle=b.siege?'rgba(138,132,118,.38)':theme.track;
+  c.lineWidth=clamp(v.s*5.2,10,32);c.lineCap='round';
+  c.beginPath();c.moveTo(r0x,r0y);c.quadraticCurveTo(r1x,r1y,r2x,r2y);c.lineTo(r3x,r3y);c.stroke();
+  if(b.siege){
+   c.strokeStyle='rgba(72,68,60,.36)';c.lineWidth=1.2;
+   for(let z=-36;z<=36;z+=6){
+    const [cx,cy]=P((z%12===0?1:-1)*1.2,z);
+    c.beginPath();c.ellipse(cx,cy,clamp(v.s*1.2,3,8),clamp(v.sy*.8,2,5),0,0,Math.PI*2);c.stroke();
+   }
+  }
+  c.restore();
+
   // Isometric grid
   c.strokeStyle=theme.grid;c.lineWidth=1;
   for(let x=-54;x<=54;x+=18){c.beginPath();c.moveTo(...P(x,-42));c.lineTo(...P(x,42));c.stroke();}
   for(let z=-36;z<=36;z+=12){c.beginPath();c.moveTo(...P(-62,z));c.lineTo(...P(62,z));c.stroke();}
+
+  // Biome-specific crags, dunes, marsh pools & woodland canopy pockets
+  c.save();
+  if(kind==='desert'){
+   for(const [cx,cz,cw,ch] of [[-40,-16,10,6],[42,14,11,7],[-34,22,8,5],[36,-24,9,5]]){
+    const [px,py]=P(cx,cz);
+    c.fillStyle='#966d3e';
+    c.beginPath();c.moveTo(px-cw*v.s*.4,py);c.lineTo(px-cw*v.s*.18,py-ch*v.s*.65);c.lineTo(px+cw*v.s*.2,py-ch*v.s*.55);c.lineTo(px+cw*v.s*.42,py);c.closePath();c.fill();
+    c.fillStyle='rgba(235,196,132,.35)';c.fillRect(px-cw*v.s*.16,py-ch*v.s*.62,cw*v.s*.32,2);
+   }
+  }else if(kind==='hills'||kind==='highlands'||kind==='mountain'||kind==='mountains'){
+   for(const [rx,rz,rad] of [[-22,-10,5.5],[24,8,5.5],[0,-28,6.5]]){
+    const [px,py]=P(rx,rz);
+    c.strokeStyle='rgba(236,222,184,.18)';c.lineWidth=1.4;
+    c.beginPath();c.ellipse(px,py,rad*v.s*1.3,rad*v.sy*.95,0,0,Math.PI*2);c.stroke();
+    c.fillStyle='rgba(92,90,82,.55)';
+    c.beginPath();c.moveTo(px-v.s*2,py);c.lineTo(px,py-v.s*2.4);c.lineTo(px+v.s*2.2,py);c.closePath();c.fill();
+   }
+  }else if(kind==='marsh'){
+   for(const [mx,mz,rx,rz] of [[-26,12,8,4],[24,-10,9,4.5],[4,4,6,3]]){
+    const [px,py]=P(mx,mz);
+    c.fillStyle='rgba(36,74,68,.55)';
+    c.beginPath();c.ellipse(px,py,rx*v.s*.8,rz*v.sy*.8,0,0,Math.PI*2);c.fill();
+   }
+  }
+  const covers=terrainForestCovers(kind);
+  for(const cov of covers){
+   const [px,py]=P(cov.x,cov.z);
+   c.fillStyle=kind==='forest'?'rgba(24,52,22,.46)':'rgba(32,54,28,.28)';
+   c.beginPath();c.ellipse(px,py,cov.radius*v.s*.85,cov.radius*v.sy*.75,0,0,Math.PI*2);c.fill();
+   if(kind==='forest'){
+    for(const [ox,oz] of [[-3,-1],[2,-2],[0,2]]){
+     const [tx,ty]=P(cov.x+ox,cov.z+oz);
+     c.fillStyle='#244222';c.beginPath();c.ellipse(tx,ty-v.s*1.3,v.s*1.8,v.s*1.4,0,0,Math.PI*2);c.fill();
+     c.fillStyle='#345d2f';c.beginPath();c.ellipse(tx-v.s*.4,ty-v.s*1.7,v.s*1.1,v.s*.9,0,0,Math.PI*2);c.fill();
+    }
+   }
+  }
+  c.restore();
 
   // Environmental trees & rocks along battlefield flanks
   const props=b.terrain||[];
@@ -235,9 +333,9 @@ export class BannerRenderer{
    const [px,py]=P(tr.x,tr.z);
    c.fillStyle=theme.cover;
    c.beginPath();c.ellipse(px,py,Math.max(4,v.s*1.8),Math.max(2,v.sy*1.1),0,0,Math.PI*2);c.fill();
-   if(tr.type==='tree'){
-    c.fillStyle='#2a4324';
-    c.beginPath();c.moveTo(px,py-v.s*3.4);c.lineTo(px-v.s*1.5,py);c.lineTo(px+v.s*1.5,py);c.closePath();c.fill();
+   if(tr.type==='tree'&&kind!=='desert'){
+    c.fillStyle=theme.accent||'#2a4324';
+    c.beginPath();c.moveTo(px,py-v.s*3.2);c.lineTo(px-v.s*1.4,py);c.lineTo(px+v.s*1.4,py);c.closePath();c.fill();
    }
   }
   c.restore();
@@ -302,6 +400,114 @@ export class BannerRenderer{
   soldierDraws.sort((a,b)=>a.py-b.py||a.px-b.px);
 
   const spriteScale=clamp(v.s/8.2,.48,1.38);
+
+  // Fortress curtain walls, flanking towers, main gate & siege engines (when b.siege is active)
+  if(b.siege){
+   const wallImg=SPRITE_STATE.images.get('siege_wall');
+   const towerImg=SPRITE_STATE.images.get('siege_tower');
+   const gateImg=SPRITE_STATE.images.get('siege_gate');
+   const breachedImg=SPRITE_STATE.images.get('siege_gate_breached');
+   const ramImg=SPRITE_STATE.images.get('siege_ram');
+   const catImg=SPRITE_STATE.images.get('siege_catapult');
+   const bombImg=SPRITE_STATE.images.get('siege_bombard');
+   const structs=b.siege.structures||[];
+   const gate=structs[0]||{id:'gate',name:'Gate',x:0,z:-18,hp:100,max:100};
+   const leftT=structs[1]||{id:'left',name:'West tower',x:-24,z:-18,hp:65,max:65};
+   const rightT=structs[2]||{id:'right',name:'East tower',x:24,z:-18,hp:65,max:65};
+
+   // Stone rampart curtain wall spanning across z = -18
+   c.save();
+   const [wlx,wly]=P(-56,-18),[wrx,wry]=P(56,-18);
+   const wallH=clamp(v.s*3.0,14,34);
+   c.fillStyle='#4a4842';
+   c.fillRect(Math.min(wlx,wrx),wly-wallH,Math.abs(wrx-wlx),wallH);
+   c.fillStyle='#676359';
+   c.fillRect(Math.min(wlx,wrx),wly-wallH,Math.abs(wrx-wlx),wallH*.35);
+   // Crenellated merlons
+   const stepX=Math.max(10,Math.round(v.s*1.9));
+   for(let mx=Math.min(wlx,wrx);mx<Math.max(wlx,wrx)-stepX*.5;mx+=stepX){
+    if(Math.abs(mx-P(0,-18)[0])<v.s*5.5)continue;
+    c.fillStyle='#787366';
+    c.fillRect(mx,wly-wallH-5*spriteScale,stepX*.55,5*spriteScale);
+   }
+   if(wallImg){
+    for(const wx of [-46,-36,-12,12,36,46]){
+     const [px,py]=P(wx,-18);
+     const sz=46*spriteScale;
+     c.drawImage(wallImg,px-sz/2,py-sz+6*spriteScale,sz,sz);
+    }
+   }
+   c.restore();
+
+   // Render Gate & Flanking Towers with intact / cracked / breached visuals + HP bars
+   for(const st of [leftT,rightT,gate]){
+    const [sx,sy]=P(st.x,st.z);
+    const frac=clamp((st.hp||0)/Math.max(1,st.max||100),0,1);
+    const isGate=st.id==='gate';
+    const breached=frac<=0;
+    const cracked=!breached&&frac<=0.55;
+    c.save();
+    c.beginPath();c.ellipse(sx,sy+2,clamp(v.s*(isGate?6:4.5),14,42),clamp(v.sy*2.6,6,18),0,0,Math.PI*2);
+    c.fillStyle='rgba(10,14,12,.45)';c.fill();
+    const img=isGate?(breached?breachedImg:gateImg):breached?breachedImg:towerImg;
+    if(img){
+     const sz=(isGate?68:62)*spriteScale;
+     c.drawImage(img,sx-sz/2,sy-sz+8*spriteScale,sz,sz);
+    }else{
+     const bw=clamp(v.s*(isGate?9:6.4),22,58),bh=breached?clamp(v.s*1.2,6,14):clamp(v.s*(isGate?4.6:5.2),18,48);
+     c.fillStyle=breached?'#5c5246':isGate?'#6f685c':'#767166';
+     c.fillRect(sx-bw/2,sy-bh,bw,bh);
+     if(isGate&&!breached){
+      c.fillStyle='#3c2a1a';c.fillRect(sx-bw*.26,sy-bh*.66,bw*.52,bh*.66);
+      c.strokeStyle='#8c7e6a';c.lineWidth=1.5;c.strokeRect(sx-bw*.26,sy-bh*.66,bw*.52,bh*.66);
+     }
+    }
+    if(cracked){
+     c.strokeStyle='#241b16';c.lineWidth=2;
+     c.beginPath();c.moveTo(sx-6*spriteScale,sy-26*spriteScale);c.lineTo(sx+2*spriteScale,sy-16*spriteScale);c.lineTo(sx-4*spriteScale,sy-6*spriteScale);c.stroke();
+    }
+    if(breached){
+     c.fillStyle='rgba(92,82,68,.75)';
+     for(const [rx,ry,rr] of [[-10,2,4],[6,4,5],[0,-1,3.5]]){
+      c.beginPath();c.arc(sx+rx*spriteScale,sy+ry*spriteScale,rr*spriteScale,0,Math.PI*2);c.fill();
+     }
+    }
+    // Structure HP bar
+    const barW=clamp(v.s*6.4,34,58),by=sy-(isGate?56:54)*spriteScale;
+    c.fillStyle='rgba(14,20,18,.86)';c.fillRect(sx-barW/2-1,by-1,barW+2,7);
+    c.fillStyle=breached?'#7e6c5c':frac>0.5?'#d8b358':'#d96248';
+    c.fillRect(sx-barW/2,by,barW*frac,5);
+    c.font='700 '+clamp(Math.round(9*spriteScale),8,12)+'px system-ui,sans-serif';
+    c.textAlign='center';c.fillStyle='#f6ead0';
+    c.fillText((st.name||st.id).toUpperCase()+(breached?' (BREACHED)':' '+Math.round(frac*100)+'%'),sx,by-4);
+    c.restore();
+   }
+
+   // Siege Engines along assault vanguard & artillery battery
+   const assaultSide=b.siege.assaultSide||'attacker';
+   const engMap=assaultSide==='attacker'?(b.siege.attackerEngines||{}):(b.siege.defenderEngines||{});
+   const breachDone=gate.hp<=0;
+   const ramZ=breachDone?-16:b.deployment?10:-6;
+   const engineSlots=[];
+   for(let i=0;i<Math.min(3,engMap.ram||0);i++)engineSlots.push({kind:'ram',img:ramImg,x:(i-(Math.min(3,engMap.ram||0)-1)/2)*11,z:ramZ});
+   for(let i=0;i<Math.min(3,engMap.catapult||0);i++)engineSlots.push({kind:'catapult',img:catImg,x:-24+i*10,z:18});
+   for(let i=0;i<Math.min(3,engMap.bombard||0);i++)engineSlots.push({kind:'bombard',img:bombImg,x:14+i*10,z:20});
+   for(const es of engineSlots){
+    const [ex,ey]=P(es.x,es.z);
+    c.save();
+    c.beginPath();c.ellipse(ex,ey+2,11*spriteScale,5*spriteScale,0,0,Math.PI*2);
+    c.fillStyle='rgba(12,16,12,.4)';c.fill();
+    if(es.img){
+     const sz=42*spriteScale;
+     c.drawImage(es.img,ex-sz/2,ey-sz+6*spriteScale,sz,sz);
+    }else{
+     c.fillStyle=es.kind==='bombard'?'#42464e':'#7c542e';
+     c.fillRect(ex-10*spriteScale,ey-12*spriteScale,20*spriteScale,12*spriteScale);
+    }
+    c.restore();
+   }
+  }
+
   for(const s of soldierDraws){
    const sideTint=s.g.side==='attacker'?'#d9a84c':'#c45749';
    const drawW=(s.meta?.frameW||64)*spriteScale*.58;
@@ -370,13 +576,24 @@ export class BannerRenderer{
    const u=clamp((ef.age||0)/(ef.duration||.4),0,1);
    const [ex,ey]=P(ef.x,ef.z);
    c.save();c.globalAlpha=1-u;
-   const sprite=ef.kind==='rout'?fxDust:ef.kind==='slash'&&fxSlash?fxSlash:fxImpact;
-   if(sprite){
-    const sz=(20+u*18)*spriteScale;
-    c.drawImage(sprite,ex-sz/2,ey-sz/2,sz,sz);
+   if(ef.kind==='breach'){
+    const rad=(12+u*32)*spriteScale;
+    c.beginPath();c.arc(ex,ey,rad,0,Math.PI*2);
+    c.strokeStyle='rgba(245,196,112,.92)';c.lineWidth=3;c.stroke();
+    if(fxDust){const sz=(38+u*36)*spriteScale;c.drawImage(fxDust,ex-sz/2,ey-sz/2,sz,sz);}
+    for(let k=0;k<6;k++){
+     const ang=k*Math.PI/3+u*0.8,dist=(6+u*24)*spriteScale;
+     c.fillStyle='#8c7c66';c.fillRect(ex+Math.cos(ang)*dist-2,ey+Math.sin(ang)*dist-2,4*spriteScale,4*spriteScale);
+    }
    }else{
-    c.beginPath();c.arc(ex,ey,(4+u*10)*spriteScale,0,Math.PI*2);
-    c.strokeStyle=ef.kind==='rout'?'rgba(210,196,158,.7)':'rgba(255,208,108,.85)';c.lineWidth=2;c.stroke();
+    const sprite=ef.kind==='rout'?fxDust:ef.kind==='slash'&&fxSlash?fxSlash:fxImpact;
+    if(sprite){
+     const sz=(20+u*18)*spriteScale;
+     c.drawImage(sprite,ex-sz/2,ey-sz/2,sz,sz);
+    }else{
+     c.beginPath();c.arc(ex,ey,(4+u*10)*spriteScale,0,Math.PI*2);
+     c.strokeStyle=ef.kind==='rout'?'rgba(210,196,158,.7)':'rgba(255,208,108,.85)';c.lineWidth=2;c.stroke();
+    }
    }
    c.restore();
   }

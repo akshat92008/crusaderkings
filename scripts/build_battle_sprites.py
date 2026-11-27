@@ -352,8 +352,214 @@ def extract_particles_and_strips():
     return assets
 
 
+def key_green_screen(cell: Image.Image) -> Image.Image:
+    """Chroma-key #00FF00 green-screen sprite backgrounds and de-spill edges cleanly."""
+    w, h = cell.size
+    px = cell.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            hi_rb = max(r, b)
+            diff = g - hi_rb
+            if g > 88 and diff > 28:
+                px[x, y] = (0, 0, 0, 0)
+            elif diff > 8 and g > 65:
+                # De-spill green edge halo onto neutral/warm rim
+                alpha = max(60, min(255, int(255 - (diff - 8) * 9)))
+                px[x, y] = (r, hi_rb, b, min(a, alpha))
+    return cell
+
+
+def _detect_green_screen_frames(im: Image.Image):
+    """Detect row bands and horizontal frame bounding boxes in a green-screen sprite sheet."""
+    w, h = im.size
+    px = im.load()
+
+    def is_fg(r: int, g: int, b: int) -> bool:
+        return not (g > 110 and g - max(r, b) > 36)
+
+    row_bands = []
+    in_r, rs = False, 0
+    for y in range(h):
+        if any(is_fg(*px[x, y][:3]) for x in range(0, w, 2)):
+            if not in_r:
+                in_r, rs = True, y
+        elif in_r:
+            in_r = False
+            if y - rs >= 24:
+                row_bands.append((rs, y))
+    if in_r and h - rs >= 24:
+        row_bands.append((rs, h))
+
+    grid = []
+    for ry0, ry1 in row_bands:
+        cols = []
+        in_c, cs = False, 0
+        for x in range(w):
+            if any(is_fg(*px[x, y][:3]) for y in range(ry0, ry1, 2)):
+                if not in_c:
+                    in_c, cs = True, x
+            elif in_c:
+                in_c = False
+                if x - cs >= 24:
+                    cols.append((cs, ry0, x, ry1))
+        if in_c and w - cs >= 24:
+            cols.append((cs, ry0, w, ry1))
+        if cols:
+            grid.append(cols)
+    return grid
+
+
+def extract_green_screen_strip(src_path: Path, key: str, picks: list[tuple[int, int]], fw: int = 96, fh: int = 96) -> str | None:
+    """Slice a 4-frame horizontal sprite strip from a #00FF00 green-screen sheet or keep committed output."""
+    out_path = OUT / f'{key}.webp'
+    if not src_path.exists():
+        return f'assets/battle/sprites/{key}.webp' if out_path.exists() else None
+
+    im = Image.open(src_path).convert('RGBA')
+    grid = _detect_green_screen_frames(im)
+    if not grid:
+        return f'assets/battle/sprites/{key}.webp' if out_path.exists() else None
+
+    cells = []
+    bboxes = []
+    for r_idx, c_idx in picks:
+        row = grid[min(r_idx, len(grid) - 1)]
+        box = row[min(c_idx, len(row) - 1)]
+        pad_box = (max(0, box[0] - 4), max(0, box[1] - 4), min(im.width, box[2] + 4), min(im.height, box[3] + 4))
+        cell = key_green_screen(im.crop(pad_box))
+        bb = cell.getbbox()
+        if bb:
+            cell = cell.crop(bb)
+            bboxes.append(cell.size)
+        cells.append(cell)
+
+    if not bboxes:
+        return f'assets/battle/sprites/{key}.webp' if out_path.exists() else None
+
+    max_w = max(w for w, _ in bboxes)
+    max_h = max(h for _, h in bboxes)
+    scale = min((fw - 8) / max(1, max_w), (fh - 8) / max(1, max_h))
+    strip = Image.new('RGBA', (fw * len(cells), fh), (0, 0, 0, 0))
+    for i, cell in enumerate(cells):
+        cw, ch = cell.size
+        nw = max(1, round(cw * scale))
+        nh = max(1, round(ch * scale))
+        resized = cell.resize((nw, nh), Image.Resampling.LANCZOS)
+        dx = i * fw + (fw - nw) // 2
+        dy = fh - nh - 3
+        strip.paste(resized, (dx, dy), resized)
+    return save_webp(strip, key)
+
+
+def _fit_rgba_canvas(im: Image.Image, size: int = 96, pad: int = 6) -> Image.Image:
+    bb = im.getbbox()
+    if bb:
+        im = im.crop(bb)
+    cw, ch = im.size
+    scale = min((size - pad * 2) / max(1, cw), (size - pad * 2) / max(1, ch))
+    nw, nh = max(1, round(cw * scale)), max(1, round(ch * scale))
+    resized = im.resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    canvas.paste(resized, ((size - nw) // 2, size - nh - pad), resized)
+    return canvas
+
+
+def _render_bombard_sprite(size: int = 96) -> Image.Image:
+    """Render a crisp 2D isometric 15th-century iron siege bombard on oak carriage."""
+    s = size * 2
+    im = Image.new('RGBA', (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    # Shadow
+    d.ellipse([26, 134, 168, 174], fill=(18, 18, 16, 110))
+    # Back wheel
+    d.ellipse([54, 96, 108, 150], fill=(78, 52, 30, 255), outline=(36, 22, 12, 255), width=4)
+    d.ellipse([72, 114, 90, 132], fill=(56, 56, 62, 255))
+    # Oak trail carriage
+    d.polygon([(30, 144), (118, 106), (132, 120), (42, 158)], fill=(116, 78, 42, 255), outline=(44, 28, 14, 255))
+    d.polygon([(36, 146), (118, 112), (122, 118), (40, 152)], fill=(142, 96, 52, 255))
+    # Iron bombard barrel angled toward upper-right
+    d.polygon([(66, 98), (144, 58), (158, 84), (78, 124)], fill=(54, 58, 66, 255), outline=(24, 26, 30, 255))
+    # Barrel highlight
+    d.polygon([(70, 100), (144, 62), (149, 71), (75, 109)], fill=(96, 104, 116, 255))
+    # Brass reinforcing bands
+    for u in (0.28, 0.56, 0.84):
+        bx = 72 + (150 - 72) * u
+        by = 110 + (71 - 110) * u
+        d.line([(bx - 6, by - 13), (bx + 6, by + 13)], fill=(198, 154, 68, 255), width=6)
+    # Muzzle bore
+    d.ellipse([140, 58, 160, 86], fill=(24, 24, 28, 255), outline=(110, 118, 128, 255), width=3)
+    # Front spoked wheel
+    d.ellipse([86, 104, 144, 162], fill=(94, 62, 34, 255), outline=(38, 24, 12, 255), width=4)
+    d.ellipse([94, 112, 136, 154], fill=(0, 0, 0, 0), outline=(64, 42, 22, 255), width=3)
+    for ang in range(0, 180, 45):
+        import math
+        rad = math.radians(ang)
+        cx, cy, r = 115, 133, 21
+        d.line([(cx - math.cos(rad) * r, cy - math.sin(rad) * r), (cx + math.cos(rad) * r, cy + math.sin(rad) * r)], fill=(124, 84, 48, 255), width=3)
+    d.ellipse([107, 125, 123, 141], fill=(160, 132, 72, 255), outline=(40, 28, 16, 255), width=2)
+    return im.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def extract_siege_and_extra_sprites(assets: dict):
+    """Extract 2D isometric siege equipment, fortress structures, and green-screen unit extras."""
+    # 1. Green-screen 4-frame strips (idle, walk, attack, hit/rout)
+    dl = Path.home() / 'Downloads'
+    gs_specs = {
+        'bronze_spear': (dl / 'Bronze Spearman Sprite Sheet.png', [(0, 0), (0, 2), (1, 2), (2, 4)]),
+        'knight_elite': (dl / 'Fantasy Knight Combat Sprite Sheet.png', [(0, 0), (1, 2), (2, 4), (3, 7)]),
+    }
+    for key, (path, picks) in gs_specs.items():
+        url = extract_green_screen_strip(path, key, picks)
+        if url:
+            assets[key] = url
+
+    # 2. Siege engines & fortress sprites
+    castle_zip = ROOT / 'assets' / 'packs' / 'kenney_castle-kit.zip'
+    if castle_zip.exists():
+        with zipfile.ZipFile(castle_zip) as zf:
+            for key, member in (
+                ('siege_ram', 'Previews/siege-ram.png'),
+                ('siege_catapult', 'Previews/siege-catapult.png'),
+                ('siege_wall', 'Previews/wall.png'),
+            ):
+                if member in zf.namelist():
+                    with zf.open(member) as f:
+                        im = _fit_rgba_canvas(Image.open(f).convert('RGBA'), 96, 6)
+                        assets[key] = save_webp(im, key)
+
+    assets['siege_bombard'] = save_webp(_render_bombard_sprite(96), 'siege_bombard')
+
+    gate_src = ROOT / 'assets' / 'hometown' / 'sprites' / 'gatehouse.webp'
+    if gate_src.exists():
+        gate_im = _fit_rgba_canvas(Image.open(gate_src).convert('RGBA'), 120, 6)
+        assets['siege_gate'] = save_webp(gate_im, 'siege_gate')
+    elif (ROOT / 'assets' / 'castle.png').exists():
+        gate_im = _fit_rgba_canvas(Image.open(ROOT / 'assets' / 'castle.png').convert('RGBA'), 120, 6)
+        assets['siege_gate'] = save_webp(gate_im, 'siege_gate')
+
+    tower_src = ROOT / 'assets' / 'hometown' / 'sprites' / 'watchtower.webp'
+    if tower_src.exists():
+        tower_im = _fit_rgba_canvas(Image.open(tower_src).convert('RGBA'), 120, 6)
+        assets['siege_tower'] = save_webp(tower_im, 'siege_tower')
+
+    rubble_src = ROOT / 'assets' / 'TileObjectsRubbleWalls.png'
+    if rubble_src.exists():
+        rw = Image.open(rubble_src).convert('RGBA')
+        # Composite broken masonry wall (5,0) + low stone rubble (2,1)
+        broken = rw.crop((0, 5 * 128, 128, 6 * 128))
+        rubble = rw.crop((1 * 128, 2 * 128, 2 * 128, 3 * 128))
+        comp = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+        comp.paste(broken, (0, -6), broken)
+        comp.paste(rubble, (0, 6), rubble)
+        assets['siege_gate_breached'] = save_webp(_fit_rgba_canvas(comp, 120, 6), 'siege_gate_breached')
+    elif (OUT / 'siege_gate_breached.webp').exists():
+        assets['siege_gate_breached'] = 'assets/battle/sprites/siege_gate_breached.webp'
+
+
 def main():
     extras = extract_particles_and_strips()
+    extract_siege_and_extra_sprites(extras)
     units = {}
     built_cache = {}
 

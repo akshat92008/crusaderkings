@@ -632,6 +632,15 @@
     "fx_slash": "assets/battle/sprites/fx_slash.webp",
     "fx_impact": "assets/battle/sprites/fx_impact.webp",
     "fx_dust": "assets/battle/sprites/fx_dust.webp",
-    "levy_villager": "assets/battle/sprites/levy_villager.webp"
+    "levy_villager": "assets/battle/sprites/levy_villager.webp",
+    "bronze_spear": "assets/battle/sprites/bronze_spear.webp",
+    "knight_elite": "assets/battle/sprites/knight_elite.webp",
+    "siege_ram": "assets/battle/sprites/siege_ram.webp",
+    "siege_catapult": "assets/battle/sprites/siege_catapult.webp",
+    "siege_wall": "assets/battle/sprites/siege_wall.webp",
+    "siege_bombard": "assets/battle/sprites/siege_bombard.webp",
+    "siege_gate": "assets/battle/sprites/siege_gate.webp",
+    "siege_tower": "assets/battle/sprites/siege_tower.webp",
+    "siege_gate_breached": "assets/battle/sprites/siege_gate_breached.webp"
   }
 }
