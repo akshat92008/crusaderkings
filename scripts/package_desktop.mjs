@@ -19,7 +19,8 @@ const topFiles = [
 
 const copyDirs = [
  'src', 'data', 'assets/branding', 'assets/game-art', 'assets/hometown',
- 'assets/battle/sprites', 'assets/battle/characters', 'assets/ui/parchment',
+ 'assets/battle/sprites', 'assets/battle/characters', 'assets/battle/0ad',
+ 'assets/battle/arenas', 'assets/ui/parchment',
  'assets/audio/music', 'assets/audio/sfx', 'assets/icons', 'assets/video',
  'assets/characters_3d'
 ];

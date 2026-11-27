@@ -98,14 +98,21 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  for(const g of groups){
   g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.hitFlash=Math.max(0,(g.hitFlash||0)-dt);g.deployFlash=Math.max(0,(g.deployFlash||0)-dt);g.skirmishing=false;
   if(g.reserve){g.moving=false;g.status='reserve';continue;}
-  if(g.routed){g.routAge=(g.routAge||0)+dt;g.moving=true;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;const home=g.homeDirection||1;g.z=clamp(g.z+home*dt*5,-46,46);continue;}
+  if(g.routed){
+   if(g.isCommander&&!g.commanderShockDone){
+    g.commanderShockDone=true;
+    for(const ally of groups){if(ally!==g&&ally.side===g.side&&!ally.routed&&distance(g,ally)<=22)ally.morale=clamp((ally.morale??75)-12,10,100);}
+   }
+   g.routAge=(g.routAge||0)+dt;g.moving=true;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;const home=g.homeDirection||1;g.z=clamp(g.z+home*dt*5,-46,46);continue;
+  }
   const enemies=live.filter(e=>e.side!==g.side),pos=snapshot.get(g.id);
   const structure=siegeActive&&g.side===assaultSide?siegeTarget(siege,g):null;
   if(!pos||(!enemies.length&&!structure)){g.moving=false;continue;}
   const role=cardRole(g),form=g.formationId||'';
   const terrain=terrainInfo?.(g);
   g.terrainName=terrain?.name||state.terrainType||'plains';g.height=terrain?.height||0;
-  const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1);
+  const tired=clamp(g.fatigue||0,0,1);
+  const reach=role==='ranged'?clamp(g.range||14,8,24):clamp(g.range||2.5,1.5,4),speed=clamp(g.speed||4,2.5,9)*clamp(terrain?.speed??1,.8,1.1)*(1-0.20*tired);
   const regSiegePower=Number.isFinite(g.siegePower)?g.siegePower:Number.isFinite(g.readiness?.siege)?g.readiness.siege:(sharedEnginePower/assaultCount);
   const isArtillery=hasArtillery||regSiegePower>=20;
   // During an active siege before breach, assaulting regiments attack the gate/towers unless non-artillery archers have an enemy in range.
@@ -148,7 +155,7 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  g.moving=step>0.01;g.vx=d?moveDir*dx/d*step/dt:0;g.vz=d?moveDir*dz/d*step/dt:0;
  if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
  const minZ=siegeActive&&g.side===assaultSide?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
- if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;}
+ if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;g.fatigue=clamp((g.fatigue||0)+dt*((form==='cavalry_wedge'||form==='flank')?0.024:0.012),0,1);}
  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
  for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,minZ,maxZ);}
  g.targetX=target.x;g.targetZ=target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
@@ -160,9 +167,11 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  if(form==='ambush'&&terrain?.inForestCover)g.statusFlags.push('AMBUSH');
  if(siegeActive&&g.side!==assaultSide)g.statusFlags.push('GARRISON');
  if(d>reach||g.cooldown>1e-8)continue;
+ g.fatigue=clamp((g.fatigue||0)+0.018,0,1);
  g.cooldown=form==='longbow_line'?.95:form==='volley_line'?1.04:role==='ranged'?1.15:.85;
  g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
- const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65),protection=clamp(e.armor||1,.75,1.65);
+ const fatiguePenalty=1-0.22*clamp(g.fatigue||0,0,1);
+ const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65)*fatiguePenalty,protection=clamp(e.armor||1,.75,1.65)*(1-0.12*clamp(e.fatigue||0,0,1));
  const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
  const wallCover=siegeActive&&e.side!==assaultSide?.72:1;
  const cover=role==='ranged'?clamp((enemyTerrain?.rangedMitigation??1)*wallCover,.55,1):1;
@@ -171,7 +180,7 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  const flanking=(form==='flank'||form==='encirclement')&&((targetLoad.get(e.id)||0)>soldiers(g)*1.05||Math.abs(pos.x-target.x)>=12);
  const offMult=(chargeReady?(form==='elephant_push'?1.36:1.28):1)*(flanking?(form==='encirclement'?1.26:1.2):1)*(form==='ambush'&&terrain?.inForestCover?1.24:1)*(form==='longbow_line'&&cardRole(e)==='foot'?1.1:1)*(1+clamp(g.commanderMartial||0,0,25)*.015);
  const defForm=e.formationId||'';
- const defMult=(defForm==='shield_wall'&&role==='ranged'?.78:1)*(defForm==='ambush'&&enemyTerrain?.inForestCover?.84:1);
+ const defMult=(defForm==='shield_wall'&&role==='ranged'?.78:1)*(defForm==='skirmish'&&role==='ranged'?.75:1)*(defForm==='ambush'&&enemyTerrain?.inForestCover?.84:1);
  const moraleMult=(chargeReady?1.45:1)*(flanking?1.3:1)*(defForm==='shield_wall'?.78:1);
  if(chargeReady)g.chargeSpent=true;
  if(flanking)g.statusFlags.push('FLANK');
@@ -180,7 +189,7 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  hits.set(e,{loss:prev.loss+loss,morale:prev.morale+loss*moraleMult});
  if(defForm==='pike_square'&&role==='mounted'){
   const selfPrev=hits.get(g)||{loss:0,morale:0};
-  hits.set(g,{loss:selfPrev.loss+loss*.28,morale:selfPrev.morale+loss*.38});
+  hits.set(g,{loss:selfPrev.loss+loss*.45,morale:selfPrev.morale+loss*.55});
  }
  if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
  else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});

@@ -1,0 +1,601 @@
+{
+  "version": 1,
+  "license": "CC-BY-SA-3.0",
+  "attribution": "Wildfire Games (0 A.D.) / codepawl/0ad-art-glb",
+  "families": {
+    "india": {
+      "label": "Indian Kingdoms (Vijayanagara Flagship)",
+      "roles": {
+        "infantry": {
+          "path": "assets/battle/0ad/india/units-mauryas-infantry-swordsman-c.glb",
+          "assetId": "units-mauryas-infantry-swordsman-c",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1902
+        },
+        "spearmen": {
+          "path": "assets/battle/0ad/india/units-mauryas-infantry-spearman-e.glb",
+          "assetId": "units-mauryas-infantry-spearman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1276
+        },
+        "pikes": {
+          "path": "assets/battle/0ad/india/units-mauryas-infantry-spearman-e.glb",
+          "assetId": "units-mauryas-infantry-spearman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1276
+        },
+        "heavy_infantry": {
+          "path": "assets/battle/0ad/india/units-mauryas-infantry-maceman-c.glb",
+          "assetId": "units-mauryas-infantry-maceman-c",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1538
+        },
+        "guard": {
+          "path": "assets/battle/0ad/india/units-mauryas-hero-infantry-swordsman-chandragupta.glb",
+          "assetId": "units-mauryas-hero-infantry-swordsman-chandragupta",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1811
+        },
+        "archers": {
+          "path": "assets/battle/0ad/india/units-mauryas-infantry-archer-c.glb",
+          "assetId": "units-mauryas-infantry-archer-c",
+          "mounted": false,
+          "clips": [
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1950
+        },
+        "cavalry": {
+          "path": "assets/battle/0ad/india/units-mauryas-cavalry-swordsman-e-m.glb",
+          "assetId": "units-mauryas-cavalry-swordsman-e-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3585
+        },
+        "horsebow": {
+          "path": "assets/battle/0ad/india/units-mauryas-cavalry-javelinist-e-m.glb",
+          "assetId": "units-mauryas-cavalry-javelinist-e-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3546
+        },
+        "elephants": {
+          "path": "assets/battle/0ad/india/units-mauryas-elephantry-c-m.glb",
+          "assetId": "units-mauryas-elephantry-c-m",
+          "mounted": true,
+          "clips": [
+            "attack_melee",
+            "attack_ranged",
+            "death",
+            "idle",
+            "run",
+            "walk"
+          ],
+          "triangles": 3736
+        },
+        "commander": {
+          "path": "assets/battle/0ad/india/units-mauryas-hero-infantry-swordsman-chandragupta.glb",
+          "assetId": "units-mauryas-hero-infantry-swordsman-chandragupta",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1811
+        },
+        "siege_ram": {
+          "path": "assets/battle/0ad/india/structures-mauryas-siege-ram.glb",
+          "assetId": "structures-mauryas-siege-ram",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "death",
+            "idle",
+            "run",
+            "walk"
+          ],
+          "triangles": 3042
+        }
+      }
+    },
+    "east_asia": {
+      "label": "East Asian Kingdoms (Ming / Joseon)",
+      "roles": {
+        "infantry": {
+          "path": "assets/battle/0ad/east_asia/units-han-infantry-swordsman-e.glb",
+          "assetId": "units-han-infantry-swordsman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1899
+        },
+        "spearmen": {
+          "path": "assets/battle/0ad/east_asia/units-han-infantry-spearman-e.glb",
+          "assetId": "units-han-infantry-spearman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 2097
+        },
+        "pikes": {
+          "path": "assets/battle/0ad/east_asia/units-han-infantry-halberdman-e.glb",
+          "assetId": "units-han-infantry-halberdman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1857
+        },
+        "heavy_infantry": {
+          "path": "assets/battle/0ad/east_asia/units-han-infantry-swordsman-c.glb",
+          "assetId": "units-han-infantry-swordsman-c",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 2203
+        },
+        "guard": {
+          "path": "assets/battle/0ad/east_asia/units-han-hero-infantry-han-xin.glb",
+          "assetId": "units-han-hero-infantry-han-xin",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1800
+        },
+        "archers": {
+          "path": "assets/battle/0ad/east_asia/units-han-infantry-archer-c.glb",
+          "assetId": "units-han-infantry-archer-c",
+          "mounted": false,
+          "clips": [
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 2187
+        },
+        "crossbow": {
+          "path": "assets/battle/0ad/east_asia/units-han-infantry-crossbowman-c.glb",
+          "assetId": "units-han-infantry-crossbowman-c",
+          "mounted": false,
+          "clips": [
+            "attack_ranged",
+            "death",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 2840
+        },
+        "cavalry": {
+          "path": "assets/battle/0ad/east_asia/units-han-cavalry-swordsman-e-m.glb",
+          "assetId": "units-han-cavalry-swordsman-e-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3419
+        },
+        "horsebow": {
+          "path": "assets/battle/0ad/east_asia/units-han-cavalry-archer-a-m.glb",
+          "assetId": "units-han-cavalry-archer-a-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3760
+        },
+        "commander": {
+          "path": "assets/battle/0ad/east_asia/units-han-hero-infantry-han-xin.glb",
+          "assetId": "units-han-hero-infantry-han-xin",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1800
+        },
+        "siege_catapult": {
+          "path": "assets/battle/0ad/east_asia/units-han-siege-mangonel.glb",
+          "assetId": "units-han-siege-mangonel",
+          "mounted": false,
+          "clips": [
+            "attack_ranged",
+            "idle"
+          ],
+          "triangles": 7182
+        },
+        "siege_tower": {
+          "path": "assets/battle/0ad/east_asia/structures-han-siege-tower.glb",
+          "assetId": "structures-han-siege-tower",
+          "mounted": false,
+          "clips": [
+            "idle",
+            "run",
+            "walk"
+          ],
+          "triangles": 3160
+        }
+      }
+    },
+    "persia": {
+      "label": "Persian & Middle Eastern Realms (Ottomans / Timurids / Mamluks / Persia)",
+      "roles": {
+        "infantry": {
+          "path": "assets/battle/0ad/persia/units-persians-infantry-spearman-e.glb",
+          "assetId": "units-persians-infantry-spearman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1360
+        },
+        "spearmen": {
+          "path": "assets/battle/0ad/persia/units-persians-infantry-spearman-e.glb",
+          "assetId": "units-persians-infantry-spearman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1360
+        },
+        "pikes": {
+          "path": "assets/battle/0ad/persia/units-persians-infantry-spearman-c3.glb",
+          "assetId": "units-persians-infantry-spearman-c3",
+          "mounted": false,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1488
+        },
+        "heavy_infantry": {
+          "path": "assets/battle/0ad/persia/units-persians-infantry-spearman-c3.glb",
+          "assetId": "units-persians-infantry-spearman-c3",
+          "mounted": false,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1488
+        },
+        "guard": {
+          "path": "assets/battle/0ad/persia/units-persians-hero-cavalry-spearman-cyrus-m.glb",
+          "assetId": "units-persians-hero-cavalry-spearman-cyrus-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 4116
+        },
+        "archers": {
+          "path": "assets/battle/0ad/persia/units-persians-infantry-archer-c.glb",
+          "assetId": "units-persians-infantry-archer-c",
+          "mounted": false,
+          "clips": [
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1525
+        },
+        "cavalry": {
+          "path": "assets/battle/0ad/persia/units-persians-cavalry-axeman-e-m.glb",
+          "assetId": "units-persians-cavalry-axeman-e-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3904
+        },
+        "horsebow": {
+          "path": "assets/battle/0ad/persia/units-persians-cavalry-archer-e-m.glb",
+          "assetId": "units-persians-cavalry-archer-e-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3862
+        },
+        "elephants": {
+          "path": "assets/battle/0ad/persia/units-persians-elephantry-c-m.glb",
+          "assetId": "units-persians-elephantry-c-m",
+          "mounted": true,
+          "clips": [
+            "attack_melee",
+            "attack_ranged",
+            "death",
+            "idle",
+            "run",
+            "walk"
+          ],
+          "triangles": 6564
+        },
+        "commander": {
+          "path": "assets/battle/0ad/persia/units-persians-hero-infantry-archer-xerxes.glb",
+          "assetId": "units-persians-hero-infantry-archer-xerxes",
+          "mounted": false,
+          "clips": [
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1533
+        },
+        "siege_ram": {
+          "path": "assets/battle/0ad/persia/structures-persians-siege-ram.glb",
+          "assetId": "structures-persians-siege-ram",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "run",
+            "walk"
+          ],
+          "triangles": 3662
+        }
+      }
+    },
+    "europe": {
+      "label": "European Realms (0 A.D. Classical Pikes/Siege + KayKit Knights)",
+      "roles": {
+        "pikes": {
+          "path": "assets/battle/0ad/europe/units-macedonians-infantry-pikeman-e.glb",
+          "assetId": "units-macedonians-infantry-pikeman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 2200
+        },
+        "heavy_infantry": {
+          "path": "assets/battle/0ad/europe/units-seleucids-infantry-swordsman-e.glb",
+          "assetId": "units-seleucids-infantry-swordsman-e",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 2774
+        },
+        "cavalry": {
+          "path": "assets/battle/0ad/europe/units-seleucids-cavalry-spearman-e-m.glb",
+          "assetId": "units-seleucids-cavalry-spearman-e-m",
+          "mounted": true,
+          "clips": [
+            "attack_capture",
+            "attack_melee",
+            "attack_ranged",
+            "attack_slaughter",
+            "death",
+            "gather_meat",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 3918
+        },
+        "commander": {
+          "path": "assets/battle/0ad/europe/units-macedonians-hero-infantry-pikeman-philip.glb",
+          "assetId": "units-macedonians-hero-infantry-pikeman-philip",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "promotion",
+            "run",
+            "walk"
+          ],
+          "triangles": 1942
+        },
+        "siege_ram": {
+          "path": "assets/battle/0ad/europe/units-romans-siege-ram.glb",
+          "assetId": "units-romans-siege-ram",
+          "mounted": false,
+          "clips": [
+            "attack_melee",
+            "idle",
+            "run",
+            "walk"
+          ],
+          "triangles": 3002
+        },
+        "siege_catapult": {
+          "path": "assets/battle/0ad/europe/units-romans-siege-onager.glb",
+          "assetId": "units-romans-siege-onager",
+          "mounted": false,
+          "clips": [
+            "attack_ranged",
+            "idle"
+          ],
+          "triangles": 1962
+        },
+        "siege_gate": {
+          "path": "assets/battle/0ad/europe/structures-romans-siege-wall-gate.glb",
+          "assetId": "structures-romans-siege-wall-gate",
+          "mounted": false,
+          "clips": [
+            "gate_closed",
+            "gate_closing",
+            "gate_open",
+            "gate_opening"
+          ],
+          "triangles": 4156
+        },
+        "siege_wall": {
+          "path": "assets/battle/0ad/europe/structures-romans-siege-wall-medium.glb",
+          "assetId": "structures-romans-siege-wall-medium",
+          "mounted": false,
+          "clips": [],
+          "triangles": 1704
+        },
+        "siege_tower": {
+          "path": "assets/battle/0ad/europe/structures-romans-siege-wall-tower.glb",
+          "assetId": "structures-romans-siege-wall-tower",
+          "mounted": false,
+          "clips": [],
+          "triangles": 1508
+        }
+      }
+    }
+  }
+}

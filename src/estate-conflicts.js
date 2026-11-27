@@ -16,7 +16,7 @@ export function openEstateClaim(g,world,r,origin,target,byPlayer=false){const ro
 // The private force belongs to the named lord, never to the sovereign's field army.
 export function estateRetinue(g,r,actor,id){
  const h=estate(g,r,id,actor),p=g.provinces[id],x=g.estateConflicts?.retinues?.[id];
- if(!h||!p||!free(g,actor)||live(g,actor).age<18||actor===g.politics.realms[r]?.ruler)return null;
+ if(!h||!p||!free(g,actor)||live(g,actor).realm!==r||live(g,actor).age<18||actor===g.politics.realms[r]?.ruler)return null;
  const capacity=Math.max(20,Math.min(240,40+10*(p.development||0)+20*(p.buildings?.barracks||0)));
  const troops=x?.lord===actor&&Number.isFinite(x.troops)?Math.min(capacity,Math.max(0,Math.floor(x.troops))):0;
  return {id,troops,capacity,available:Math.min(20,capacity-troops),wealth:h.wealth,lastRecruit:x?.lord===actor?x.lastRecruit:-120};

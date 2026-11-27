@@ -157,7 +157,7 @@ export function updateFieldCharacters(scene, groups, dt) {
 }
 
 // Camera presets preserve the same projection and ground picking used by the renderer.
-export const CAMERA_PRESETS = { overview: { distance: 125, yaw: 0.38 }, tactical: { distance: 72, yaw: 0.38 }, regiment: { distance: 40, yaw: 0.38 } };
+export const CAMERA_PRESETS = { overview: { distance: 66, yaw: 0.28 }, tactical: { distance: 46, yaw: 0.25 }, regiment: { distance: 26, yaw: 0.22 } };
 
 export function cameraDestination(mode, groups, selected) {
   const preset = CAMERA_PRESETS[mode];

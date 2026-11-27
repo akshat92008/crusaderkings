@@ -3,7 +3,7 @@ import {terrainHeight, terrainForestCovers} from './field-tactics.js';
 // Field-battle-only scenery, shared by the shipped bundle and fallback renderer.
 // Raised perimeter props remain outside the playable combat rectangle; terrain groves &
 // high-ground contours match deterministic terrainHeight & terrainForestCovers.
-export function fieldScenery(seed = 1450, biome = 'temperate', compact = false) {
+export function fieldScenery(seed = 1450, biome = 'temperate', compact = false, includeGroundDiscs = true) {
   let st = seed >>> 0 || 1;
   const rand = () => {
     st = (Math.imul(st, 1664525) + 1013904223) >>> 0;
@@ -25,12 +25,14 @@ export function fieldScenery(seed = 1450, biome = 'temperate', compact = false) 
   ground.shape = 'box';
 
   // Shallow, irregular color patches define rough ground without obstructing orders.
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < (compact ? 8 : 18); i++) {
-      const x = side * (45 + rand() * 28);
-      const z = -57 + rand() * 114;
-      const r = 2 + rand() * 5;
-      add('sphere', x, 0.018, z, r, 0.045, r * (0.5 + rand() * 0.6), earth);
+  if (includeGroundDiscs) {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < (compact ? 8 : 18); i++) {
+        const x = side * (45 + rand() * 28);
+        const z = -57 + rand() * 114;
+        const r = 2 + rand() * 5;
+        add('sphere', x, 0.018, z, r, 0.045, r * (0.5 + rand() * 0.6), earth);
+      }
     }
   }
   for (const side of [-1, 1]) {
@@ -75,7 +77,7 @@ export function fieldScenery(seed = 1450, biome = 'temperate', compact = false) 
 }
 
 /** Generate visible woodland grove trees & highland ridge markers aligned to terrainHeight. */
-export function terrainVisualProps(terrain = 'plains', biome = 'temperate', compact = false) {
+export function terrainVisualProps(terrain = 'plains', biome = 'temperate', compact = false, includeGroundDiscs = true) {
   const items = [];
   const desert = biome === 'desert' || String(terrain).toLowerCase() === 'desert';
   const coastal = String(terrain).toLowerCase() === 'coastal';
@@ -95,8 +97,8 @@ export function terrainVisualProps(terrain = 'plains', biome = 'temperate', comp
   for (let gi = 0; gi < covers.length; gi++) {
     const g = covers[gi];
     const baseY = terrainHeight(g.x, g.z, terrain);
-    // Soft mossy woodland floor footprint
-    add('sphere', g.x, baseY + 0.03, g.z, g.radius * 1.95, 0.08, g.radius * 1.95, moss);
+    // Soft mossy woodland floor footprint (2D fallback only; 3D uses vertex colors)
+    if (includeGroundDiscs) add('sphere', g.x, baseY + 0.03, g.z, g.radius * 1.95, 0.08, g.radius * 1.95, moss);
     const count = Math.max(4, Math.round((compact ? 5 : 9) * (g.density || 0.8)));
     let st = ((gi + 1) * 977 + norm.length * 131) >>> 0;
     const rng = () => {

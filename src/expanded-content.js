@@ -10,6 +10,12 @@ import {dlcLifestyleEvents} from './content/events-dlc-lifestyles.js';
 import {crossroadsEvents} from './content/events-crossroads.js';
 import {grandChronicleEvents} from './content/events-grand-chronicles.js';
 import {siegeCapitalDynastyEvents} from './content/events-siege-capital-dynasty.js';
+import {warDiplomacyEvents} from './content/events-war-diplomacy.js';
+import {economyTradeEvents} from './content/events-economy-trade.js';
+import {faithSocietyEvents} from './content/events-faith-society.js';
+import {culturesWorldEvents} from './content/events-cultures-world.js';
+import {ck2DlcEpicEvents} from './content/events-ck2-dlc-epics.js';
+import {ck2WorldCourtEvents} from './content/events-ck2-world-court.js';
 import {expandedMandates} from './content/mandates-decisions.js';
 import {marriageCandidates,negotiatedMarriage} from './dynastic-politics.js';
 import {initEmergent,tickEmergent,emergentAction,currentEmergentEvent,emergentDecisions,extendedEmergentDecisions,EMERGENT_EVENTS,EXTENDED_EMERGENT_EVENTS,EXTENDED_REACTIVE_EVENTS,EMERGENT_DECISIONS,EXTENDED_EMERGENT_DECISIONS} from './emergent-content.js';
@@ -25,7 +31,13 @@ export const SOVEREIGN_CONTENT_EVENTS=[
 ...dlcLifestyleEvents(E,C),
 ...crossroadsEvents(E,C),
 ...grandChronicleEvents(E,C),
-...siegeCapitalDynastyEvents(E,C)
+...siegeCapitalDynastyEvents(E,C),
+...warDiplomacyEvents(E,C),
+...economyTradeEvents(E,C),
+...faithSocietyEvents(E,C),
+...culturesWorldEvents(E,C),
+...ck2DlcEpicEvents(E,C),
+...ck2WorldCourtEvents(E,C)
 ];
 export const EVENTS=[
 ...supplementalEvents(E,C),

@@ -226,7 +226,7 @@
  .map-legend-overlay{bottom:44px;left:8px;max-width:calc(100% - 66px)}
  .mapfooter{padding:3px 8px;font-size:9px}
  .eventticker{padding:3px 8px;min-height:24px;font-size:9px}
- .toast{top:10px;bottom:auto;max-width:calc(100vw - 20px);transform:translate(-50%,-18px);padding:10px 14px;font-size:11px}
+ .toast{bottom:calc(62px + env(safe-area-inset-bottom));top:auto;max-width:calc(100vw - 20px);transform:translate(-50%,18px);padding:10px 14px;font-size:11px}
  .toast.visible{transform:translate(-50%,0)}
  .leftbar,.rightbar{padding-bottom:max(14px,env(safe-area-inset-bottom))}
  .battle-top{padding:6px 8px}

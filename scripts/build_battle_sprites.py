@@ -67,7 +67,7 @@ CULTURE_SHEETS = {
         'commander': ('fia0dsfia0dsfia0', 118, 102),
     },
     'southindia': {
-        'infantry': ('snyt3isnyt3isnyt', 96, 96),
+        'infantry': ('r0d056r0d056r0d0', 96, 96),
         'heavy_infantry': ('v2kpj7v2kpj7v2kp', 96, 96),
         'pikemen': ('r0d056r0d056r0d0', 96, 96),
         'archers': ('qottp7qottp7qott', 96, 96),
@@ -105,7 +105,7 @@ CULTURE_SHEETS = {
         'commander': ('lesd2wlesd2wlesd', 118, 102),
     },
     'southeast': {
-        'infantry': ('snyt3isnyt3isnyt', 96, 96),
+        'infantry': ('r0d056r0d056r0d0', 96, 96),
         'heavy_infantry': ('d8i71id8i71id8i7', 96, 96),
         'pikemen': ('6s7zl66s7zl66s7z', 96, 96),
         'archers': ('e41b5qe41b5qe41b', 96, 96),
@@ -166,42 +166,43 @@ def load_git_sheet(sheet_id: str) -> Image.Image:
     return im
 
 
-def key_cell_background(cell: Image.Image) -> Image.Image:
-    """Perimeter flood-fill keying for white or light/dark checkerboard mattes.
+def _sample_matte_tones(cell: Image.Image):
+    w, h = cell.size
+    px = cell.load()
+    samples = []
+    for y in list(range(2, min(20, h), 4)) + list(range(max(0, h - 20), h - 1, 4)):
+        for x in list(range(2, min(20, w), 4)) + list(range(max(0, w - 20), w - 1, 4)):
+            r, g, b, _ = px[x, y]
+            if max(r, g, b) - min(r, g, b) <= 18:
+                if all(abs(r - sr) + abs(g - sg) + abs(b - sb) > 14 for sr, sg, sb in samples):
+                    samples.append((r, g, b))
+        if len(samples) >= 10:
+            break
+    return samples
 
-    Samples actual neutral matte colors from the cell's border band so dark
-    checkerboard squares are removed cleanly alongside light ones, without ever
-    entering the colored soldier interior.
-    """
+
+def _is_matte(r: int, g: int, b: int, matte_tones) -> bool:
+    hi = max(r, g, b)
+    lo = min(r, g, b)
+    sat = hi - lo
+    # White or neutral light-grey checker grid matte without eroding tan/cream shields
+    if sat <= 12 and hi >= 208:
+        return True
+    if sat <= 18:
+        for sr, sg, sb in matte_tones:
+            tol = 12 if max(sr, sg, sb) < 35 else 18
+            if abs(r - sr) <= tol and abs(g - sg) <= tol and abs(b - sb) <= tol:
+                return True
+    return False
+
+
+def key_cell_background(cell: Image.Image) -> Image.Image:
+    """Perimeter + enclosed checkerboard flood-fill keying without eroding interior armor."""
     w, h = cell.size
     px = cell.load()
     visited = bytearray(w * h)
     q = deque()
-
-    # Sample distinct neutral tones from the outermost 32px corner bands (covers light & dark checker tiles)
-    samples = []
-    for y in list(range(2, min(36, h), 4)) + list(range(max(0, h - 36), h - 1, 4)):
-        for x in list(range(2, min(36, w), 4)) + list(range(max(0, w - 36), w - 1, 4)):
-            r, g, b, _ = px[x, y]
-            if max(r, g, b) - min(r, g, b) <= 22:
-                if all(abs(r - sr) + abs(g - sg) + abs(b - sb) > 16 for sr, sg, sb in samples):
-                    samples.append((r, g, b))
-        if len(samples) >= 8:
-            break
-    matte_tones = samples
-
-    def is_matte(r: int, g: int, b: int) -> bool:
-        hi = max(r, g, b)
-        lo = min(r, g, b)
-        sat = hi - lo
-        if (sat <= 22 and hi >= 145) or (hi >= 238 and sat <= 34):
-            return True
-        if sat <= 18:
-            for sr, sg, sb in matte_tones:
-                tol = 10 if max(sr, sg, sb) < 28 else 22
-                if abs(r - sr) <= tol and abs(g - sg) <= tol and abs(b - sb) <= tol:
-                    return True
-        return False
+    matte_tones = _sample_matte_tones(cell)
 
     for x in range(w):
         q.append((x, 0))
@@ -216,7 +217,7 @@ def key_cell_background(cell: Image.Image) -> Image.Image:
         if visited[idx]:
             continue
         r, g, b, a = px[x, y]
-        if not is_matte(r, g, b):
+        if not _is_matte(r, g, b, matte_tones):
             continue
         visited[idx] = 1
         px[x, y] = (0, 0, 0, 0)
@@ -229,6 +230,44 @@ def key_cell_background(cell: Image.Image) -> Image.Image:
         if y + 1 < h and not visited[idx + w]:
             q.append((x, y + 1))
 
+    # Gently catch only true enclosed light+dark checkerboard islands (alternating gray contrast), never white clothing
+    seen_island = bytearray(w * h)
+    for y0 in range(6, h - 6, 4):
+        for x0 in range(6, w - 6, 4):
+            idx0 = y0 * w + x0
+            if visited[idx0] or seen_island[idx0]:
+                continue
+            r, g, b, a = px[x0, y0]
+            if a == 0 or (max(r, g, b) - min(r, g, b)) > 12 or max(r, g, b) < 175:
+                continue
+            # Require at least one neutral neighbor of notably different brightness (checkerboard tile edge)
+            has_checker_step = False
+            for nx, ny in ((x0 + 8, y0), (x0, y0 + 8), (x0 - 8, y0), (x0, y0 - 8)):
+                if 0 <= nx < w and 0 <= ny < h:
+                    nr, ng, nb, na = px[nx, ny]
+                    if na > 0 and (max(nr, ng, nb) - min(nr, ng, nb)) <= 12 and 24 <= abs(max(r, g, b) - max(nr, ng, nb)) <= 85:
+                        has_checker_step = True
+                        break
+            if not has_checker_step:
+                continue
+            comp = []
+            cq = deque([(x0, y0)])
+            seen_island[idx0] = 1
+            while cq and len(comp) < 2500:
+                cx, cy = cq.popleft()
+                comp.append((cx, cy))
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if 0 <= nx < w and 0 <= ny < h:
+                        nidx = ny * w + nx
+                        if not visited[nidx] and not seen_island[nidx]:
+                            nr, ng, nb, na = px[nx, ny]
+                            if na > 0 and (max(nr, ng, nb) - min(nr, ng, nb)) <= 14 and max(nr, ng, nb) >= 165:
+                                seen_island[nidx] = 1
+                                cq.append((nx, ny))
+            if 64 <= len(comp) < 2000:
+                for cx, cy in comp:
+                    px[cx, cy] = (0, 0, 0, 0)
+
     # Gentle 1px edge de-fringing for pale anti-aliased halos touching transparent pixels
     for y in range(1, h - 1):
         for x in range(1, w - 1):
@@ -237,7 +276,7 @@ def key_cell_background(cell: Image.Image) -> Image.Image:
                 continue
             hi = max(r, g, b)
             lo = min(r, g, b)
-            if hi - lo <= 22 and hi >= 145:
+            if hi - lo <= 16 and hi >= 205:
                 neighbors_clear = (
                     px[x - 1, y][3] == 0 or px[x + 1, y][3] == 0 or
                     px[x, y - 1][3] == 0 or px[x, y + 1][3] == 0
@@ -247,20 +286,69 @@ def key_cell_background(cell: Image.Image) -> Image.Image:
     return cell
 
 
+def _cell_quality(cell: Image.Image) -> tuple[float, Image.Image]:
+    """Score a keyed 6x6 cell cleanly so empty/corrupted cells are avoided."""
+    w, h = cell.size
+    px = cell.load()
+    opaque = 0
+    border_op = 0
+    for y in range(h):
+        for x in range(w):
+            a = px[x, y][3]
+            if a > 25:
+                opaque += 1
+                if x < 5 or x >= w - 5 or y < 5 or y >= h - 5:
+                    border_op += 1
+    if opaque < 1200 or opaque > w * h * 0.80:
+        return (-1e6, cell)
+    bb = cell.getbbox()
+    if not bb:
+        return (-1e6, cell)
+    bw = bb[2] - bb[0]
+    bh = bb[3] - bb[1]
+    aspect = min(bw, bh) / max(1, max(bw, bh))
+    # Reward solid silhouettes cleanly inset from cell gutters
+    score = opaque - border_op * 18.0 + aspect * 1500.0
+    return (score, cell)
+
+
 def slice_strip(sheet_id: str, fw: int, fh: int) -> Image.Image:
     im = load_git_sheet(sheet_id)
     w, h = im.size
     strip = Image.new('RGBA', (fw * len(FRAME_COORDS), fh), (0, 0, 0, 0))
     cells = []
     bboxes = []
-    for col, row in FRAME_COORDS:
-        x0 = round(col * w / 6) + 5
-        y0 = round(row * h / 6) + 5
-        x1 = round((col + 1) * w / 6) - 5
-        y1 = round((row + 1) * h / 6) - 5
-        cell = key_cell_background(im.crop((x0, y0, x1, y1)))
-        bb = cell.getbbox()
-        cells.append(cell)
+    # Pick cleanest cell in each semantic row band (fallback nearby col if preferred col has artifact)
+    row_prefs = [
+        (0, [0, 1, 2, 3, 4, 5]),
+        (1, [2, 1, 3, 0, 4, 5]),
+        (3, [2, 3, 1, 4, 0, 5]),
+        (4, [1, 2, 0, 3, 4, 5]),
+    ]
+    for pref_row, col_order in row_prefs:
+        best_score = -1e9
+        best_cell = None
+        for r_cand in (pref_row, min(5, pref_row + 1), max(0, pref_row - 1)):
+            for col in col_order:
+                x0 = round(col * w / 6) + 9
+                y0 = round(r_cand * h / 6) + 9
+                x1 = round((col + 1) * w / 6) - 9
+                y1 = round((r_cand + 1) * h / 6) - 9
+                cand = key_cell_background(im.crop((x0, y0, x1, y1)))
+                sc, scored_cell = _cell_quality(cand)
+                if r_cand != pref_row:
+                    sc -= 800.0
+                if sc > best_score:
+                    best_score = sc
+                    best_cell = scored_cell
+                if sc > 5500 and col == col_order[0] and r_cand == pref_row:
+                    break
+            if best_score > 5500 and r_cand == pref_row:
+                break
+        if best_cell is None:
+            best_cell = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        bb = best_cell.getbbox()
+        cells.append(best_cell)
         if bb:
             bboxes.append(bb)
 
@@ -501,6 +589,101 @@ def _render_bombard_sprite(size: int = 96) -> Image.Image:
     return im.resize((size, size), Image.Resampling.LANCZOS)
 
 
+def _render_vfx_sprites(assets: dict):
+    """Ensure crisp procedural fallback VFX when raw VFX sheets produce blank/noise frames."""
+    # Slash arc (transparent amber-steel arc)
+    sl = Image.new('RGBA', (96, 96), (0, 0, 0, 0))
+    ds = ImageDraw.Draw(sl)
+    ds.arc([12, 14, 84, 82], start=210, end=350, fill=(255, 224, 150, 235), width=7)
+    ds.arc([16, 18, 80, 78], start=215, end=345, fill=(255, 250, 228, 255), width=3)
+    assets['fx_slash'] = save_webp(sl, 'fx_slash')
+
+    # Impact flash
+    im = Image.new('RGBA', (96, 96), (0, 0, 0, 0))
+    di = ImageDraw.Draw(im)
+    di.ellipse([26, 26, 70, 70], fill=(255, 196, 92, 165))
+    di.ellipse([36, 36, 60, 60], fill=(255, 245, 200, 245))
+    assets['fx_impact'] = save_webp(im, 'fx_impact')
+
+    # Earthy dust cloud
+    du = Image.new('RGBA', (96, 96), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(du)
+    for cx, cy, rr, a in [(38, 56, 18, 120), (54, 52, 20, 140), (46, 44, 16, 110), (62, 60, 14, 95)]:
+        dd.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=(168, 146, 108, a))
+    assets['fx_dust'] = save_webp(du, 'fx_dust')
+
+
+def extract_green_screen_horizontal(src_path: Path, key: str, fw: int = 96, fh: int = 96) -> str | None:
+    """Slice a 4-pose single-row green-screen strip cleanly by finding the 4 torso centers."""
+    out_path = OUT / f'{key}.webp'
+    if not src_path.exists():
+        return f'assets/battle/sprites/{key}.webp' if out_path.exists() else None
+    im = Image.open(src_path).convert('RGBA')
+    w, h = im.size
+    px = im.load()
+
+    def is_fg(r: int, g: int, b: int) -> bool:
+        return not (g > 110 and g - max(r, b) > 36)
+
+    # Detect foreground horizontal runs in the lower 55% of image (feet/legs/horses never overlap horizontally)
+    y_start = int(h * 0.45)
+    cols_fg = [any(is_fg(*px[x, y][:3]) for y in range(y_start, h - 4, 2)) for x in range(w)]
+    bands = []
+    in_b, bs = False, 0
+    for x, ok in enumerate(cols_fg):
+        if ok and not in_b:
+            in_b, bs = True, x
+        elif not ok and in_b:
+            in_b = False
+            if x - bs >= 24:
+                bands.append((bs, x))
+    if in_b and w - bs >= 24:
+        bands.append((bs, w))
+    # Merge small <18px internal leg gaps
+    merged = []
+    for b in bands:
+        if merged and b[0] - merged[-1][1] < 24:
+            merged[-1] = (merged[-1][0], b[1])
+        else:
+            merged.append(b)
+    # Find vertical valleys of ZERO green-keyed foreground across FULL height between the 4 torso bands
+    full_cols = [sum(1 for y in range(h) if is_fg(*px[x, y][:3])) for x in range(w)]
+    if len(merged) != 4:
+        cuts = [round(i * w / 4) for i in range(5)]
+    else:
+        cuts = [0]
+        for i in range(3):
+            lo, hi = merged[i][1] - 10, merged[i + 1][0] + 10
+            lo, hi = max(0, lo), min(w - 1, hi)
+            if lo < hi:
+                best_x = min(range(lo, hi + 1), key=lambda x: full_cols[x])
+            else:
+                best_x = (merged[i][1] + merged[i + 1][0]) // 2
+            cuts.append(best_x)
+        cuts.append(w)
+
+    cells, bboxes = [], []
+    for i in range(4):
+        cell = key_green_screen(im.crop((cuts[i], 0, cuts[i + 1], h)))
+        bb = cell.getbbox()
+        if bb:
+            cell = cell.crop(bb)
+            bboxes.append(cell.size)
+        cells.append(cell)
+    if not bboxes:
+        return None
+    max_w = max(bw for bw, _ in bboxes)
+    max_h = max(bh for _, bh in bboxes)
+    scale = min((fw - 6) / max(1, max_w), (fh - 6) / max(1, max_h))
+    strip = Image.new('RGBA', (fw * 4, fh), (0, 0, 0, 0))
+    for i, cell in enumerate(cells):
+        cw, ch = cell.size
+        nw, nh = max(1, round(cw * scale)), max(1, round(ch * scale))
+        resized = cell.resize((nw, nh), Image.Resampling.LANCZOS)
+        strip.paste(resized, (i * fw + (fw - nw) // 2, fh - nh - 2), resized)
+    return save_webp(strip, key)
+
+
 def extract_siege_and_extra_sprites(assets: dict):
     """Extract 2D isometric siege equipment, fortress structures, and green-screen unit extras."""
     # 1. Green-screen 4-frame strips (idle, walk, attack, hit/rout)
@@ -514,21 +697,30 @@ def extract_siege_and_extra_sprites(assets: dict):
         if url:
             assets[key] = url
 
-    # 2. Siege engines & fortress sprites
+    # 2. Siege engines & fortress sprites (prefer cohesive dark medieval masonry from TileObjectsRubbleWalls.png!)
     castle_zip = ROOT / 'assets' / 'packs' / 'kenney_castle-kit.zip'
     if castle_zip.exists():
         with zipfile.ZipFile(castle_zip) as zf:
             for key, member in (
                 ('siege_ram', 'Previews/siege-ram.png'),
                 ('siege_catapult', 'Previews/siege-catapult.png'),
-                ('siege_wall', 'Previews/wall.png'),
             ):
                 if member in zf.namelist():
                     with zf.open(member) as f:
                         im = _fit_rgba_canvas(Image.open(f).convert('RGBA'), 96, 6)
                         assets[key] = save_webp(im, key)
 
+    rubble_src = ROOT / 'assets' / 'TileObjectsRubbleWalls.png'
+    if rubble_src.exists():
+        rw = Image.open(rubble_src).convert('RGBA')
+        # Crenellated medieval stone battlement section (64x128 tile at col 0, row 5)
+        wall_cell = rw.crop((0, 640, 64, 768))
+        assets['siege_wall'] = save_webp(_fit_rgba_canvas(wall_cell, 96, 4), 'siege_wall')
+    elif (OUT / 'siege_wall.webp').exists():
+        assets['siege_wall'] = 'assets/battle/sprites/siege_wall.webp'
+
     assets['siege_bombard'] = save_webp(_render_bombard_sprite(96), 'siege_bombard')
+    _render_vfx_sprites(assets)
 
     gate_src = ROOT / 'assets' / 'hometown' / 'sprites' / 'gatehouse.webp'
     if gate_src.exists():
@@ -543,10 +735,8 @@ def extract_siege_and_extra_sprites(assets: dict):
         tower_im = _fit_rgba_canvas(Image.open(tower_src).convert('RGBA'), 120, 6)
         assets['siege_tower'] = save_webp(tower_im, 'siege_tower')
 
-    rubble_src = ROOT / 'assets' / 'TileObjectsRubbleWalls.png'
     if rubble_src.exists():
         rw = Image.open(rubble_src).convert('RGBA')
-        # Composite broken masonry wall (5,0) + low stone rubble (2,1)
         broken = rw.crop((0, 5 * 128, 128, 6 * 128))
         rubble = rw.crop((1 * 128, 2 * 128, 2 * 128, 3 * 128))
         comp = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
@@ -562,8 +752,19 @@ def main():
     extract_siege_and_extra_sprites(extras)
     units = {}
     built_cache = {}
+    sources_dir = ROOT / 'assets' / 'battle' / 'sources'
 
     for key, (sid, fw, fh) in DEFAULT_SHEETS.items():
+        if key == 'infantry' and (sources_dir / 'infantry_eu.jpg').exists():
+            url = extract_green_screen_horizontal(sources_dir / 'infantry_eu.jpg', 'infantry', fw, fh)
+            if url:
+                units[key] = {'url': url, 'frames': 4, 'frameW': fw, 'frameH': fh}
+                continue
+        if key == 'cavalry' and (sources_dir / 'cavalry_eu.jpg').exists():
+            url = extract_green_screen_horizontal(sources_dir / 'cavalry_eu.jpg', 'cavalry', fw, fh)
+            if url:
+                units[key] = {'url': url, 'frames': 4, 'frameW': fw, 'frameH': fh}
+                continue
         cache_key = (sid, fw, fh)
         strip = built_cache.get(cache_key)
         if strip is None:
@@ -575,6 +776,16 @@ def main():
     for cult, spec_map in CULTURE_SHEETS.items():
         cultures[cult] = {}
         for ukey, (sid, fw, fh) in spec_map.items():
+            if cult == 'europe_west' and ukey == 'infantry' and (sources_dir / 'infantry_eu.jpg').exists():
+                url = extract_green_screen_horizontal(sources_dir / 'infantry_eu.jpg', f'cultures/{cult}-{ukey}', fw, fh)
+                if url:
+                    cultures[cult][ukey] = {'url': url, 'frames': 4, 'frameW': fw, 'frameH': fh}
+                    continue
+            if cult in ('europe_west', 'europe_east') and ukey == 'cavalry' and (sources_dir / 'cavalry_eu.jpg').exists():
+                url = extract_green_screen_horizontal(sources_dir / 'cavalry_eu.jpg', f'cultures/{cult}-{ukey}', fw, fh)
+                if url:
+                    cultures[cult][ukey] = {'url': url, 'frames': 4, 'frameW': fw, 'frameH': fh}
+                    continue
             strip = slice_strip(sid, fw, fh)
             rel = f'cultures/{cult}-{ukey}'
             cultures[cult][ukey] = {'url': save_webp(strip, rel), 'frames': len(FRAME_COORDS), 'frameW': fw, 'frameH': fh}

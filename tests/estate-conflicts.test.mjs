@@ -6,3 +6,12 @@ test('low authority allows abstract internal feud, high authority suppresses esc
 import {careerAction} from '../src/player-career.js';
 test('private retainers use estate gold, persist, and suffer actual losses during local feuds',()=>{const {g,r,origin,target,a,b,x}=fixture(),lord=a.lord;assert.ok(careerAction(g,'start',lord).ok);const cash=g.factions[r].treasury,wealth=a.wealth,armyCount=Object.keys(g.armies).length;assert.ok(careerAction(g,'retinue',origin,'recruit').ok);assert.equal(a.wealth,wealth-80);assert.equal(estateRetinue(g,r,lord,origin).troops,20);assert.equal(careerAction(g,'retinue',target,'recruit').ok,false);assert.equal(careerAction(g,'retinue',origin,'recruit').ok,false);assert.equal(g.factions[r].treasury,cash);assert.equal(Object.keys(g.armies).length,armyCount);let copy=restoreGame(snapshot(g),world);assert.equal(estateRetinue(copy,r,lord,origin).troops,20);g.factions[r].treasury=0;g.turn=6;tickEstateConflicts(g,world);assert.equal(x.status,'feud');g.turn=12;tickEstateConflicts(g,world);assert.ok(estateRetinue(g,r,lord,origin).troops<20);assert.ok(['claimant victory','defender victory'].includes(x.status));assert.equal(g.provinces[target].owner,r);});
 test('a player vassal may initiate a valid neighboring title petition regardless of AI personality',()=>{const {g,r,origin,target,a}=fixture(),lord=a.lord;g.estateConflicts.claims={};g.politics.people[lord].traits=['content'];assert.ok(careerAction(g,'start',lord).ok);assert.ok(estateClaimTargets(g,world,r,lord,origin).includes(target));assert.equal(careerAction(g,'estate-claim',target,origin,world).ok,false);const cash=a.wealth;assert.ok(careerAction(g,'estate-claim',origin,target,world).ok);assert.equal(a.wealth,cash-60);assert.equal(estateDisputes(g,r)[0].claimant,lord);assert.equal(careerAction(g,'estate-claim',origin,target,world).ok,false);});
+
+test('retinues do not resurrect if holding changes realm or holder',()=>{
+ const {g,r,origin,a}=fixture(),lord=a.lord;
+ assert.ok(careerAction(g,'start',lord).ok);
+ assert.ok(careerAction(g,'retinue',origin,'recruit').ok);
+ assert.equal(estateRetinue(g,r,lord,origin).troops,20);
+ g.politics.people[lord].realm='france';
+ assert.equal(estateRetinue(g,r,lord,origin),null);
+});

@@ -179,8 +179,11 @@ export function validateFieldResult(g,battle,result,world=null){
  return {ok:true};
 }
 export function concludeBattle(g,battle,result,world=null){
- if(result?.fieldBattle&&battle?.type==='battle'){const valid=validateFieldResult(g,battle,result,world);if(!valid.ok)return valid;battle.resolved=true;}
- const src=g.armies[battle.attacker];if(!src||!g.provinces[battle.to])return {ok:false,msg:'The battle no longer exists.'};
+ if(battle?.resolved)return {ok:false,msg:'This battle result has already been applied.'};
+ if(!result||typeof result.victory!=='boolean')return {ok:false,msg:'Invalid battle result.'};
+ if(result?.fieldBattle&&battle?.type==='battle'){const valid=validateFieldResult(g,battle,result,world);if(!valid.ok)return valid;}
+ const src=g.armies[battle?.attacker];if(!src||!g.provinces[battle?.to])return {ok:false,msg:'The battle no longer exists.'};
+ battle.resolved=true;
  const dst=g.provinces[battle.to];const was=controller(g,battle.to),war=activeWar(g,g.player,was);
 
  const ratio=clamp(result.attackerRemaining??0,0,1),forces=result.fieldBattle?participatingArmies(g,battle.playerArmies||[src.id],g.player,battle.from||src.province,was):[src];
@@ -618,6 +621,9 @@ export function snapshot(g){
 export function restoreGame(text,world){
  const o=JSON.parse(text);if(o.version!==1||!o.factions?.[o.player]||o.player==='independent'||!o.provinces||!o.armies)throw Error('Invalid or incompatible save file');
  if((o.mapVersion||'legacy')!==(world.meta?.mapVersion||'legacy')||Object.keys(o.provinces).length!==world.provinces.length||world.provinces.some(p=>!o.provinces[p.id]))throw Error('Map version mismatch');
+ for(const f of Object.values(o.factions)){if(!f||typeof f!=='object')continue;f.treasury=Number.isFinite(f.treasury)?f.treasury:0;f.food=Number.isFinite(f.food)?clamp(f.food,-1000,50000):0;f.stability=Number.isFinite(f.stability)?clamp(f.stability,0,100):50;f.legitimacy=Number.isFinite(f.legitimacy)?clamp(f.legitimacy,0,100):50;f.prestige=Number.isFinite(f.prestige)?Math.max(0,f.prestige):0;}
+ for(const p of Object.values(o.provinces)){if(!p||typeof p!=='object')continue;p.population=Number.isFinite(p.population)?clamp(p.population,1,2000):10;p.development=Number.isFinite(p.development)?clamp(p.development,0,30):1;p.unrest=Number.isFinite(p.unrest)?clamp(p.unrest,0,100):0;p.buildings??={farm:0,market:0,barracks:0,fort:0};}
+ for(const a of Object.values(o.armies)){if(!a||typeof a!=='object')continue;for(const k of ['infantry','archers','cavalry'])a[k]=Number.isFinite(a[k])?Math.max(0,Math.round(a[k])):0;a.morale=Number.isFinite(a.morale)?clamp(a.morale,0,100):75;a.experience=Number.isFinite(a.experience)?clamp(a.experience,0,1):0;}
  rehydrateSaveDefaults(o);
  initializeKingdomSystems(o,world);
  syncTitles(o);

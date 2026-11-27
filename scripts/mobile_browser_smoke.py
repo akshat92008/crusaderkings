@@ -152,8 +152,8 @@ try:
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+1')
     assert page.locator('#battle-timer').inner_text()=='DEPLOY YOUR ARMY'
     assert page.locator('#battle-your-bar').is_visible() and page.locator('#battle-enemy-bar').is_visible()
-    assert page.locator('#battle-strength').get_attribute('data-renderer')=='banner'
-    assert page.locator('#battle-move-tap').is_hidden() and page.locator('#battle-camera').is_hidden()
+    assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','banner')
+    assert (page.locator('#battle-camera').is_hidden() if page.locator('#battle-strength').get_attribute('data-renderer')=='banner' else page.locator('#battle-camera').is_visible())
     assert page.locator('#battle-units .unitcard').count()>=2
     page.locator('#battle-presets [data-preset="flanks"]').click()
     page.locator('#battle-units .unitcard').nth(1).click()
@@ -163,8 +163,8 @@ try:
     page.wait_for_timeout(500);page.screenshot(path=str(OUT/(name+'-battle-deployment.png')),timeout=45000)
     page.click('#battle-start');page.wait_for_timeout(700)
     page.locator('#battle-units .unitcard.reserve').click()
-    # Real pointer deployment using the same responsive coordinate contract, not a hidden RTS button.
-    point=page.evaluate("""async()=>{const {bannerViewport,bannerProject}=await import('/src/banner-renderer.js');const c=document.querySelector('#battle-canvas'),r=c.getBoundingClientRect(),t=document.querySelector('.battle-top').getBoundingClientRect(),d=document.querySelector('.battle-bottom').getBoundingClientRect();const v=bannerViewport(c.clientWidth,c.clientHeight,Math.min(c.clientHeight*.32,Math.max(0,t.bottom-r.top))+8,Math.min(c.clientHeight*.42,Math.max(0,r.bottom-d.top))+5,1);const [x,y]=bannerProject(v,0,25);return [r.left+x,r.top+y];}""")
+    # Real pointer deployment using the active renderer's responsive coordinate contract.
+    point=page.evaluate("""async()=>{const b=globalThis.__activeBattle;const c=document.querySelector('#battle-canvas'),r=c.getBoundingClientRect();if(b&&!b.ctx?.isBannerRenderer){const pt=b.project([0,0,25]);if(pt)return [r.left+pt[0],r.top+pt[1]];}const {bannerViewport,bannerProject}=await import('/src/banner-renderer.js');const t=document.querySelector('.battle-top').getBoundingClientRect(),d=document.querySelector('.battle-bottom').getBoundingClientRect();const v=bannerViewport(c.clientWidth,c.clientHeight,Math.min(c.clientHeight*.32,Math.max(0,t.bottom-r.top))+8,Math.min(c.clientHeight*.42,Math.max(0,r.bottom-d.top))+5,1);const [x,y]=bannerProject(v,0,25);return [r.left+x,r.top+y];}""")
     if touch:page.touchscreen.tap(*point)
     else:page.mouse.click(*point)
     page.wait_for_function("document.querySelectorAll('#battle-units .unitcard.reserve').length===0",timeout=5000)
@@ -173,7 +173,7 @@ try:
     page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
     page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
     if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
-    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer')=='banner'
+    page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','banner')
     page.click('#battle-cancel');assert page.locator('#battle-screen').is_hidden()
     print(name,'PASS: practice battle deployment, reserve placement, pause, speed, retreat, repeat battle and cancel')
    if name=='desktop':

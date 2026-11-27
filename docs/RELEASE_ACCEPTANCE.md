@@ -16,7 +16,7 @@ node scripts/package_desktop.mjs
 
 ## Architecture Scope Covered by Acceptance
 
-- **CK2 Parchment UI & Grand Strategy Campaign:** `assets/court-theme.css`, `assets/ui/parchment/*`, economic transparency tooltips (`formatTreasuryTooltip`, `formatStabilityTooltip`), 5-tier feudal titles, council voting, dynastic succession, royal court & 1,071 events / 357 mandates, plus the **2D Living Capital** (`Hometown`) settlement loop.
+- **CK2 Parchment UI & Grand Strategy Campaign:** `assets/court-theme.css`, `assets/ui/parchment/*`, economic transparency tooltips (`formatTreasuryTooltip`, `formatStabilityTooltip`), 5-tier feudal titles, council voting, dynastic succession, royal court & 3,051 events / 437 decisions & mandates, plus the **2D Living Capital** (`Hometown`) settlement loop.
 - **2D Isometric Banner Lines Field Battles:** `src/banner-renderer.js` + `src/simple-card-battle.js` + `assets/battle/sprites/manifest.json` cultural unit spritesheets (default + regional rosters), deployment presets, reserves, and directional formations.
 - **2D Playable Fortress Sieges:** `#battle-siege-showcase` (`siegeMode: true, fortLevel: 2`) and fortified campaign province battles (`fort > 0`), tracking gate/tower structure HP (`#battle-fort-status`), breach resolution, and post-siege fort damage (`applyFortDamage`).
 

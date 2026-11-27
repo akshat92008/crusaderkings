@@ -25,5 +25,5 @@ for(const name of ['Knight','Rogue_Hooded']){
 }
 await build({entryPoints:['src/three-battle-scene.js'],outfile:'src/three-battle.bundle.js',bundle:true,minify:true,format:'esm',platform:'browser',target:'es2022',legalComments:'inline'});
 const size=(await readFile('src/three-battle.bundle.js')).length;
-if(size<200000||size>1500000)throw Error('Unexpected Three bundle size '+size);
+if(size<200000||size>1800000)throw Error('Unexpected Three bundle size '+size);
 console.log('Local Three.js/GLTFLoader bundle',size,'bytes');

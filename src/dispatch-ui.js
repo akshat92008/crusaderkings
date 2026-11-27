@@ -162,13 +162,14 @@ export function buildMonthlyDispatch(g, world, opts = {}) {
 
 export function renderCrownDispatch(g, world, esc, opts = {}) {
  const cards = buildMonthlyDispatch(g, world, opts);
+ const sealLabel = { urgent: 'URGENT SEAL', high: 'PRIORITY', medium: 'COUNCIL', low: 'ORDER' };
  return '<div class="dispatch-deck" id="crown-dispatch">'
-  + '<div class="dispatch-head"><span>✦ THE CROWN DISPATCH</span><small>' + cards.length + ' PRIORITIES</small></div>'
+  + '<div class="dispatch-head"><span>✦ THE CROWN DISPATCH</span><small class="dispatch-count">' + cards.length + ' PRIORITIES</small></div>'
   + cards.map(c => '<div class="dispatch-card level-' + esc(c.level) + '">'
-   + '<div class="dispatch-cat">' + esc(c.category) + '</div>'
-   + '<b>' + esc(c.title) + '</b>'
-   + '<p>' + esc(c.detail) + '</p>'
-   + '<button type="button" class="rowbtn" data-priority-tab="' + esc(c.tab) + '">' + esc(c.cta) + ' ›</button>'
+   + '<div class="dispatch-card-head"><span class="dispatch-cat">' + esc(c.category) + '</span><span class="dispatch-seal">' + esc(sealLabel[c.level] || 'DECREE') + '</span></div>'
+   + '<b class="dispatch-title">' + esc(c.title) + '</b>'
+   + '<p class="dispatch-detail">' + esc(c.detail) + '</p>'
+   + '<button type="button" class="rowbtn dispatch-cta" data-priority-tab="' + esc(c.tab) + '"><span>' + esc(c.cta) + '</span><span class="dispatch-arrow" aria-hidden="true">›</span></button>'
    + '</div>').join('')
   + '</div>';
 }

@@ -61,7 +61,7 @@ export function renderPreWarComparison(g,world,targetRealm,esc){
  const name=id=>g.factions?.[id]?.name||id;
  return '<div class="rule"><b>Pre-war strength comparison · '+esc(cmp.verdict)+'</b><div class="war-compare"><div><b>Your coalition · '+fmt(cmp.ourTotal)+'</b><small>Realm '+fmt(cmp.ourTroops)+' · Allies '+fmt(cmp.ourAllyTroops)+(cmp.ourAllies.length?' ('+cmp.ourAllies.map(id=>esc(name(id))).join(', ')+')':'')+'</small></div><div><b>'+esc(name(targetRealm))+' · '+fmt(cmp.theirTotal)+'</b><small>Realm '+fmt(cmp.theirTroops)+' · Allies '+fmt(cmp.theirAllyTroops)+(cmp.theirAllies.length?' ('+cmp.theirAllies.map(id=>esc(name(id))).join(', ')+')':'')+'</small></div></div><div class="smallnote">Force ratio '+(cmp.ratio===null?'Unopposed':cmp.ratio.toFixed(2)+':1')+(cmp.truceMonths?' · Truce active ('+cmp.truceMonths+' mo.)':'')+'</div></div>';
 }
-function decision(action,name,desc,price){return '<button class="rowbtn" data-action="court-decision" data-type="'+action+'"><b>'+name+'</b> · '+price+'g <small>'+desc+'</small></button>';}
+function decision(action,name,desc,price){return '<button class="rowbtn decision-btn" data-action="court-decision" data-type="'+action+'"><span class="decision-head"><b>'+name+'</b><span class="cost-chip">'+price+'g</span></span><small>'+desc+'</small></button>';}
  export function renderCourt(g,esc){
   const c=currentCourt(g),f=g.factions[g.player];if(!c)return '<p class="paragraph">Court records are unavailable.</p>';
   const event=currentRoyalEvent(g),deep=deepSystemsView(g,g.player);
@@ -81,20 +81,20 @@ function decision(action,name,desc,price){return '<button class="rowbtn" data-ac
   stat('Stewardship',fmt(c.ruler.stewardship)+'/5')+stat('Martial ability',fmt(c.ruler.martial)+'/5')+
   stat('Diplomatic ability',fmt(c.ruler.diplomacy)+'/5')+stat('Successions',fmt(c.successions))+
   '</div></div>'+section('ROYAL ADVISORS')+
-  '<div class="statlist">'+stat('Chief steward',fmt(c.steward)+'/5')+stat('Royal marshal',fmt(c.marshal)+'/5')+
-  stat('Prestige',fmt(f.prestige))+stat('Legitimacy',fmt(f.legitimacy)+'%')+stat('Technology',fmt(f.tech)+'/10')+'</div>'+
-  section('ISSUE A COURT DECISION')+
+  '<div class="rule"><div class="statlist">'+stat('Chief steward',fmt(c.steward)+'/5')+stat('Royal marshal',fmt(c.marshal)+'/5')+
+  stat('Prestige',fmt(f.prestige))+stat('Legitimacy',fmt(f.legitimacy)+'%')+stat('Technology',fmt(f.tech)+'/10')+'</div></div>'+
+  section('ISSUE A COURT DECISION')+'<div class="decision-list">'+
   decision('audience','Hold public audience','Restore stability and lower provincial unrest',120)+
   decision('steward','Promote chief steward','Permanently improve tax efficiency',250)+
   decision('marshal','Reform army command','Improve experience and morale of your armies',250)+
   decision('chronicle','Commission a chronicle','Gain prestige and legitimacy',180)+
-  decision('succession','Secure the succession','Improve legitimacy and stability',220);
+  decision('succession','Secure the succession','Improve legitimacy and stability',220)+'</div>';
  if(event){
   html+=section('DECISION REQUIRED · ROYAL EVENT')+
    '<div class="rule"><div class="label">COURT DISPATCH</div>'+eventImage(event,g.player)+'<h3>'+esc(event.title)+'</h3>'+
-   '<p class="paragraph">'+esc(event.description)+'</p>'+
-   event.choices.map((ch,i)=>'<button class="rowbtn" data-action="royal-choice" data-choice="'+i+'">'+esc(ch.label)+
-    '<small>'+Object.entries(ch).filter(([k])=>k!=='label').map(([k,v])=>esc(k)+' '+(v>0?'+':'')+fmt(v)).join(' · ')+'</small></button>').join('')+'</div>';
+   '<p class="paragraph">'+esc(event.description)+'</p><div class="decision-list">'+
+   event.choices.map((ch,i)=>'<button class="rowbtn decision-btn" data-action="royal-choice" data-choice="'+i+'"><span class="decision-head"><b>'+esc(ch.label)+'</b></span>'+
+    '<small>'+Object.entries(ch).filter(([k])=>k!=='label').map(([k,v])=>esc(k)+' '+(v>0?'+':'')+fmt(v)).join(' · ')+'</small></button>').join('')+'</div></div>';
  }else html+=section('ROYAL DISPATCHES')+'<p class="paragraph">No unresolved court event. New events appear as the campaign advances.</p>';
  const threats=g.kingdom?.threats||[];
  if(threats.length)html+=section('FRONTIER WARNING')+threats.map(t=>
@@ -106,8 +106,8 @@ export function renderTrade(g,world,esc){
  const f=g.factions[g.player],pacts=Object.values(g.kingdom?.tradePacts||{}).filter(p=>p.partners.includes(g.player));
  let html='<div class="label">COMMERCE AND MERCHANTS</div>'+
   '<p class="paragraph">Merchant treaties increase monthly revenue. Markets improve their value. Improve relations through gifts, then negotiate from the Diplomacy tab.</p>'+
-  '<div class="statlist">'+stat('Trade treaties',fmt(tradePactCount(g)))+stat('Revenue per month','+'+fmt(tradeIncome(g,g.player))+'g')+
-   stat('Treasury',fmt(f.treasury)+'g')+'</div>'+section('TRADE PARTNERS');
+  '<div class="rule"><div class="statlist">'+stat('Trade treaties',fmt(tradePactCount(g)))+stat('Revenue per month','+'+fmt(tradeIncome(g,g.player))+'g')+
+   stat('Treasury',fmt(f.treasury)+'g')+'</div></div>'+section('TRADE PARTNERS');
  if(!pacts.length)html+='<p class="paragraph">No merchant treaties yet. Establish one with a court that has at least +10 relations.</p>';
  for(const treaty of pacts){
   const other=treaty.partners.find(id=>id!==g.player),name=g.factions[other]?.name||other;
@@ -120,10 +120,10 @@ export function renderLegacy(g,esc){
  const result=campaignStanding(g),goals=objectives(g);
  let html='<div class="label">THE LEGACY OF YOUR HOUSE</div>'+
   '<p class="paragraph">Your campaign is scored at the year 1500. Complete at least four of the six objectives while keeping your dynasty on the map to secure a victorious legacy.</p>'+
-  '<div class="statlist">'+stat('Campaign year',fmt(g.year))+
+  '<div class="rule"><div class="statlist">'+stat('Campaign year',fmt(g.year))+
   stat('Assessment year',fmt(result.targetYear))+
   stat('Legacy score',fmt(result.score))+stat('Completed objectives',fmt(result.fulfilled)+'/'+fmt(result.total))+
-  '</div>'+section('DYNASTIC OBJECTIVES');
+  '</div></div>'+section('DYNASTIC OBJECTIVES');
  for(const o of goals){
   const w=Math.round(o.progress*100);
   html+='<div class="rule"><div class="label">'+(o.complete?'✓ COMPLETE':'IN PROGRESS')+'</div>'+
@@ -789,7 +789,7 @@ export function renderProvinceLord(g,world,id,esc){
   }
   out+=renderEstateCharter(g,h,btn);
   out+=renderEstateSuccession(g,id,esc,'province');
-  out+=btn('gift','Send gift (100g)')+(h.loyalty<45?btn('concede','Negotiate concession (150g)'):'');
+  out+='<div class="action-stack">'+btn('gift','Send gift (100g)')+(h.loyalty<45?btn('concede','Negotiate concession (150g)'):'')+'</div>';
  }
  return out+'</div>';
 }

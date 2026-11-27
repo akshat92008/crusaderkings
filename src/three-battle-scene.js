@@ -9,6 +9,7 @@ import {updateFieldCharacters} from './battle-presentation.js';
  */
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {buildMedievalBattlefield} from './battlefield-art.js';
 
@@ -19,11 +20,23 @@ const meshes={
  cylinder:()=>new THREE.CylinderGeometry(.5,.5,1,8),
  sphere:()=>new THREE.SphereGeometry(.5,9,7)
 };
-const walkClip=clips=>clips.find(c=>/^Walking_A$/i.test(c.name))||clips.find(c=>/walk/i.test(c.name))||clips.find(c=>/run/i.test(c.name));
-const idleClip=clips=>clips.find(c=>/^Idle_A$/i.test(c.name))||clips.find(c=>/idle/i.test(c.name))||clips[0];
-const attackClip=clips=>clips.find(c=>/1H_Melee_Attack_Slice/i.test(c.name))||clips.find(c=>/melee.*attack|attack.*slash/i.test(c.name))||clips.find(c=>/attack/i.test(c.name));
-const bowClip=clips=>clips.find(c=>/bow.*(shoot|release)/i.test(c.name))||clips.find(c=>/shoot.*bow|archery/i.test(c.name))||attackClip(clips);
+const walkClip=clips=>clips.find(c=>/^(Walking_A|walk)$/i.test(c.name))||clips.find(c=>/walk/i.test(c.name))||clips.find(c=>/run/i.test(c.name));
+const idleClip=clips=>clips.find(c=>/^(Idle_A|idle)$/i.test(c.name))||clips.find(c=>/idle/i.test(c.name))||clips[0];
+const attackClip=clips=>clips.find(c=>/^(attack_melee|1H_Melee_Attack_Slice)$/i.test(c.name))||clips.find(c=>/melee.*attack|attack.*slash|attack_melee/i.test(c.name))||clips.find(c=>/attack/i.test(c.name));
+const bowClip=clips=>clips.find(c=>/^attack_ranged$/i.test(c.name))||clips.find(c=>/bow.*(shoot|release)/i.test(c.name))||clips.find(c=>/shoot.*bow|archery|attack_ranged/i.test(c.name))||attackClip(clips);
 const elapsedTime=(phase,t,j)=>(t*10+phase+j*Math.PI*.6);
+
+const INDIA_REALMS=new Set(['vijayanagara','delhi','bahmani','bengal','gujarat','malwa','jaunpur','orissa','mewar','sindh','marwar','gondwana','khandesh','ahmednagar','bijapur','golconda']);
+const EAST_ASIA_REALMS=new Set(['ming','joseon','ashikaga','ayutthaya','dai-viet','dai_viet','lan-xang','prome','ava','pegu','shan','oirat','chagatai','manchu','tibetan','tibet','majapahit','malacca','sukhothai']);
+const PERSIA_REALMS=new Set(['ottomans','mamluks','timurids','qara','aq-qoyunlu','persia','safavids','oman','yemen','rasulids','bahrain','arabia','karaman','morocco','tunis','horde','uzbek','kazakh','songhai','mali','kilwa']);
+
+export function regionalFamilyForRealm(realmId){
+ const id=String(realmId||'').toLowerCase();
+ if(INDIA_REALMS.has(id))return 'india';
+ if(EAST_ASIA_REALMS.has(id))return 'east_asia';
+ if(PERSIA_REALMS.has(id))return 'persia';
+ return 'europe';
+}
 
 
 /** Simple authored procedural mount until a properly rigged horse is integrated. */
@@ -101,40 +114,101 @@ export class ThreeBattleScene {
  async prepareCharacters(){
   const loader=new GLTFLoader();
   try{
+   await MeshoptDecoder.ready;
+   loader.setMeshoptDecoder(MeshoptDecoder);
+  }catch(e){console.warn('MeshoptDecoder init warning:',e);}
+  this.regionalTemplates={};
+  try{
    const [knight,rogue]=await Promise.all([
     loader.loadAsync('assets/battle/characters/Knight.glb'),
     loader.loadAsync('assets/battle/characters/Rogue_Hooded.glb')
    ]);
    if(this.disposed)return;
    this.templates={infantry:knight,archers:rogue};
+   try{
+    const mRes=await fetch('assets/battle/0ad/manifest.json');
+    if(mRes.ok){
+     const manifest=await mRes.json();
+     const needed=new Set([regionalFamilyForRealm(this.regionalRealms.attacker),regionalFamilyForRealm(this.regionalRealms.defender)]);
+     for(const fam of needed){
+      const roles=manifest?.families?.[fam]?.roles;
+      if(!roles)continue;
+      this.regionalTemplates[fam]={};
+      const uniquePaths=new Map();
+      for(const [role,entry] of Object.entries(roles)){
+       if(role.startsWith('siege_'))continue;
+       if(!uniquePaths.has(entry.path))uniquePaths.set(entry.path,{entry,roles:[role]});
+       else uniquePaths.get(entry.path).roles.push(role);
+      }
+      const loaded=await Promise.allSettled([...uniquePaths.keys()].map(p=>loader.loadAsync(p)));
+      if(this.disposed)return;
+      let idx=0;
+      for(const [p,info] of uniquePaths.entries()){
+       const r=loaded[idx++];
+       if(r.status==='fulfilled'){
+        const val={...r.value,_mountedModel:!!info.entry.mounted,_assetId:info.entry.assetId};
+        for(const role of info.roles)this.regionalTemplates[fam][role]=val;
+       }
+      }
+     }
+    }
+   }catch(e){console.warn('0 A.D. manifest load fallback:',e);}
    if(Object.values(this.regionalRealms).includes('ashikaga')){const optional=await Promise.allSettled([loader.loadAsync('assets/characters_3d/ashigaru-foot-soldier-806707.glb'),loader.loadAsync('assets/characters_3d/daimyo-lord-78364a.glb')]);if(this.disposed)return;for(const [i,key] of ['ashigaru','daimyo'].entries())if(optional[i].status==='fulfilled')this.templates[key]=optional[i].value;}
-   this.modelsReady=true;this.loadingStatus='Animated KayKit infantry ready';
+   this.modelsReady=true;this.loadingStatus='Animated 3D armies ready (0 A.D. & KayKit)';
   }catch(err){
    this.modelsReady=false;this.loadingStatus='Using geometric soldiers: '+String(err);
-   console.warn('KayKit characters unavailable; keeping procedural soldiers',err);
+   console.warn('3D character assets unavailable; keeping procedural soldiers',err);
   }
+ }
+ _resolveTemplate(g,i){
+  const realm=this.regionalRealms[g.side];
+  const fam=regionalFamilyForRealm(realm);
+  const reg=this.regionalTemplates?.[fam];
+  if(reg){
+   const spec=g.specialistId||g.kind||g.type;
+   if((spec==='elephants'||g.kind==='elephants')&&reg.elephants)return reg.elephants;
+   if(i===0&&g.id.endsWith('0')&&reg.commander)return reg.commander;
+   if((spec==='horsebow'||g.kind==='horsebow')&&reg.horsebow)return reg.horsebow;
+   if(g.type==='cavalry'&&reg.cavalry)return reg.cavalry;
+   if((spec==='crossbow'||g.kind==='crossbow')&&reg.crossbow)return reg.crossbow;
+   if(g.type==='archers'&&reg.archers)return reg.archers;
+   if((spec==='pikes'||spec==='spearmen'||g.kind==='pikemen')&&(reg.pikes||reg.spearmen))return reg.pikes||reg.spearmen;
+   if((spec==='guard'||spec==='heavy_infantry')&&(reg[spec]||reg.heavy_infantry||reg.guard))return reg[spec]||reg.heavy_infantry||reg.guard;
+   if(reg.infantry)return reg.infantry;
+  }
+  if(realm==='ashikaga'&&g.type==='infantry'){
+   return (i===0&&g.id.endsWith('0')&&this.templates.daimyo)||this.templates.ashigaru||this.templates.infantry;
+  }
+  return this.templates[g.type]||this.templates.infantry;
  }
  prepareSquad(g){
   if(this.groups.has(g.id)||!this.modelsReady)return;
-  const baseTemplate=this.templates[g.type]||this.templates.infantry;
-  const count=g.type==='archers'?8:g.type==='cavalry'?6:11;
+  const spec=g.specialistId||g.kind||g.type;
+  const isElephant=spec==='elephants'||g.kind==='elephants';
+  const count=isElephant?3:g.type==='archers'?8:g.type==='cavalry'?6:11;
   const units=[];
   for(let i=0;i<count;i++){
-   const japanese=this.regionalRealms[g.side]==='ashikaga'&&g.type==='infantry';const regionalTemplate=japanese?((i===0&&g.id.endsWith('0')&&this.templates.daimyo)||this.templates.ashigaru):null;const template=regionalTemplate||baseTemplate;const rig=cloneSkeleton(template.scene);
-   const box=new THREE.Box3().setFromObject(rig);const height=box.max.y-box.min.y||1.7;const scale=1.75/height;
+   const template=this._resolveTemplate(g,i);
+   const rig=cloneSkeleton(template.scene);
+   const box=new THREE.Box3().setFromObject(rig);const height=box.max.y-box.min.y||1.7;
+   const mounted=g.type==='cavalry';
+   const embeddedMount=Boolean(template._mountedModel);
+   const targetHeight=isElephant?3.15:embeddedMount?2.35:1.75;
+   const scale=targetHeight/height;
    // A wrapper allows the original skeleton to keep its root animation.
-   const root=new THREE.Group(),mounted=g.type==='cavalry';
-   rig.scale.multiplyScalar(mounted?scale*.74:scale);
-   rig.position.y=(mounted?.91:0)-box.min.y*scale*(mounted?.74:1);
+   const root=new THREE.Group();
+   const scaleMul=(mounted&&!embeddedMount)?.74:1;
+   rig.scale.multiplyScalar(scale*scaleMul);
+   rig.position.y=((mounted&&!embeddedMount)?.91:0)-box.min.y*scale*scaleMul;
    let mount=null;
-   if(mounted){mount=createHorse();root.add(mount.horse);}
+   if(mounted&&!embeddedMount){mount=createHorse();root.add(mount.horse);}
    root.add(rig);this.scene.add(root);
    const mixer=new THREE.AnimationMixer(rig);
    const idle=idleClip(template.animations),walk=walkClip(template.animations),attack=g.type==='archers'?bowClip(template.animations):attackClip(template.animations);
    const actions={};
    for(const [name,clip] of [['idle',idle],['walk',walk],['attack',attack]])if(clip){actions[name]=mixer.clipAction(clip);actions[name].loop=THREE.LoopRepeat;}
    const start=actions.idle||actions.walk||actions.attack;if(start)start.play();
-   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null,mount,regionalModel:!!regionalTemplate,restYaw:rig.rotation.y,restZ:rig.position.z});
+   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null,mount,regionalModel:!!(this.regionalTemplates?.[regionalFamilyForRealm(this.regionalRealms[g.side])]||template._assetId),restYaw:rig.rotation.y,restZ:rig.position.z});
    this.mixers.push(mixer);
   }
   this.groups.set(g.id,units);

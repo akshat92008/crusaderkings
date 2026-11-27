@@ -67,8 +67,18 @@ function loadSpriteUrl(key,url,countTowardReady=true){
  img.src=url;
 }
 
-function ensureSprites(groups=null){
+function arenaKeyFor(kind,siege=false){
+ const k=String(kind||'plains').toLowerCase();
+ if(siege)return k==='desert'?'siege_desert':'siege_plains';
+ if(k==='mountains')return 'mountain';
+ if(k==='coastal')return 'coast';
+ return TERRAIN_THEMES[k]?k:'plains';
+}
+
+function ensureSprites(groups=null,terrainKind='plains',siege=false){
  if(typeof fetch!=='function'||typeof Image==='undefined')return;
+ const aKey=arenaKeyFor(terrainKind,siege);
+ loadSpriteUrl('arena:'+aKey,'assets/battle/arenas/'+aKey+'.webp',false);
  if(!SPRITE_STATE.loading&&!SPRITE_STATE.manifest){
   SPRITE_STATE.loading=true;
   fetch('assets/battle/sprites/manifest.json').then(r=>r.ok?r.json():null).then(m=>{
@@ -175,7 +185,7 @@ export class BannerRenderer{
   this.zoom=1;
   this.panX=0;
   this.panY=0;
-  ensureSprites();
+  ensureSprites(null,this.terrainType,false);
  }
 
  get spritesReady(){return SPRITE_STATE.total>0&&SPRITE_STATE.loaded>=SPRITE_STATE.total;}
@@ -216,68 +226,60 @@ export class BannerRenderer{
   const kind=String(this.terrainType||'plains').toLowerCase();
   const theme=TERRAIN_THEMES[kind]||TERRAIN_THEMES.plains;
 
-  // 1. Atmospheric terrain wash, layered elevation ridges & biome landscape
+  // 1. Atmospheric terrain wash + painted 2D isometric arena backdrop (cover-scaled cleanly)
   const sky=c.createLinearGradient(0,0,0,h);
   sky.addColorStop(0,theme.sky||'#222c24');sky.addColorStop(.18,theme.top);sky.addColorStop(.62,theme.mid);sky.addColorStop(1,theme.bot);
   c.fillStyle=sky;c.fillRect(0,0,w,h);
 
-  // Layered elevation ridges along horizon & flanks
-  c.save();
-  for(let layer=0;layer<3;layer++){
-   const yBase=v.top+layer*14-6;
-   c.beginPath();
-   c.moveTo(0,yBase+28);
-   for(let x=0;x<=w;x+=Math.max(48,Math.round(w/8))){
-    const ridgeAmp=(kind==='hills'||kind==='highlands'||kind==='mountain'||kind==='mountains')?16:kind==='desert'?11:7;
-    const ry=yBase+Math.sin(x*0.012+layer*1.9)*ridgeAmp-layer*4;
-    c.lineTo(x,ry);
-   }
-   c.lineTo(w,yBase+40);c.lineTo(0,yBase+40);c.closePath();
-   c.fillStyle=theme.ridge;c.fill();
-  }
-  c.restore();
-
-  const ridge=c.createRadialGradient(v.cx,v.cy-20*v.sy,12,v.cx,v.cy,85*v.s);
-  ridge.addColorStop(0,'rgba(250,235,180,.09)');ridge.addColorStop(1,'rgba(0,0,0,0)');
-  c.fillStyle=ridge;c.fillRect(0,0,w,h);
-
-  // Coast / coastal shoreline & animated surf waves
-  if(kind==='coast'||kind==='coastal'){
+  const arenaImg=SPRITE_STATE.images.get('arena:'+arenaKeyFor(kind,!!b.siege));
+  if(arenaImg&&arenaImg.width&&arenaImg.height){
+   const sc=Math.max(w/arenaImg.width,h/arenaImg.height);
+   const dw=arenaImg.width*sc,dh=arenaImg.height*sc;
+   c.drawImage(arenaImg,(w-dw)/2,(h-dh)/2,dw,dh);
+  }else{
+   // Procedural ridge & road fallback for headless tests / pre-image load frame
    c.save();
-   const [sx0,sy0]=P(32,-44),[sx1,sy1]=P(68,-44),[sx2,sy2]=P(68,44),[sx3,sy3]=P(36,44);
-   c.beginPath();c.moveTo(sx0,sy0);c.lineTo(sx1,sy1);c.lineTo(sx2,sy2);c.lineTo(sx3,sy3);c.closePath();
-   c.fillStyle='rgba(44,98,118,.52)';c.fill();
-   c.strokeStyle='rgba(222,238,220,.42)';c.lineWidth=clamp(v.s*.7,2,6);
-   c.beginPath();c.moveTo(sx0,sy0);c.quadraticCurveTo(P(38,0)[0],P(38,0)[1],sx3,sy3);c.stroke();
-   for(let wv=-32;wv<=32;wv+=16){
-    const phase=Math.sin(t*2.1+wv)*1.4;
-    const [wx0,wy0]=P(43+phase,wv-5),[wx1,wy1]=P(48+phase,wv+5);
-    c.strokeStyle='rgba(205,240,248,.34)';c.lineWidth=1.5;
-    c.beginPath();c.moveTo(wx0,wy0);c.lineTo(wx1,wy1);c.stroke();
+   for(let layer=0;layer<3;layer++){
+    const yBase=v.top+layer*14-6;
+    c.beginPath();
+    c.moveTo(0,yBase+28);
+    for(let x=0;x<=w;x+=Math.max(48,Math.round(w/8))){
+     const ridgeAmp=(kind==='hills'||kind==='highlands'||kind==='mountain'||kind==='mountains')?16:kind==='desert'?11:7;
+     const ry=yBase+Math.sin(x*0.012+layer*1.9)*ridgeAmp-layer*4;
+     c.lineTo(x,ry);
+    }
+    c.lineTo(w,yBase+40);c.lineTo(0,yBase+40);c.closePath();
+    c.fillStyle=theme.ridge;c.fill();
    }
    c.restore();
+
+   if(kind==='coast'||kind==='coastal'){
+    c.save();
+    const [sx0,sy0]=P(32,-44),[sx1,sy1]=P(68,-44),[sx2,sy2]=P(68,44),[sx3,sy3]=P(36,44);
+    c.beginPath();c.moveTo(sx0,sy0);c.lineTo(sx1,sy1);c.lineTo(sx2,sy2);c.lineTo(sx3,sy3);c.closePath();
+    c.fillStyle='rgba(44,98,118,.52)';c.fill();
+    c.strokeStyle='rgba(222,238,220,.42)';c.lineWidth=clamp(v.s*.7,2,6);
+    c.beginPath();c.moveTo(sx0,sy0);c.quadraticCurveTo(P(38,0)[0],P(38,0)[1],sx3,sy3);c.stroke();
+    c.restore();
+   }
+
+   c.save();
+   const [r0x,r0y]=P(0,40),[r1x,r1y]=P(-6,12),[r2x,r2y]=P(5,-10),[r3x,r3y]=P(0,-40);
+   c.strokeStyle=b.siege?'rgba(138,132,118,.38)':theme.track;
+   c.lineWidth=clamp(v.s*5.2,10,32);c.lineCap='round';
+   c.beginPath();c.moveTo(r0x,r0y);c.quadraticCurveTo(r1x,r1y,r2x,r2y);c.lineTo(r3x,r3y);c.stroke();
+   c.restore();
   }
+
+  const ridge=c.createRadialGradient(v.cx,v.cy-20*v.sy,12,v.cx,v.cy,85*v.s);
+  ridge.addColorStop(0,'rgba(250,235,180,.08)');ridge.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle=ridge;c.fillRect(0,0,w,h);
 
   // Battlefield diamond perimeter
   const corners=[P(-64,-42),P(64,-42),P(64,42),P(-64,42)];
   c.save();
   c.beginPath();c.moveTo(...corners[0]);for(let i=1;i<4;i++)c.lineTo(...corners[i]);c.closePath();
   c.strokeStyle='rgba(235,214,154,.24)';c.lineWidth=1.5;c.stroke();
-  c.restore();
-
-  // Textured dirt / cobbled road track linking deployment baselines
-  c.save();
-  const [r0x,r0y]=P(0,40),[r1x,r1y]=P(-6,12),[r2x,r2y]=P(5,-10),[r3x,r3y]=P(0,-40);
-  c.strokeStyle=b.siege?'rgba(138,132,118,.38)':theme.track;
-  c.lineWidth=clamp(v.s*5.2,10,32);c.lineCap='round';
-  c.beginPath();c.moveTo(r0x,r0y);c.quadraticCurveTo(r1x,r1y,r2x,r2y);c.lineTo(r3x,r3y);c.stroke();
-  if(b.siege){
-   c.strokeStyle='rgba(72,68,60,.36)';c.lineWidth=1.2;
-   for(let z=-36;z<=36;z+=6){
-    const [cx,cy]=P((z%12===0?1:-1)*1.2,z);
-    c.beginPath();c.ellipse(cx,cy,clamp(v.s*1.2,3,8),clamp(v.sy*.8,2,5),0,0,Math.PI*2);c.stroke();
-   }
-  }
   c.restore();
 
   // Isometric grid
@@ -382,7 +384,7 @@ export class BannerRenderer{
   }
 
   // Soldier-level Y-sorted 2D isometric sprite rendering
-  ensureSprites(drawList.map(d=>d.g));
+  ensureSprites(drawList.map(d=>d.g),kind,!!b.siege);
   const soldierDraws=[];
 
   for(const {g} of drawList){

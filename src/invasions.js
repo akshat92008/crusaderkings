@@ -166,14 +166,16 @@ function trimArmy(a,fraction){
 }
 
 export function resolveInvasion(g,world,threat,result){
+ if(!result||typeof result.victory!=='boolean')return {ok:false,msg:'Invalid invasion battle result.'};
  const found=pendingInvasion(g,threat);
  if(!found||found.status!=='ready')return {ok:false,msg:'No active invasion at that province'};
  const province=g.provinces[found.province],attacker=g.armies[found.army];
  if(!validReadyInvasion(g,world,found))return {ok:false,msg:'The invasion is no longer valid'};
+ found.status='resolved';
  const human=[...armiesOf(g,g.player).filter(a=>a.province===found.province),...fieldContingentsAt(g,g.player,found.province,found.by)];
  const invaders=[...nativeInvasionArmies(g,found),...fieldContingentsAt(g,found.by,attacker.province,g.player)];
- const playerRatio=clamp(result.attackerRemaining??.5,0,1);
- const enemyRatio=clamp(result.enemyRemaining??(result.victory?.45:.78),0,1);
+ const playerRatio=clamp(Number.isFinite(result.attackerRemaining)?result.attackerRemaining:.5,0,1);
+ const enemyRatio=clamp(Number.isFinite(result.enemyRemaining)?result.enemyRemaining:(result.victory?.45:.78),0,1);
  if(result.fieldBattle)applyFieldForceLosses(human,result,'attacker',playerRatio);
  for(const a of human){if(!result.fieldBattle)trimArmy(a,playerRatio);syncRegiments(g,a);}
  if(result.fieldBattle)applyFieldForceLosses(invaders,result,'defender',enemyRatio);
@@ -184,6 +186,7 @@ export function resolveInvasion(g,world,threat,result){
  if(defended){
   resolveBattleCommanders(g,g.player,invaders,{loserRemaining:enemyRatio,fieldBattle:!!result.fieldBattle});
   if(enemyRatio<.3)for(const a of invaders)captureCommander(g,g.player,a);
+  for(const a of invaders)if(troops(a)<=0)delete g.armies[a.id];
   g.factions[g.player].prestige+=8;
   g.factions[found.by].prestige=Math.max(0,g.factions[found.by].prestige-4);
  }else{

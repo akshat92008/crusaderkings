@@ -21,6 +21,12 @@ import {
  EXTENDED_EMERGENT_DECISIONS
 } from '../src/emergent-content.js';
 import { siegeCapitalDynastyEvents } from '../src/content/events-siege-capital-dynasty.js';
+import { warDiplomacyEvents } from '../src/content/events-war-diplomacy.js';
+import { economyTradeEvents } from '../src/content/events-economy-trade.js';
+import { faithSocietyEvents } from '../src/content/events-faith-society.js';
+import { culturesWorldEvents } from '../src/content/events-cultures-world.js';
+import { ck2DlcEpicEvents } from '../src/content/events-ck2-dlc-epics.js';
+import { ck2WorldCourtEvents } from '../src/content/events-ck2-world-court.js';
 import { eventArt } from '../src/game-art.js';
 
 const REGIONAL_REALMS = [
@@ -121,14 +127,110 @@ const TRIGGER_TARGET_EFFECTS = new Map([
  ['foreignMarriage', new Set([...REALM_WIDE_EFFECTS, 'opinion', 'relation', 'stress'])]
 ]);
 
+const PROVINCE_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'development', 'unrest', 'trust', 'acceptance', 'grain', 'tools', 'loyalty', 'leverage']);
+const DISASTER_EFFECTS = new Set([...PROVINCE_EFFECTS, 'crisis']);
+const PERSON_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'stress']);
+const DYNASTIC_PERSON_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'opinion', 'stress']);
+const CHILD_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'education', 'stress']);
+const HEIR_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'opinion', 'education', 'stress']);
+const NEIGHBOR_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'relation']);
+const ARMY_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'morale', 'experience', 'supply', 'fatigue']);
+const WAR_EFFECTS = new Set([...REALM_WIDE_EFFECTS, 'relation', 'morale', 'experience', 'supply', 'fatigue']);
+
+const EXPANSION_TRIGGER_EFFECTS = new Map([
+ ...TRIGGER_TARGET_EFFECTS,
+ ['army_supply', ARMY_EFFECTS],
+ ['army_fatigue', ARMY_EFFECTS],
+ ['neighbor', NEIGHBOR_EFFECTS],
+ ['hostile', NEIGHBOR_EFFECTS],
+ ['friendly', NEIGHBOR_EFFECTS],
+ ['tributeDebt', NEIGHBOR_EFFECTS],
+ ['vassal', PROVINCE_EFFECTS],
+ ['loyal', PROVINCE_EFFECTS],
+ ['lowlegitimacy', PROVINCE_EFFECTS],
+ ['unrest', PROVINCE_EFFECTS],
+ ['lowstability', PROVINCE_EFFECTS],
+ ['lowtrust', PROVINCE_EFFECTS],
+ ['difference', PROVINCE_EFFECTS],
+ ['food', PROVINCE_EFFECTS],
+ ['debt', PROVINCE_EFFECTS],
+ ['inflation', PROVINCE_EFFECTS],
+ ['research', PROVINCE_EFFECTS],
+ ['institution', PROVINCE_EFFECTS],
+ ['institutionUpgrade', new Set([...PROVINCE_EFFECTS, 'institutionLevel'])],
+ ['sanctuary', PROVINCE_EFFECTS],
+ ['culturalDistrict', PROVINCE_EFFECTS],
+ ['faithTension', PROVINCE_EFFECTS],
+ ['lowFaithAuthority', PROVINCE_EFFECTS],
+ ['crisis', DISASTER_EFFECTS],
+ ['flood', DISASTER_EFFECTS],
+ ['epidemic', DISASTER_EFFECTS],
+ ['drought', DISASTER_EFFECTS],
+ ['famine', DISASTER_EFFECTS],
+ ['fire', DISASTER_EFFECTS],
+ ['crossroads_contact', PROVINCE_EFFECTS],
+ ['faith_dharmic', PROVINCE_EFFECTS],
+ ['faith_islamic', PROVINCE_EFFECTS],
+ ['faith_christian', PROVINCE_EFFECTS],
+ ['faith_traditions', PROVINCE_EFFECTS],
+ ['cont_europe', PROVINCE_EFFECTS],
+ ['cont_asia', PROVINCE_EFFECTS],
+ ['cont_africa', PROVINCE_EFFECTS],
+ ['cont_americas', PROVINCE_EFFECTS],
+ ['cont_oceania', PROVINCE_EFFECTS],
+ ['gov_feudal', PROVINCE_EFFECTS],
+ ['gov_republic', PROVINCE_EFFECTS],
+ ['gov_imperial', PROVINCE_EFFECTS],
+ ['gov_regional', PROVINCE_EFFECTS],
+ ['gov_sultanate', PROVINCE_EFFECTS],
+ ['gov_shogunate', PROVINCE_EFFECTS],
+ ['gov_steppe', PROVINCE_EFFECTS],
+ ['gov_centralized', PROVINCE_EFFECTS],
+ ['gov_confederation', PROVINCE_EFFECTS],
+ ['gov_military', PROVINCE_EFFECTS],
+ ['gov_city', PROVINCE_EFFECTS],
+ ['gov_kinship', PROVINCE_EFFECTS],
+ ['gov_tributary', PROVINCE_EFFECTS],
+ ...REGIONAL_REALMS.map(r => [`region_${r}`, PROVINCE_EFFECTS]),
+ ['activePlot', new Set([...REALM_WIDE_EFFECTS, 'plotPreparation', 'stress'])],
+ ['detectedPlot', PERSON_EFFECTS],
+ ['knownSecret', PERSON_EFFECTS],
+ ['newReign', PERSON_EFFECTS],
+ ['faithDebate', PERSON_EFFECTS],
+ ['governmentDebate', PERSON_EFFECTS],
+ ['languageStudent', PERSON_EFFECTS],
+ ['stress', PERSON_EFFECTS],
+ ['highStress', PERSON_EFFECTS],
+ ['illness', new Set([...REALM_WIDE_EFFECTS, 'health', 'stress'])],
+ ['child', CHILD_EFFECTS],
+ ['wardGuardian', HEIR_EFFECTS],
+ ['married', DYNASTIC_PERSON_EFFECTS],
+ ['courtRival', DYNASTIC_PERSON_EFFECTS],
+ ['courtFriend', DYNASTIC_PERSON_EFFECTS],
+ ['councillor', DYNASTIC_PERSON_EFFECTS],
+ ['livingClaimant', DYNASTIC_PERSON_EFFECTS],
+ ['childless', PERSON_EFFECTS],
+ ['reign_chapter', PERSON_EFFECTS],
+ ['focus_diplomacy', new Set([...PERSON_EFFECTS, 'focusXP'])],
+ ['focus_intrigue', new Set([...PERSON_EFFECTS, 'focusXP'])],
+ ['focus_learning', new Set([...PERSON_EFFECTS, 'focusXP'])],
+ ['focus_martial', new Set([...PERSON_EFFECTS, 'focusXP'])],
+ ['focus_stewardship', new Set([...PERSON_EFFECTS, 'focusXP'])],
+ ['taxFaction', new Set([...REALM_WIDE_EFFECTS, 'factionPressure', 'factionLoyalty'])],
+ ['levyFaction', new Set([...REALM_WIDE_EFFECTS, 'factionPressure', 'factionLoyalty'])],
+ ['libertyFaction', new Set([...REALM_WIDE_EFFECTS, 'factionPressure', 'factionLoyalty'])],
+ ['claimantFaction', new Set([...REALM_WIDE_EFFECTS, 'factionPressure', 'factionLoyalty'])],
+ ['independenceFaction', new Set([...REALM_WIDE_EFFECTS, 'factionPressure', 'factionLoyalty'])]
+]);
+
 test('Full expanded & emergent catalog has exact verified deduplicated counts and unique IDs', () => {
  const stats = allContentStats();
  assert.equal(EVENTS.length, 512);
- assert.equal(SOVEREIGN_CONTENT_EVENTS.length, 399);
- assert.equal(ALL_EVENTS.length, 911);
+ assert.equal(SOVEREIGN_CONTENT_EVENTS.length, 2379);
+ assert.equal(ALL_EVENTS.length, 2891);
  assert.equal(DECISIONS.length, 174);
- assert.equal(SOVEREIGN_MANDATES.length, 167);
- assert.equal(ALL_DECISIONS.length, 341);
+ assert.equal(SOVEREIGN_MANDATES.length, 247);
+ assert.equal(ALL_DECISIONS.length, 421);
 
  const emergentAll = [
   ...EMERGENT_EVENTS,
@@ -136,9 +238,11 @@ test('Full expanded & emergent catalog has exact verified deduplicated counts an
   ...EXTENDED_REACTIVE_EVENTS
  ];
  assert.equal(emergentAll.length, 160);
- assert.equal(stats.expandedEvents, 911);
+ assert.equal(stats.expandedEvents, 2891);
  assert.equal(stats.emergentEvents, 160);
- assert.equal(stats.totalEvents, 1071);
+ assert.equal(stats.totalEvents, 3051);
+ assert.ok(stats.totalEvents >= 3000, `Expected >= 3000 total events, got ${stats.totalEvents}`);
+ assert.ok(stats.totalDecisions >= 420, `Expected >= 420 total decisions, got ${stats.totalDecisions}`);
 
  const seenExpandedIds = new Set();
  for (const ev of ALL_EVENTS) {
@@ -146,7 +250,7 @@ test('Full expanded & emergent catalog has exact verified deduplicated counts an
   assert.ok(!seenExpandedIds.has(ev.id), `Duplicate event id in ALL_EVENTS: ${ev.id}`);
   seenExpandedIds.add(ev.id);
  }
- assert.equal(seenExpandedIds.size, 911);
+ assert.equal(seenExpandedIds.size, 2891);
 
  const seenAllEventIds = new Set(seenExpandedIds);
  for (const ev of emergentAll) {
@@ -154,7 +258,7 @@ test('Full expanded & emergent catalog has exact verified deduplicated counts an
   assert.ok(!seenAllEventIds.has(ev.id), `Duplicate event id across ALL_EVENTS and emergent events: ${ev.id}`);
   seenAllEventIds.add(ev.id);
  }
- assert.equal(seenAllEventIds.size, 1071);
+ assert.equal(seenAllEventIds.size, 3051);
 
  const seenDecisionIds = new Set();
  for (const dec of [...ALL_DECISIONS, ...EMERGENT_DECISIONS, ...EXTENDED_EMERGENT_DECISIONS]) {
@@ -162,7 +266,7 @@ test('Full expanded & emergent catalog has exact verified deduplicated counts an
   assert.ok(!seenDecisionIds.has(dec.id), `Duplicate decision id: ${dec.id}`);
   seenDecisionIds.add(dec.id);
  }
- assert.equal(seenDecisionIds.size, 357);
+ assert.equal(seenDecisionIds.size, 437);
 });
 
 test('Every event in ALL_EVENTS has valid metadata, choices, trigger, supported effect keys, and eventArt mapping', () => {
@@ -205,8 +309,8 @@ test('Multi-stage chains have zero dangling follow-ups, zero unreachable follow-
  const roots = ALL_EVENTS.filter(e => e.trigger !== 'followup' && e.choices.some(c => c.next));
  const followups = ALL_EVENTS.filter(e => e.trigger === 'followup');
 
- assert.equal(roots.length, 333);
- assert.equal(followups.length, 528);
+ assert.equal(roots.length, 875);
+ assert.equal(followups.length, 1966);
 
  const reachable = new Set();
  let deepChains = 0;
@@ -230,7 +334,7 @@ test('Multi-stage chains have zero dangling follow-ups, zero unreachable follow-
   if (maxDepth >= 3) deepChains++;
  }
 
- assert.equal(deepChains, 17, 'Expected 17 multi-stage chains with depth >= 3');
+ assert.equal(deepChains, 559, 'Expected 559 multi-stage chains with depth >= 3');
  for (const f of followups) {
   assert.ok(reachable.has(f.id), `Unreachable orphan followup stage: ${f.id}`);
  }
@@ -403,5 +507,106 @@ test('All 16 new multi-stage narrative chains resolve end-to-end across branches
   };
   assert.equal(currentExpandedEvent(g, forgedRealm), null, `Foreign realm ${forgedRealm} must not see ${id}`);
   assert.equal(expandedAction(g, TEST_WORLD, 'resolve', 0).ok, false);
+ }
+});
+
+test('Four major expansion packs validate strict trigger-target effects, depth>=3 chains, and zero silent no-ops', () => {
+ const stubE = (id, category, title, description, trigger, choices) => ({ id, category, title, description, trigger, choices });
+ const stubC = (label, cost, effects, next = null) => ({ label, cost, effects, ...(next ? { next } : {}) });
+ const packs = [
+  ['warDiplomacy', warDiplomacyEvents(stubE, stubC), 336],
+  ['economyTrade', economyTradeEvents(stubE, stubC), 384],
+  ['faithSociety', faithSocietyEvents(stubE, stubC), 300],
+  ['culturesWorld', culturesWorldEvents(stubE, stubC), 288],
+  ['ck2DlcEpic', ck2DlcEpicEvents(stubE, stubC), 338],
+  ['ck2WorldCourt', ck2WorldCourtEvents(stubE, stubC), 334]
+ ];
+
+ for (const [name, pack, expectedLen] of packs) {
+  assert.equal(pack.length, expectedLen, `Expected ${expectedLen} stages in ${name}`);
+  const packById = new Map(pack.map(e => [e.id, e]));
+  const roots = pack.filter(e => e.trigger !== 'followup');
+  assert.ok(roots.length >= 60, `Expected >= 60 roots in ${name}, got ${roots.length}`);
+
+  for (const root of roots) {
+   const allowed = EXPANSION_TRIGGER_EFFECTS.get(root.trigger);
+   assert.ok(allowed, `Missing EXPANSION_TRIGGER_EFFECTS entry for trigger "${root.trigger}" on ${root.id} (${name})`);
+
+   let maxDepth = 1;
+   const walk = (node, depth, stack) => {
+    if (depth > maxDepth) maxDepth = depth;
+    assert.ok(node.choices.length >= 2 && node.choices.length <= 4, `${node.id} should have 2-4 choices`);
+    assert.equal(node.choices[node.choices.length - 1].cost, 0, `${node.id} must offer a free fallback option`);
+    for (const ch of node.choices) {
+     assert.ok(Object.keys(ch.effects).length > 0, `${node.id} choice "${ch.label}" must not have empty effects`);
+     for (const k of Object.keys(ch.effects)) {
+      assert.ok(allowed.has(k), `Effect "${k}" on ${node.id} does not execute on trigger "${root.trigger}"`);
+     }
+     if (ch.next) {
+      assert.ok(!stack.has(ch.next), `Cycle in ${node.id} -> ${ch.next}`);
+      const nextNode = packById.get(ch.next);
+      assert.ok(nextNode, `Missing followup ${ch.next} in ${name}`);
+      stack.add(ch.next);
+      walk(nextNode, depth + 1, stack);
+      stack.delete(ch.next);
+     }
+    }
+   };
+   walk(root, 1, new Set([root.id]));
+   assert.ok(maxDepth >= 3, `Expected chain ${root.id} in ${name} to reach depth >= 3, got ${maxDepth}`);
+  }
+ }
+
+ // Verify all 80 new mnd_c_* mandates have valid triggers and supported effect keys
+ const newMandates = SOVEREIGN_MANDATES.filter(d => d.id.startsWith('mnd_c_'));
+ assert.equal(newMandates.length, 80);
+ for (const m of newMandates) {
+  assert.ok(VALID_TRIGGERS.has(m.trigger), `Invalid mandate trigger ${m.trigger} on ${m.id}`);
+  const allowed = EXPANSION_TRIGGER_EFFECTS.get(m.trigger);
+  assert.ok(allowed, `Missing target-effect mapping for mandate trigger ${m.trigger}`);
+  for (const [k, v] of Object.entries(m.effects)) {
+   assert.ok(SUPPORTED_EFFECT_KEYS.has(k) && allowed.has(k), `Unsupported/no-op mandate effect ${k} on ${m.id}`);
+   assert.ok(Number.isFinite(v));
+  }
+ }
+});
+
+test('Sample multi-stage chains across all 4 new packs resolve end-to-end and enforce regional locks', () => {
+ const runs = [
+  ['wd_log_oxen_1', 'a', { army: 'x' }, [0, 0, 0, 0]],
+  ['wd_nav_harbor_chain_1', 'a', { other: 'b', army: 'x' }, [1, 1, 0]],
+  ['et_guild_wool_staple_1', 'a', { province: 'p' }, [0, 0, 0]],
+  ['et_plag_harbor_lazaretto_1', 'a', { province: 'p' }, [1, 0, 0]],
+  ['fs_mon_relic_shrine_1', 'a', { province: 'p' }, [0, 0, 0]],
+  ['fs_suc_coronation_oath_1', 'a', { actor: 'r', person: 'r', succession: 0 }, [0, 0, 0]],
+  ['cw_reg_vijaya_anicut_1', 'vijayanagara', { province: 'p', region: 'vijayanagara' }, [0, 0, 0, 0]],
+  ['cw_reg_ottoman_timar_1', 'ottomans', { province: 'p', region: 'ottomans' }, [0, 0, 0, 0]],
+  ['cw_reg_ming_canal_1', 'ming', { province: 'p', region: 'ming' }, [0, 0, 0, 0]],
+  ['cw_gov_republic_1', 'a', { province: 'p' }, [0, 0, 0, 0]],
+  ['cw_xr_finance_annuities_1', 'a', { province: 'p' }, [0, 0, 0, 0]],
+  ['epc_coronation_summons', 'a', { actor: 'r', person: 'r', succession: 0 }, [1, 0, 0]],
+  ['ckw_council_favor', 'a', { actor: 'r', person: 'v' }, [0, 0, 0]],
+  ['ckw_conclave_strike', 'a', { faction: 'f1' }, [0, 0, 0]]
+ ];
+
+ for (const [rootId, realm, target, choices] of runs) {
+  const g = makeChainFixture(realm);
+  g.chronicles.realms = { [realm]: { successionAt: 0 } };
+  g.economy.crises.p = { kind: 'epidemic', severity: 40 };
+  g.conflict.factions = { f1: { id: 'f1', realm, kind: 'liberty', status: 'organizing', pressure: 45, members: ['p'] } };
+  g.expanded.realms[realm].active = { id: rootId, target, started: 0, expires: 9 };
+  for (let step = 0; step < choices.length; step++) {
+   const cur = currentExpandedEvent(g, realm);
+   assert.ok(cur, `Expected active event at step ${step} of ${rootId}`);
+   const res = expandedAction(g, TEST_WORLD, 'resolve', choices[step]);
+   assert.ok(res.ok, `Failed resolving ${cur.id}: ${res.msg}`);
+   const nextEv = g.expanded.realms[realm].active;
+   if (step < choices.length - 1) {
+    assert.ok(nextEv, `Expected followup after step ${step} of ${rootId}`);
+    g.turn = nextEv.availableAt;
+   } else {
+    assert.equal(nextEv, null, `Expected ${rootId} to conclude cleanly`);
+   }
+  }
  }
 });

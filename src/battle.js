@@ -70,7 +70,7 @@ export class ThreeBattleScene extends BundledBattleScene {
     super(canvas, config);
     this.terrainType = config?.terrain || (config?.biome === 'desert' ? 'desert' : 'plains');
     if (config?.fieldBattle) {
-      applyFieldAtmosphere(this.scene, this.renderer, config.biome);
+      applyFieldAtmosphere(this.scene, this.renderer, config.terrain || config.biome);
       suppressFortScenery(this.environment);
       this._alignTerrainGround(this.terrainType, config.biome);
     }
@@ -81,12 +81,24 @@ export class ThreeBattleScene extends BundledBattleScene {
     if (!ground?.geometry?.constructor) return;
     const PlaneGeo = ground.geometry.constructor;
     const oldGeo = ground.geometry;
-    const geo = new PlaneGeo(190, 175, 48, 44);
+    const geo = new PlaneGeo(360, 340, 64, 64);
     const pos = geo.attributes?.position;
     if (!pos) return;
+    if (this.scene?.fog) this.scene.fog.density = 0.0046;
+    if (ground.material?.map?.repeat) ground.material.map.repeat.set(14, 14);
     const covers = terrainForestCovers(terrain);
     const colors = new Float32Array(pos.count * 3);
-    const desert = biome === 'desert' || String(terrain).toLowerCase() === 'desert';
+    const kind = String(biome || terrain || 'plains').toLowerCase();
+    const palette = {
+      desert:   { base: [1.02, 0.89, 0.68], peak: [0.10, 0.06, 0.02], grove: [0.80, 0.72, 0.50] },
+      steppe:   { base: [0.96, 0.88, 0.66], peak: [0.09, 0.07, 0.04], grove: [0.70, 0.74, 0.48] },
+      mountain: { base: [0.76, 0.76, 0.78], peak: [0.20, 0.20, 0.22], grove: [0.46, 0.56, 0.44] },
+      coastal:  { base: [0.90, 0.92, 0.79], peak: [0.10, 0.08, 0.06], grove: [0.60, 0.72, 0.52] },
+      marsh:    { base: [0.64, 0.74, 0.60], peak: [0.12, 0.10, 0.08], grove: [0.44, 0.58, 0.42] },
+      forest:   { base: [0.74, 0.84, 0.68], peak: [0.12, 0.08, 0.04], grove: [0.46, 0.62, 0.42] },
+      hills:    { base: [0.85, 0.88, 0.75], peak: [0.15, 0.10, 0.05], grove: [0.54, 0.67, 0.47] },
+      plains:   { base: [0.87, 0.90, 0.83], peak: [0.15, 0.08, 0.04], grove: [0.56, 0.69, 0.50] }
+    }[kind] || { base: [0.87, 0.90, 0.83], peak: [0.15, 0.08, 0.04], grove: [0.56, 0.69, 0.50] };
     for (let i = 0; i < pos.count; i++) {
       const wx = pos.getX(i);
       const wz = -pos.getY(i);
@@ -95,13 +107,13 @@ export class ThreeBattleScene extends BundledBattleScene {
       const inGrove = covers.some(c => Math.hypot(wx - c.x, wz - c.z) <= c.radius);
       const elev = clamp(wy / 4.5, 0, 1);
       if (inGrove) {
-        colors[i * 3] = desert ? 0.72 : 0.56;
-        colors[i * 3 + 1] = desert ? 0.74 : 0.69;
-        colors[i * 3 + 2] = desert ? 0.56 : 0.50;
+        colors[i * 3] = palette.grove[0];
+        colors[i * 3 + 1] = palette.grove[1];
+        colors[i * 3 + 2] = palette.grove[2];
       } else {
-        colors[i * 3] = 0.87 + elev * 0.15;
-        colors[i * 3 + 1] = 0.90 + elev * 0.08;
-        colors[i * 3 + 2] = 0.83 + elev * 0.04;
+        colors[i * 3] = palette.base[0] + elev * palette.peak[0];
+        colors[i * 3 + 1] = palette.base[1] + elev * palette.peak[1];
+        colors[i * 3 + 2] = palette.base[2] + elev * palette.peak[2];
       }
     }
     pos.needsUpdate = true;
@@ -567,7 +579,7 @@ export class BattleGame {
     this.fieldSeed = 1450;
     this.effects = [];
     ensureTacticalStats(this);
-    this.camera = { yaw: 0.38, distance: 72, target: [0, 0, -3], eye: [0, 55, 80] };
+    this.camera = { yaw: 0.25, distance: 56, target: [0, 0.5, 4], eye: [0, 32, 54] };
     this.drag = null;
     this.keys = new Set();
     this.projectiles = [];
@@ -614,8 +626,9 @@ export class BattleGame {
     if (descriptor.fieldBattle && !this.ctx.isBannerRenderer) {
       const seed = [...String(descriptor.to || 'practice')].reduce((n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0, 1450);
       const compact = coarse || this.ctx instanceof CanvasFallback;
-      this.fieldLandscape = fieldScenery(seed, this.biome || 'temperate', compact);
-      this.terrainProps = terrainVisualProps(this.terrainType, this.biome || 'temperate', compact);
+      const discs = !this.ctx.isThreeBattle;
+      this.fieldLandscape = fieldScenery(seed, this.biome || 'temperate', compact, discs);
+      this.terrainProps = terrainVisualProps(this.terrainType, this.biome || 'temperate', compact, discs);
       this.terrainGrid = terrainGroundGrid(this.terrainType, this.biome || 'temperate', compact);
     } else {
       this.terrainProps = [];
@@ -747,6 +760,7 @@ export class BattleGame {
         g.readiness = armyReadiness(game, a);
       }
       g.simpleField=this.simpleField;
+      g.isCommander = idx === 0;
       g.realmId = game?.player || playerFaction?.id || null;
       g.commanderMartial = atkMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
@@ -790,6 +804,7 @@ export class BattleGame {
         g.readiness = armyReadiness(game, enemyArmy || enemies);
       }
       g.simpleField=this.simpleField;
+      g.isCommander = idx === 0;
       g.realmId = enemy?.id || descriptor.enemy || null;
       g.commanderMartial = defMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
@@ -816,7 +831,7 @@ export class BattleGame {
           if (g.side === holdSide) moveCard(g, { x: g.x, z: Math.min(-24, -Math.abs(g.z) - 8) });
         }
       }
-      this.camera.distance=105;
+      this.camera.distance = this.ctx?.isThreeBattle ? 68 : 105;
     }
     this.selected = 0;
     this.selectedGroupId = this.groups[0]?.side === 'attacker' ? this.groups[0].id : null;
@@ -1027,7 +1042,7 @@ export class BattleGame {
   handleCanvasTap(x, y) {
     if (this.done) return null;
     if(this.simpleField&&this.deployment){const p=this.rayGround(x,y),g=this.selectedGroup();if(p&&this.placeRegiment(g,p[0],p[2]))return {action:'move',group:g,point:[g.x,g.z]};return null;}
-    if(this.simpleField&&!this.deployment){const g=this.selectedGroup(),p=this.rayGround(x,y);if(g?.reserve&&p&&this.placeRegiment(g,p[0],p[2]))return {action:'deploy',group:g,point:[g.x,g.z]};return null;}
+    if(this.simpleField&&!this.deployment){const g=this.selectedGroup(),p=this.rayGround(x,y);if(g?.reserve&&p&&this.placeRegiment(g,p[0],p[2]))return {action:'deploy',group:g,point:[g.x,g.z]};}
 
     if (this.tapMove) {
       const p = this.rayGround(x, y);
@@ -1150,7 +1165,9 @@ export class BattleGame {
 
   getCamera() {
     const c = this.camera, y = c.yaw, d = c.distance;
-    const eye = [c.target[0] + Math.sin(y) * d * 0.68, c.target[1] + d * 0.72, c.target[2] + Math.cos(y) * d * 0.68];
+    const pitch = this.ctx?.isThreeBattle ? 0.48 : 0.72;
+    const spread = this.ctx?.isThreeBattle ? 0.78 : 0.68;
+    const eye = [c.target[0] + Math.sin(y) * d * spread, c.target[1] + d * pitch, c.target[2] + Math.cos(y) * d * spread];
     return { eye, target: c.target };
   }
 
@@ -1580,25 +1597,26 @@ export class BattleGame {
         instance(obj, g.x, gy + 5.05, g.z, 0.29, 0.32, 0.29, C.gold, 'sphere');
       }
 
-      if (field && k === this.selected && ['move', 'fallback', 'hold'].includes(g.fieldOrder)) {
-        const mx = g.moveX ?? g.anchorX;
-        const mz = g.moveZ ?? g.anchorZ;
-        const my = terrain ? terrainHeight(mx, mz, terrain) : 0;
-        instance(obj, mx, my + 0.09, mz, 2.2, 0.12, 2.2, [0.90, 0.76, 0.30]);
-        for (let i = 1; i <= 5; i++) {
-          const t = i / 6;
-          const wx = mix(g.x, mx, t), wz = mix(g.z, mz, t);
-          const wy = terrain ? terrainHeight(wx, wz, terrain) : 0;
-          instance(obj, wx, wy + 0.06, wz, 0.28, 0.07, 0.28, [0.90, 0.76, 0.30]);
+      if (!this.ctx.isThreeBattle) {
+        if (field && k === this.selected && ['move', 'fallback', 'hold'].includes(g.fieldOrder)) {
+          const mx = g.moveX ?? g.anchorX;
+          const mz = g.moveZ ?? g.anchorZ;
+          const my = terrain ? terrainHeight(mx, mz, terrain) : 0;
+          instance(obj, mx, my + 0.09, mz, 2.2, 0.12, 2.2, [0.90, 0.76, 0.30]);
+          for (let i = 1; i <= 5; i++) {
+            const t = i / 6;
+            const wx = mix(g.x, mx, t), wz = mix(g.z, mz, t);
+            const wy = terrain ? terrainHeight(wx, wz, terrain) : 0;
+            instance(obj, wx, wy + 0.06, wz, 0.28, 0.07, 0.28, [0.90, 0.76, 0.30]);
+          }
         }
-      }
-
-      if (k === this.selected || g === selGroup) {
-        instance(obj, g.x, gy + 0.08, g.z, 5.2, 0.14, 5.2, [0.95, 0.79, 0.42]);
-        instance(obj, g.x, gy + 0.11, g.z, 4.4, 0.15, 4.4, [0.28, 0.35, 0.32]);
-      }
-      if (selGroup?.focusTargetId && g.id === selGroup.focusTargetId) {
-        instance(obj, g.x, gy + 0.10, g.z, 4.6, 0.14, 4.6, [0.88, 0.28, 0.24]);
+        if (k === this.selected || g === selGroup) {
+          instance(obj, g.x, gy + 0.08, g.z, 5.2, 0.14, 5.2, [0.95, 0.79, 0.42]);
+          instance(obj, g.x, gy + 0.11, g.z, 4.4, 0.15, 4.4, [0.28, 0.35, 0.32]);
+        }
+        if (selGroup?.focusTargetId && g.id === selGroup.focusTargetId) {
+          instance(obj, g.x, gy + 0.10, g.z, 4.6, 0.14, 4.6, [0.88, 0.28, 0.24]);
+        }
       }
     }
 
@@ -1734,6 +1752,18 @@ export class BattleGame {
       if (!pt || pt[0] < -40 || pt[0] > w + 40 || pt[1] < -30 || pt[1] > h + 30) continue;
 
       const isSel = g === sel;
+      if (this.ctx?.isThreeBattle && !g.routed && (isSel || sel?.focusTargetId === g.id)) {
+        const gPt = this.project([g.x, gy + 0.15, g.z]);
+        if (gPt) {
+          ctx.save?.();
+          ctx.beginPath();
+          ctx.ellipse(gPt[0], gPt[1], 32, 16, 0, 0, TAU);
+          ctx.strokeStyle = isSel ? 'rgba(243, 214, 155, 0.92)' : 'rgba(232, 92, 76, 0.92)';
+          ctx.lineWidth = isSel ? 2.4 : 2;
+          ctx.stroke();
+          ctx.restore?.();
+        }
+      }
       const badge = unitBadgeLabel(g);
       const count = g.routed ? 0 : Math.max(0, Math.round(g.troops ?? maxT * clamp(g.life / Math.max(1, g.initialLife || 100), 0, 1)));
       const hpFrac = clamp((g.life || 0) / Math.max(1, g.initialLife || 100), 0, 1);
