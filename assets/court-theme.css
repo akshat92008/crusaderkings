@@ -1520,3 +1520,46 @@ body.in-battle .toast{top:auto;bottom:max(210px,26dvh)}
 @media(prefers-reduced-motion:reduce){
  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+
+/* Living Royal Chronicle — primary campaign navigation.
+   Scope this first design-system pass to the dock; preserve existing simulation and drawers. */
+.reign-nav{
+ --dock-brass:#c49a45;--dock-ivory:#f2e9d5;--dock-charcoal:#142629;
+ position:relative;top:auto;left:auto;right:auto;
+ display:flex;align-items:stretch;flex-wrap:wrap;gap:5px;
+ flex:0 0 auto;padding:7px 10px;
+ background:linear-gradient(180deg,#203437,var(--dock-charcoal));
+ border-top:1px solid #92744a;border-bottom:0;
+ box-shadow:0 -3px 12px #0005;overflow:visible;
+}
+.reign-nav>button,.reign-nav summary{
+ min-width:0;min-height:38px;padding:8px 11px;
+ border:1px solid #92744a;border-radius:3px;
+ color:var(--dock-ivory);background:#1b3032;
+ font-family:Georgia,serif;font-size:14px;line-height:1.1;
+ letter-spacing:.1px;box-shadow:none;
+}
+.reign-nav>button:nth-child(-n+6){flex:1 1 76px;border-top:2px solid var(--dock-brass)}
+.reign-nav>button:nth-child(n+7),.reign-nav summary{
+ flex:0 1 auto;font-family:Inter,system-ui,sans-serif;font-size:12px;color:#d8d0bc;
+ border-color:#526465;background:transparent;
+}
+.reign-nav>button span{display:inline;font-size:inherit}
+.reign-nav>button:hover,.reign-nav summary:hover,.reign-nav>button[aria-pressed="true"]{
+ color:#fff2cf;background:#344b4b;border-color:#e8c575;transform:none;
+}
+.reign-nav>button:focus-visible,.reign-nav summary:focus-visible{
+ outline:2px solid #f2d18a;outline-offset:2px;
+}
+.reign-nav details{margin-left:0;position:relative;flex:0 1 auto}
+.reign-nav #outliner-list{position:absolute;top:auto;bottom:calc(100% + 7px);right:0;max-height:min(55dvh,480px);width:min(280px,88vw)}
+@media(max-width:900px){
+ .reign-nav{gap:4px;padding:5px 7px}
+ .reign-nav>button:nth-child(-n+6){flex:1 1 14%;min-height:44px;padding:6px 4px;font-size:12px}
+ .reign-nav>button:nth-child(n+7),.reign-nav summary{min-height:36px;padding:5px 7px;font-size:11px}
+}
+@media(max-width:420px){
+ .reign-nav>button:nth-child(-n+6){flex:1 1 29%}
+ .reign-nav>button:nth-child(n+7),.reign-nav details{flex:1 1 18%}
+}
