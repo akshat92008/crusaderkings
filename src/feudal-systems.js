@@ -249,6 +249,7 @@ export function syncTitles(g){
      bRec.level=seat?.level??(kind==='castle'?1:0);
      if(h.subholdings?.[kind]?.holder&&live(g,h.subholdings[kind].holder)&&g.politics.people[h.subholdings[kind].holder].realm===realm){
       bRec.holder=h.subholdings[kind].holder;
+      bRec.granted=true;
      }else if(!bRec.granted){
       bRec.holder=h.lord;
      }
@@ -674,8 +675,10 @@ export function revokeTitle(g,world,realm,titleId,opts={}){
   if(controller(g,t.province)!==realm)return no('Cannot revoke an occupied county.');
   h.lord=r.id;h.loyalty=100;h.tax=1;h.levy=1;h.autonomy=1;
  }else if(tier==='barony'&&f.baronies[t.id]){
-  f.baronies[t.id].holder=h?.lord===r.id?r.id:(h?.lord||r.id);
-  if(f.baronies[t.id].holder===targetId)f.baronies[t.id].holder=r.id;
+  const nextHolder=h?.lord===r.id?r.id:(h?.lord||r.id);
+  f.baronies[t.id].holder=nextHolder===targetId?r.id:nextHolder;
+  f.baronies[t.id].granted=f.baronies[t.id].holder!==h?.lord;
+  if(h?.subholdings?.[t.baronyType])h.subholdings[t.baronyType].holder=f.baronies[t.id].holder===h.lord?null:f.baronies[t.id].holder;
  }else if(tier==='duchy'){
   t.holder=r.id;
  }
@@ -723,6 +726,8 @@ export function feudalAction(g,world,action,id,extra){
   if(t?.tier!=='barony'||t.realm!==realm||controller(g,t.province)!==realm)return no('Select a controlled barony.');
   if(!p||p.realm!==realm||p.age<18||isImprisoned(g,p.id))return no('Select a free adult subject.');
   f.baronies[t.id].holder=p.id;f.baronies[t.id].granted=true;
+  const bh=g.politics.holdings?.[t.province]?.subholdings?.[t.baronyType];
+  if(bh)bh.holder=p.id;
   syncTitles(g);
   return ok('Barony granted to '+p.name+'.');
  }

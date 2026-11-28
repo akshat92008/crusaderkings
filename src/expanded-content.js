@@ -563,7 +563,13 @@ function apply(g,r,t,e){const f=g.factions[r],p=g.provinces[t.province],h=g.poli
  }}
 }
 function note(g,r,id,label,kind){const s=g.expanded;s.history.unshift({realm:r,id,label,kind,turn:g.turn});s.history=s.history.slice(0,240);if(r===g.player){g.log.unshift({date:g.year+' · month '+(g.month+1),text:label});g.log=g.log.slice(0,45);}}
-function eventView(g,r,active){if(!active||g.turn>=active.expires)return null;const modEvents=g.mods?.customEvents;const def=EVENT_BY_ID.get(active.id)||(modEvents&&modEvents.find(x=>x.id===active.id));return def&&(!eventRegion.has(def.id)||(eventRegion.get(def.id)===r&&active.target?.region===r))&&valid(g,r,active.target)?{...def,...active}:null;}
+export function classifyEventTier(def,active=null){
+ const cat=String(def?.category||'').toLowerCase(),trig=String(def?.trigger||'').toLowerCase();
+ if(['succession','war','crisis','rebellion','regency'].some(k=>cat.includes(k))||['newreign','civilwar','famine','epidemic','livingclaimant','regency','critical','crisis'].some(k=>trig.includes(k)))return 'critical';
+ if(['intrigue','diplomacy','court','religion','faith','economy','crossroads','politics'].some(k=>cat.includes(k))||trig.startsWith('crossroads_')||trig==='war'||trig==='disloyal')return 'important';
+ return 'chronicle';
+}
+function eventView(g,r,active){if(!active||g.turn>=active.expires)return null;const modEvents=g.mods?.customEvents;const def=EVENT_BY_ID.get(active.id)||(modEvents&&modEvents.find(x=>x.id===active.id));return def&&(!eventRegion.has(def.id)||(eventRegion.get(def.id)===r&&active.target?.region===r))&&valid(g,r,active.target)?{...def,...active,tier:classifyEventTier(def,active)}:null;}
 export function currentExpandedEvent(g,r=g.player){return eventView(g,r,g.expanded?.realms[r]?.active);}
 export function currentExpandedEvents(g,r=g.player){const s=g.expanded?.realms[r];return s?[s.active,...(s.concurrent||[])].map(a=>eventView(g,r,a)).filter(Boolean):[];}
 export function expandedChoiceStatus(g,r,target,choice,remaining=0){
@@ -601,6 +607,18 @@ export function tickExpanded(g,world){const root=initExpanded(g);if(root.lastTic
  if(!humanControlsRealm(g,r)&&g.turn%12===0&&f.treasury>900){const ds=expandedDecisions(g,world,r).filter(d=>d.ready&&d.trigger!=='land');if(ds.length)decide(g,world,r,ds[Math.floor(rand(root)*ds.length)].id);}
  }
  tickEmergent(g,world);
+}
+export function featuredStartsCatalog(){
+ return [
+  {id:'vijayanagara',title:'Deva Raya II of Vijayanagara',family:'india',difficulty:'Recommended · Flagship',summary:'Defend the wealthy Tungabhadra heartland, field royal war elephants, and expand Southern trade.'},
+  {id:'ming',title:'Jingtai Court of Great Ming',family:'east_asia',difficulty:'Accessible · Imperial',summary:'Command banner crossbows & handguns across prosperous agrarian riverlands while guarding northern steppes.'},
+  {id:'ottomans',title:'Mehmed II of the Ottoman Porte',family:'persia',difficulty:'Dynamic · Conquest',summary:'Mobilize disciplined Janissary siege artillery and forge an imperial crossroads between Anatolia and Europe.'},
+  {id:'france',title:'Charles VII of France',family:'europe',difficulty:'Standard · Recovery',summary:'Centralize noble estates, repel rival claimants, and master heavy chivalric lance formations.'},
+  {id:'england',title:'Henry VI of England',family:'europe',difficulty:'Challenging · Dynastic',summary:'Steady a factional royal council, guard overseas holdings, and field dread English longbowmen.'},
+  {id:'ashikaga',title:'Ashikaga Shogunate',family:'east_asia',difficulty:'Challenging · Feudal',summary:'Balance assertive regional daimyo while defending the imperial capital of Kyoto.'},
+  {id:'mamluks',title:'Mamluk Sultanate',family:'persia',difficulty:'Standard · Mercantile',summary:'Command Red Sea commerce and steppe horsemen against ambitious border powers.'},
+  {id:'castile',title:'Crown of Castile',family:'europe',difficulty:'Standard · Frontier',summary:'Integrate Iberian frontier forts, charter overseas expeditions, and consolidate dynastic unions.'}
+ ];
 }
 export function allContentStats(){
  return {

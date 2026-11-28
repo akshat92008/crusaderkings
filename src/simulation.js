@@ -288,7 +288,7 @@ export function advanceMonth(g,world){
     const cb=cbs.find(c=>c.goal===target.id)||cbs[0];
     if(cb&&viable.viable&&(g.factions[a.owner].prestige||0)>=cb.prestigeCost&&previous!=='independent'){
      const res=declareCasusBelliWar(g,world,a.owner,previous,cb.cb,cb.target);
-     if(res.ok)war=res.war;
+     if(res.ok){war=res.war;if(g.strategy?.lastWarDeclared)g.strategy.lastWarDeclared[a.owner]=g.turn;}
     }
     if(!war){
      const prof=personalityProfile(g,a.owner);

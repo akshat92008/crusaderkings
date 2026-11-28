@@ -104,3 +104,31 @@ test('AI county holders invest annually using their own resources and no crown c
  assert.equal(g.factions[realm].treasury,0);
  assert.equal(g.feudal.titles[key(id,'city')].parent,'c:'+id);
 });
+
+test('baron control supports spawning local barons, setting tax/levy duty charters, and revoking baronies to demesne',()=>{
+ const {g,realm,id,r}=fixture();
+ assert.ok(feudalAction(g,world,'subholding-build',key(id,'city')).ok);
+ assert.ok(feudalAction(g,world,'subholding-spawn',key(id,'city')).ok);
+ const baronId=g.politics.holdings[id].subholdings.city.holder;
+ assert.ok(baronId&&baronId!==r.id);
+ assert.equal(g.feudal.baronies[key(id,'city')].granted,true);
+ assert.equal(g.feudal.titles[key(id,'city')].holder,baronId);
+ const htmlWithBaron=renderCountySubholdings(g,id,String);
+ assert.match(htmlWithBaron,/Revoke to Demesne/);
+ assert.match(htmlWithBaron,/subholding-duty/);
+
+ const baseProf=subholdingProfile(g,id);
+ assert.ok(feudalAction(g,world,'subholding-duty',key(id,'city'),'tax').ok);
+ const taxProf=subholdingProfile(g,id);
+ assert.ok(taxProf.tax>baseProf.tax);
+ assert.ok(taxProf.levy<baseProf.levy);
+
+ const copy=restoreGame(snapshot(g),world);
+ assert.equal(copy.politics.holdings[id].subholdings.city.duty,'tax');
+ assert.equal(subholdingProfile(copy,id).tax,taxProf.tax);
+
+ assert.ok(feudalAction(copy,world,'subholding-revoke',key(id,'city')).ok);
+ assert.equal(copy.politics.holdings[id].subholdings.city.holder,null);
+ assert.equal(copy.feudal.baronies[key(id,'city')].granted,false);
+ assert.equal(copy.feudal.titles[key(id,'city')].holder,r.id);
+});

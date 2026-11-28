@@ -75,6 +75,16 @@
 .ht-building.planned{opacity:.55;filter:saturate(.5)}
 .ht-building.planned .ht-building-label{border:1px dashed #e5c781}
 .ht-building:focus-visible,.ht-tile:focus-visible{outline:2px solid #f4d07d}
+.ht-tile-preview:not(:disabled){border-color:rgba(128,225,148,.65);background:rgba(92,188,112,.14)}
+.ht-tile-preview.ht-plot-occupied{border-color:rgba(220,90,78,.55)}
+.ht-ghost-preview{display:none;position:absolute;left:50%;bottom:50%;transform:translate(-50%,10%);width:86px;height:86px;opacity:.68;pointer-events:none;z-index:20;filter:drop-shadow(0 0 8px rgba(132,232,148,.85))}
+.ht-ghost-preview b{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);background:#1f4c2c;color:#e7f9ea;border:1px solid #82d896;border-radius:3px;padding:1px 5px;font-size:9px;white-space:nowrap}
+.ht-tile-preview:hover .ht-ghost-preview,.ht-tile-preview:focus-visible .ht-ghost-preview{display:block}
+.ht-person.person-d{top:248px;left:420px;animation-delay:-11s;animation-direction:reverse}
+.ht-steward-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;border:1px solid rgba(114,78,34,.35);margin-top:6px;background:rgba(255,250,238,.6)}
+.ht-steward-item.ht-sev-critical{background:#f7dbd6;border-color:#a3362c}
+.ht-steward-item.ht-sev-warn{background:#f6e8c8;border-color:#9e722d}
+.ht-steward-item.ht-sev-good{background:#e2f0e2;border-color:#3a794c}
 .ht-header-actions{display:flex;gap:6px;flex-wrap:wrap}
 #toast{z-index:60}
 .ht-toolbar select{max-width:100%}

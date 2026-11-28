@@ -310,17 +310,46 @@ body.in-campaign .topbar .brand{display:none}
 .outliner-row:hover,.outliner-row:focus-visible{background:rgba(166,122,52,.22)}
 
 /* CK2 Map Legend, Zoom & Mode Dock */
+.mapcorner.top{
+ display:inline-flex;
+ align-items:center;
+ gap:8px;
+ position:absolute;
+ top:10px;
+ left:12px;
+ z-index:6;
+ pointer-events:auto;
+ background:linear-gradient(180deg,#2c2018eb,#19120ded);
+ border:1.5px solid #9a753d;
+ color:#f0da9e;
+ padding:6px 11px;
+ border-radius:3px;
+ font-family:Cinzel,serif;
+ font-size:10.5px;
+ letter-spacing:.8px;
+ box-shadow:0 3px 10px rgba(0,0,0,.65);
+ cursor:pointer;
+ transition:border-color .15s ease,filter .15s ease;
+}
+.canvaswrap .mapcorner.top b,.mapcorner.top b{color:#ffe7a6}
+.mapcorner.top:hover{
+ border-color:#e5bd6e;
+ filter:brightness(1.08);
+}
 .mapmodes{
  top:auto;
  bottom:44px;
  left:auto;
  right:62px;
- max-width:min(440px,calc(100% - 82px));
+ max-width:min(620px,calc(100% - 82px));
+ display:flex;
+ flex-wrap:wrap;
+ justify-content:flex-end;
  background:linear-gradient(180deg,#2c2018f2,#19120df5);
  border:2px solid #9a753d;
  border-radius:4px;
  box-shadow:0 8px 24px rgba(0,0,0,.85);
- padding:5px;
+ padding:6px;
  gap:4px;
 }
 .mapmodebtn{

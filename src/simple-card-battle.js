@@ -1,4 +1,4 @@
-import {siegeTarget,siegeDamage,siegeBreached} from './military-systems.js';
+import {siegeTarget,siegeDamage,siegeBreached,siegeCorridorBreached} from './military-systems.js';
 // Banner Lines: deterministic, renderer-independent card battles.
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -106,7 +106,8 @@ export function stepCardBattle(state,dt,terrainInfo=null){
    g.routAge=(g.routAge||0)+dt;g.moving=true;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;const home=g.homeDirection||1;g.z=clamp(g.z+home*dt*5,-46,46);continue;
   }
   const enemies=live.filter(e=>e.side!==g.side),pos=snapshot.get(g.id);
-  const structure=siegeActive&&g.side===assaultSide?siegeTarget(siege,g):null;
+  const corridorOpen=siegeCorridorBreached(siege,pos?.x??g.x);
+  const structure=siegeActive&&g.side===assaultSide&&!corridorOpen?siegeTarget(siege,g):null;
   if(!pos||(!enemies.length&&!structure)){g.moving=false;continue;}
   const role=cardRole(g),form=g.formationId||'';
   const terrain=terrainInfo?.(g);
@@ -154,7 +155,7 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  if(form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
  g.moving=step>0.01;g.vx=d?moveDir*dx/d*step/dt:0;g.vz=d?moveDir*dz/d*step/dt:0;
  if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
- const minZ=siegeActive&&g.side===assaultSide?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
+ const minZ=siegeActive&&g.side===assaultSide&&!siegeCorridorBreached(siege,pos.x)?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
  if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;g.fatigue=clamp((g.fatigue||0)+dt*((form==='cavalry_wedge'||form==='flank')?0.024:0.012),0,1);}
  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
  for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,minZ,maxZ);}

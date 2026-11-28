@@ -1,13 +1,13 @@
 # Asset & Content Manifest — Sovereign: 1450
 
 > **Machine-generated audit** produced by `python3 scripts/audit_release_assets.py`.
-> Audit timestamp (UTC): `2026-11-27T19:17:21Z`
+> Audit timestamp (UTC): `2026-11-27T20:06:22Z`
 
 ## 1. Tracked Asset Summary (`assets/`)
 
-- **Total tracked files under `assets/`:** `2382` (1952.99 MB)
-- **Tracked `src/content/` modules:** `8`
-- **Local untracked files under `assets/` (excluded from tracked counts):** `16`
+- **Total tracked files under `assets/`:** `2435` (1991.75 MB)
+- **Tracked `src/content/` modules:** `14`
+- **Local untracked files under `assets/` (excluded from tracked counts):** `6`
 
 | Category | Tracked Files | Total Size | Formats | Sprite / Image Dimensions (WxH) |
 | :--- | ---: | ---: | :--- | :--- |
@@ -21,8 +21,8 @@
 | `assets/audio` | 26 | 164.60 MB | `.mp3` (18), `.txt` (3), `.zip` (2), `.7z` (2), `.ogg` (1) | — |
 | `assets/branding` | 4 | 619.7 KB | `.png` (3), `.webp` (1) | `180x180` (1), `192x192` (1), `512x512` (1), `960x540` (1) |
 | `assets/packs` | 47 | 318.47 MB | `.zip` (39), `.rar` (6), `.txt` (2) | — |
-| `assets (root)` | 24 | 3.64 MB | `.png` (16), `.txt` (3), `.svg` (3), `.css` (2) | `512x1024` (2), `500x422` (2), `178x141` (2), `175x140` (2), `178x137` (2), `305x222` (1) (+5 more) |
-| `assets/battle` | 8 | 7.04 MB | `.glb` (6), `.txt` (2) | — |
+| `assets (root)` | 24 | 3.65 MB | `.png` (16), `.txt` (3), `.svg` (3), `.css` (2) | `512x1024` (2), `500x422` (2), `178x141` (2), `175x140` (2), `178x137` (2), `305x222` (1) (+5 more) |
+| `assets/battle` | 61 | 45.81 MB | `.glb` (44), `.webp` (11), `.txt` (2), `.jpg` (2), `.md` (1), `.json` (1) | `1280x720` (11), `1376x768` (2) |
 | `assets/characters_3d` | 5 | 4.91 MB | `.glb` (3), `.txt` (1), `.zip` (1) | — |
 | `assets/cliopatria` | 519 | 294.54 MB | `.png` (507), `.md` (4), `.ipynb` (3), `.py` (2), `<none>` (1), `.zip` (1), `.txt` (1) | `4800x2400` (507) |
 | `assets/documents` | 5 | 293.78 MB | `.part00` (2), `.part01` (2), `.sh` (1) | — |
@@ -93,22 +93,12 @@
 
 | Local Path | Size | Format |
 | :--- | ---: | :--- |
-| `assets/battle/arenas/coast.webp` | 47.1 KB | `.webp` |
-| `assets/battle/arenas/desert.webp` | 16.0 KB | `.webp` |
-| `assets/battle/arenas/forest.webp` | 87.3 KB | `.webp` |
-| `assets/battle/arenas/highlands.webp` | 27.3 KB | `.webp` |
-| `assets/battle/arenas/hills.webp` | 29.2 KB | `.webp` |
-| `assets/battle/arenas/marsh.webp` | 51.1 KB | `.webp` |
-| `assets/battle/arenas/mountain.webp` | 28.9 KB | `.webp` |
-| `assets/battle/arenas/plains.webp` | 56.0 KB | `.webp` |
-| `assets/battle/arenas/siege_desert.webp` | 14.8 KB | `.webp` |
-| `assets/battle/arenas/siege_plains.webp` | 43.8 KB | `.webp` |
-| `assets/battle/arenas/steppe.webp` | 24.5 KB | `.webp` |
-| `assets/battle/sources/cavalry_eu.jpg` | 593.4 KB | `.jpg` |
-| `assets/battle/sources/infantry_eu.jpg` | 630.7 KB | `.jpg` |
 | `assets/packs/City_Builder_Village_Buildings_part_1.zip` | 237.76 MB | `.zip` |
 | `assets/packs/City_Builder_Village_Buildings_part_2.zip` | 209.33 MB | `.zip` |
 | `assets/packs/Foozle_2DS0008_Isometric_Gold_Mine_1.zip` | 531.93 MB | `.zip` |
+| `assets/terrain/natural-earth-relief-low.webp` | 44.3 KB | `.webp` |
+| `assets/terrain/natural-earth-relief.webp` | 1.16 MB | `.webp` |
+| `assets/terrain/terrain-height.png` | 1.09 MB | `.png` |
 
 ## 5. Narrative Event & Mandate Content Audit (`src/content/`)
 

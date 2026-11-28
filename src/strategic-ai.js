@@ -39,9 +39,10 @@ export function initStrategy(g,world){
  if(g.strategy?.version===1){
   g.strategy.lessons??={};
   g.strategy.abandoned??=[];
+  g.strategy.lastWarDeclared??={};
   return g.strategy;
  }
- return g.strategy={version:1,plans:{},pacts:{},history:[],lessons:{},abandoned:[],lastTick:-1};
+ return g.strategy={version:1,plans:{},pacts:{},history:[],lessons:{},abandoned:[],lastWarDeclared:{},lastTick:-1};
 }
 
 function note(g,realm,message){
@@ -150,6 +151,8 @@ export function evaluateWarViability(g,world,attacker,defender){
  }
  const alreadyAtWar=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(attacker)&&![w.attacker,w.defender].includes(defender));
  if(alreadyAtWar)return {viable:false,ratio:0,reason:'Already committed to another war'};
+ const sinceLastWar=g.turn-(g.strategy?.lastWarDeclared?.[attacker]??-120);
+ if(sinceLastWar<18)return {viable:false,ratio:0,reason:'Campaign cooldown recovering logistics'};
  const minReserve=prof.id==='cautious'?200:100;
  const civilWarActive=Object.values(g.conflict?.factions||{}).some(fx=>fx.realm===attacker&&fx.status==='civil war');
  if(civilWarActive||(f.treasury??500)<minReserve||(f.food??50)<0||(f.stability??60)<30){
@@ -472,7 +475,8 @@ function applyAiPersonalityDecisions(g,world,realm,plan){
     const cbs=availableCasusBelli(g,world,realm,plan.target);
     const preferred=cbs.find(c=>tPreferredCb(prof.id,c.cb))||cbs[0];
     if(preferred&&(f.prestige||0)>=preferred.prestigeCost){
-     declareCasusBelliWar(g,world,realm,plan.target,preferred.cb,preferred.target);
+     const res=declareCasusBelliWar(g,world,realm,plan.target,preferred.cb,preferred.target);
+     if(res?.ok&&g.strategy?.lastWarDeclared)g.strategy.lastWarDeclared[realm]=g.turn;
     }
    }
   }

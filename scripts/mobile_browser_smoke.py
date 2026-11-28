@@ -204,7 +204,7 @@ try:
      return snapshot(g);
     }''')
     page.reload(wait_until='domcontentloaded')
-    page.locator('#realm-search').wait_for(state='visible')
+    page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
     page.locator('#save-file').set_input_files({'name':'allied-field.json','mimeType':'application/json','buffer':allied_save.encode()})
     page.locator('#start-screen').wait_for(state='hidden')
     page.locator('#quick-nav [data-priority-tab="search"]').click()
@@ -224,7 +224,7 @@ try:
     print('desktop PASS: call allied field contingent, march to the frontier, deploy in battle')
    if name=='desktop':
     page.reload(wait_until='domcontentloaded')
-    page.locator('#realm-search').wait_for(state='visible')
+    page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
     page.locator('#save-file').set_input_files({'name':'career-base.json','mimeType':'application/json','buffer':backup})
     page.locator('#start-screen').wait_for(state='hidden')
     page.click('#open-management')

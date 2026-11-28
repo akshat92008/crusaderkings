@@ -14,6 +14,7 @@ import {
   ensureTacticalStats
 } from './field-tactics.js';
 import {REGIMENTS, armyReadiness, regimentProfile, createSiegeState, siegeTarget, siegeDamage, siegeBreached} from './military-systems.js';
+import {homeCapitalLayout} from './hometown.js';
 import {BattleModelArt} from './glb-art.js';
 import {armyFormationSlots, militaryDoctrine, startingTroops, combatStatistics, chooseCounterFormation, availableFormations} from './military-doctrines.js';
 import {ThreeBattleScene as BundledBattleScene} from './three-battle.bundle.js';
@@ -597,11 +598,14 @@ export class BattleGame {
     this.biome = biome;
     this.terrainType = descriptor.terrain || province?.terrain || staticProv?.terrain || (biome === 'desert' ? 'desert' : 'plains');
 
+    this.capitalLayout = isSiege ? homeCapitalLayout(game, descriptor.to) : null;
     const config = {
       fortLevel,
       biome,
       terrain: this.terrainType,
       fieldBattle: !!descriptor.fieldBattle,
+      siegeMode: isSiege,
+      capitalLayout: this.capitalLayout,
       seed: 1450 + Math.round(fortLevel * 23),
       attackerRealm: game?.player,
       defenderRealm: descriptor.enemy
@@ -690,7 +694,7 @@ export class BattleGame {
         ? { ...enemyArmy, ...Object.fromEntries(['infantry', 'archers', 'cavalry'].map(t => [t, (enemyArmy[t] || 0) + (descriptor.defenseMode ? 0 : startingTroops(enemy, descriptor.defenseGarrison || 0)[t])])) }
         : startingTroops(enemy, Math.max(95, (descriptor.defenseTroops || 0) + (descriptor.defenseMode ? 0 : descriptor.defenseGarrison || 0)));
 
-    this.siege = isSiege ? createSiegeState(fortLevel, !!descriptor.defenseMode) : null;
+    this.siege = isSiege ? createSiegeState(fortLevel, !!descriptor.defenseMode, this.capitalLayout) : null;
     if (this.siege) {
       const sumEngines = armies => {
         const out = { ram: 0, catapult: 0, bombard: 0 };
@@ -1507,7 +1511,7 @@ export class BattleGame {
       }
     }
 
-    if (this.siege) {
+    if (this.siege && !(this.ctx?.isThreeBattle && this.ctx?.siegeReady)) {
       for (const q of this.siege.structures) {
         const height = q.hp > 0 ? 1 + 3 * q.hp / q.max : 0.35;
         instance(obj, q.x, height / 2, q.z, q.id === 'gate' ? 9 : 5, height, 3, q.hp > 0 ? C.stone : C.earth);
@@ -1640,7 +1644,9 @@ export class BattleGame {
       }
     }
 
-    const vp = this.ctx.render(obj, this.getCamera(), this.groups, this.elapsed, { terrainType: this.terrainType, terrainGrid: this.terrainGrid });
+    const vp = this.ctx.isThreeBattle
+      ? this.ctx.render(obj, this.getCamera(), this.groups, this.elapsed, this.siege, this.capitalLayout)
+      : this.ctx.render(obj, this.getCamera(), this.groups, this.elapsed, { terrainType: this.terrainType, terrainGrid: this.terrainGrid });
     if (this.scenery && vp) this.scenery.render(vp, this.sceneryPlacements);
     this.renderOverlay();
   }

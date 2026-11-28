@@ -14,7 +14,8 @@ fs.mkdirSync(WWW, { recursive: true });
 
 const topFiles = [
  'index.html', 'styles.css', 'manifest.webmanifest', 'sw.js', 'LICENSE',
- 'docs/HISTORICAL_CONTEXT.md', 'docs/COMMERCIAL_LICENSING.md', 'docs/HOMETOWN.md'
+ 'docs/HISTORICAL_CONTEXT.md', 'docs/COMMERCIAL_LICENSING.md', 'docs/HOMETOWN.md',
+ 'docs/production/ASSET_LICENSE_REGISTER.md'
 ];
 
 const copyDirs = [

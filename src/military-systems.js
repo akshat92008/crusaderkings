@@ -608,13 +608,49 @@ export function tickMilitary(g,world){
 }
 
 // Tactical gate and tower objectives are separate from render assets.
-export function createSiegeState(fortLevel,defenseMode=false){
+export function createSiegeState(fortLevel,defenseMode=false,capitalMeta=null){
  const level=cap(Number(fortLevel)||0,0,3);
  if(!level)return null;
- const hp=80+level*65;
- return {level,assaultSide:defenseMode?'defender':'attacker',structures:[{id:'gate',name:'Gate',x:0,z:-18,hp,max:hp},{id:'left',name:'West tower',x:-24,z:-18,hp:hp*.65,max:hp*.65},{id:'right',name:'East tower',x:24,z:-18,hp:hp*.65,max:hp*.65}]};
+ const capitalBonus=capitalMeta?Math.min(60,(Number(capitalMeta.gatehouse)||0)*10+(Number(capitalMeta.watchtower)||0)*6+(Number(capitalMeta.citadel)||0)*14):0;
+ const hp=80+level*65+capitalBonus;
+ return {
+  level,
+  assaultSide:defenseMode?'defender':'attacker',
+  capitalDefense:!!capitalMeta?.isCapital,
+  capitalLevel:Number(capitalMeta?.level)||0,
+  structures:[
+   {id:'gate',name:'Gate',x:0,z:-18,hp,max:hp},
+   {id:'left',name:'West tower',x:-24,z:-18,hp:hp*.65,max:hp*.65},
+   {id:'right',name:'East tower',x:24,z:-18,hp:hp*.65,max:hp*.65}
+  ]
+ };
 }
 export function siegeTarget(siege,g){if(!siege||g.side!==siege.assaultSide)return null;const gate=siege.structures[0];if(gate.hp<=0)return null;const flank=g.x<-15?siege.structures[1]:g.x>15?siege.structures[2]:null;return flank&&flank.hp>0?flank:gate;}
 export function siegeDamage(siege,id,damage){const x=siege?.structures.find(x=>x.id===id);if(!x||x.hp<=0)return false;x.hp=Math.max(0,x.hp-Math.max(0,damage));return x.hp===0;}
 export function siegeBreached(siege){return !siege||siege.structures[0].hp<=0;}
-export function applyFortDamage(g,province,result){const p=g.provinces[province];if(p&&result?.fortBreached&&p.buildings.fort>0)p.buildings.fort--;}
+export function siegeCorridorBreached(siege,x=0){
+ if(!siege||siegeBreached(siege))return true;
+ const left=siege.structures[1],right=siege.structures[2];
+ if(left&&left.hp<=0&&Math.abs(x-left.x)<=7.5)return true;
+ if(right&&right.hp<=0&&Math.abs(x-right.x)<=7.5)return true;
+ return false;
+}
+export function applyFortDamage(g,province,result){
+ const p=g.provinces?.[province];
+ if(p&&result?.fortBreached){
+  if(p.buildings?.fort>0)p.buildings.fort--;
+  const capRow=g.hometown?.buildings?.[province];
+  if(capRow){
+   for(const key of ['gatehouse','watchtower','citadel']){
+    if((capRow[key]||0)>0){capRow[key]--;break;}
+   }
+  }
+  const realmId=Object.keys(g.hometown?.realms||{}).find(r=>g.hometown.realms[r]?.capital===province);
+  const h=realmId&&g.hometown.realms[realmId];
+  if(h){
+   if(!Array.isArray(h.founded))h.founded=[];
+   h.founded.unshift({year:Number(g?.year||1450),text:`Ramparts breached at ${province}; defenses sustained siege damage.`});
+   if(h.founded.length>16)h.founded.length=16;
+  }
+ }
+}

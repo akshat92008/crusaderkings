@@ -107,8 +107,8 @@ export class ThreeBattleScene {
    const inst=new THREE.InstancedMesh(make(),new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide}),9000);
    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);inst.frustumCulled=false;inst.count=0;this.scene.add(inst);this.batches[kind]=inst;
   }
-  this.groups=new Map();this.templates={};this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
-  this.environment=buildMedievalBattlefield(this.scene,config);if(config.fieldBattle){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}
+  this.groups=new Map();this.templates={};this.siegeTemplates={};this.siegeProps=null;this.siegeReady=false;this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
+  this.environment=buildMedievalBattlefield(this.scene,config);if(config.fieldBattle||config.siegeMode){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}
   this.prepareCharacters();
  }
  async prepareCharacters(){
@@ -143,7 +143,7 @@ export class ThreeBattleScene {
       const loaded=await Promise.allSettled([...uniquePaths.keys()].map(p=>loader.loadAsync(p)));
       if(this.disposed)return;
       let idx=0;
-      for(const [p,info] of uniquePaths.entries()){
+      for(const [,info] of uniquePaths.entries()){
        const r=loaded[idx++];
        if(r.status==='fulfilled'){
         const val={...r.value,_mountedModel:!!info.entry.mounted,_assetId:info.entry.assetId};
@@ -151,6 +151,24 @@ export class ThreeBattleScene {
        }
       }
      }
+     const defFam=regionalFamilyForRealm(this.regionalRealms.defender);
+     const atkFam=regionalFamilyForRealm(this.regionalRealms.attacker);
+     const siegeKeys=[
+      ['gate',[manifest?.families?.[defFam]?.roles?.siege_gate?.path,manifest?.families?.europe?.roles?.siege_gate?.path,'assets/battle/kenney/gate.glb']],
+      ['wall',[manifest?.families?.[defFam]?.roles?.siege_wall?.path,manifest?.families?.europe?.roles?.siege_wall?.path,'assets/battle/kenney/wall.glb']],
+      ['tower',[manifest?.families?.[defFam]?.roles?.siege_tower?.path,manifest?.families?.europe?.roles?.siege_tower?.path,'assets/battle/kenney/tower-square-base.glb']],
+      ['ram',[manifest?.families?.[atkFam]?.roles?.siege_ram?.path,manifest?.families?.europe?.roles?.siege_ram?.path,'assets/battle/kenney/siege-catapult.glb']],
+      ['catapult',[manifest?.families?.[atkFam]?.roles?.siege_catapult?.path,manifest?.families?.europe?.roles?.siege_catapult?.path,'assets/battle/kenney/siege-catapult.glb']]
+     ];
+     await Promise.all(siegeKeys.map(async([key,paths])=>{
+      for(const p of paths.filter(Boolean)){
+       try{
+        const res=await loader.loadAsync(p);
+        if(!this.disposed&&res?.scene){this.siegeTemplates[key]=res;break;}
+       }catch{}
+      }
+     }));
+     this.siegeReady=Boolean(this.siegeTemplates.gate||this.siegeTemplates.wall||this.siegeTemplates.tower);
     }
    }catch(e){console.warn('0 A.D. manifest load fallback:',e);}
    if(Object.values(this.regionalRealms).includes('ashikaga')){const optional=await Promise.allSettled([loader.loadAsync('assets/characters_3d/ashigaru-foot-soldier-806707.glb'),loader.loadAsync('assets/characters_3d/daimyo-lord-78364a.glb')]);if(this.disposed)return;for(const [i,key] of ['ashigaru','daimyo'].entries())if(optional[i].status==='fulfilled')this.templates[key]=optional[i].value;}
@@ -243,7 +261,7 @@ export class ThreeBattleScene {
    }
   }
  }
- render(objects,camera,groups,elapsed){
+ render(objects,camera,groups,elapsed,siege=null,capitalLayout=null){
   if(this.disposed)return null;
   const w=Math.max(this.canvas.clientWidth,1),h=Math.max(this.canvas.clientHeight,1),dpr=Math.min(window.devicePixelRatio||1,1.5);
   this.renderer.setPixelRatio(dpr);this.renderer.setSize(w,h,false);
@@ -263,14 +281,92 @@ export class ThreeBattleScene {
   }
   let dt=elapsed-this.lastRenderTime;this.lastRenderTime=elapsed;
   this.updateCharacters(groups,cap(dt,0,.05));
+  this.updateSiegeVisuals(siege,capitalLayout,groups,elapsed);
   this.environment?.update(elapsed);
   this.renderer.render(this.scene,this.camera);
   return null;
+ }
+ updateSiegeVisuals(siege,capitalLayout,groups,elapsed){
+  if(!siege||!this.siegeReady||this.disposed)return;
+  if(!this.siegeProps){
+   const g=new THREE.Group();g.name='3D Siege Fortifications';this.scene.add(g);
+   const fitMesh=(tpl,targetH,x,z,rotY=0)=>{
+    if(!tpl?.scene)return null;
+    const node=tpl.scene.clone(true);
+    const box=new THREE.Box3().setFromObject(node);
+    const h=Math.max(0.1,box.max.y-box.min.y);
+    const s=targetH/h;
+    node.scale.setScalar(s);
+    node.position.set(x,-box.min.y*s,z);
+    node.rotation.y=rotY;
+    g.add(node);
+    return {node,baseY:-box.min.y*s,baseScale:s};
+   };
+   const structures=new Map();
+   for(const st of siege.structures||[]){
+    const tpl=st.id==='gate'?this.siegeTemplates.gate||this.siegeTemplates.wall:this.siegeTemplates.tower||this.siegeTemplates.wall;
+    const targetH=st.id==='gate'?9.2:10.8;
+    const item=fitMesh(tpl,targetH,st.x,st.z,0);
+    if(item)structures.set(st.id,item);
+   }
+   for(const wx of [-36,-13,13,36]){
+    fitMesh(this.siegeTemplates.wall||this.siegeTemplates.tower,6.8,wx,-18,0);
+   }
+   const engines=[];
+   const atkEng=siege.assaultSide==='defender'?siege.defenderEngines:siege.attackerEngines;
+   const ramCount=Math.min(2,atkEng?.ram||0);
+   for(let i=0;i<ramCount;i++){
+    const item=fitMesh(this.siegeTemplates.ram,3.2,(i-0.5)*11+(ramCount===1?5.5:0),6,Math.PI);
+    if(item)engines.push({kind:'ram',item});
+   }
+   const catCount=Math.min(2,(atkEng?.catapult||0)+(atkEng?.bombard||0));
+   for(let i=0;i<catCount;i++){
+    const item=fitMesh(this.siegeTemplates.catapult,3.4,i===0?-16:16,14,Math.PI);
+    if(item)engines.push({kind:'catapult',item});
+   }
+   // Represent defender's real Hometown buildings behind the rampart.
+   if(capitalLayout?.buildings?.length){
+    for(const b of capitalLayout.buildings.slice(0,18)){
+     const isDef=b.effect==='defense'||b.key==='citadel'||b.key==='fort';
+     const tpl=isDef?(this.siegeTemplates.tower||this.siegeTemplates.wall):this.siegeTemplates.wall;
+     const h=isDef?7.5:4.2+Math.min(3,b.level*.3);
+     fitMesh(tpl,h,cap(b.x,-34,34),cap(b.z,-62,-27),0);
+    }
+   }
+   this.siegeProps={group:g,structures,engines};
+  }
+  for(const st of siege.structures||[]){
+   const item=this.siegeProps.structures.get(st.id);
+   if(!item)continue;
+   const ratio=st.max>0?cap(st.hp/st.max,0,1):0;
+   if(ratio<=0){
+    // Collapse tower / sink gate leaves so the breach gap is visibly passable.
+    item.node.scale.set(item.baseScale,item.baseScale*0.18,item.baseScale);
+    item.node.position.y=item.baseY-0.55;
+    item.node.rotation.z=st.id==='gate'?0:(st.id==='left'?-0.22:0.22);
+   }else{
+    item.node.scale.set(item.baseScale,item.baseScale*(0.55+0.45*ratio),item.baseScale);
+    item.node.position.y=item.baseY;
+    item.node.rotation.z=0;
+   }
+  }
+  const breached=siege.structures?.[0]?.hp<=0;
+  for(const eng of this.siegeProps.engines){
+   if(eng.kind==='ram'){
+    const targetZ=breached?-22:-13.5;
+    const front=(groups||[]).filter(u=>u.side===siege.assaultSide&&!u.routed).sort((a,b)=>a.z-b.z)[0];
+    const desired=front?cap(front.z-1.5,targetZ,8):-8;
+    eng.item.node.position.z+=(desired-eng.item.node.position.z)*0.08;
+   }else{
+    eng.item.node.position.y=eng.item.baseY+Math.abs(Math.sin(elapsed*1.8))*0.08;
+   }
+  }
  }
  dispose(){
   this.disposed=true;disposeFieldMaterials(this);
   for(const units of this.groups.values())for(const u of units){u.mixer.stopAllAction();this.scene.remove(u.root);}
   this.groups.clear();this.mixers.length=0;
+  if(this.siegeProps?.group){this.scene.remove(this.siegeProps.group);this.siegeProps=null;}
   this.environment?.dispose();
   for(const m of Object.values(this.batches)){m.geometry.dispose();m.material.dispose();this.scene.remove(m);}
   this.renderer.dispose();

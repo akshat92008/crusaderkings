@@ -6,3 +6,5 @@ __pycache__/
 *.log
 *.tmp
 .env
+assets/packs/City_Builder_Village_Buildings_part_*.zip
+assets/packs/Foozle_2DS0008_Isometric_Gold_Mine_1.zip

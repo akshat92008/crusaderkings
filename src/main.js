@@ -21,7 +21,7 @@ import {exportModTemplate,applyModPack,removeModPack} from './mod-loader.js';
 import {renderModStudio} from './mod-ui.js';
 import {renderCrownDispatch} from './dispatch-ui.js';
 import {workspaceFor,workspaceTab,realmPriorities,searchRealms} from './campaign-navigation.js';
-import {currentExpandedEvents,currentEmergentEvent,expandedAction} from './expanded-content.js';
+import {currentExpandedEvents,currentEmergentEvent,expandedAction,classifyEventTier,featuredStartsCatalog} from './expanded-content.js';
 import {buildHistoricalWorld,expandHistoricalWorld,densifyHistoricalWorld,worldForSave,capitalDistrict,realmGeography} from './historical-world.js';
 import {populateGlobalKingdoms} from './world-kingdoms-1450.js';
 import {livingAction} from './living-systems.js';
@@ -31,7 +31,7 @@ import {intrigueAction} from './intrigue-systems.js';
 import {campaignWorld} from './independence-systems.js';
 import {identityAction} from './identity-systems.js';
 import {feudalAction} from './feudal-systems.js';
-import {renderCountySubholdings} from './subholdings.js';
+import {renderCountySubholdings,syncSubholdingSeats} from './subholdings.js';
 import {chronicleAction} from './chronicle-systems.js';
 import {strategyAction,defenseSupport} from './strategic-ai.js';
 import {dlcAction} from './ck2-dlc-systems.js';
@@ -89,7 +89,8 @@ const activeObjectUrls=new Set();
 function revokeObjectUrls(){for(const u of activeObjectUrls){try{URL.revokeObjectURL(u);}catch{}}activeObjectUrls.clear();}
 function exportSave(){if(!game||battle)return;const blob=new Blob([snapshot(game)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');activeObjectUrls.add(url);a.href=url;a.download=saveFilename(game);document.body.append(a);a.click();a.remove();setTimeout(()=>{if(activeObjectUrls.delete(url))try{URL.revokeObjectURL(url);}catch{}},1000);message('Campaign backup exported.');}
 function closePopover(){const pop=el('map-popover');if(pop){pop.hidden=true;pop.innerHTML='';}}
-function hideTooltip(){const tip=el('ui-tooltip');if(tip)tip.hidden=true;}
+const tooltipState={target:null,locked:false,level:1,x:0,y:0};
+function hideTooltip(force=false){if(tooltipState.locked&&!force)return;tooltipState.locked=false;tooltipState.target=null;const tip=el('ui-tooltip');if(tip){tip.hidden=true;tip.classList.remove('locked');}}
 function updateMapLegend(){
  const legendEl=el('map-legend-overlay');if(!legendEl)return;
  const show=game&&(map.mode!=='political'||!el('map-modes')?.hidden);
@@ -136,12 +137,12 @@ map.onContextMenu=(id,x,y)=>openQuickPopover('province',id,x,y);
 function setDrawer(next){closePopover();hideTooltip();const open=next==='management'||next==='province';document.querySelector('.map-options').open=false;el('management-panel').hidden=next!=='management';el('province-drawer').hidden=next!=='province';el('panel-scrim').hidden=!open;el('open-management').setAttribute('aria-expanded',String(next==='management'));el('open-province').setAttribute('aria-expanded',String(next==='province'));}
 function cancelMarch(){marchFrom=null;map.setMarchOrigin(null);el('cancel-march').hidden=true;el('map-target-help').textContent='Tap a province to inspect';}
 function onProvince(id){if(!game)return;if(marchFrom){let r=startMarch(game,world,marchFrom,id);cancelMarch();if(r.ok&&r.type==='battle'){if(openBattle(r))return;message('Could not open battle. No campaign casualties were applied.');return;}clickResult(r);}
- selected=id;map.select(id);renderInspector();setDrawer('province');}
+ selected=id;map.select(id);if(map.mode==='diplomacy'||map.mode==='opinion')updateMapLegend();renderInspector();setDrawer('province');}
 function render(){if(!game)return;const f=player(),s=empireStats(game,game.player),career=careerView(game);
  const goldTip=career?`Personal wealth ${fmt(career.person?.wealth||0)}g · estate funds shown in career panel`:formatTreasuryTooltip(f,s);
- const goldPill=el('resource-gold')?.closest('.resource');if(goldPill){goldPill.dataset.tooltip=goldTip;goldPill.title=goldTip;}
- const stabPill=el('resource-stability')?.closest('.resource');if(stabPill)stabPill.dataset.tooltip=formatStabilityTooltip(f,s);
- const armyPill=el('resource-army')?.closest('.resource');if(armyPill)armyPill.dataset.tooltip=`Total soldiers across ${fmt(s.provinces)} provinces: ${fmt(s.troops)}`;
+ const goldPill=el('resource-gold')?.closest('.resource');if(goldPill){goldPill.dataset.tooltip=goldTip;goldPill.dataset.tooltipDetail=`Tax +${fmt(s.taxIncome||0)}g · Trade +${fmt((s.trade||0)+(s.tradePosts||0))}g · Upkeep −${fmt(s.upkeep||0)}g`;goldPill.dataset.tooltipRule='Royal treasury funds buildings, armies, council missions, and diplomacy. Negative treasury erodes stability & legitimacy.';goldPill.title=goldTip;}
+ const stabPill=el('resource-stability')?.closest('.resource');if(stabPill){stabPill.dataset.tooltip=formatStabilityTooltip(f,s);stabPill.dataset.tooltipDetail=`Food ${fmt(f.food)} (${s.foodDelta>=0?'+':''}${fmt(s.foodDelta)}/mo) · Avg realm order & unrest`;stabPill.dataset.tooltipRule='Stability below 45 fuels pretender/independence factions and lowers provincial levy compliance.';}
+ const armyPill=el('resource-army')?.closest('.resource');if(armyPill){armyPill.dataset.tooltip=`Total soldiers across ${fmt(s.provinces)} provinces: ${fmt(s.troops)}`;armyPill.dataset.tooltipDetail=`Provincial districts ${fmt(s.provinces)} · Monthly upkeep ${fmt(s.upkeep)}g · Food −${fmt(s.foodUpkeep)}/mo`;armyPill.dataset.tooltipRule='Only armies stationed in the target/adjacent district join an assault. Appoint marshals to boost combat power & morale.';}
  el('resource-prestige').textContent=fmt(f.prestige||0);el('resource-legitimacy').textContent=fmt(f.legitimacy||0)+'%';el('resource-gold').textContent=fmt(career?career.person?.wealth||0:f.treasury)+' ◈';el('resource-army').textContent=fmt(s.troops);el('resource-stability').textContent=fmt(f.stability)+'%';el('date-display').textContent=`${MONTHS[game.month].toUpperCase()} ${game.year}`;
  const ruler=career?career.person:game.politics?.people?.[game.politics?.realms?.[game.player]?.ruler],mark=portraitMark(ruler);el('hud-ruler').hidden=!ruler;el('hud-ruler-name').textContent=(ruler?.name||'—')+(ruler&&personalDilemmas(game,ruler.id).length?' · !':'');const succWarn=career?null:successionWarningSummary(game);const warnEl=el('hud-succession-warning');if(warnEl){warnEl.hidden=!succWarn;warnEl.textContent=succWarn?'⚠ '+succWarn.label:'';warnEl.title=succWarn?.detail||'';}el('hud-portrait').innerHTML=(portraitImage(ruler)||esc(mark.initials)).replace('loading="lazy"','loading="eager"');el('hud-portrait').style.background=mark.color;el('quick-nav').hidden=false;el('open-management').textContent=career?'Manage career':'Manage kingdom';for(const b of el('quick-nav').querySelectorAll('[data-priority-tab]'))b.hidden=!!career&&!CAREER_TABS.includes(b.dataset.priorityTab);const outliner=campaignOutliner(game,world);el('outliner-count').textContent=outliner.count;el('outliner-list').innerHTML=renderCampaignOutliner(outliner,esc);el('faction-name').textContent=f.name;el('faction-government').textContent=career?'Vassal career':f.government;
  el('faction-flag').style.background=f.color;el('faction-flag').innerHTML=(assetImage(realmArt(f.id),'realm-emblem')||'♛').replace('loading="lazy"','loading="eager"');
@@ -212,11 +213,15 @@ function renderTab(){if(!game)return;const career=vassalCareer(game);el('workspa
 }
 function renderInspector(){if(!game)return;if(vassalCareer(game)){el('province-panel').innerHTML=renderCareerProvince(game,campaignWorld(game,world),selected,esc);return;}let p=staticById[selected],state=game.provinces[selected];if(!p||!state){el('province-panel').innerHTML='<div class="emptyselection"><div class="emptycrest">♜</div><h2>THE KING\'S ATLAS</h2><p>Select any province to inspect its holdings.</p></div>';return;}
  const own=state.owner===game.player&&controller(game,selected)===game.player,owner=game.factions[state.owner],a=armiesAt(game,selected,state.owner),yourArmies=armiesAt(game,selected,game.player).filter(a=>armySize(a)>0).sort((a,b)=>armySize(b)-armySize(a)),yourArmy=yourArmies[0],localTroops=yourArmies.reduce((n,a)=>n+armySize(a),0);const total=a.reduce((s,q)=>s+armySize(q),0);
- let text=`<div class="inspector"><span class="eyebrow">PROVINCE CHANCERY · ${esc(p.continent.toUpperCase())}</span><h2>${esc(displayProvince(p))}</h2>${renderPinButton(game,'province',selected,esc)}<button class="rowbtn" data-quick-province="${esc(selected)}">Quick actions ▾</button><div class="owner"><span class="swatch" style="background:${esc(owner?.color||'#667670')}"></span>${esc(owner?.name||'Independent Polities')} ${own?'<span style="color:#e4ca83"> · YOUR REALM</span>':''}</div><div class="province-hero">${p.terrain==='forest'?'♣':p.terrain==='highlands'?'▲':'♜'}<span>${esc(p.terrain.toUpperCase())} · ${p.centroid[0].toFixed(1)}°, ${p.centroid[1].toFixed(1)}°</span></div><div class="province-facts"><div class="fact" data-tooltip="Provincial population drives tax and levies"><label>POPULATION</label><b>${fmt(state.population)}k</b></div><div class="fact" data-tooltip="Development boosts local output and garrison"><label>DEVELOPMENT</label><b>LV. ${fmt(state.development)}</b></div><div class="fact" data-tooltip="High unrest risks local revolt and factions"><label>UNREST</label><b style="color:${state.unrest>55?'#e1a194':'#aed2af'}">${fmt(state.unrest)}%</b></div><div class="fact" data-tooltip="Stationed regiments plus fort garrison"><label>GARRISON & ARMY</label><b>${fmt(total||45+state.development*12)}</b></div></div>`;
+ const holdingRec=game.politics?.holdings?.[selected],subSeats=holdingRec?syncSubholdingSeats(game,selected):[];
+ const builtSubCount=subSeats.filter(s=>s.level>0).length,baronCount=subSeats.filter(s=>s.level>0&&s.holder&&s.holder!==holdingRec?.lord).length;
+ let text=`<div class="inspector"><span class="eyebrow">PROVINCE CHANCERY · ${esc(p.continent.toUpperCase())}</span><h2>${esc(displayProvince(p))}</h2>${renderPinButton(game,'province',selected,esc)}<button class="rowbtn" data-quick-province="${esc(selected)}">Quick actions ▾</button><div class="owner"><span class="swatch" style="background:${esc(owner?.color||'#667670')}"></span>${esc(owner?.name||'Independent Polities')} ${own?'<span style="color:#e4ca83"> · YOUR REALM</span>':''}</div><div class="province-hero">${p.terrain==='forest'?'♣':p.terrain==='highlands'?'▲':'♜'}<span>${esc(p.terrain.toUpperCase())} · ${p.centroid[0].toFixed(1)}°, ${p.centroid[1].toFixed(1)}°${holdingRec?' · ⚑ '+baronCount+'/'+builtSubCount+' BARONS':''}</span></div><div class="province-facts"><div class="fact" data-tooltip="Provincial population drives tax and levies"><label>POPULATION</label><b>${fmt(state.population)}k</b></div><div class="fact" data-tooltip="Development boosts local output and garrison"><label>DEVELOPMENT</label><b>LV. ${fmt(state.development)}</b></div><div class="fact" data-tooltip="High unrest risks local revolt and factions"><label>UNREST</label><b style="color:${state.unrest>55?'#e1a194':'#aed2af'}">${fmt(state.unrest)}%</b></div><div class="fact" data-tooltip="Stationed regiments plus fort garrison"><label>GARRISON & ARMY</label><b>${fmt(total||45+state.development*12)}</b></div></div>`;
  const guests=fieldContingentsAt(game,game.player,selected);
  if(guests.length)text+='<div class="rule"><b>Allied contingents</b>'+guests.map(a=>'<p class="smallnote">'+esc(ownerName(game,a.owner))+' · '+fmt(armySize(a))+' troops</p>').join('')+'</div>';
  const occupied=occupation(game,selected);if(occupied)text+='<div class="rule"><b>OCCUPIED BY '+esc(ownerName(game,occupied.by))+'</b><p class="paragraph">Legal ownership remains with '+esc(ownerName(game,state.owner))+'.</p>'+(occupied.by===game.player&&yourArmy?'<button class="rowbtn" data-action="march">March from occupied territory</button>':'')+'</div>';if(game.naval?.ports[selected])text+='<div class="rule"><b>PORT '+(portBlocked(game,selected)?'· BLOCKADED':'')+'</b></div>';
- text+='<details class="province-section" data-section="lord"><summary>Local lord & vassal contract</summary>'+renderProvinceLord(game,world,selected,esc)+'</details><details class="province-section" data-section="subholdings"><summary>County sub-holdings (Castle · City · Temple)</summary>'+renderCountySubholdings(game,selected,esc,'feudal')+'</details><details class="province-section" data-section="connections"><summary>Economy, titles & claims</summary>'+renderProvinceConnections(game,world,selected,esc)+'</details>';const local=game.civic?.provinces[selected];
+ const subOpen=state.owner===game.player?' open':'';
+ const subLabel=holdingRec?`Baronies & Baron Control (${baronCount}/${builtSubCount} delegated · C${subSeats[0]?.level||0} · Ci${subSeats[1]?.level||0} · T${subSeats[2]?.level||0})`:'County sub-holdings (Castle · City · Temple)';
+ text+='<details class="province-section" data-section="lord"><summary>Local lord & vassal contract</summary>'+renderProvinceLord(game,world,selected,esc)+'</details><details class="province-section" data-section="subholdings"'+subOpen+'><summary>'+esc(subLabel)+'</summary>'+renderCountySubholdings(game,selected,esc,'feudal')+'</details><details class="province-section" data-section="connections"><summary>Economy, titles & claims</summary>'+renderProvinceConnections(game,world,selected,esc)+'</details>';const local=game.civic?.provinces[selected];
  if(own){const recruitButtons=['infantry','archers','cavalry'].map(t=>{const q=recruitmentQuote(game,selected,t);return '<button data-action="recruit" data-type="'+t+'" '+(!q.available||player().treasury<q.cost?'disabled':'')+'>'+t.charAt(0).toUpperCase()+t.slice(1)+'<small>'+esc(q.available?fmt(q.count)+' troops · '+fmt(q.cost)+' gold':q.reason)+'</small></button>';}).join('');
  text+=`<p class="paragraph">${yourArmy?`${fmt(localTroops)} troops stationed here · ${yourArmies.length} armies. All local troops march together.`:'No army stationed here.'}</p><button class="btnblock" data-action="march" ${!yourArmy||localTroops<20?'disabled':''}>Move or attack</button>${yourArmy?'<details class="province-section" data-section="command" open><summary>Army & commander</summary>'+yourArmies.map(a=>'<div class="rule"><b>'+fmt(armySize(a))+' troops</b>'+renderArmyCommand(game,a,esc,'province')+'</div>').join('')+'</details>':''}<details class="province-section" data-section="recruit"><summary>Recruit troops</summary><div class="building-grid">${recruitButtons}</div></details><details class="province-section" data-section="build"><summary>Improve province</summary><div class="building-grid">${Object.entries(BUILDINGS).map(([kind,b])=>{const level=state.buildings[kind],cost=Math.round(b.cost*(level+1)*civicModifiers(game,game.player).build*economyModifiers(game,game.player).cost),quote=homeRealm(game)?homeQuote(game,world,'building',kind,selected):null;return '<button data-action="build" data-type="'+kind+'" '+((quote?!quote.ok:level>=homeMax(game)||player().treasury<cost)?'disabled':'')+'>'+esc(b.icon)+' '+esc(b.name)+'<small>Level '+level+' / '+homeMax(game)+' · '+esc(quote?(quote.ok?quote.price.gold+' gold + materials · '+quote.months+' months':quote.msg):level>=homeMax(game)?'Complete':fmt(cost)+' gold')+'</small></button>';}).join('')}</div></details>`;
  }else{
@@ -228,7 +233,7 @@ function renderInspector(){if(!game)return;if(vassalCareer(game)){el('province-p
   text+='<button class="btnblock secondary" data-action="show-diplomacy" data-target="'+esc(state.owner)+'">✦ DIPLOMATIC OPTIONS</button>';
  }
  text+=`<details class="province-section" data-section="details"><summary>Province details</summary>${local?'<div class="rule"><b>'+esc(local.culture)+'</b><p class="paragraph">'+esc(local.faith)+' · '+fmt(local.acceptance)+'% acceptance</p></div>':''}<div class="sectiontitle">ADJACENT PROVINCES</div><p class="paragraph">${p.neighbors.length} connected land provinces. ${p.neighbors.filter(n=>game.provinces[n].owner!==state.owner).length} under foreign control.${p.landComponentSize===1?' No land route: use an available naval route where possible.':p.landComponentSize?' Land network: '+p.landComponentSize+' districts.':''}</p><div class="divider"></div><p class="paragraph">${p.ownershipSource?`Starting ownership: ${esc(p.ownershipSource)}.${p.historicalPolity?' Reference polity: '+esc(p.historicalPolity)+'.':''}${p.referenceInherited?' Inherited from the parent gameplay district.':''}${Number.isFinite(p.referenceSamples)&&p.referenceSamples>0&&p.historicalPolity?' Sample agreement: '+p.referenceMatches+'/'+p.referenceSamples+' points.':''} `:''}${p.nameSource?' Geographic name, not a historical county title.':''} Gameplay districts are approximate, not verified historical counties.</p></details></div>`;
- const panel=el('province-panel'),sameProvince=panel.dataset.province===selected,hadCommand=!!panel.querySelector('[data-section="command"]'),open=sameProvince?[...panel.querySelectorAll('details[open]')].map(d=>d.dataset.section):[];panel.dataset.province=selected;panel.innerHTML=text;for(const d of panel.querySelectorAll('details'))d.open=open.includes(d.dataset.section)||d.dataset.section==='command'&&(!sameProvince||!hadCommand);
+ const panel=el('province-panel'),sameProvince=panel.dataset.province===selected,hadCommand=!!panel.querySelector('[data-section="command"]'),open=sameProvince?[...panel.querySelectorAll('details[open]')].map(d=>d.dataset.section):[];panel.dataset.province=selected;panel.innerHTML=text;for(const d of panel.querySelectorAll('details'))d.open=open.includes(d.dataset.section)||(d.dataset.section==='command'&&(!sameProvince||!hadCommand))||(!sameProvince&&state.owner===game.player&&d.dataset.section==='subholdings');
 }
 let campaignSound=true;try{const saved=localStorage.getItem('crown-of-nations.audio-enabled.v2');if(saved!==null)campaignSound=saved!=='off';}catch{}
 let battleSound=campaignSound;
@@ -272,7 +277,7 @@ function collectEventPrompts(){
  if(em)out.push({key:'emergent:'+em.id,badge:em.category||'EMERGENT EVENT',title:em.title,desc:em.description,imgKey:em.id,choices:(em.choices||[]).map((c,i)=>({label:c.label+(c.cost?' ('+c.cost+'g)':''),kind:'emergent',id:em.id+':'+i,chips:effectChips(c.effects,c.cost||0),ready:player().treasury>=(c.cost||0)}))});
  for(const x of currentExpandedEvents(game,game.player)){
   if(game.turn<(x.availableAt??x.started))continue;
-  out.push({key:'expanded:'+x.id+':'+x.started,badge:x.category||'REALM EVENT',title:x.title,desc:x.description,imgKey:x.id,actor:x.target?.person||x.target?.actor,choices:(x.choices||[]).map((c,i)=>({label:c.label+(c.cost?' ('+c.cost+'g)':''),kind:'expanded',id:x.id+':'+i,chips:effectChips(c.effects,c.cost||0),ready:player().treasury>=(c.cost||0)}))});
+  out.push({key:'expanded:'+x.id+':'+x.started,badge:x.category||'REALM EVENT',tier:x.tier||classifyEventTier(x),title:x.title,desc:x.description,imgKey:x.id,actor:x.target?.person||x.target?.actor,choices:(x.choices||[]).map((c,i)=>({label:c.label+(c.cost?' ('+c.cost+'g)':''),kind:'expanded',id:x.id+':'+i,chips:effectChips(c.effects,c.cost||0),ready:player().treasury>=(c.cost||0)}))});
  }
  const ce=civicEvent(game);
  if(ce)out.push({key:'civic:'+ce.id,badge:'SOCIETY DISPATCH',title:ce.title,desc:ce.description,imgKey:ce.id,choices:(ce.choices||[]).map((c,i)=>({label:c.label+(c.cost?' ('+c.cost+'g)':''),kind:'civic',id:String(i),chips:effectChips(c,c.cost||0),ready:player().treasury>=(c.cost||0)}))});
@@ -307,6 +312,11 @@ function maybePopupEventModal(prevKeys=new Set()){
  const active=collectEventPrompts();
  const fresh=active.find(e=>!deferredModalEvents.has(e.key)&&!prevKeys.has(e.key)&&(game.turn>=2||e.kind==='royal'));
  if(!fresh)return;
+ if(fresh.tier==='chronicle'&&fresh.key.startsWith('expanded:')){
+  deferredModalEvents.add(fresh.key);
+  message('Chronicle: '+fresh.title+' (open Stories tab to weigh in)');
+  return;
+ }
  if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}
  renderEventModal(fresh);
 }
@@ -389,9 +399,10 @@ function advanceWithInvasions(){
 }
 // Bind controls once. Rebuilt content uses delegated events.
 el('start-world-count').textContent=atlasWorld.factions.length+' REALMS · '+atlasWorld.provinces.length+' DISTRICTS';
-function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value);el('start-new').disabled=!f;if(!f){el('start-faction-info').textContent='No matching kingdoms. Try another name or region.';return;}const d=militaryDoctrine(f),count=atlasWorld.provinces.filter(p=>p.owner===f.id).length;const history=historicalContext(f.id);el('start-faction-info').innerHTML=assetImage(realmArt(f.id),'realm-emblem start-emblem')+esc(f.continent+' · '+count+' districts · '+d.name+(history?' · '+history.context:''));}
+function renderStartFaction(){const f=atlasWorld.factions.find(f=>f.id===el('start-faction').value);el('start-new').disabled=!f;const featWrap=el('featured-starts');if(featWrap){const cur=el('start-faction').value;featWrap.innerHTML=featuredStartsCatalog().map(s=>`<button type="button" class="featured-start-btn${cur===s.id?' active':''}" data-pick-realm="${esc(s.id)}" title="${esc(s.difficulty)}">${esc(s.id==='vijayanagara'?'★ Vijayanagara (Flagship)':s.title.split(' of ').pop())}</button>`).join('');}if(!f){el('start-faction-info').textContent='No matching kingdoms. Try another name or region.';return;}const d=militaryDoctrine(f),count=atlasWorld.provinces.filter(p=>p.owner===f.id).length;const history=historicalContext(f.id);const feat=featuredStartsCatalog().find(x=>x.id===f.id);el('start-faction-info').innerHTML=assetImage(realmArt(f.id),'realm-emblem start-emblem')+esc((feat?`[${feat.difficulty}] ${feat.summary} · `:'')+f.continent+' · '+count+' districts · '+d.name+(history?' · '+history.context:''));}
 function filterStartRealms(preferred=el('start-faction').value){const list=searchRealms(atlasWorld.factions,el('realm-search').value);el('start-faction').innerHTML=list.map(f=>`<option value="${esc(f.id)}">${esc(f.name)} — ${esc(f.continent)}</option>`).join('');if(list.some(f=>f.id===preferred))el('start-faction').value=preferred;renderStartFaction();}
-el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-faction').addEventListener('change',renderStartFaction);filterStartRealms('ottomans');
+el('featured-starts')?.addEventListener('click',e=>{const b=e.target.closest('[data-pick-realm]');if(!b)return;el('realm-search').value='';filterStartRealms(b.dataset.pickRealm);});
+el('realm-search').addEventListener('input',()=>filterStartRealms());el('start-faction').addEventListener('change',renderStartFaction);filterStartRealms('vijayanagara');
 el('start-new').addEventListener('click',()=>{if(atlasWorld.factions.some(f=>f.id===el('start-faction').value))start(el('start-faction').value);});
 try{if(readBestLocalSave(localStorage))el('load-existing').hidden=false;}catch{}
 loadCampaignDurable({storage:localStorage}).then(res=>{if(res?.raw&&el('load-existing'))el('load-existing').hidden=false;}).catch(()=>{});
@@ -415,7 +426,9 @@ el('atlas-expand').addEventListener('click',()=>{
  setDrawer(null);el('atlas-expand').closest('details')?.removeAttribute('open');map.resize();
 });
 el('toggle-relief').addEventListener('click',()=>{map.setRelief(!map.useRelief);el('toggle-relief').textContent=map.useRelief?'◈ 3D ON':'▤ 3D OFF';el('toggle-relief').setAttribute('aria-pressed',String(map.useRelief));});
-el('map-modes').addEventListener('click',e=>{const button=e.target.closest('[data-mapmode]');if(!button)return;const mode=button.dataset.mapmode;map.setMode(mode);el('mapmode').textContent=mode==='historical'?'1450 REFERENCE':mode==='dejure'?'DE JURE':mode.toUpperCase();for(const b of el('map-modes').querySelectorAll('[data-mapmode]')){const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}updateMapLegend();if(mode==='historical')message('Reference map: 1450 borders prioritize balanced campaign districts.');});
+const MAP_MODE_TITLES={political:'POLITICAL',vassals:'VASSALS',diplomacy:'DIPLOMACY',dynasty:'DYNASTIES',dejure:'DE JURE KINGDOMS',duchies:'DE JURE DUCHIES',government:'GOVERNMENTS',opinion:'OPINION',revolt:'REVOLT',economy:'PROSPERITY',control:'BARONS & FORTS',trade:'TRADE & WEALTH',epidemics:'DISEASE',culture:'CULTURE',religion:'RELIGION',terrain:'TERRAIN',historical:'1450 REFERENCE'};
+const toggleMapModeBar=()=>{const m=el('map-modes');m.hidden=!m.hidden;el('show-map-modes')?.setAttribute('aria-expanded',String(!m.hidden));el('mapmode-toggle')?.setAttribute('aria-expanded',String(!m.hidden));const opts=document.querySelector('.map-options');if(opts)opts.open=false;updateMapLegend();};
+el('map-modes').addEventListener('click',e=>{const button=e.target.closest('[data-mapmode]');if(!button)return;const mode=button.dataset.mapmode;map.setMode(mode);el('mapmode').textContent=MAP_MODE_TITLES[mode]||mode.toUpperCase();for(const b of el('map-modes').querySelectorAll('[data-mapmode]')){const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}updateMapLegend();if(mode==='historical')message('Reference map: 1450 borders prioritize balanced campaign districts.');});
 const closeHometown=()=>{el('hometown-screen').hidden=true;};
 el('open-hometown').addEventListener('click',()=>{if(!game||battle)return;const r=openHometown(game,world);if(!r.ok){message(r.msg);return;}if(speedInterval){clearInterval(speedInterval);speedInterval=null;el('auto-time').textContent='▶';}cancelMarch();setDrawer(null);el('hometown-screen').hidden=false;renderHometown(game,world,el('hometown-screen'));save(false);});
 bindHometown(el('hometown-screen'),()=>game,()=>world,message,save,render,closeHometown,advanceWithInvasions);
@@ -424,9 +437,17 @@ el('open-province').addEventListener('click',()=>setDrawer(el('province-drawer')
 el('open-priorities').addEventListener('click',()=>navigateTab('realm'));
 for(const id of ['close-management','close-province','panel-scrim'])el(id).addEventListener('click',()=>setDrawer(null));
 el('cancel-march').addEventListener('click',cancelMarch);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeHometown();closePopover();hideTooltip();if(!battle){setDrawer(null);cancelMarch();}}if(game&&!battle&&e.key==='/'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName)&&!e.target?.isContentEditable){e.preventDefault();navigateTab('search');el('campaign-query')?.focus();}});
-el('show-map-modes').addEventListener('click',()=>{const m=el('map-modes');m.hidden=!m.hidden;el('show-map-modes').setAttribute('aria-expanded',String(!m.hidden));document.querySelector('.map-options').open=false;updateMapLegend();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeHometown();closePopover();hideTooltip(true);if(!battle){setDrawer(null);cancelMarch();}}if((e.key==='t'||e.key==='T')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName)&&tooltipState.target){e.preventDefault();tooltipState.locked=true;tooltipState.level=tooltipState.level>=3?1:tooltipState.level+1;showTooltipFor(tooltipState.target,tooltipState.x,tooltipState.y,tooltipState.level,true);}if(game&&!battle&&e.key==='/'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName)&&!e.target?.isContentEditable){e.preventDefault();navigateTab('search');el('campaign-query')?.focus();}});
+el('show-map-modes').addEventListener('click',toggleMapModeBar);
+el('mapmode-toggle')?.addEventListener('click',toggleMapModeBar);
 document.addEventListener('click',e=>{
+ const tipBtn=e.target.closest?.('[data-tip-action]');
+ if(tipBtn&&tooltipState.target){
+  if(tipBtn.dataset.tipAction==='expand'){tooltipState.locked=true;tooltipState.level=tooltipState.level>=3?1:tooltipState.level+1;showTooltipFor(tooltipState.target,tooltipState.x,tooltipState.y,tooltipState.level,true);}
+  else if(tipBtn.dataset.tipAction==='close'){hideTooltip(true);}
+  return;
+ }
+ if(tooltipState.locked&&!e.target.closest?.('#ui-tooltip')&&!e.target.closest?.('[data-tooltip],[data-tooltip-detail]'))hideTooltip(true);
  const pop=el('map-popover');
  const pbtn=e.target.closest('[data-popover-idx]');
  if(pbtn&&pop?._actions){const act=pop._actions[Number(pbtn.dataset.popoverIdx)];closePopover();act?.fn();return;}
@@ -436,19 +457,27 @@ document.addEventListener('click',e=>{
  if(qc){const r=qc.getBoundingClientRect();openQuickPopover('character',qc.dataset.quickCharacter,r.left,r.bottom+4);return;}
  if(pop&&!pop.hidden&&!e.target.closest('#map-popover'))closePopover();
 });
-const showTooltipFor=(target,x,y)=>{
+const showTooltipFor=(target,x,y,level=tooltipState.locked?tooltipState.level:1,locked=tooltipState.locked)=>{
  const tip=el('ui-tooltip');if(!tip||!target)return;
  let text=target.dataset.tooltip||'';
  if(!text&&target.dataset.character&&game)text=tooltipData(game,world,'character',target.dataset.character);
  if(!text&&target.dataset.provinceLink&&game)text=tooltipData(game,world,'province',target.dataset.provinceLink);
  if(!text){tip.hidden=true;return;}
- tip.textContent=text;tip.hidden=false;
+ tooltipState.target=target;tooltipState.x=x;tooltipState.y=y;tooltipState.level=level;tooltipState.locked=locked;
+ const detail=target.dataset.tooltipDetail||'';
+ const rule=target.dataset.tooltipRule||'';
+ const hasMore=Boolean(detail||rule);
+ let html=`<div class="tip-head"><span>LEVEL ${level}/3${locked?' · LOCKED':''}</span><span>${hasMore?'[T] Expand':'Info'}</span></div><div>${esc(text)}</div>`;
+ if(level>=2&&detail)html+=`<div class="tip-detail"><b>Breakdown:</b> ${esc(detail)}</div>`;
+ if(level>=3&&rule)html+=`<div class="tip-rule"><b>Rule:</b> ${esc(rule)}</div>`;
+ if(locked)html+=`<div class="tip-actions">${hasMore?`<button type="button" data-tip-action="expand">Level ${(level%3)+1}</button>`:''}<button type="button" data-tip-action="close">Close ×</button></div>`;
+ tip.innerHTML=html;tip.classList.toggle('locked',!!locked);tip.hidden=false;
  const rect=tip.getBoundingClientRect();
  tip.style.left=Math.max(8,Math.min(window.innerWidth-rect.width-8,x+12))+'px';
  tip.style.top=Math.max(8,Math.min(window.innerHeight-rect.height-8,y+12))+'px';
 };
-document.addEventListener('pointerover',e=>{if(e.pointerType==='touch')return;const t=e.target.closest('[data-tooltip],[data-character],[data-province-link]');if(t)showTooltipFor(t,e.clientX,e.clientY);else hideTooltip();});
-document.addEventListener('pointerout',e=>{if(!e.relatedTarget?.closest?.('[data-tooltip],[data-character],[data-province-link]'))hideTooltip();});
+document.addEventListener('pointerover',e=>{if(e.pointerType==='touch'||tooltipState.locked)return;const t=e.target.closest('[data-tooltip],[data-character],[data-province-link]');if(t)showTooltipFor(t,e.clientX,e.clientY,1,false);else hideTooltip(false);});
+document.addEventListener('pointerout',e=>{if(tooltipState.locked)return;if(!e.relatedTarget?.closest?.('[data-tooltip],[data-character],[data-province-link]'))hideTooltip(false);});
 el('zoom-in').addEventListener('click',()=>map.zoomAt(map.w/2,map.h/2,1.35));el('zoom-out').addEventListener('click',()=>map.zoomAt(map.w/2,map.h/2,1/1.35));
 el('tabs').addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t)navigateTab(t.dataset.tab);});
 el('workspace-nav').addEventListener('click',e=>{const t=e.target.closest('[data-workspace]');if(t){const next=workspaceTab(t.dataset.workspace,rememberedTabs);if(next)navigateTab(next);}});

@@ -258,13 +258,17 @@ export function drawOceanLettering(ctx,toScreen,w,h){
 export function buildAtlasEdges(world){const edges=new Map(),key=p=>p.map(n=>Math.round(n*10000)).join(',');for(const p of world.provinces){for(const ring of extractOuterRings(p.geometry))for(let i=1;i<ring.length;i++){const a=ring[i-1],b=ring[i],ka=key(a),kb=key(b);if(ka===kb)continue;const k=ka<kb?ka+'|'+kb:kb+'|'+ka;let e=edges.get(k);if(!e){e={a,b,ids:[]};edges.set(k,e);}if(!e.ids.includes(p.id))e.ids.push(p.id);}}return [...edges.values()];}
 export function politicalEdgeKind(edge,owner){if(edge.ids.length===1)return 'outline';return new Set(edge.ids.map(owner)).size>1?'frontier':'district';}
 
-export function drawPoliticalEdges(c,edges,owner,s,viewport,project=null){
+export function drawPoliticalEdges(c,edges,owner,s,viewport,project=null,options={}){
  c.save();c.lineJoin='round';c.lineCap='round';
+ const showDistricts=options.showDistricts??(project?true:false);
  const passes=project
-  ?[['outline',1.0,'rgba(44,38,28,.62)'],['district',0.55,'rgba(48,41,31,.24)'],['frontier',4.2,'rgba(24,18,12,.36)'],['frontier',1.9,'rgba(42,31,19,.92)']]
+  ?(showDistricts
+    ?[['district',0.55,'rgba(36,28,18,.22)'],['outline',1.15,'rgba(32,24,16,.68)'],['frontier',3.2,'rgba(20,15,10,.22)'],['frontier',1.75,'rgba(26,19,12,.92)']]
+    :[['outline',1.10,'rgba(32,24,16,.64)'],['frontier',3.2,'rgba(20,15,10,.22)'],['frontier',1.75,'rgba(26,19,12,.92)']])
   :[['outline',.82,'rgba(58,53,38,.56)'],['frontier',2.15,'rgba(43,39,31,.86)']];
  for(const [kind,width,color] of passes){
   c.beginPath();
+  if(kind==='district'&&project)c.setLineDash([4,4]);else c.setLineDash([]);
   for(const e of edges){
    if(viewport&&(Math.max(e.a[0],e.b[0])<viewport[0]||Math.min(e.a[0],e.b[0])>viewport[2]||Math.max(e.a[1],e.b[1])<viewport[1]||Math.min(e.a[1],e.b[1])>viewport[3]))continue;
    if(politicalEdgeKind(e,owner)!==kind)continue;

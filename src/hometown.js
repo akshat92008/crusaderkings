@@ -6,6 +6,17 @@ import {humanControlsRealm} from './player-career.js';
 const ok=msg=>({ok:true,msg}),no=msg=>({ok:false,msg}),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const integer=(v,d=0)=>Number.isFinite(v)?Math.max(0,Math.floor(v)):d;
 export const TOWN_NAMES=['Settlement','Village','Large village','Township','Fortified town','Trade city','Royal city','Royal capital','Metropolitan capital','Imperial capital'];
+export const TOWN_VISUAL_TIERS=[
+ {tier:1,min:1,max:2,name:'Tier I · Timber Outpost',desc:'Earthen roads, timber hall & clearing farms'},
+ {tier:2,min:3,max:4,name:'Tier II · Chartered Ward',desc:'Cobbled crossing, timber palisade & cart traffic'},
+ {tier:3,min:5,max:6,name:'Tier III · Stone Bailey',desc:'Stone ramparts, corner towers & town garrison'},
+ {tier:4,min:7,max:8,name:'Tier IV · Royal Bastion',desc:'Fortified stone curtain, banners & guild plazas'},
+ {tier:5,min:9,max:10,name:'Tier V · Imperial Citadel',desc:'Gilded royal citadel, grand plaza & siege arsenal'}
+];
+export function townVisualTier(level=1){
+ const lv=clamp(integer(level,1),1,10);
+ return TOWN_VISUAL_TIERS.find(t=>lv>=t.min&&lv<=t.max)||TOWN_VISUAL_TIERS[0];
+}
 export const TOWN_STAGE_NOTES=[
   'Founding timber outpost with hearth & palisade watch',
   'Cleared ploughlands, common well, and woodcutters lane',
@@ -390,3 +401,79 @@ export function homeEngineQuote(g,r,definition){const h=active(g,r);if(!h||!defi
 export function spendHomeEngineMaterials(g,r,definition){const q=homeEngineQuote(g,r,definition);if(!q?.ok)return false;const h=active(g,r);h.stock.wood-=q.price.wood;h.stock.iron-=q.price.iron;return true;}
 
 export function homeBuyMaterial(g,kind,amount=50){const h=active(g,g.player),f=g.factions[g.player];if(!h||!humanControlsRealm(g,g.player)||!materials.includes(kind)||!Number.isInteger(amount)||amount<1||amount>500||!permitted(g,h.capital,g.player))return no('Invalid material purchase.');const cap=1000+h.level*700+totals(g,g.player).storage*100;const qty=Math.min(amount,Math.max(0,cap-h.stock[kind]));const price=qty*({wood:3,stone:4,iron:5}[kind]);if(!qty||f.treasury<price)return no('Insufficient treasury or reserve capacity.');f.treasury-=price;h.stock[kind]+=qty;return ok(qty+' '+kind+' purchased for '+price+' gold.');}
+
+/**
+ * Returns deterministic 3D siege courtyard layout info for a Hometown capital
+ * province so 3D sieges mirror actual built Hometown structures and plots.
+ */
+export function homeCapitalLayout(g,provinceId){
+ if(!g||!provinceId)return null;
+ const entry=Object.entries(g.hometown?.realms||{}).find(([,h])=>h?.capital===provinceId);
+ if(!entry)return null;
+ const [realmId,h]=entry;
+ const spots=homePositions(g,provinceId,h);
+ const buildings=[];
+ for(const [key,slot] of Object.entries(spots)){
+  const lv=homeLevel(g,provinceId,key);
+  if(lv<=0)continue;
+  const col=slot%8,row=Math.floor(slot/8);
+  buildings.push({
+   key,
+   name:HOME_BUILDINGS[key]?.name||key,
+   effect:HOME_BUILDINGS[key]?.effect||'civic',
+   level:lv,
+   slot,
+   row,
+   col,
+   x:Number(((col-3.5)*8.5).toFixed(2)),
+   z:Number((-30-row*4.2).toFixed(2))
+  });
+ }
+ return {
+  isCapital:true,
+  realmId,
+  level:integer(h.level,1),
+  gatehouse:homeLevel(g,provinceId,'gatehouse'),
+  watchtower:homeLevel(g,provinceId,'watchtower'),
+  citadel:homeLevel(g,provinceId,'citadel'),
+  fort:homeLevel(g,provinceId,'fort'),
+  buildings
+ };
+}
+
+/**
+ * Generates live Steward shortage/deficit forecasts (months to exhaustion) and
+ * concrete actionable crown remedies from current production & army upkeep.
+ */
+export function stewardAdvice(g,world=null,r=g?.player){
+ if(!g||!r)return [];
+ const f=g.factions?.[r],h=active(g,r);
+ if(!f||!h)return [];
+ const bd=productionBreakdown(g,world,r);
+ const items=[];
+ const treasury=Math.floor(f.treasury||0);
+ const ownLand=Object.values(g.provinces||{}).filter(p=>p.owner===r&&controller(g,p.id)===r);
+ const ownArmies=Object.values(g.armies||{}).filter(a=>a.owner===r);
+ let rawUpkeep=0;
+ for(const a of ownArmies)rawUpkeep+=Math.max(0,(a.infantry||0)+(a.archers||0)+(a.cavalry||0))*.08;
+ const troopCost=Math.round(rawUpkeep);
+ if(bd.food.net<0){
+  const mo=Math.max(0,Math.floor(bd.food.stored/Math.abs(bd.food.net)));
+  items.push({id:'food_deficit',severity:mo<=6?'critical':'warn',title:`Food deficit (${bd.food.net}/mo)`,detail:`Granaries empty in ~${mo} months (${bd.food.stored} stored, −${bd.food.consumption}/mo army drain).`,action:{kind:'worker',key:'farmers|2',label:'Assign +2 Farmers'}});
+ }else if(bd.food.stored<120){
+  items.push({id:'food_low',severity:'warn',title:'Low food reserves',detail:`Only ${bd.food.stored} food stored ahead of winter or sieges.`,action:{kind:'select',key:'farm',label:'Build Farmstead'}});
+ }
+ if(troopCost>Math.max(30,treasury*0.25)&&(bd.wood.total<12||troopCost>ownLand.length*28)){
+  items.push({id:'treasury_strain',severity:'warn',title:`Heavy military upkeep (${troopCost}g/mo)`,detail:`Mobilized forces strain the royal purse (${treasury}g treasury).`,action:{kind:'worker',key:'merchants|2',label:'Assign +2 Merchants'}});
+ }
+ if(bd.wood.stock<40||bd.wood.total<6){
+  items.push({id:'wood_short',severity:'warn',title:'Timber bottleneck',detail:`${bd.wood.stock} wood in stores (+${bd.wood.total}/mo); construction & rams require steady timber.`,action:{kind:'worker',key:'woodcutters|2',label:'Assign +2 Woodcutters'}});
+ }
+ if(bd.iron.stock<25&&h.level>=3){
+  items.push({id:'iron_short',severity:'info',title:'Iron reserve low',detail:`${bd.iron.stock} iron stored (+${bd.iron.total}/mo); needed for arms & siege engines.`,action:{kind:'worker',key:'miners|2',label:'Assign +2 Miners'}});
+ }
+ if(!items.length){
+  items.push({id:'surplus',severity:'good',title:'Crown magazines in balance',detail:`Food +${bd.food.net}/mo, Timber +${bd.wood.total}/mo, Stone +${bd.stone.total}/mo, Iron +${bd.iron.total}/mo.`,action:{kind:'select',key:'town',label:'Plan next expansion'}});
+ }
+ return items;
+}

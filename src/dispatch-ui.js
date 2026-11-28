@@ -157,7 +157,7 @@ export function buildMonthlyDispatch(g, world, opts = {}) {
   });
  }
 
- return cards.slice(0, 6);
+ return cards.slice(0, 4);
 }
 
 export function renderCrownDispatch(g, world, esc, opts = {}) {

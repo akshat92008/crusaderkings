@@ -444,6 +444,8 @@ export class CampaignAudio {
     this.master = null;
     this.bgmGain = null;
     this.sfxGain = null;
+    this.ambienceGain = null;
+    this.bus = { master: 1.0, music: 0.65, sfx: 0.95, ambience: 0.55 };
     this.noise = null;
     this.droneNodes = [];
     this.voices = new Set();
@@ -476,9 +478,9 @@ export class CampaignAudio {
       if (!this.ctx) {
         this.ctx = this.factory?.();
         if(this.ctx){
-          this.master=this.ctx.createGain();this.bgmGain=this.ctx.createGain();this.sfxGain=this.ctx.createGain();
-          this.master.gain.value=this.muted?0:.24;this.bgmGain.gain.value=this.mode==='silent'?0:.65;this.sfxGain.gain.value=.95;
-          this.bgmGain.connect(this.master);this.sfxGain.connect(this.master);this.master.connect(this.ctx.destination);
+          this.master=this.ctx.createGain();this.bgmGain=this.ctx.createGain();this.sfxGain=this.ctx.createGain();this.ambienceGain=this.ctx.createGain();
+          this.master.gain.value=this.muted?0:0.24*this.bus.master;this.bgmGain.gain.value=this.mode==='silent'?0:this.bus.music;this.sfxGain.gain.value=this.bus.sfx;this.ambienceGain.gain.value=this.bus.ambience;
+          this.bgmGain.connect(this.master);this.sfxGain.connect(this.master);this.ambienceGain.connect(this.master);this.master.connect(this.ctx.destination);
           this.noise=makeNoiseBuffer(this.ctx,1.5);
           if(this.sampleLoader&&this.ctx.decodeAudioData){this.samples=new SampleBank(this.ctx,this.sampleLoader===true?undefined:this.sampleLoader);void this.samples.warm(['click','seal']);}
         }
@@ -497,6 +499,22 @@ export class CampaignAudio {
 
   isMuted() {
     return this.muted;
+  }
+  getBusVolumes() {
+    return { ...this.bus };
+  }
+  setBusVolume(name, val) {
+    if (!Object.hasOwn(this.bus, name)) return false;
+    const v = Math.max(0, Math.min(1, Number(val) || 0));
+    this.bus[name] = v;
+    if (name === 'master' && this.master) this.master.gain.value = this.muted ? 0 : 0.24 * v;
+    if (name === 'music') {
+      if (this.bgmGain) this.bgmGain.gain.value = this.mode === 'silent' ? 0 : v;
+      if (this.score) this.score.volume = 0.75 * v * this.bus.master;
+    }
+    if (name === 'sfx' && this.sfxGain) this.sfxGain.gain.value = v;
+    if (name === 'ambience' && this.ambienceGain) this.ambienceGain.gain.value = v;
+    return true;
   }
 
   setMuted(muted) {
