@@ -1,0 +1,498 @@
+{
+  "date": "2026-11-28",
+  "totalScannedToday": 96,
+  "uniqueCopied": 88,
+  "exactDuplicatesSkipped": 8,
+  "files": [
+    {
+      "file": "Gemini_Generated_Image_urn23vurn23vurn2.png",
+      "bytes": 7157632,
+      "sha256": "01eaa550d953afcdcccf278f8ba5bd56f4e5d99d3095e4fb39b65c4ca3b348bc"
+    },
+    {
+      "file": "Gemini_Generated_Image_dmh6qldmh6qldmh6.png",
+      "bytes": 7279242,
+      "sha256": "db6cbe5b8b378470fdaaea1fec4e1fac32fe0aeb6083d30180a4f327fb7d0837"
+    },
+    {
+      "file": "Gemini_Generated_Image_d36t5rd36t5rd36t.png",
+      "bytes": 6514458,
+      "sha256": "9c4a35c3b966cf212c13debda3c5fda6eeace1385de7354cfeb59e5794334dd8"
+    },
+    {
+      "file": "Gemini_Generated_Image_jqg4pljqg4pljqg4.png",
+      "bytes": 7909232,
+      "sha256": "a8cba8cf7ef327618283d08d685f5ef56340e81956f6dbed9241084dec2c3fec"
+    },
+    {
+      "file": "Gemini_Generated_Image_cd142zcd142zcd14.png",
+      "bytes": 6991497,
+      "sha256": "cf4f6cd5c6b0da678f9f41ec82cbcf53ee899980ae717b4c43b323b752d5ccb2"
+    },
+    {
+      "file": "Gemini_Generated_Image_7837m57837m57837.png",
+      "bytes": 5473485,
+      "sha256": "1037ac01ecf0ba083c7a64395d43b50a90ef987d630f4357328ed83e92bf013d"
+    },
+    {
+      "file": "Gemini_Generated_Image_c1brmbc1brmbc1br.png",
+      "bytes": 6757078,
+      "sha256": "0288db23bcc6cad92429518e6bfb4f8e7a662266ae6ccabe120a6dd5250fa235"
+    },
+    {
+      "file": "Gemini_Generated_Image_gkn46gkn46gkn46g.png",
+      "bytes": 6500171,
+      "sha256": "744b9e0a049bfaaa2024aef088f3d1b11477430d301df3640ffbfd65cd0cde44"
+    },
+    {
+      "file": "Gemini_Generated_Image_ifufgwifufgwifuf.png",
+      "bytes": 6871526,
+      "sha256": "ab66293b00fba16a1030f2a9decbe7d900c5aa576e3feb8a5a66098c19b77a6b"
+    },
+    {
+      "file": "Gemini_Generated_Image_bw44wibw44wibw44.png",
+      "bytes": 7082235,
+      "sha256": "74730d4921329d79f83eb31267f21cc86b748f68e09408d85ab8fa523166110c"
+    },
+    {
+      "file": "Gemini_Generated_Image_j37yjhj37yjhj37y.png",
+      "bytes": 8887854,
+      "sha256": "cbc48270388a214d3dc0c2affe05ab22673fe89ee66be70cd4123616a0f08419"
+    },
+    {
+      "file": "Gemini_Generated_Image_5g8sr75g8sr75g8s.png",
+      "bytes": 9185133,
+      "sha256": "c74584a2d593de87d89d8ae31799400c371b1a6efddd66ba742c4d3dda145904"
+    },
+    {
+      "file": "Gemini_Generated_Image_nv2dslnv2dslnv2d.png",
+      "bytes": 8825577,
+      "sha256": "8ca50068c1e388568608322e07982a14ab8ba7efb97553874bbbb18606cf486f"
+    },
+    {
+      "file": "Gemini_Generated_Image_rjnxkurjnxkurjnx.png",
+      "bytes": 9188720,
+      "sha256": "b4686f9a769b032a66fcf2b2ea94a2f624ab2d642dc349d66be7d8ac9ae9dd4c"
+    },
+    {
+      "file": "Gemini_Generated_Image_ph7qiph7qiph7qip.png",
+      "bytes": 8664162,
+      "sha256": "6b43e5e07a2ec8cc642ff4c9baaaf86b22fcb4af2311183cf9c5143dcbe05b66"
+    },
+    {
+      "file": "Gemini_Generated_Image_sr6kexsr6kexsr6k.png",
+      "bytes": 7686903,
+      "sha256": "1df00b464c4cda7948605af3c085e391dd31b468848d1af6e9d0b92cb27bb7eb"
+    },
+    {
+      "file": "Gemini_Generated_Image_h285zmh285zmh285.png",
+      "bytes": 8324602,
+      "sha256": "c963291b637e0abb628fa27cf6d0246736e4c879b15fec149e114ef887c7fa7f"
+    },
+    {
+      "file": "Gemini_Generated_Image_gde05zgde05zgde0.png",
+      "bytes": 8223032,
+      "sha256": "d8c1c4f99a1e46bc862569399f40697c041380f031c6c09fa3ba879238bee18c"
+    },
+    {
+      "file": "Gemini_Generated_Image_xenp6dxenp6dxenp.png",
+      "bytes": 7461315,
+      "sha256": "1078ae98b95ca6c2d016b107b41f6c81a3dce87cd47306a076f6838a4403bbfa"
+    },
+    {
+      "file": "Gemini_Generated_Image_j27hunj27hunj27h.png",
+      "bytes": 7469229,
+      "sha256": "1340caa675644a06f0824216bfd0d14d53b77288bbba282f56d47200c4760062"
+    },
+    {
+      "file": "Gemini_Generated_Image_4wzb5z4wzb5z4wzb.png",
+      "bytes": 8520583,
+      "sha256": "c156c24067ff9f9fc718625c30028cb1d0e944ee3adc0af9cf942c2f889a3de7"
+    },
+    {
+      "file": "Gemini_Generated_Image_38ro8h38ro8h38ro.png",
+      "bytes": 7706629,
+      "sha256": "bb0ac45bc64621a99819bb517fe550fe75bf97418282c295f136f4e19ae467b4"
+    },
+    {
+      "file": "Gemini_Generated_Image_dgh8jkdgh8jkdgh8.png",
+      "bytes": 7256407,
+      "sha256": "3483795693eb0773c1b07ec7d0ae1f80b180b7798947f0be97e1e9a1b53bcca9"
+    },
+    {
+      "file": "Gemini_Generated_Image_i8j3dri8j3dri8j3.png",
+      "bytes": 8257260,
+      "sha256": "85e27c45563300d48d0c187c0128a0b893d15e273b25d413f6dba00af59c759c"
+    },
+    {
+      "file": "Gemini_Generated_Image_d3g5t7d3g5t7d3g5.png",
+      "bytes": 8240182,
+      "sha256": "427f31291cfa0b9f8f1409077597dc8d8344fcd54ea0d0250ade4961424f428b"
+    },
+    {
+      "file": "Gemini_Generated_Image_oe3qsioe3qsioe3q.png",
+      "bytes": 7958010,
+      "sha256": "1c19381e2e9acc22bbe99b9a3188710013188e9513fea673701df60f0630e714"
+    },
+    {
+      "file": "Gemini_Generated_Image_ue3k2tue3k2tue3k.png",
+      "bytes": 7532534,
+      "sha256": "7f1a4d1d0a1eb2e77a59eb0c9db1320b0ed7c786769e4543e94b30af83f312ec"
+    },
+    {
+      "file": "Gemini_Generated_Image_gc7tozgc7tozgc7t.png",
+      "bytes": 7601672,
+      "sha256": "d2ea4e05677891811c2c4a8cc0d26062281dade3b8a717e6558fe102a6e4d212"
+    },
+    {
+      "file": "Gemini_Generated_Image_8be0hb8be0hb8be0.png",
+      "bytes": 7258409,
+      "sha256": "a1108f140498d44b0c7e66013141054acbb85b3cb447bd125a6202b33e9a57de"
+    },
+    {
+      "file": "Gemini_Generated_Image_lffoaxlffoaxlffo.png",
+      "bytes": 7800205,
+      "sha256": "eaa5f405c6fd215586c80c5b2190882d6ec2755ba6ebf3e4b2dc049318be9cdb"
+    },
+    {
+      "file": "Gemini_Generated_Image_3gsd4p3gsd4p3gsd.png",
+      "bytes": 7907474,
+      "sha256": "282b1d73380d72fb2144552883f000a9480e8ef8d3752762ce365d7de152769b"
+    },
+    {
+      "file": "Gemini_Generated_Image_owmcqbowmcqbowmc.png",
+      "bytes": 7276030,
+      "sha256": "fabee13f75ee58844c9d401a77b16f02afb6c64c785291740417b3a070a311f8"
+    },
+    {
+      "file": "Gemini_Generated_Image_4c23344c23344c23.png",
+      "bytes": 8141607,
+      "sha256": "0fd5ea4fb37ddd23a2e579c3c5c0b2add20060ee1503cb02a59c2a70e2a3a4c3"
+    },
+    {
+      "file": "Gemini_Generated_Image_5ikiyv5ikiyv5iki.png",
+      "bytes": 7383663,
+      "sha256": "66b05850bcfeae8ea59527f04b0550cba12c29b46ff2697c16ed838ba4170b7e"
+    },
+    {
+      "file": "Gemini_Generated_Image_wn8f37wn8f37wn8f.png",
+      "bytes": 7552327,
+      "sha256": "f9751c4ede84ae76bb776e7df65d6e877041245aa686c2710249d332e7cdb979"
+    },
+    {
+      "file": "Gemini_Generated_Image_4wc5u34wc5u34wc5.png",
+      "bytes": 8385071,
+      "sha256": "22475a4c3b44ac0c81dedaec9a277c15001dd8470b9218185daa9cd63ddf8c74"
+    },
+    {
+      "file": "Gemini_Generated_Image_qzc53dqzc53dqzc5.png",
+      "bytes": 7801844,
+      "sha256": "981cc2b88d4f3ad9c7447b5101ea61fd208cac5941900f563afb6f14d2ba0753"
+    },
+    {
+      "file": "Gemini_Generated_Image_2yj20b2yj20b2yj2.png",
+      "bytes": 8446665,
+      "sha256": "5841e8083276374c114dd10f2d550f7286f0176df28d310ffc71e870ab745fd3"
+    },
+    {
+      "file": "Gemini_Generated_Image_watcwuwatcwuwatc.png",
+      "bytes": 7981376,
+      "sha256": "40feca30f227fff5fbc95c9653d4260ee377f51fd4f88d025d0c65a65ff64ba5"
+    },
+    {
+      "file": "Gemini_Generated_Image_uqu087uqu087uqu0.png",
+      "bytes": 7146505,
+      "sha256": "3adbe42ae9e658e2bd078bdff21881b4e53bb0797850847fbeea515319461338"
+    },
+    {
+      "file": "Gemini_Generated_Image_8lmvdf8lmvdf8lmv.png",
+      "bytes": 7868271,
+      "sha256": "80f07342f1e7170bd4d4dd3e260a12699d27d87967193ffa166118929b962658"
+    },
+    {
+      "file": "Gemini_Generated_Image_uyui3iuyui3iuyui.png",
+      "bytes": 8512632,
+      "sha256": "66ac1289afc4d87fb69eaa39b769b050e0bbd352524f360284f311629000d2f5"
+    },
+    {
+      "file": "Gemini_Generated_Image_ju5145ju5145ju51.png",
+      "bytes": 8705862,
+      "sha256": "1c5d291641b68e5416821690cf126e8a2a2e8945e203b8b0f2eb35902d22348a"
+    },
+    {
+      "file": "Gemini_Generated_Image_xgdz64xgdz64xgdz.png",
+      "bytes": 7754710,
+      "sha256": "b370642e06dcb70e3db29946066835687d772afba4dfd0b9dd7abb9902478a4a"
+    },
+    {
+      "file": "Gemini_Generated_Image_6h56c86h56c86h56.png",
+      "bytes": 8292048,
+      "sha256": "afd202a146681ab1d91c4fd93793c857271eb0d85d078d20576e587dab45c931"
+    },
+    {
+      "file": "Gemini_Generated_Image_adojz8adojz8adoj.png",
+      "bytes": 9048557,
+      "sha256": "ae9cce482b18d7e6ae4ab4ceb2603d51d5c9975fb9a121d86beb7b343828a2de"
+    },
+    {
+      "file": "Gemini_Generated_Image_qxib4xqxib4xqxib.png",
+      "bytes": 7530905,
+      "sha256": "c6ad04f2c506d02c3cf4c279c3ed5bdb962b703902baa79ef32226c1ec5c3934"
+    },
+    {
+      "file": "Gemini_Generated_Image_8wwcae8wwcae8wwc.png",
+      "bytes": 9049013,
+      "sha256": "ae4be3f7e63ad456a139f72eb5fac87c28798415d2f3b7ef9a72c0422d75af2e"
+    },
+    {
+      "file": "Gemini_Generated_Image_aayu56aayu56aayu.png",
+      "bytes": 9215966,
+      "sha256": "ba3ab151943dc1f560769de5943c6915be8e6e9d57d7006a2fa06c523ae5753c"
+    },
+    {
+      "file": "Gemini_Generated_Image_11u28111u28111u2.png",
+      "bytes": 8148966,
+      "sha256": "61b750814472c405a99d7c7242cfca20ef5a36968c8144b797f2b34512fb0965"
+    },
+    {
+      "file": "Gemini_Generated_Image_jaqzubjaqzubjaqz.png",
+      "bytes": 8504728,
+      "sha256": "bd687661ae0515e825771e9d86ddbaed11498e4c1895f6f9219383826bc6d42f"
+    },
+    {
+      "file": "Gemini_Generated_Image_4kne5e4kne5e4kne.png",
+      "bytes": 8329677,
+      "sha256": "44e103749ac4a70ca75bb1f8ad0455d222c152d9cb4026515435c7e79cb00d0d"
+    },
+    {
+      "file": "Gemini_Generated_Image_au0xigau0xigau0x.png",
+      "bytes": 8408978,
+      "sha256": "696fb0eda4840cf42a0e6f60f0fa994a8cca3840ad4b8e3870927e2dce62853b"
+    },
+    {
+      "file": "Gemini_Generated_Image_t2ab2at2ab2at2ab.png",
+      "bytes": 7828312,
+      "sha256": "a5b669dea117843d2f1c446a4778c871fd2a5093dc21201f2d4f08694e9b04d8"
+    },
+    {
+      "file": "Gemini_Generated_Image_x9ulbex9ulbex9ul.png",
+      "bytes": 8938414,
+      "sha256": "059985a6affb05bc418316153bd22dcca73f0ec97593874174bb852b87adf250"
+    },
+    {
+      "file": "Gemini_Generated_Image_7bzy947bzy947bzy.png",
+      "bytes": 8919778,
+      "sha256": "eaa6f29457687c1bb7582986a63695adc470f084ea7a0512cd6a05fb0e1a4ff7"
+    },
+    {
+      "file": "Gemini_Generated_Image_oz05rmoz05rmoz05.png",
+      "bytes": 8907469,
+      "sha256": "8fcb4ae4c05a1f48452d594bb6859358fb15d5d64d8df29ef255286ff528ada3"
+    },
+    {
+      "file": "Gemini_Generated_Image_fmut87fmut87fmut.png",
+      "bytes": 8048512,
+      "sha256": "3e4c5150c6eb0694017edeeffe77d85b8e9bb1d4c9188f174b25620e27aa357c"
+    },
+    {
+      "file": "Gemini_Generated_Image_msvb57msvb57msvb.png",
+      "bytes": 8396811,
+      "sha256": "894c8e66396cac0e8eb28a075f9cc0788462b32170b2f8c72d3996f879d2bb42"
+    },
+    {
+      "file": "Gemini_Generated_Image_crsvcvcrsvcvcrsv.png",
+      "bytes": 8573247,
+      "sha256": "ae35bac6de1ac5fb88169ce36a3f493656fc2f0001e6dc40d211b77b0fbf2d06"
+    },
+    {
+      "file": "Gemini_Generated_Image_7o8wf7o8wf7o8wf7.png",
+      "bytes": 7880115,
+      "sha256": "bd79ea3ecc22d5215f1addee9721a04cb099d6e8c1cb2838f101408b5dad5368"
+    },
+    {
+      "file": "Gemini_Generated_Image_vfphb0vfphb0vfph.png",
+      "bytes": 9020829,
+      "sha256": "c2b96eb86b01ef1e022efdaecd506624ab0b1db1550050a36b7ed2841f686983"
+    },
+    {
+      "file": "Gemini_Generated_Image_5o7h6d5o7h6d5o7h.png",
+      "bytes": 9158402,
+      "sha256": "17211c1f555c364e599872f8224511426af082d21e5e1cd75b9d504f189f29bf"
+    },
+    {
+      "file": "Gemini_Generated_Image_k6ss23k6ss23k6ss.png",
+      "bytes": 8875074,
+      "sha256": "396efce7ba47813188242108a149a14e27fc2e74a24f6e88bc3fb2912fb547fb"
+    },
+    {
+      "file": "Gemini_Generated_Image_axe4qoaxe4qoaxe4.png",
+      "bytes": 5229653,
+      "sha256": "d4c1db95335f0a41e81cef44b17a8bb2e65e25ac287e42e62d1bbb3e8b5cbf9c"
+    },
+    {
+      "file": "ChatGPT Image Nov 28, 2026, 09_59_13 AM-1.png",
+      "bytes": 2657700,
+      "sha256": "10bce99acaa6126ca93577a000f9a1871beadb7ed095cb44175ebc2dcf70e617"
+    },
+    {
+      "file": "ChatGPT Image Nov 28, 2026, 09_59_14 AM-2.png",
+      "bytes": 2825291,
+      "sha256": "2ee12e819dc385d7ecedb2708406ce80eed326cc0885b206b645b45a081ede2d"
+    },
+    {
+      "file": "Gemini_Generated_Image_sijq8nsijq8nsijq.png",
+      "bytes": 8109736,
+      "sha256": "219f1cb955b33b8842946a5d556159d0d0ba9871b4ff4a061868d4b5325fe58f"
+    },
+    {
+      "file": "Gemini_Generated_Image_25it1p25it1p25it.png",
+      "bytes": 6505124,
+      "sha256": "2f9d1ec07efa6541f3ade0f3571c2257b5265382d65f2a8dee9956753b75384b"
+    },
+    {
+      "file": "Gemini_Generated_Image_bjehxbbjehxbbjeh.png",
+      "bytes": 6759380,
+      "sha256": "8166700aa82a86a849e2556f01aa0a4ddeb56f1c16f7c2118640788184ae2665"
+    },
+    {
+      "file": "Gemini_Generated_Image_cufiolcufiolcufi.png",
+      "bytes": 6904834,
+      "sha256": "7101c681286c3829e095c6909c0b168cd6affb530bf852fe2caa82822e1cc776"
+    },
+    {
+      "file": "Gemini_Generated_Image_46hia946hia946hi.png",
+      "bytes": 6650578,
+      "sha256": "a261d9a6d8e09d5120a0665b8895ba36b0f9e002d313d394537bf2c34b4e325f"
+    },
+    {
+      "file": "Gemini_Generated_Image_ij8zbyij8zbyij8z.png",
+      "bytes": 6755359,
+      "sha256": "ccc62d49578438039dfb0cd3ae735670d555eef8829b1903281ac2fb92f15cce"
+    },
+    {
+      "file": "Gemini_Generated_Image_5gje8d5gje8d5gje.png",
+      "bytes": 9068057,
+      "sha256": "f6539d0c8c3166a12745073c23fc7937e7cbf9bde459aa1f65e44c8af49f42eb"
+    },
+    {
+      "file": "Gemini_Generated_Image_wsdepfwsdepfwsde.png",
+      "bytes": 8892630,
+      "sha256": "c9a1abacdb71efbbf5d62b734dcda1078c51a530ed03cceeb0a9f6b887dfead6"
+    },
+    {
+      "file": "Gemini_Generated_Image_wput4rwput4rwput.png",
+      "bytes": 9678998,
+      "sha256": "71ca84c2f9b3aa71da0d39197cad4c5a693f71ad59275a52028afd5fe94e611a"
+    },
+    {
+      "file": "Gemini_Generated_Image_b6uuzyb6uuzyb6uu.png",
+      "bytes": 9281696,
+      "sha256": "1fbce5f350c70eab3d1dde8270a8d5826cf1fcaad06631b33cda9b2adf16211a"
+    },
+    {
+      "file": "Gemini_Generated_Image_kv9qp1kv9qp1kv9q.png",
+      "bytes": 9792493,
+      "sha256": "0d19b541dc373ef19be17ec9d65ab9bc1d339b94592d0a827c9503ca95701563"
+    },
+    {
+      "file": "Gemini_Generated_Image_j7e1auj7e1auj7e1.png",
+      "bytes": 9440056,
+      "sha256": "4ef365d80366e295993b6fb9cf5f19ffd42e4f5808d0e9e901edfb02e299dd85"
+    },
+    {
+      "file": "Gemini_Generated_Image_quoawequoawequoa.png",
+      "bytes": 8294204,
+      "sha256": "a8088430f18ca01693265c0b1a18731df8a21e3e024cb02958cd2ef744477080"
+    },
+    {
+      "file": "Gemini_Generated_Image_iv33ziv33ziv33zi.png",
+      "bytes": 9313324,
+      "sha256": "53c502750eb7568d566c1b3bb00c4ddd5d510e496a42088f85e07244d733e7f9"
+    },
+    {
+      "file": "Gemini_Generated_Image_v3g6kqv3g6kqv3g6.png",
+      "bytes": 9605911,
+      "sha256": "ea8a7963f1f7ea5a13a53f8fa414717623851a0ea11dfa7560c45fec3e9c3433"
+    },
+    {
+      "file": "Gemini_Generated_Image_5h26fa5h26fa5h26.png",
+      "bytes": 9216043,
+      "sha256": "019408c20950ba652a89dc059cf12fbaaff51ff96787826a071ba99198e235f0"
+    },
+    {
+      "file": "Gemini_Generated_Image_fum1rffum1rffum1.png",
+      "bytes": 9762178,
+      "sha256": "a98065eec94ffcd881d64a1fe9cb134b2e87e6d8362177333fda9383eea8af79"
+    },
+    {
+      "file": "Gemini_Generated_Image_295swt295swt295s.png",
+      "bytes": 9024854,
+      "sha256": "12d25751e5e990a60bdc441a543ce6d20ff1f55f87a763344f2a56e93963d125"
+    },
+    {
+      "file": "Gemini_Generated_Image_kw5yhdkw5yhdkw5y.png",
+      "bytes": 9324405,
+      "sha256": "0efeb61df1e87228c20538d8d1b1e4827e336f85274c0be6197810c76743e7d6"
+    },
+    {
+      "file": "Gemini_Generated_Image_6bl1ra6bl1ra6bl1.png",
+      "bytes": 9904134,
+      "sha256": "b4443ec76a8de67b6b78c054c42a65e1f33a803eefab99d1a2c8da6566bd2799"
+    },
+    {
+      "file": "Gemini_Generated_Image_212l91212l91212l.png",
+      "bytes": 9946725,
+      "sha256": "9d7958f2e658e71e07a3410461ab7271688203bb707635bea325d79490bff574"
+    }
+  ],
+  "duplicates": [
+    {
+      "skipped": "Gemini_Generated_Image_cd142zcd142zcd14 (1).png",
+      "duplicateOf": "Gemini_Generated_Image_cd142zcd142zcd14.png",
+      "sha256": "cf4f6cd5c6b0da678f9f41ec82cbcf53ee899980ae717b4c43b323b752d5ccb2",
+      "bytes": 6991497
+    },
+    {
+      "skipped": "Gemini_Generated_Image_c1brmbc1brmbc1br (1).png",
+      "duplicateOf": "Gemini_Generated_Image_c1brmbc1brmbc1br.png",
+      "sha256": "0288db23bcc6cad92429518e6bfb4f8e7a662266ae6ccabe120a6dd5250fa235",
+      "bytes": 6757078
+    },
+    {
+      "skipped": "Gemini_Generated_Image_sr6kexsr6kexsr6k (1).png",
+      "duplicateOf": "Gemini_Generated_Image_sr6kexsr6kexsr6k.png",
+      "sha256": "1df00b464c4cda7948605af3c085e391dd31b468848d1af6e9d0b92cb27bb7eb",
+      "bytes": 7686903
+    },
+    {
+      "skipped": "Gemini_Generated_Image_uqu087uqu087uqu0 (1).png",
+      "duplicateOf": "Gemini_Generated_Image_uqu087uqu087uqu0.png",
+      "sha256": "3adbe42ae9e658e2bd078bdff21881b4e53bb0797850847fbeea515319461338",
+      "bytes": 7146505
+    },
+    {
+      "skipped": "Gemini_Generated_Image_4kne5e4kne5e4kne (1).png",
+      "duplicateOf": "Gemini_Generated_Image_4kne5e4kne5e4kne.png",
+      "sha256": "44e103749ac4a70ca75bb1f8ad0455d222c152d9cb4026515435c7e79cb00d0d",
+      "bytes": 8329677
+    },
+    {
+      "skipped": "Gemini_Generated_Image_x9ulbex9ulbex9ul (1).png",
+      "duplicateOf": "Gemini_Generated_Image_x9ulbex9ulbex9ul.png",
+      "sha256": "059985a6affb05bc418316153bd22dcca73f0ec97593874174bb852b87adf250",
+      "bytes": 8938414
+    },
+    {
+      "skipped": "Gemini_Generated_Image_fmut87fmut87fmut (1).png",
+      "duplicateOf": "Gemini_Generated_Image_fmut87fmut87fmut.png",
+      "sha256": "3e4c5150c6eb0694017edeeffe77d85b8e9bb1d4c9188f174b25620e27aa357c",
+      "bytes": 8048512
+    },
+    {
+      "skipped": "Gemini_Generated_Image_v3g6kqv3g6kqv3g6 (1).png",
+      "duplicateOf": "Gemini_Generated_Image_v3g6kqv3g6kqv3g6.png",
+      "sha256": "ea8a7963f1f7ea5a13a53f8fa414717623851a0ea11dfa7560c45fec3e9c3433",
+      "bytes": 9605911
+    }
+  ]
+}
