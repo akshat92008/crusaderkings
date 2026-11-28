@@ -58,7 +58,7 @@ try:
    if name=='desktop':
     assert page.locator('#resource-prestige').is_visible()
     assert page.locator('#resource-legitimacy').is_visible()
-   page.locator('#quick-nav [data-priority-tab="search"]').click()
+   page.locator('#open-search').click()
    page.fill('#campaign-query','military');assert page.locator('.finder-row').count()>0
    page.fill('#campaign-query','no-such-result-xyz');assert page.locator('.finder-row').count()==0
    page.fill('#campaign-query','council');page.locator('.finder-row[data-priority-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
@@ -84,7 +84,7 @@ try:
    page.locator('#tabs [data-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
    page.locator('#tabs [data-tab="vassals"]').click();assert page.locator('#vassal-sort').is_visible()
    page.locator('[data-workspace="realm"]').click();page.click('#close-management')
-   page.click('#open-management')
+   page.locator('#quick-nav [data-priority-tab="realm"]').click()
    page.locator('.campaign-hub [data-character]').first.click()
    assert page.locator('.character-hero').is_visible()
    assert page.locator('.character-skills').is_visible()
@@ -98,7 +98,7 @@ try:
    for work in ['realm','court','foreign','war','people']:
     page.locator('[data-workspace="'+work+'"]').click()
     assert 1<=page.locator('#tabs .tab:visible').count()<=8
-   page.click('#close-management');page.locator('#army-outliner summary').click()
+   page.click('#close-management');page.locator('.map-options summary').click();page.locator('#army-outliner summary').click()
    assert page.locator('#outliner-list [data-character]').count()==1
    page.locator('#army-outliner summary').click();page.click('#open-province')
    assert page.locator('#province-drawer').is_visible()
@@ -143,7 +143,9 @@ try:
    page.click('#next-month');assert 'FEBRUARY' in page.locator('#date-display').inner_text()
    page.click('#save-game');assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).turn")==1
    if chromium and name in ('desktop','mobile','small-phone'):
-    if touch:page.click('#mobile-battle-shortcut')
+    if touch:
+     if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options summary').click()
+     page.click('#battle-showcase')
     else:
      if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options summary').click()
      page.click('#battle-showcase')
@@ -208,7 +210,7 @@ try:
     page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
     page.locator('#save-file').set_input_files({'name':'allied-field.json','mimeType':'application/json','buffer':allied_save.encode()})
     page.locator('#start-screen').wait_for(state='hidden')
-    page.locator('#quick-nav [data-priority-tab="search"]').click()
+    page.locator('#open-search').click()
     page.fill('#campaign-query','diplomacy')
     page.locator('.finder-row[data-priority-tab="diplomacy"]').click()
     page.get_by_text('Treaties and allied support',exact=True).click()
@@ -228,7 +230,7 @@ try:
     page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
     page.locator('#save-file').set_input_files({'name':'career-base.json','mimeType':'application/json','buffer':backup})
     page.locator('#start-screen').wait_for(state='hidden')
-    page.click('#open-management')
+    page.locator('#quick-nav [data-priority-tab="realm"]').click()
     page.get_by_text('Play as a landed vassal',exact=True).click()
     page.locator('#career-person').wait_for(state='visible')
     person=page.locator('#career-person').input_value()
@@ -261,7 +263,7 @@ try:
     page.reload(wait_until='domcontentloaded')
     page.locator('#load-existing').wait_for(state='visible')
     page.click('#load-existing')
-    page.click('#open-management')
+    page.locator('#quick-nav [data-priority-tab="realm"]').click()
     assert page.get_by_text('VASSAL CAREER',exact=True).is_visible()
     page.screenshot(path=str(OUT/'desktop-vassal-career.png'))
     print('desktop PASS: playable vassal role, crown controls restricted, progression and save/reload')
@@ -274,7 +276,7 @@ try:
   page.goto('http://127.0.0.1:'+str(server.server_port),wait_until='domcontentloaded',timeout=45000)
   page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)
   page.select_option('#start-faction','england');page.select_option('#start-difficulty','peaceful');page.click('#start-new')
-  page.click('#open-hometown');ht=page.locator('#hometown-screen');assert ht.is_visible()
+  page.click('#capital-nav');ht=page.locator('#hometown-screen');assert ht.is_visible()
   assert ht.locator('.ht-tabs button').count()==5
   assert ht.locator('.ht-resources > div').count()==6
   assert ht.locator('.ht-landscape').count()==1

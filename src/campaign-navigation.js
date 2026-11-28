@@ -2,13 +2,15 @@ import {regencyView} from './regency-systems.js';
 import {estateDisputes} from './estate-conflicts.js';
 import {pendingVassalPetitions} from './vassal-courts.js';
 import {politicalEstates} from './realm-authority.js';
-// Five workspaces retain every existing panel and its original action handlers.
+// Each page belongs to one campaign destination or utility.
 export const WORKSPACES=[
- {id:'realm',name:'Reign',tabs:['realm','decrees','economy','trade','search']},
- {id:'court',name:'Court',tabs:['court','characters','dynasty','council','vassals','political','titles','stories']},
- {id:'foreign',name:'Diplomacy',tabs:['diplomacy','strategy']},
+ {id:'realm',name:'Crown',tabs:['realm','decrees','identity','heritage','legacy']},
+ {id:'court',name:'Court',tabs:['court','characters','dynasty','council','vassals','titles']},
+ {id:'foreign',name:'Diplomacy',tabs:['diplomacy','political','strategy']},
+ {id:'economy',name:'Economy',tabs:['economy','trade','society']},
  {id:'war',name:'Military',tabs:['military','naval']},
- {id:'people',name:'Chronicle',tabs:['society','identity','heritage','legacy','chronicle']}
+ {id:'chronicle',name:'Chronicle',tabs:['chronicle','stories']},
+ {id:'search',name:'Search',tabs:['search']}
 ];
 export function workspaceFor(tab){return WORKSPACES.find(g=>g.tabs.includes(tab))||WORKSPACES[0];}
 export function workspaceTab(id,remembered={}){const g=WORKSPACES.find(w=>w.id===id);return g?(g.tabs.includes(remembered[id])?remembered[id]:g.tabs[0]):null;}

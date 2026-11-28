@@ -179,3 +179,39 @@
 .ht-under-construction .ht-complex{filter:sepia(.14)}
 @media(min-width:1150px){.ht-town-layout{grid-template-columns:minmax(0,1fr) minmax(270px,330px)}}
 @media(max-width:600px){.ht-scene{margin:0}.ht-resources div{padding:5px 2px}.ht-job{flex-wrap:wrap}.ht-tabs button{padding:9px 8px}.ht-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ht-card{padding:9px}.ht-card .ht-button{width:100%;font-size:12px}.ht-header p{font-size:12px}.ht-scene-toolbar{padding:7px 8px}.ht-zoom-controls button{padding:8px 7px;font-size:11px}.ht-scene-toolbar small{font-size:10px}.ht-scene-scroll{max-height:58vh}.ht-card>.ht-complex{width:100px;height:85px}.ht-town-inspector{padding:12px}.ht-ledger-bar{padding:7px 9px}.ht-work-row{grid-template-columns:minmax(84px,1fr) auto auto auto;gap:4px}}
+
+/* Capital overview */
+#hometown-screen {
+  background: radial-gradient(ellipse at 45% 0%, #274548, #122427 60%);
+  color: #f2e9d5;
+}
+#hometown-screen .ht-header,
+#hometown-screen .ht-scene-toolbar {
+  background: #182f32;
+  border-color: #9e855770;
+  box-shadow: none;
+}
+#hometown-screen .ht-header h2 { font-family: Georgia, serif; font-weight: 600 }
+#hometown-screen .ht-tabs { margin-top: 9px; padding-bottom: 3px }
+#hometown-screen .ht-tabs button {
+  background: #172e31;
+  font: 600 12px system-ui, sans-serif;
+  border-color: #9e855770;
+  min-height: 40px;
+}
+#hometown-screen .ht-tabs button[aria-pressed="true"] { background: #344a46; border-color: #d5af69 }
+#hometown-screen .ht-mode-bar,
+#hometown-screen .ht-scene-help { background: #14292b; border-color: #9e855770 }
+.ht-project-levels { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 12px 7px; align-items: center }
+.ht-project-levels span:first-child,
+.ht-project-levels span:last-child { padding: 4px 8px; background: #8f754616; border-radius: 4px }
+.ht-project-levels b { margin-left: 3px }
+.ht-project-shortage { font-weight: 700 }
+.ht-advanced { border: 1px solid #9e855770; border-radius: 5px; margin-top: 10px; background: #162b2d }
+.ht-advanced > summary { color: #f2e9d5; padding: 10px; cursor: pointer; font: 600 12px system-ui, sans-serif }
+.ht-advanced > .ht-card,
+.ht-advanced > .ht-workforce-card,
+.ht-advanced > .ht-trade,
+.ht-advanced > .ht-ledger { margin: 8px }
+.ht-job progress { display: block; width: 138px; margin-top: 3px; accent-color: #4f7158 }
+.ht-tile:disabled:not(.ht-plot-occupied) { opacity: .45; cursor: default }

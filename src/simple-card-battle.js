@@ -148,26 +148,42 @@ export function stepCardBattle(state,dt,terrainInfo=null){
   if(!enemies.length){g.moving=false;continue;}
   const score=e=>distance(pos,snapshot.get(e.id))+(g.lane!==e.lane?3:0)+(cardRole(g)==='mounted'&&cardRole(e)==='ranged'?-6:0)+Math.min(10,Math.max(0,(targetLoad.get(e.id)||0)/Math.max(1,soldiers(e))-1)*4);
   const best=enemies.slice().sort((a,b)=>score(a)-score(b)||byId(a,b))[0],old=enemies.find(e=>e.id===g.cardTargetId);
-  const e=rangedEnemy||(old&&score(old)<=score(best)+4?old:best);g.cardTargetId=e.id;targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
+  const fieldOrder=siege?null:g.fieldOrder;
+ const focus=!siege&&enemies.find(enemy=>enemy.id===g.focusTargetId);
+ const e=rangedEnemy||focus||(old&&score(old)<=score(best)+4?old:best);
+ g.cardTargetId=e.id;
+ targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
  const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz);
+ const anchored=fieldOrder==='move'||fieldOrder==='fallback';
+ const moveX=anchored?g.moveX-pos.x:dx,moveZ=anchored?g.moveZ-pos.z:dz;
+ const moveDistance=Math.hypot(moveX,moveZ);
  const enemyTerrain=terrainInfo?.(e);
- let step=Math.min(Math.max(0,d-reach*.88),speed*dt),moveDir=1;
- if(form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
- g.moving=step>0.01;g.vx=d?moveDir*dx/d*step/dt:0;g.vz=d?moveDir*dz/d*step/dt:0;
- if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;g.facing=Math.atan2(g.facingX,g.facingZ);}
+ const pace=fieldOrder==='charge'&&role==='mounted'?speed*1.18:speed;
+ const travel=anchored?moveDistance:Math.max(0,d-reach*.88);
+ let step=fieldOrder==='hold'?0:Math.min(travel,pace*dt),moveDir=1;
+ if(!anchored&&fieldOrder!=='hold'&&form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
+ g.moving=step>0.01;
+ g.vx=moveDistance?moveDir*moveX/moveDistance*step/dt:0;
+ g.vz=moveDistance?moveDir*moveZ/moveDistance*step/dt:0;
+ if(anchored&&g.moving){g.facingX=moveX/moveDistance;g.facingZ=moveZ/moveDistance;}
+ else if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;}
+ if(g.moving||d>0.01)g.facing=Math.atan2(g.facingX,g.facingZ);
+ if(fieldOrder==='move'&&moveDistance<=step+.02)g.fieldOrder='advance';
  const minZ=siegeActive&&g.side===assaultSide&&!siegeCorridorBreached(siege,pos.x)?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
  if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;g.fatigue=clamp((g.fatigue||0)+dt*((form==='cavalry_wedge'||form==='flank')?0.024:0.012),0,1);}
  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
  for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,minZ,maxZ);}
- g.targetX=target.x;g.targetZ=target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
+ g.targetX=anchored?g.moveX:target.x;g.targetZ=anchored?g.moveZ:target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
  g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.skirmishing?'skirmishing':g.moving?'moving':'engaging';
  g.statusFlags=[];
+ if(fieldOrder==='hold')g.statusFlags.push('HOLD');
+ if(fieldOrder==='fallback')g.statusFlags.push('FALL BACK');
  if(g.skirmishing)g.statusFlags.push('SKIRMISH');
  if(form==='shield_wall'||form==='pike_square')g.statusFlags.push('BRACED');
  if((form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6)g.statusFlags.push('CHARGE');
  if(form==='ambush'&&terrain?.inForestCover)g.statusFlags.push('AMBUSH');
  if(siegeActive&&g.side!==assaultSide)g.statusFlags.push('GARRISON');
- if(d>reach||g.cooldown>1e-8)continue;
+ if(d>reach||g.cooldown>1e-8||fieldOrder==='fallback')continue;
  g.fatigue=clamp((g.fatigue||0)+0.018,0,1);
  g.cooldown=form==='longbow_line'?.95:form==='volley_line'?1.04:role==='ranged'?1.15:.85;
  g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;

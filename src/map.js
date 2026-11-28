@@ -804,6 +804,7 @@ export class CampaignMap{
    Math.max(...corners.map(k=>k[0])),
    Math.max(...corners.map(k=>k[1]))
   ];
+  this.onViewport?.(this.visualWorld,viewport,[cam.centerLon,cam.centerLat]);
   const visible=this.geoIndex.query(viewport),visibleWorld={...this.visualWorld,provinces:visible};
   const seats=this._realmSeats();
   const groups=this.game?atlasArmyGroups(this.game.armies,this.game.naval?.voyages):[];

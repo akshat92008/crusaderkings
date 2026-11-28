@@ -51,6 +51,7 @@ export function createGame(world,player='ottomans'){
  initDlcSystems(game,world);
  initCrossroads(game,world);
  initReignChapters(game);
+ recordTreasury(game);
  for(const a of Object.values(game.armies))a.commander=allocateCommanderName(game,a.owner,a.id);
  return game;
 }
@@ -241,6 +242,16 @@ export function negotiate(g,other,action,world={factions:[]}){
 }
 // Reproducible pseudo-random outcomes. No Math.random in the simulation core.
 function rand(g){g.seed=(1664525*g.seed+1013904223)>>>0;return g.seed/4294967296;}
+// Sample after all monthly systems settle, including route payments and debt.
+function recordTreasury(g) {
+ const realm = g.player;
+ const gold = g.factions[realm]?.treasury;
+ if (!Number.isFinite(gold)) return;
+ const histories = g.treasuryHistory ??= {};
+ const samples = histories[realm] ??= [];
+ samples.push({year:g.year, month:g.month, gold});
+ if (samples.length > 12) samples.shift();
+}
 export function advanceMonth(g,world){
  world=campaignWorld(g,world);
  g.turn++;g.month++;if(g.month===12){g.month=0;g.year++;}
@@ -344,6 +355,7 @@ export function advanceMonth(g,world){
  tickCrossroads(g,world);
  tickReignChapters(g);
  tickHometown(g,world);
+ recordTreasury(g);
  return g;
 }
 const SKILL_KEYS=['diplomacy','martial','stewardship','intrigue','learning'];

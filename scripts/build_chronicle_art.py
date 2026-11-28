@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Build the Chronicle artwork from visually reviewed source boundaries.
+
+Requires Pillow, NumPy and OpenCV. Run from any working directory.
+"""
+from collections import defaultdict
+import json
+from pathlib import Path
+
+import cv2
+import numpy as np
+from PIL import Image, ImageOps
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / "assets/artwork-downloads-2026-11-28"
+ART = ROOT / "assets/game-art/chronicle"
+SPEC = json.loads(Path(__file__).with_name("chronicle-art-spec.json").read_text())
+LANDSCAPES = defaultdict(lambda: defaultdict(list))
+PORTRAITS = defaultdict(list)
+SCENES = defaultdict(list)
+FLAGS = defaultdict(list)
+
+DISPOSITIONS = {
+    "3d-battle-reference": "reserved: unit appearance reference; field battles use 3D models",
+    "alternate-portraits": "reserved: alternate portraits pending individual boundary review",
+    "captioned-portraits": "held: captions intersect portraits",
+    "framed-portraits": "held: white atlas frames and inconsistent cell edges intrude into portraits",
+    "loose-emblems": "reserved: heraldic reference pending semantic mapping",
+    "icons": "reserved: individual names and bounds require manual verification",
+    "frames": "reserved: individual borders and frames require manual verification",
+}
+
+
+def save(im, kind, name, size, quality):
+    folder = ART / kind
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / (name + ".webp")
+    im.thumbnail(size, Image.Resampling.LANCZOS)
+    im.save(path, quality=quality, method=4)
+    return path.relative_to(ROOT).as_posix()
+
+
+def crop_cells(im, spec):
+    xs = [0, *spec["x"], im.width]
+    ys = [0, *spec["y"], im.height]
+    for row, (y1, y2) in enumerate(zip(ys, ys[1:])):
+        for col, (x1, x2) in enumerate(zip(xs, xs[1:])):
+            # Remove guide seams, annotations, and the mark in the lower-right cell.
+            t, b = spec.get("trim_top", 0), spec.get("trim_bottom", 0)
+            end = 65 if row == len(ys) - 2 and col == len(xs) - 2 else 0
+            yield row, col, im.crop((x1 + 10, y1 + 10 + t, x2 - 10, y2 - 10 - b - end))
+
+
+def cut_flags(im, spec):
+    rgb = np.array(im.convert("RGB")).astype("int16")
+    red, green, blue = rgb.transpose(2, 0, 1)
+    magenta = (red > 125) & (blue > 125) & (np.minimum(red, blue) > green + 55)
+    magenta &= np.abs(red - blue) < 120
+    alpha = (255 * ~magenta).astype("uint8")
+    contours, _ = cv2.findContours(alpha, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    boxes = (tuple(map(int, cv2.boundingRect(contour))) for contour in contours)
+    boxes = sorted(
+        (b for b in boxes if b[2] > 55 and b[3] > 55 and b[2] * b[3] > 6000),
+        key=lambda b: (b[1] // 120, b[0]),
+    )
+    rgba = np.dstack((rgb.astype("uint8"), alpha))
+    saved = {}
+    for region, indices in spec["regions"].items():
+        for index in indices:
+            if index not in saved:
+                x, y, w, h = boxes[index]
+                glyph = Image.fromarray(rgba[y : y + h, x : x + w].copy())
+                padded = ImageOps.expand(glyph, border=3, fill=(0, 0, 0, 0))
+                saved[index] = save(padded, "flags", f"{spec['number']}-{index:02}", (128, 128), 84)
+            FLAGS[region].append(saved[index])
+    return list(saved.values())
+
+
+def process(filename, spec):
+    spec = {**spec, "number": list(SPEC).index(filename)}
+    kind = spec["kind"]
+    if kind in DISPOSITIONS:
+        return {"kind": kind, "status": DISPOSITIONS[kind]}
+    with Image.open(SOURCE / filename) as raw:
+        im = raw.convert("RGB")
+    if kind == "flag":
+        return {"kind": kind, "status": "integrated", "outputs": cut_flags(im, spec)}
+    outputs = []
+    width = len(spec["x"]) + 1
+    for row, col, cell in crop_cells(im, spec):
+        index = row * width + col
+        basename = f"{spec['number']}-{index:02}"
+        if kind == "landscape":
+            url = save(cell, "landscapes", basename, (900, 540), 80)
+            LANDSCAPES[spec["region"]][spec["tags"][index]].append(url)
+        elif kind == "portrait":
+            # The source art contains four reviewed rows for adult male, elder male,
+            # adult female and elder female. Preserve the original framing ratio.
+            url = save(cell, "portraits", basename, (384, 512), 80)
+            PORTRAITS[spec["region"]].append((row, url))
+        else:
+            url = save(cell, "scenes", basename, (1100, 620), 82)
+            SCENES[spec["tags"][index]].append(url)
+        outputs.append(url)
+    return {"kind": kind, "status": "integrated", "outputs": outputs}
+
+
+if __name__ == "__main__":
+    target = ROOT / "docs/production/CHRONICLE_ART_REVIEW.json"
+    previous = json.loads(target.read_text()) if target.exists() else {}
+    reviewed = {name: process(name, spec) for name, spec in SPEC.items()}
+    assets = {"landscapes": LANDSCAPES, "portraits": PORTRAITS, "scenes": SCENES, "flags": FLAGS}
+    manifest = ROOT / "src/ui/chronicle-art-data.js"
+    manifest.write_text(
+        "// Generated by scripts/build_chronicle_art.py.\nexport const chronicleArt = "
+        + json.dumps(assets, ensure_ascii=False, separators=(",", ":"))
+        + ";\n"
+    )
+    used_paths = {output for record in reviewed.values() for output in record.get("outputs", [])}
+    for record in previous.values():
+        for output in record.get("outputs", []):
+            path = ROOT / output
+            if output not in used_paths and path.resolve().is_relative_to(ART) and path.suffix == ".webp":
+                path.unlink(missing_ok=True)
+    target.write_text(json.dumps(reviewed, ensure_ascii=False, indent=2) + "\n")
+    print(f"Reviewed {len(reviewed)} sources; generated {sum(len(a.get('outputs', [])) for a in reviewed.values())} WebP assets.")

@@ -1,0 +1,32 @@
+.royal-economy { padding:9px; color:var(--chronicle-ivory); font:14px/1.45 var(--chronicle-body) }
+.royal-economy-hero { position:relative; display:grid; align-items:end; min-height:100px; overflow:hidden; isolation:isolate; border:1px solid var(--chronicle-border); border-radius:5px }
+.royal-economy-hero img { position:absolute; z-index:-2; inset:0; width:100%; height:100%; object-fit:cover }
+.royal-economy-hero::before { position:absolute; z-index:-1; inset:0; content:""; background:linear-gradient(transparent,#0b191b) }
+.royal-economy h2,.royal-economy h3 { margin:10px 0; font:650 25px/1.1 var(--chronicle-display) }
+.royal-economy-hero h2 { margin:12px }
+.royal-economy nav { display:flex; flex-wrap:wrap; gap:5px; margin:10px 0 }
+.royal-economy nav button, .royal-ledger-filters :is(input,select), .royal-tax select {
+ min-height:36px; color:var(--chronicle-ivory); background:#14292c; border:1px solid var(--chronicle-border); border-radius:4px; padding:5px 8px; font:inherit
+}
+.royal-economy nav button[aria-pressed=true] { background:#355253; border-color:var(--chronicle-brass) }
+.royal-cash { display:grid; padding:12px 0; border-bottom:1px solid var(--chronicle-border) }
+.royal-cash strong { font:650 38px/1.25 var(--chronicle-display); color:#e3bd76 }
+.royal-cash small { font-size:.45em }
+.royal-chart { margin:12px 0; color:#deb771 }
+.royal-chart svg { width:100%; height:72px; display:block }
+.royal-chart div,.royal-accounts div,.royal-innovation header { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.royal-accounts div { border-bottom:1px solid var(--chronicle-border); padding:5px 0 }
+.royal-accounts dd { margin:0 }
+.royal-table-scroll { overflow:auto; max-height:50vh }
+.royal-ledger { width:100%; border-collapse:collapse; font-size:12px }
+.royal-ledger th,.royal-ledger td { padding:5px; text-align:start; border-bottom:1px solid var(--chronicle-border) }
+.royal-ledger th small, .royal-routes span, .royal-innovation small { display:block; color:#d5c7a6 }
+.royal-ledger thead { position:sticky; top:0; background:#142629 }
+.royal-ledger thead button { color:inherit; font:inherit; background:transparent; border:0 }
+.royal-ledger-filters { display:flex; flex-wrap:wrap; gap:7px }
+.royal-ledger-filters label { display:grid; gap:3px }
+.royal-innovation { border-top:1px solid var(--chronicle-border); padding:10px 0 }
+.royal-innovation header { justify-content:flex-start }
+.royal-innovation h4 { margin:0; font:650 21px/1.2 var(--chronicle-display) }
+.royal-innovation p { margin:5px 0 }
+.royal-innovation progress { width:100%; accent-color:var(--chronicle-brass) }

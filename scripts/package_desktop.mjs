@@ -23,7 +23,7 @@ const copyDirs = [
  'assets/battle/sprites', 'assets/battle/characters', 'assets/battle/0ad',
  'assets/battle/arenas', 'assets/ui/parchment',
  'assets/audio/music', 'assets/audio/sfx', 'assets/icons', 'assets/video',
- 'assets/characters_3d'
+ 'assets/characters_3d', 'assets/terrain'
 ];
 
 const explicitAssets = [
@@ -60,9 +60,9 @@ for (const d of copyDirs) copied += walkCopy(d);
 
 const desktopPkg = {
  name: 'sovereign-1450-desktop',
- productName: 'Sovereign: 1450',
+ productName: 'Reign 1450',
  version,
- description: 'Sovereign: 1450 — offline native desktop wrapper for Windows and macOS.',
+ description: 'Reign 1450 — offline native desktop wrapper for Windows and macOS.',
  main: 'main.js',
  private: true,
  license: 'MIT',
@@ -79,7 +79,7 @@ const desktopPkg = {
  },
  build: {
   appId: 'com.sovereign1450.desktop',
-  productName: 'Sovereign 1450',
+  productName: 'Reign 1450',
   asar: true,
   directories: { output: 'release' },
   files: ['main.js', 'preload.js', 'www/**/*'],
@@ -163,7 +163,7 @@ function createWindow() {
   height: 900,
   minWidth: 1024,
   minHeight: 680,
-  title: 'Sovereign: 1450',
+  title: 'Reign 1450',
   backgroundColor: '#0a1114',
   icon: path.join(WWW_ROOT, 'assets/branding/icon-512.png'),
   autoHideMenuBar: true,

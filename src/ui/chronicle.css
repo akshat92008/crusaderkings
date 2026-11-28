@@ -1,0 +1,46 @@
+#campaign-settings {
+ width:min(560px, calc(100vw - 32px));
+ max-height:calc(100dvh - 32px);
+ overflow:auto;
+ color:var(--chronicle-ivory);
+ background:var(--chronicle-ink);
+ border:1px solid var(--chronicle-brass);
+ border-radius:8px;
+ padding:clamp(14px, 3vw, 26px);
+ font:14px/1.45 var(--chronicle-body);
+}
+#campaign-settings::backdrop { background:#030b0de0 }
+#campaign-settings header { display:flex; align-items:center; justify-content:space-between; gap:12px }
+#campaign-settings h2, .royal-journal h2 { margin:0; font:650 30px/1.1 var(--chronicle-display) }
+#campaign-settings label, .journal-filter { display:grid; gap:5px }
+#campaign-settings label:has([type=checkbox]) { display:flex; align-items:center }
+#campaign-settings select, #campaign-settings button, .journal-filter select, .journal-tabs button, .journal-alert button, .journal-dispatch {
+ min-height:40px;
+ color:var(--chronicle-ivory);
+ background:#14292c;
+ border:1px solid var(--chronicle-border);
+ border-radius:4px;
+ padding:6px 9px;
+ font:inherit;
+}
+#campaign-settings fieldset { margin:16px 0; border:1px solid var(--chronicle-border); border-radius:4px }
+.settings-fields { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:14px }
+.settings-delivery { display:grid; grid-template-columns:1fr auto; align-items:end; gap:10px; margin-bottom:8px }
+.royal-journal { color:var(--chronicle-ivory); padding:10px; font:14px/1.45 var(--chronicle-body) }
+.journal-tabs { display:flex; gap:8px; margin:10px 0 }
+.journal-tabs button[aria-pressed=true] { background:#355253; border-color:var(--chronicle-brass) }
+.journal-month { margin-top:12px; padding-top:8px; border-top:1px solid var(--chronicle-border) }
+.journal-month h3 { margin:0; color:#d7b46d; font:650 21px/1.2 var(--chronicle-display) }
+.journal-month ul { display:grid; gap:8px; padding:0; list-style:none }
+.journal-month li { border-bottom:1px solid #b89b612b; padding-bottom:8px }
+.journal-alert, .journal-dispatch { margin:8px 0 }
+.journal-alert p { margin:5px 0 }
+.journal-dispatch { display:grid; width:100%; text-align:left }
+html[data-motion=reduce] :is(.chronicle-nav,.leftbar,.rightbar,.maptop,.toast,.event-modal) {
+ animation-duration:.01ms!important;
+ transition-duration:.01ms!important;
+ scroll-behavior:auto!important;
+}
+:root { --campaign-ui-scale:1 }
+#tab-content, #province-panel { zoom:var(--campaign-ui-scale) }
+html[data-density=standard] .topresources .resource:has(#resource-prestige, #resource-legitimacy) { display:none }

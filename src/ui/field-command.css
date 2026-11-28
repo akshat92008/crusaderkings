@@ -1,0 +1,41 @@
+.battle-screen.field-command .battle-top,
+.battle-screen.field-command .battle-bottom {
+  background: #112528ee;
+  border-color: #a98d5c;
+  box-shadow: 0 0 24px #050d10a0;
+}
+.field-command .battle-top { gap: 12px }
+.field-command .battle-top h2 { font: 600 clamp(15px, 2.6vw, 24px)/1.1 Georgia, serif }
+.field-command .banner-score,
+.field-command .battle-commands {
+  border-color: #a98d5c66;
+  background: #0b1c1f;
+  box-shadow: none;
+}
+.field-command .battle-guide,
+.field-command .battle-focus,
+.field-command .battle-meta { font: 500 12px/1.3 system-ui, sans-serif }
+.field-command .battle-strength:empty { display: none }
+.field-command .battle-comparison { gap: 5px; margin-block: 3px; font: 500 11px/1.3 system-ui, sans-serif }
+.field-command .battle-comparison > div { padding: 3px 6px; background: #183133; border-color: #a98d5c55 }
+.field-command .battle-commands select,
+.field-command .battle-commands button,
+.field-command .battle-buttons select,
+.field-command .battle-buttons button {
+  background: #1c3638;
+  border-color: #aa8b58;
+  box-shadow: none;
+  font: 600 12px/1.2 system-ui, sans-serif;
+}
+.field-command .battle-commands #battle-start { background: #ddb86e; color: #241a0d; border-color: #efd38c }
+.field-command .battle-buttons #battle-retreat { background: #62332e; color: #fff3de }
+.field-command .battle-units .unitcard { background: linear-gradient(#254042,#14292d); border-color: #9b865f }
+.field-command .battle-units .unitcard.active { background: linear-gradient(#536145,#34473a); border-color: #ddb86e }
+.field-command .battle-units .unitcard.reserve { background: linear-gradient(#32495f,#253844); border-color: #7798b4 }
+@media (max-width: 650px) {
+  .field-command .battle-comparison { display: none }
+  .field-command .battle-top .battle-meta { font-size: 10px }
+  .field-command .battle-guide { font-size: 11px }
+  .field-command .battle-commands button,
+  .field-command .battle-commands select { font-size: 10px }
+}

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-const css = readFileSync(new URL('../assets/court-theme.css', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../src/ui/chronicle-shell.css', import.meta.url), 'utf8');
 const dock = html.match(/<nav id="quick-nav"[\s\S]*?<\/nav>/)?.[0];
 
 test('campaign dock exposes six destinations below the map', () => {
@@ -14,8 +14,8 @@ test('campaign dock exposes six destinations below the map', () => {
     assert.ok(dock.includes('data-priority-tab="' + tab + '"'), tab);
     assert.ok(html.includes('data-tab="' + tab + '"'), tab);
   }
-  for (const utility of ['search','chronicle']) assert.ok(dock.includes('data-priority-tab="' + utility + '"'));
-  assert.ok(dock.includes('id="open-hometown"'));
+  for (const utility of ['search','chronicle']) assert.ok(html.includes('data-priority-tab="' + utility + '"'));
+  assert.ok(dock.includes('id="capital-nav"'));
   assert.ok(main.includes("closest('[data-priority-tab]')"));
   assert.ok(main.includes("el('open-hometown').addEventListener"));
 });
@@ -30,7 +30,7 @@ test('legacy management tabs and unique DOM hooks are preserved', () => {
 });
 
 test('campaign dock has responsive sizing and keyboard focus styling', () => {
-  assert.match(css, /\.reign-nav>button:focus-visible/);
-  assert.match(css, /\.reign-nav #outliner-list/);
-  assert.match(css, /@media\(max-width:420px\)\{[\s\S]*?\.reign-nav/);
+  assert.match(css, /:focus-visible/);
+  assert.match(css, /#quick-nav\.chronicle-nav/);
+  assert.match(css, /@media \(max-width: 620px\)/);
 });

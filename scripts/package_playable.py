@@ -18,24 +18,20 @@ keep += [str(p.relative_to(ROOT)) for folder in ('src','data') for p in (ROOT/fo
 keep += ['assets/icons/Strategy_game_trait_icon_sheet_807567b6.jpg','assets/icons/Character_trait_icon_sheet_fe2300f5.jpg','assets/icons/Medieval_strategy_game_skill_icons_c1080878.jpg','assets/icons/Medieval_political_office_icon_s…_7042e0b0.jpg','assets/icons/Create_historical_strategy_game_…_7e8a58fa.jpg','assets/icons/Medieval_strategy_game_icon_sheet_8967b69f.jpg','assets/video/Medieval_war_table_map_animation_ac51bb4b.mp4']
 keep += ['assets/favicon.svg','assets/court-theme.css','assets/court-compass.svg','assets/monarch-crest.svg','docs/HISTORICAL_CONTEXT.md']
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/branding').rglob('*') if p.is_file()]
-keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/battle/characters').rglob('*') if p.is_file()]
-keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/game-art').rglob('*') if p.is_file()]
-keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/audio/music').rglob('*') if p.is_file()]
+runtime_art = ('battle/0ad', 'battle/arenas', 'battle/characters', 'battle/sprites', 'game-art',
+               'audio/music', 'audio/sfx', 'terrain', 'ui/parchment')
+keep += [str(p.relative_to(ROOT)) for subfolder in runtime_art
+         for p in (ROOT/'assets'/subfolder).rglob('*') if p.is_file()]
+keep += ['docs/production/ASSET_LICENSE_REGISTER.md']
 keep += ['assets/hometown.css','assets/archery_range.png','assets/barracks.png','assets/blacksmith.png','assets/castle.png','assets/stable.png','assets/watchtower_wooden_full_size.png','assets/house1.png','assets/house1b.png','assets/house1c.png','docs/HOMETOWN.md']
 keep += [str(p.relative_to(ROOT)) for p in (ROOT/'assets/hometown').rglob('*') if p.is_file()]
 keep += ['assets/characters_3d/ashigaru-foot-soldier-806707.glb','assets/characters_3d/daimyo-lord-78364a.glb','assets/characters_3d/LICENSE-Polyfork.txt']
-text = ('CROWN OF NATIONS: 1450 — CULTURAL WARFARE PLAYTEST\n'
-        'This is a playable development preview, not a finished game.\n\n'
-        'Extract the ZIP. In a terminal inside crown-of-nations run:\n'
-        '  python3 -m http.server 8080\n'
-        'Then open http://localhost:8080\n\n'
-        'The live political atlas has been upgraded. Playable province borders remain synthetic,\n'
-        'and the history overlay is incomplete.\n'
-        'WebGL2 battles use bundled KayKit animated infantry, archers and riders.\n'
-        'New castles, settlements, siege props and camp scenery are procedural.\n'
-        'Royal courts, rival AI, trade, government institutions and contextual narrative events are playable.\n'
-        'This edition adds cultural army doctrine and defensive battles, with selectable formations and deployment.\n'
-        'The world map remains synthetic; political depth and release quality are still under development.\n')
+text = ('REIGN 1450 — PLAYTEST BUILD\n\n'
+        'Extract the archive. Start the local game with START_GAME_MAC.command or START_GAME_WINDOWS.bat.\n'
+        'You can also run python3 -m http.server 8080 inside the extracted crown-of-nations folder\n'
+        'and open http://localhost:8080 in your browser. Python 3 is required by the launchers.\n\n'
+        'The campaign features a world atlas, dynastic politics, a capital settlement and 3D field battles.\n'
+        'Campaign district borders are approximate. Asset attributions are included in the archive.\n')
 for needed in ['assets/battle/characters/Knight.glb','assets/battle/characters/Rogue_Hooded.glb','src/three-battle.bundle.js']:
   if not (ROOT/needed).is_file(): raise FileNotFoundError('Required playable battle art missing: '+needed)
 with ZipFile(OUT,'w',ZIP_DEFLATED,compresslevel=8) as zipf:

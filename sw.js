@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sovereign-1450-v3';
+const CACHE_NAME = 'reign-1450-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,17 @@ const CORE_ASSETS = [
   './data/world.json',
   './data/historical-polities-1450.json',
   './src/main.js',
+  './src/ui/chronicle-shell.css',
+  './src/ui/minimap.js',
+  './src/ui/chronicle.css',
+  './src/ui/chronicle.js',
+  './src/ui/royal-economy.css',
+  './src/ui/royal-economy.js',
+  './src/ui/politics.css',
+  './src/ui/lineage.js',
+  './src/ui/asset-registry.js',
+  './src/ui/chronicle-art-data.js',
+  './src/ui/field-command.css',
   './src/simulation.js',
   './src/map.js',
   './src/banner-renderer.js',

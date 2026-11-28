@@ -1,0 +1,167 @@
+import {eventImage} from '../game-art.js';
+
+const STORE = 'reign1450.interface.v1';
+const categories = {
+  critical: 'Succession, invasions and crises',
+  important: 'Court and political decisions',
+  works: 'Construction and research',
+  chronicle: 'Routine affairs'
+};
+const defaults = {critical: 'pause', important: 'notify', works: 'notify', chronicle: 'record'};
+const modes = {pause: 'Pause and show', notify: 'Notify', record: 'Chronicle only'};
+const choices = {
+  density: {standard: 'Standard', expert: 'Expert'},
+  scale: {90: '90%', 100: '100%', 110: '110%', 125: '125%'},
+  motion: {system: 'System preference', reduce: 'Reduced'},
+  delay: {0: 'Immediate', 300: 'Short', 700: 'Long'}
+};
+function load() {
+  let data;
+  try { data = JSON.parse(localStorage.getItem(STORE)); } catch {}
+  const p = {density:'standard', scale:'100', motion:'system', delay:'300', delivery:{}, sound:{}};
+  for (const k in choices) if (Object.hasOwn(choices[k], data?.[k])) p[k] = data[k];
+  for (const k in defaults) {
+    p.delivery[k] = Object.hasOwn(modes, data?.delivery?.[k]) ? data.delivery[k] : defaults[k];
+    p.sound[k] = typeof data?.sound?.[k] === 'boolean' ? data.sound[k] : k === 'critical';
+  }
+  return p;
+}
+export const preferences = load();
+function apply() {
+  const root = document.documentElement;
+  root.dataset.density = preferences.density;
+  root.dataset.motion = preferences.motion;
+  root.style.setProperty('--campaign-ui-scale', String(Number(preferences.scale) / 100));
+}
+const labels = {density:'Information density', scale:'Interface size', motion:'Motion', delay:'Tooltip delay'};
+function options(values, value) {
+  return Object.entries(values).map(([k,v]) => '<option value="'+k+'"'+(String(value)===k?' selected':'')+'>'+v+'</option>').join('');
+}
+export function installSettings() {
+  apply();
+  let dialog;
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#open-settings,[data-open-campaign-settings]')) return;
+    if (!dialog) {
+      dialog = document.createElement('dialog');
+      dialog.id = 'campaign-settings'; dialog.setAttribute('aria-labelledby','campaign-settings-title');
+      dialog.innerHTML = '<header><h2 id="campaign-settings-title">Campaign settings</h2><form method="dialog"><button autofocus aria-label="Close settings">Close</button></form></header>'+
+        '<div class="settings-fields">'+Object.entries(choices).map(([k,v]) => '<label>'+labels[k]+'<select data-setting="'+k+'">'+options(v,preferences[k])+'</select></label>').join('')+'</div>'+
+        '<fieldset><legend>Notifications</legend>'+Object.entries(categories).map(([k,label]) => '<div class="settings-delivery"><label>'+label+'<select data-delivery="'+k+'">'+options(modes,preferences.delivery[k])+'</select></label><label><input type="checkbox" data-sound="'+k+'"'+(preferences.sound[k]?' checked':'')+' aria-label="Sound for '+label+'"> Sound</label></div>').join('')+'</fieldset>'+
+        '<details><summary>Keyboard shortcuts</summary><p><kbd>/</kbd> Search the campaign<br><kbd>T</kbd> Pin and expand a focused tooltip<br><kbd>Esc</kbd> Close an overlay or tooltip</p></details>';
+      dialog.addEventListener('change', e => {
+        const input = e.target;
+        if (input.dataset.setting) preferences[input.dataset.setting] = input.value;
+        if (input.dataset.delivery) preferences.delivery[input.dataset.delivery] = input.value;
+        if (input.dataset.sound) preferences.sound[input.dataset.sound] = input.checked;
+        apply();
+        try { localStorage.setItem(STORE, JSON.stringify(preferences)); } catch {}
+      });
+      dialog.addEventListener('keydown', e => e.stopPropagation());
+      document.body.append(dialog);
+    }
+    if (!dialog.open) dialog.showModal();
+  });
+}
+
+export function dispatchCategory(entry) {
+  if (entry.tier && Object.hasOwn(categories,entry.tier)) return entry.tier;
+  const text = entry.text || [entry.badge,entry.title].join(' ');
+  if (/\b(died|abdicated|invasion|invaded|revolt|rebelled|rebellion|civil war|succession crisis|succeeded to|crowned|famine|epidemic)\b/i.test(text)) return 'critical';
+  if (/\b(researched|research complete[d]?|discovery|level \d+ completed|construction (finished|completed)|upgrade[d]? (is )?complete[d]?)\b/i.test(text)) return 'works';
+  if (entry.key || /\b(alliance|treaty|regency|decree|independence|victory|defeat)\b/i.test(text)) return 'important';
+  return 'chronicle';
+}
+const lastLog = new WeakMap();
+export function observeRecords(game) {
+  const log = (game.log || []).filter(l => typeof l?.text === 'string');
+  if (!lastLog.has(game)) {
+    if (!Array.isArray(game.royalJournal)) game.royalJournal = log.slice(0,360);
+    else {
+      const known = new Set(game.royalJournal.map(record => record.date+'|'+record.text));
+      const unsaved = log.filter(record=>!known.has(record.date+'|'+record.text));
+      game.royalJournal = [...unsaved,...game.royalJournal].slice(0,360);
+    }
+    lastLog.set(game, new Set(log));
+    return [];
+  }
+  const previous = lastLog.get(game);
+  const fresh = log.filter(entry => !previous.has(entry));
+  if (fresh.length) game.royalJournal = [...fresh, ...game.royalJournal].slice(0,360);
+  lastLog.set(game,new Set(log));
+  return fresh;
+}
+export function deliver(prompts, records, {pause, showEvent, notify, sound}) {
+  const entries = [...prompts.map(entry => ({entry,prompt:true})),...records.map(entry => ({entry,prompt:false}))];
+  const active = entries.map(item => ({...item,category:dispatchCategory(item.entry)}))
+    .filter(item => preferences.delivery[item.category] !== 'record')
+    .sort((a,b) => Object.keys(categories).indexOf(a.category)-Object.keys(categories).indexOf(b.category));
+  if (!active.length) return;
+  const paused = active.filter(item => preferences.delivery[item.category] === 'pause');
+  if (paused.length) pause();
+  if (active.some(item => preferences.sound[item.category])) sound();
+  const modal = paused.find(item => item.prompt);
+  if (modal) { showEvent(modal.entry); return; }
+  const first = (paused[0] || active[0]).entry;
+  notify((first.title || first.text)+(active.length>1?' · '+(active.length-1)+' more in Chronicle':''));
+}
+let section = 'timeline';
+let filter = 'all';
+export function selectJournal(sectionName) { section = sectionName === 'alerts' ? 'alerts' : 'timeline'; }
+const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function normalizeDate(value) {
+  const s=String(value||''), parts=s.match(/^(\d+) · month (\d+)$/i);
+  if (parts && monthNames[Number(parts[2])-1]) return monthNames[Number(parts[2])-1]+' '+parts[1];
+  const words=s.match(/^(\w+) (\d+)$/);
+  if (words) {
+    const month=monthNames.find(m => m.slice(0,3).toLowerCase()===words[1].slice(0,3).toLowerCase());
+    if (month) return month+' '+words[2];
+  }
+  return s || 'Undated';
+}
+export function renderJournal(game, priorities, prompts, esc) {
+  const records=game.royalJournal||game.log||[];
+  const nav='<div class="journal-tabs" role="group" aria-label="Chronicle view">'+[['timeline','Timeline'],['alerts','Alerts']].map(([k,v])=>'<button type="button" data-journal-view="'+k+'" aria-pressed="'+(k===section)+'">'+v+'</button>').join('')+'</div>';
+  let content='';
+  if (section==='alerts') {
+    const groups = new Map();
+    for (const p of priorities) {
+      if (!groups.has(p.tab)) groups.set(p.tab,[]);
+      groups.get(p.tab).push(p);
+    }
+    if (prompts.length) content+='<h3>Awaiting your decision</h3>'+prompts.map(p=>'<button class="journal-dispatch" data-journal-event="'+esc(p.key)+'"><small>'+esc(p.badge)+'</small><b>'+esc(p.title)+'</b></button>').join('');
+    for (const [tab,group] of groups) content+='<section class="journal-alert"><button type="button" data-priority-tab="'+esc(tab)+'">'+esc(group[0].label)+(group.length>1?' +'+(group.length-1):'')+' ›</button>'+group.map(p=>'<p>'+esc(p.detail)+'</p>').join('')+'</section>';
+    if (!content) content='<p>No decisions or alerts are pending.</p>';
+  } else {
+    content='<label class="journal-filter">Show <select id="journal-filter">'+options({all:'All records',...categories},filter)+'</select></label>';
+    const months=new Map();
+    for (const entry of records) {
+      if (typeof entry?.text !== 'string' || (filter!=='all' && dispatchCategory(entry)!==filter)) continue;
+      const date=normalizeDate(entry.date);
+      if (!months.has(date)) months.set(date,new Map());
+      const month=months.get(date); month.set(entry.text,(month.get(entry.text)||0)+1);
+    }
+    let illustrated=0;
+    for (const [date,entries] of months) {
+      content+='<section class="journal-month"><h3>'+esc(date)+'</h3><ul>';
+      for (const [text,count] of entries) {
+        const major=dispatchCategory({text})==='critical' && illustrated<3;
+        if (major) illustrated++;
+        content+='<li>'+(major?eventImage(text,game.player):'')+esc(text)+(count>1?' <small>×'+count+'</small>':'')+'</li>';
+      }
+      content+='</ul></section>';
+    }
+    if (!months.size) content+='<p>No matching records yet.</p>';
+  }
+  return '<article class="royal-journal"><h2>Royal chronicle</h2>'+nav+content+'</article>';
+}
+export function bindJournal(container, refresh, open) {
+  container.addEventListener('click',e=>{
+    const tab=e.target.closest('[data-journal-view]'),event=e.target.closest('[data-journal-event]');
+    if(tab){selectJournal(tab.dataset.journalView);refresh();container.querySelector('[data-journal-view="'+section+'"]')?.focus();}
+    if(event)open(event.dataset.journalEvent);
+  });
+  container.addEventListener('change',e=>{
+    if(e.target.id==='journal-filter'){filter=e.target.value;refresh();container.querySelector('#journal-filter')?.focus();}
+  });
+}

@@ -1,0 +1,303 @@
+.province-banner {
+ position: relative;
+ display: grid;
+ min-height: 120px;
+ aspect-ratio: 2 / 1;
+ margin: 12px 0;
+ isolation: isolate;
+ overflow: hidden;
+ border: 1px solid #92744a;
+ border-radius: 5px;
+ background: #23383b;
+ color: #f2e9d5;
+}
+
+.province-landscape {
+ position: absolute;
+ inset: 0;
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+ z-index: -2;
+}
+
+.province-banner::after {
+ content: "";
+ position: absolute;
+ inset: 0;
+ z-index: -1;
+ background: linear-gradient(0deg, #0b191bef, transparent 80%);
+}
+
+.province-banner.occupied::after {
+ background: linear-gradient(0deg, #442127fa, #3d211735 80%);
+}
+
+.province-banner figcaption {
+ align-self: end;
+ display: flex;
+ align-items: end;
+ gap: 8px;
+ padding: 8px;
+}
+
+.province-banner figcaption b, .province-banner figcaption small {
+ display: block;
+ text-transform: capitalize;
+}
+
+.province-banner figcaption b {
+ font: 700 16px / 1.15 var(--chronicle-display, Georgia, serif);
+}
+
+.province-banner figcaption small {
+ margin-top: 2px;
+ color: #f2e9d5;
+}
+
+.province-emblem {
+ width: 42px;
+ height: 44px;
+ flex: 0 0 42px;
+ object-fit: contain;
+ filter: drop-shadow(0 1px 2px #0b191b);
+}
+
+.royal-overview, .envoy-header {
+ margin-bottom: 12px;
+ padding: 12px;
+ border: 1px solid #92744a;
+ border-radius: 5px;
+ background: linear-gradient(135deg, #233d3d, #152729 65%);
+ color: #f2e9d5;
+}
+
+.royal-overview > header {
+ display: flex;
+ align-items: center;
+ gap: 10px;
+ margin-bottom: 12px;
+}
+
+#tab-content .royal-overview > header h2 {
+ margin: 0;
+ color: #f2e9d5;
+ font: 700 clamp(18px, 2vw, 24px) / 1.1 var(--chronicle-display, Georgia, serif);
+}
+
+.royal-overview small, .envoy-header small {
+ color: #e8dac0;
+ font-size: 11px;
+}
+
+.crown-shield {
+ width: 44px;
+ height: 46px;
+ object-fit: contain;
+}
+
+.royal-household {
+ display: grid;
+ grid-template-columns: repeat(3, minmax(0, 1fr));
+ gap: 5px;
+}
+
+.royal-person {
+ display: grid;
+ min-width: 0;
+ align-content: start;
+ justify-items: center;
+ text-align: center;
+}
+
+.royal-person > .portrait-mark {
+ width: min(100%, 65px);
+ height: auto;
+ aspect-ratio: 3 / 4;
+ border: 1px solid #b08f56;
+}
+
+.royal-person .portrait-frame {
+ width: 100%;
+ height: 100%;
+ border: 0;
+}
+
+.royal-person > div {
+ display: grid;
+ gap: 1px;
+ justify-items: center;
+ min-width: 0;
+}
+
+#tab-content .royal-person .character-link {
+ max-width: 100%;
+ min-height: 26px;
+ padding: 0 2px;
+ color: #ffe2a5;
+ overflow-wrap: anywhere;
+}
+
+.royal-person.empty {
+ align-content: center;
+ min-height: 70px;
+}
+
+.royal-attributes, .royal-vitals {
+ display: grid;
+ margin: 12px 0 0;
+ padding: 7px 0;
+ border-block: 1px solid #92744a80;
+ gap: 6px;
+}
+
+.royal-attributes { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.royal-vitals { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.royal-attributes div, .royal-vitals div { text-align: center; }
+.royal-attributes dt, .royal-vitals dt { color: #e8dac0; font-size: 10px; overflow-wrap: anywhere; }
+.royal-attributes dt .game-art-icon { display: block; margin: 0 auto 2px; }
+.royal-attributes dd, .royal-vitals dd { margin: 2px 0 0; font-weight: 650; font-size: 12px; overflow-wrap: anywhere; }
+
+.crown-traits {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 5px 8px;
+ padding: 0;
+ margin: 8px 0;
+ list-style: none;
+ color: #f2e9d5;
+ font-size: 11px;
+ text-transform: capitalize;
+}
+
+.royal-links {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 4px;
+ margin-top: 10px;
+}
+
+.royal-ambition { margin: 7px 0 0; }
+
+.envoy-header {
+ display: grid;
+ grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+ gap: 8px;
+ align-items: center;
+ margin-top: 10px;
+}
+
+.envoy-relation {
+ display: grid;
+ gap: 2px;
+ text-align: center;
+}
+
+.envoy-relation strong {
+ font: 700 22px / 1 var(--chronicle-display, Georgia, serif);
+ color: #f4ce89;
+}
+
+.envoy-proposal summary span {
+ color: #57412d;
+ font-weight: 550;
+}
+
+.envoy-proposal dl { margin: 5px 0 8px; }
+.envoy-proposal dl > div {
+ display: flex;
+ justify-content: space-between;
+ gap: 8px;
+ padding: 4px 0;
+ border-bottom: 1px solid #92744a55;
+}
+
+.envoy-proposal dd { margin: 0; font-variant-numeric: tabular-nums; }
+.adviser-card > h3 { text-transform: capitalize; }
+.adviser-card > h3 .game-art-icon { vertical-align: middle; }
+.adviser-card .adviser-task { margin: 5px 0 0; font-weight: 650; }
+
+royal-lineage {
+ display: block;
+ border: 1px solid #92744a;
+ border-radius: 5px;
+ overflow: hidden;
+ background: #152729;
+ color: #f2e9d5;
+}
+
+.lineage-controls {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ gap: 5px;
+ padding: 7px;
+ border-bottom: 1px solid #92744a80;
+}
+.lineage-controls strong { flex: 1; }
+.lineage-controls output { min-width: 35px; text-align: center; font-size: 11px; }
+.lineage-controls button, .lineage-person button {
+ padding: 4px 6px;
+ border: 1px solid #92744a;
+ border-radius: 3px;
+ background: #213a3b;
+ color: #f2e9d5;
+ min-height: 29px;
+ cursor: pointer;
+}
+.lineage-controls button:disabled { opacity: .55; cursor: default; }
+.lineage-view { max-height: min(52dvh, 420px); overflow: auto; }
+.lineage-rows { min-width: 100%; width: max-content; padding: 10px; }
+.lineage-rows section > h4 { margin: 4px 0 7px; color: #e0c799; }
+.lineage-generation { position: relative; display: flex; gap: 8px; margin-bottom: 10px; }
+.lineage-generation::before {
+ content: "";
+ position: absolute;
+ top: -4px;
+ inset-inline: 4%;
+ height: 1px;
+ background: #92744a88;
+}
+.lineage-person {
+ display: grid;
+ align-content: start;
+ justify-items: center;
+ gap: 3px;
+ width: 100px;
+ padding: 5px 3px;
+ text-align: center;
+ background: #203436;
+ border: 1px solid #92744a80;
+ border-radius: 4px;
+}
+.lineage-person .portrait-frame { width: 42px; height: 54px; overflow: hidden; }
+.lineage-person button[data-character] { background: transparent; border-color: transparent; color: #ffe2a5; font-weight: 650; }
+.lineage-person small { font-size: 10px; color: #e8dac0; }
+
+.province-lord-mark {
+ display: grid;
+ justify-items: end;
+ gap: 2px;
+ margin-left: auto;
+ max-width: 45%;
+ text-align: right;
+}
+
+.province-lord-mark .portrait-mark {
+ width: 38px;
+ height: 44px;
+ border: 1px solid #b08f56;
+}
+
+.province-lord-mark .portrait-frame {
+ width: 100%;
+ height: 100%;
+ border: 0;
+}
+
+#province-panel .province-lord-mark .character-link {
+ padding: 1px 3px;
+ color: #ffe2a5;
+ max-width: 100%;
+ overflow-wrap: anywhere;
+}

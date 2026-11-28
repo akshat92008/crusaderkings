@@ -197,9 +197,9 @@ test('renderHometown renders ledger, stage badges, worker pills, and Siege/Arsen
   assert.ok(html.includes('ht-ledger-body" hidden'), 'ledger body initially collapsed');
 
   // Verify 6 resource cards and 5 nav tabs
-  const resSection = html.split('<div class="ht-resources">')[1].split('</div><div class="ht-food-summary">')[0];
+  const resSection = html.split('<div class="ht-resources">')[1].split('</div><nav class="ht-tabs"')[0];
   assert.equal((resSection.match(/<div><small>/g) || []).length, 6);
-  const tabSection = html.split('<nav class="ht-tabs">')[1].split('</nav>')[0];
+  const tabSection = html.split('<nav class="ht-tabs" aria-label="Capital management">')[1].split('</nav>')[0];
   assert.equal((tabSection.match(/data-ht="tab"/g) || []).length, 5);
 
   // Bind and toggle ledger + switch to military tab

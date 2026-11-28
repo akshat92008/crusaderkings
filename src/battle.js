@@ -1,3 +1,4 @@
+import {effectiveCharacterSkill} from './character-agency.js';
 import {BannerRenderer} from './banner-renderer.js';
 import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells,cardFormationChoices,toggleCardReserve} from './simple-card-battle.js';
 import {chooseBattleRenderer, freshBattleCanvas, disposeNativeRenderer} from './battle-lifecycle.js';
@@ -731,12 +732,21 @@ export class BattleGame {
       ? packSpecialistRegiments(enemies, hostileFieldArmies, game.military?.armies, REGIMENTS, slotCount(enemies))
       : packActiveRegiments(enemies, enemySlots, enemyDoctrine);
 
-    const sideCommanderMartial = (armies, realmId) => {
-      const cmdId = armies?.find?.(x => x?.commander)?.commander || game?.politics?.houses?.[realmId]?.ruler;
-      return Math.max(0, game?.politics?.people?.[cmdId]?.stats?.martial ?? 0);
+    const sideCommander = (armies, realmId) => {
+      for (const army of armies) {
+        const name = armyReadiness(game, army).commander;
+        const character = game?.politics?.people?.[game.military?.armies?.[army.id]?.commander];
+        if (name && character) return {name, martial: effectiveCharacterSkill(game, character, 'martial')};
+      }
+      const ruler = game?.politics?.people?.[game?.politics?.realms?.[realmId]?.ruler];
+      return ruler?.alive ? {name: ruler.name, martial: effectiveCharacterSkill(game, ruler, 'martial')} : null;
     };
-    const atkMartial = descriptor.commanderMartial?.attacker ?? sideCommanderMartial(alliedFieldArmies, game?.player);
-    const defMartial = descriptor.commanderMartial?.defender ?? sideCommanderMartial(hostileFieldArmies, descriptor.enemy);
+    this.commanders = descriptor.fieldBattle ? {
+      attacker: sideCommander(alliedFieldArmies, game?.player),
+      defender: sideCommander(hostileFieldArmies, descriptor.enemy)
+    } : null;
+    const atkMartial = descriptor.commanderMartial?.attacker ?? this.commanders?.attacker?.martial ?? 0;
+    const defMartial = descriptor.commanderMartial?.defender ?? this.commanders?.defender?.martial ?? 0;
 
     for (const entry of packedAttacker) {
       const idx = entry.slotIndex;
@@ -1256,6 +1266,7 @@ export class BattleGame {
     if (this.onStatus) {
       this.onStatus({
         groups: this.groups,
+        commanders: this.commanders,
         selected: this.selected,
         selectedGroupId: this.selectedGroupId,
         selectedGroup: sel,
@@ -1311,11 +1322,17 @@ export class BattleGame {
   }
 
   command(index, order, point, all = false) {
-    if (!this.descriptor?.fieldBattle || this.done || this.simpleField) return false;
+    if (!this.descriptor?.fieldBattle || this.done || this.deployment) return false;
     const groups = all ? this.groups.filter(g => g.side === 'attacker') : [this.groups[index]];
     let changed = false;
     for (const g of groups) {
-      if (g?.side === 'attacker' && issueFieldOrder(g, order, point)) changed = true;
+      if (g?.side === 'attacker' && issueFieldOrder(g, order, point)) {
+        if (this.simpleField) {
+          g.focusTargetId = null;
+          g.focusTarget = null;
+        }
+        changed = true;
+      }
     }
     if (changed) {
       this.audio?.play('order');

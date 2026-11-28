@@ -71,3 +71,30 @@ test('card battle: higher commanderMartial wins an equal mirror match',()=>{
  for(let i=0;i<600&&!weak.routed&&!strong.routed;i++)stepField(s,.05);
  assert.ok(weak.routed&&!strong.routed);
 });
+
+test('card battle executes hold, a ground move, and a designated charge target',()=>{
+ const a=unit('a','attacker','cavalry',0,0,120);
+ const front=unit('front','defender','infantry',0,-15,120);
+ const rear=unit('rear','defender','archers',20,-20,120);
+ const state={simpleField:true,groups:[a,front,rear]};
+ issueFieldOrder(a,'hold');
+ stepField(state,0.1);
+ assert.equal(a.z,0);
+ assert.equal(a.moving,false);
+
+ issueFieldOrder(a,'move',[10,0]);
+ stepField(state,0.1);
+ assert.ok(a.x>0);
+ assert.equal(a.z,0);
+
+ issueFieldOrder(a,'charge');
+ a.focusTargetId=rear.id;
+ stepField(state,0.1);
+ assert.equal(a.cardTargetId,rear.id);
+ assert.ok(a.z<0);
+
+ issueFieldOrder(a,'fallback');
+ const before=a.z;
+ stepField(state,0.1);
+ assert.ok(a.z>before);
+});
