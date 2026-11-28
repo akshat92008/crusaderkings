@@ -69,7 +69,8 @@ try:
    page.click('#nav-back');assert page.locator('[id^="council-candidate-"]').count()>0
    page.click('#nav-forward');assert page.locator('.campaign-hub').is_visible()
    page.click('#close-management')
-   page.locator('#quick-nav [data-priority-tab="characters"]').click()
+   page.locator('#quick-nav [data-priority-tab="court"]').click()
+   page.locator('#tabs [data-tab="characters"]').click()
    page.fill('#people-query','no-matching-person-xyz');assert page.locator('.directory-list .person-row').count()==0
    page.fill('#people-query','');assert page.locator('.directory-list .person-row').count()>0
    page.locator('#tabs [data-tab="dynasty"]').click();assert page.locator('.family-generation').count()==4
