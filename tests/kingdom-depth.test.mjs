@@ -34,7 +34,7 @@ test('merchant treaty requires relations and creates measurable monthly trade in
  assert.ok(negotiate(g,'france','trade',world).ok);
  assert.equal(tradePactCount(g),1);
  assert.ok(tradeIncome(g,'ottomans')>0);
- const before=empireStats(g,'ottomans');assert.equal(before.trade,tradeIncome(g,'ottomans'));
+ const before=empireStats(g,'ottomans');assert.equal(before.trade,tradeIncome(g,'ottomans')+(before.tradeRouteIncome||0));
  const prev=f.treasury;advanceMonth(g,world);
  assert.ok(f.treasury>prev-250,'income should contribute to monthly treasury');
  assert.equal(negotiate(g,'france','trade',world).ok,false);

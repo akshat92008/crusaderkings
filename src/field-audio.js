@@ -1,8 +1,8 @@
-import {SampleBank} from './sample-audio.js';
+import {SampleBank,ExtendedSfxBank} from './sample-audio.js';
 import {SoundtrackPlayer,soundtrackPaths,campaignMusicKey} from './soundtrack.js';
 // Original procedural sound effects, battle music fallback, and unified campaign audio.
-const limits = { steel: 0.15, arrow: 0.20, hoof: 0.28, rout: 0.8, horn: 1.1, rally: 1.1, wind: 2.2, order: 0.15, victory: 1, defeat: 1 };
-const sfxLimits = { click: 0.05, coin: 0.08, seal: 0.12, horn: 0.5, chime: 0.15, alert: 0.25, march: 0.18, succession: 0.8, rally: 0.6 };
+const limits = { steel: 0.15, arrow: 0.20, hoof: 0.28, rout: 0.8, horn: 1.1, rally: 1.1, wind: 2.2, order: 0.15, victory: 1, defeat: 1, impact: 0.22, breach: 0.45, catapult: 0.35, footsteps: 0.25, sword: 0.16 };
+const sfxLimits = { click: 0.05, toggle: 0.06, coin: 0.08, seal: 0.12, horn: 0.5, chime: 0.15, alert: 0.25, march: 0.18, succession: 0.8, rally: 0.6, build: 0.25, upgrade: 0.25, open: 0.12, close: 0.12, error: 0.2, footsteps: 0.18, breach: 0.4, catapult: 0.35, impact: 0.22 };
 
 const defaultAudioCtxFactory = () => {
   const C = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -45,7 +45,7 @@ export function fieldAudioEvents(groups, seen, elapsed, ambientDue = 0) {
 export class FieldAudio {
   constructor(factory, enabled = true, opts = {}) {
     this.factory = factory;
-    this.sampleLoader=opts.sampleLoader;this.samples=null;
+    this.sampleLoader=opts.sampleLoader;this.samples=null;this.extendedSamples=null;
     this.enabled = enabled;
     this.seen = new Map();
     this.next = new Map();
@@ -64,7 +64,11 @@ export class FieldAudio {
         this.master.gain.value = 0.18;
         this.master.connect(this.ctx.destination);
         this.noise = makeNoiseBuffer(this.ctx, 2);
-        if(this.sampleLoader&&this.ctx.decodeAudioData){this.samples=new SampleBank(this.ctx,this.sampleLoader===true?undefined:this.sampleLoader);void this.samples.warm(['steel','hoof','order','victory','defeat']);}
+        if(this.sampleLoader&&this.ctx.decodeAudioData){
+          const ldr=this.sampleLoader===true?undefined:this.sampleLoader;
+          this.samples=new SampleBank(this.ctx,ldr);void this.samples.warm(['steel','hoof','order','victory','defeat']);
+          this.extendedSamples=new ExtendedSfxBank(this.ctx,ldr);void this.extendedSamples.warm(['impact','breach','catapult','arrow','sword','horn','rally','footsteps']);
+        }
       }
       this.ctx.resume?.()?.catch?.(() => {});
       return true;
@@ -94,6 +98,7 @@ export class FieldAudio {
     if (now < (this.next.get(kind) || 0)) return false;
     this.next.set(kind, now + (limits[kind] || 0.2));
     if(this.samples?.play(kind,node=>this.connect(node,pan),(source,nodes)=>this.track(source,nodes)))return true;
+    if(this.extendedSamples?.play(kind,node=>this.connect(node,pan),(source,nodes)=>this.track(source,nodes)))return true;
     try {
       const tone = (freq, end, dur, volume, type = 'sine', delay = 0) => {
         if (this.voices.size >= 12) return;
@@ -214,7 +219,7 @@ export class FieldAudio {
   close() {
     if (this.closed) return;
     this.closed = true;
-    this.silence();this.samples?.close();
+    this.silence();this.samples?.close();this.extendedSamples?.close();
     try {
       this.master?.disconnect();
       this.ctx?.close?.()?.catch?.(() => {});
@@ -454,7 +459,7 @@ export class CampaignAudio {
     this.step = 0;
     this.closed = false;
     this.linked = new Set();
-    this.sampleLoader=opts.sampleLoader;this.samples=null;this.onMusicState=opts.onMusicState;
+    this.sampleLoader=opts.sampleLoader;this.samples=null;this.extendedSamples=null;this.onMusicState=opts.onMusicState;
     this.realm=null;this.scoreOverride=null;this.unlocked=false;this.score=opts.mediaFactory?new SoundtrackPlayer(opts.mediaFactory,{volume:.75,reuseMedia:true,onState:opts.onMusicState,onUnavailable:()=>this._startProceduralBgm(),onPlaying:()=>this._stopProceduralBgm()}):null;
   }
 
@@ -482,7 +487,11 @@ export class CampaignAudio {
           this.master.gain.value=this.muted?0:0.24*this.bus.master;this.bgmGain.gain.value=this.mode==='silent'?0:this.bus.music;this.sfxGain.gain.value=this.bus.sfx;this.ambienceGain.gain.value=this.bus.ambience;
           this.bgmGain.connect(this.master);this.sfxGain.connect(this.master);this.ambienceGain.connect(this.master);this.master.connect(this.ctx.destination);
           this.noise=makeNoiseBuffer(this.ctx,1.5);
-          if(this.sampleLoader&&this.ctx.decodeAudioData){this.samples=new SampleBank(this.ctx,this.sampleLoader===true?undefined:this.sampleLoader);void this.samples.warm(['click','seal']);}
+          if(this.sampleLoader&&this.ctx.decodeAudioData){
+            const ldr=this.sampleLoader===true?undefined:this.sampleLoader;
+            this.samples=new SampleBank(this.ctx,ldr);void this.samples.warm(['click','seal']);
+            this.extendedSamples=new ExtendedSfxBank(this.ctx,ldr);void this.extendedSamples.warm(['click','seal','coin','build','upgrade','chime','alert','error','open','close','march','succession']);
+          }
         }
       }
       this.ctx?.resume?.()?.catch?.(()=>{});
@@ -690,6 +699,7 @@ export class CampaignAudio {
     const now = c.currentTime || 0;
     if (now < (this.nextSfx.get(kind) || 0)) return false;
     this.nextSfx.set(kind, now + sfxLimits[kind]);
+    if(this.extendedSamples?.play(kind,node=>{node.connect(this.sfxGain);return null;},(source,nodes)=>this._track(source,nodes)))return true;
     if(this.samples?.play(kind,node=>{node.connect(this.sfxGain);return null;},(source,nodes)=>this._track(source,nodes)))return true;
 
     const tone = (freq, end, dur, vol, type = 'sine', delay = 0) => {
@@ -785,7 +795,7 @@ export class CampaignAudio {
   close() {
     if (this.closed) return;
     this.closed = true;
-    this._stopBgm();this.score?.close();this.samples?.close();
+    this._stopBgm();this.score?.close();this.samples?.close();this.extendedSamples?.close();
     for (const v of this.voices) {
       try { v.stop?.(); } catch {}
     }

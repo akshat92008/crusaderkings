@@ -144,7 +144,7 @@ export function portraitArt(p){if(!p)return null;const region=getRegion(p.realm)
  const chosen=region==='southindia'&&salt%2?'india_extra':region==='northindia'&&salt%3===0?'india_extra':region;return tile('portraits',chosen,row*4+salt%4);}
 export function dynastyArt(p){if(!p)return null;const r=getRegion(p.realm);if(!r)return null;const g=['western','eastern'].includes(r)?'europe':['northindia','southindia'].includes(r)?'india':['ottoman','persian','steppe'].includes(r)?'persia':'global';return tile('dynasties',g,hashArt(p.house||p.id)%16);}
 export function assetImage(path,cls='game-art-image'){return path?'<img class="'+cls+'" src="'+path+'" alt="" loading="lazy" decoding="async">':'';}
-export function portraitImage(p){const path=portraitArt(p);if(!path)return '';const tone=hashArt(p?.id||p?.name||path)%4;const tier=p?.epithet?'rank-legend':(p?.age<18?'rank-ward':'rank-noble');return '<span class="portrait-frame portrait-tone-'+tone+' '+tier+'">'+assetImage(path,'portrait-photo')+'</span>';}
+export function portraitImage(p){const path=portraitArt(p);if(!path)return '';const tone=hashArt(p?.id||p?.name||path)%4;const tier=p?.epithet?'rank-legend':(p?.age<18?'rank-ward':'rank-noble');const age=Number.isFinite(p?.age)?p.age:28;const ageCls=age<18?'age-youth':age<45?'age-prime':age<65?'age-mature':'age-elder';const deadCls=p?.alive===false?' is-deceased':'';return '<span class="portrait-frame portrait-tone-'+tone+' '+tier+' '+ageCls+deadCls+'">'+assetImage(path,'portrait-photo')+'</span>';}
 const eventRules=[
 [/funeral|mourning|grief|bereave|death of|loss of|memorial/,'mourning'],
 [/wedding|marriage|betrothal|birth|newborn|heir.*educat|family/,'family'],

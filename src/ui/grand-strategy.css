@@ -1,0 +1,863 @@
+/* ==========================================================================
+   REIGN 1450 — PHASE 14 "SUNLIT ILLUMINATED CHRONICLE" GRAND STRATEGY UI
+   Engraved royal brass, deep architectural obsidian slate, warm ivory ink,
+   crisp tabular numerals, and zero backdrop-filter over active canvases.
+   ========================================================================== */
+
+:root {
+  --gs-obsidian: #091316;
+  --gs-slate-deep: #0e1c20;
+  --gs-slate: #13252a;
+  --gs-slate-elev: #193036;
+  --gs-slate-hover: #213d44;
+  --gs-brass: #c89f4c;
+  --gs-brass-bright: #e7c882;
+  --gs-brass-deep: #85662d;
+  --gs-brass-hairline: rgba(200, 159, 76, 0.38);
+  --gs-brass-subtle: rgba(200, 159, 76, 0.2);
+  --gs-ivory: #f4ecd9;
+  --gs-parchment: #e4d4b4;
+  --gs-muted: #a6b4ac;
+  --gs-azure: #4c8eab;
+  --gs-azure-bright: #75b7d4;
+  --gs-crimson: #9e3930;
+  --gs-crimson-bright: #cc5c4f;
+  --gs-emerald: #4e8c5e;
+  --gs-font-display: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --gs-font-editorial: "Cormorant Garamond", Georgia, serif;
+  --gs-font-ui: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --gs-shadow-panel: 0 18px 46px rgba(3, 8, 10, 0.72), inset 0 1px 0 rgba(244, 236, 217, 0.08);
+  --gs-shadow-dock: 0 12px 32px rgba(2, 7, 9, 0.76), inset 0 1px 0 rgba(231, 200, 130, 0.22);
+  --chronicle-display: var(--gs-font-editorial);
+  --chronicle-body: var(--gs-font-ui);
+}
+
+/* Regional Accent Continuity */
+body[data-culture-theme="indian"] { --gs-brass: #db9640; --gs-brass-bright: #f2be76; --gs-brass-hairline: rgba(219, 150, 64, 0.42); }
+body[data-culture-theme="islamic"] { --gs-brass: #43b6a6; --gs-brass-bright: #7ed8cb; --gs-brass-hairline: rgba(67, 182, 166, 0.42); }
+body[data-culture-theme="eastasian"] { --gs-brass: #d45d47; --gs-brass-bright: #ed8b77; --gs-brass-hairline: rgba(212, 93, 71, 0.42); }
+body[data-culture-theme="european"] { --gs-brass: #c89f4c; --gs-brass-bright: #e7c882; --gs-brass-hairline: rgba(200, 159, 76, 0.42); }
+
+/* Tabular Numerals for Zero-Jitter Strategy Ledgers */
+.resource b,
+.date,
+#battle-your-count,
+#battle-enemy-count,
+#battle-timer,
+.regiment-count,
+.statlist strong,
+.fact b,
+#outliner-count,
+.v2-fc-delta {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   1. IMPERIAL TOPBAR HUD
+   ========================================================================== */
+body.in-campaign .topbar {
+  background: linear-gradient(180deg, #162b30 0%, #0e1d21 62%, #0a1619 100%);
+  border-bottom: 1px solid var(--gs-brass-hairline);
+  box-shadow: 0 4px 20px rgba(2, 7, 9, 0.62), inset 0 -1px 0 rgba(200, 159, 76, 0.16);
+  padding: 5px clamp(10px, 1.8vw, 24px);
+  min-height: 58px;
+  gap: 10px;
+}
+
+body.in-campaign .brand {
+  gap: 9px;
+}
+
+body.in-campaign .brand .crest {
+  border: 1px solid var(--gs-brass-hairline);
+  border-radius: 5px;
+  background: linear-gradient(155deg, #22383c, #0f1f23);
+  box-shadow: inset 0 1px 0 rgba(244, 236, 217, 0.15);
+}
+
+body.in-campaign .brandname {
+  font-family: var(--gs-font-display);
+  letter-spacing: 0.12em;
+  color: var(--gs-ivory);
+}
+
+body.in-campaign .brandname span {
+  color: var(--gs-brass-bright);
+}
+
+body.in-campaign .brandcaption {
+  font-family: var(--gs-font-ui);
+  letter-spacing: 0.11em;
+  color: var(--gs-muted);
+}
+
+/* Sovereign Plaque */
+#hud-ruler {
+  padding: 4px 10px 4px 5px;
+  border: 1px solid var(--gs-brass-subtle);
+  border-radius: 5px;
+  background: linear-gradient(160deg, rgba(25, 48, 54, 0.92), rgba(13, 27, 31, 0.96));
+  box-shadow: inset 0 1px 0 rgba(244, 236, 217, 0.08);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+#hud-ruler:hover {
+  border-color: var(--gs-brass);
+  background: linear-gradient(160deg, #213e45, #12262b);
+}
+
+#hud-ruler .portrait-mark {
+  border: 1px solid var(--gs-brass);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+#hud-realm-name {
+  font-family: var(--gs-font-ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--gs-brass-bright);
+}
+
+#hud-ruler-name {
+  font-family: var(--gs-font-editorial);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--gs-ivory);
+}
+
+/* Resource Ledger Plaques */
+body.in-campaign .topresources {
+  gap: 5px;
+}
+
+body.in-campaign .topresources .resource {
+  background: linear-gradient(180deg, rgba(16, 33, 37, 0.96), rgba(10, 21, 24, 0.98));
+  border: 1px solid var(--gs-brass-subtle);
+  border-radius: 4px;
+  padding: 4px 9px;
+  box-shadow: inset 0 1px 0 rgba(244, 236, 217, 0.05);
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+body.in-campaign .topresources .resource:hover {
+  border-color: var(--gs-brass-hairline);
+  background: linear-gradient(180deg, #173036, #0f2125);
+}
+
+body.in-campaign .topresources .resource small {
+  font-family: var(--gs-font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--gs-muted);
+}
+
+body.in-campaign .topresources .resource b {
+  font-family: var(--gs-font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gs-ivory);
+}
+
+/* Timebar & Gilded Sovereign Advance Button */
+body.in-campaign .timebar {
+  gap: 6px;
+}
+
+body.in-campaign .date {
+  background: #0a1619;
+  border: 1px solid var(--gs-brass-subtle);
+  border-radius: 4px;
+  padding: 6px 11px;
+  font-family: var(--gs-font-display);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--gs-parchment);
+}
+
+.goldbtn,
+body.in-campaign #next-month.goldbtn {
+  background: linear-gradient(180deg, #e7c87e 0%, #c89b44 56%, #a67c2c 100%);
+  color: #191105;
+  border: 1px solid #f2da9a;
+  border-radius: 4px;
+  font-family: var(--gs-font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 rgba(255, 244, 214, 0.35);
+  box-shadow: 0 3px 12px rgba(5, 11, 13, 0.55), inset 0 1px 0 rgba(255, 250, 232, 0.55);
+  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+}
+
+.goldbtn:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: 0 5px 16px rgba(5, 11, 13, 0.65), inset 0 1px 0 rgba(255, 250, 232, 0.72);
+}
+
+.goldbtn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+body.in-campaign .iconbtn,
+body.in-campaign .speed-control select {
+  background: linear-gradient(180deg, #183035, #0f2024);
+  border: 1px solid var(--gs-brass-subtle);
+  border-radius: 4px;
+  color: var(--gs-ivory);
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+body.in-campaign .iconbtn:hover,
+body.in-campaign .speed-control select:hover {
+  border-color: var(--gs-brass);
+  background: linear-gradient(180deg, #213e45, #142a2f);
+}
+
+/* ==========================================================================
+   2. 7-DESTINATION IMPERIAL COMMAND DOCK (#quick-nav)
+   ========================================================================== */
+#quick-nav.chronicle-nav {
+  background: linear-gradient(180deg, #152b30 0%, #0c1b1e 100%);
+  border: 1px solid var(--gs-brass-hairline);
+  border-top: 2px solid var(--gs-brass);
+  border-radius: 6px;
+  padding: 5px 6px;
+  gap: 4px;
+  box-shadow: var(--gs-shadow-dock);
+}
+
+#quick-nav.chronicle-nav > button {
+  min-width: clamp(50px, 7.6vw, 88px);
+  min-height: 48px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--gs-parchment);
+  font-family: var(--gs-font-ui);
+  font-weight: 600;
+  font-size: clamp(9.5px, 1.1vw, 11.5px);
+  letter-spacing: 0.03em;
+  transition: background 130ms ease, border-color 130ms ease, color 130ms ease;
+}
+
+#quick-nav.chronicle-nav > button:hover {
+  background: rgba(200, 159, 76, 0.14);
+  border-color: var(--gs-brass-hairline);
+  color: var(--gs-ivory);
+}
+
+#quick-nav.chronicle-nav > button[aria-expanded="true"] {
+  background: linear-gradient(180deg, #254146, #182f34);
+  border-color: var(--gs-brass);
+  color: var(--gs-brass-bright);
+  box-shadow: inset 0 -2px 0 var(--gs-brass-bright), inset 0 1px 0 rgba(244, 236, 217, 0.1);
+}
+
+#quick-nav.chronicle-nav i {
+  color: var(--gs-brass-bright);
+  font-size: 19px;
+}
+
+/* Map top controls & minimap */
+.maparea .maptop .smallbtn,
+.maparea .map-options summary,
+#mapmode-toggle {
+  background: linear-gradient(180deg, #162c31, #0d1d21);
+  color: var(--gs-ivory);
+  border: 1px solid var(--gs-brass-hairline);
+  border-radius: 4px;
+  font-family: var(--gs-font-ui);
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(2, 7, 9, 0.45);
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+.maparea .maptop .smallbtn:hover,
+.maparea .map-options summary:hover,
+#mapmode-toggle:hover {
+  border-color: var(--gs-brass-bright);
+  background: linear-gradient(180deg, #203d44, #14292e);
+}
+
+.maparea .map-options .mapactions {
+  background: linear-gradient(165deg, #14282d, #0b181b);
+  border: 1px solid var(--gs-brass-hairline);
+  border-top: 2px solid var(--gs-brass);
+  border-radius: 5px;
+  box-shadow: var(--gs-shadow-panel);
+}
+
+.campaign-minimap {
+  background: #0d1c1f;
+  border: 1px solid var(--gs-brass-hairline);
+  border-top: 2px solid var(--gs-brass);
+  border-radius: 5px;
+  box-shadow: 0 8px 22px rgba(2, 7, 9, 0.65);
+}
+
+.map-zoom button {
+  background: linear-gradient(180deg, #172e33, #0e1e22);
+  border: 1px solid var(--gs-brass-hairline);
+  color: var(--gs-ivory);
+}
+
+.map-zoom button:hover {
+  border-color: var(--gs-brass-bright);
+  color: var(--gs-brass-bright);
+}
+
+/* ==========================================================================
+   3. ARCHITECTURAL MANAGEMENT & PROVINCE DRAWERS
+   ========================================================================== */
+#management-panel,
+#province-drawer {
+  background: linear-gradient(165deg, #162b30 0%, #0e1d21 55%, #0a1518 100%);
+  border-color: var(--gs-brass-hairline);
+  box-shadow: var(--gs-shadow-panel);
+  color: var(--gs-ivory);
+}
+
+#management-panel {
+  border-right: 1px solid var(--gs-brass-hairline);
+}
+
+#province-drawer {
+  border-left: 1px solid var(--gs-brass-hairline);
+}
+
+#management-panel .faction-ident {
+  background: linear-gradient(180deg, rgba(200, 159, 76, 0.09), transparent);
+  border-bottom: 1px solid var(--gs-brass-hairline);
+}
+
+#management-panel .faction-ident strong {
+  font-family: var(--gs-font-display);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  color: var(--gs-ivory);
+}
+
+#management-panel .faction-ident small {
+  color: var(--gs-brass-bright);
+  font-family: var(--gs-font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+#management-panel .tabs {
+  background: #0b181b;
+  border-bottom: 1px solid var(--gs-brass-hairline);
+}
+
+#management-panel .tab {
+  font-family: var(--gs-font-ui);
+  color: var(--gs-muted);
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+#management-panel .tab:hover {
+  color: var(--gs-ivory);
+  background: rgba(200, 159, 76, 0.09);
+}
+
+#management-panel .tab.active {
+  color: var(--gs-brass-bright);
+  background: linear-gradient(180deg, #213c41, #162b2f);
+  border-color: var(--gs-brass-hairline);
+  box-shadow: inset 0 -2px 0 var(--gs-brass);
+}
+
+#management-panel h2,
+#management-panel h3,
+#province-drawer h2,
+#province-drawer h3 {
+  font-family: var(--gs-font-display);
+  letter-spacing: 0.05em;
+  color: var(--gs-parchment);
+}
+
+#management-panel .card,
+#province-drawer .card,
+#management-panel .rule,
+#province-drawer .rule {
+  background: linear-gradient(160deg, rgba(22, 43, 48, 0.85), rgba(12, 25, 29, 0.92));
+  border: 1px solid var(--gs-brass-subtle);
+  border-radius: 5px;
+}
+
+/* ==========================================================================
+   4. SOVEREIGN TITLE SCREEN (#start-screen)
+   ========================================================================== */
+#start-screen {
+  background: #081214;
+}
+
+#start-screen::after {
+  background: linear-gradient(95deg, #081214 6%, rgba(8, 18, 20, 0.84) 44%, rgba(8, 18, 20, 0.22) 86%);
+}
+
+#start-screen .reign-start-card {
+  width: min(472px, 100%);
+  border: 1px solid rgba(200, 159, 76, 0.56);
+  border-top: 3px solid var(--gs-brass-bright);
+  border-radius: 6px;
+  background: linear-gradient(165deg, rgba(24, 46, 51, 0.97) 0%, rgba(12, 25, 28, 0.99) 100%);
+  box-shadow: 0 28px 80px rgba(2, 7, 9, 0.86), 0 0 0 1px rgba(231, 200, 130, 0.14), inset 0 1px 0 rgba(244, 236, 217, 0.14);
+}
+
+.reign-masthead h1 {
+  font-family: var(--gs-font-editorial);
+  font-weight: 600;
+  color: var(--gs-ivory);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+}
+
+.reign-masthead em {
+  font-family: var(--gs-font-display);
+  font-style: normal;
+  color: var(--gs-brass-bright);
+  letter-spacing: 0.04em;
+}
+
+#start-screen .startselectors label {
+  font-family: var(--gs-font-display);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--gs-brass-bright);
+}
+
+#start-screen .featured-start-btn {
+  border-radius: 4px;
+  border: 1px solid var(--gs-brass-subtle);
+  background: linear-gradient(180deg, #193136, #102125);
+  color: var(--gs-ivory);
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+#start-screen .featured-start-btn:hover {
+  border-color: var(--gs-brass);
+  background: linear-gradient(180deg, #224046, #152b30);
+}
+
+#start-screen .featured-start-btn.active {
+  background: linear-gradient(180deg, #325257, #20393d);
+  border-color: var(--gs-brass-bright);
+  color: var(--gs-ivory);
+  box-shadow: inset 0 -2px 0 var(--gs-brass-bright);
+}
+
+#start-screen #start-new.goldbtn.primary {
+  padding: 13px 18px;
+  font-size: 14px;
+  letter-spacing: 0.13em;
+}
+
+/* ==========================================================================
+   5. 3D TACTICAL BATTLEFIELD & SIEGE COMMAND HUD
+   ========================================================================== */
+.battle-screen.field-command .battle-top,
+.battle-screen.field-command .battle-bottom {
+  background: linear-gradient(180deg, rgba(16, 33, 37, 0.95), rgba(10, 22, 25, 0.97));
+  border-color: var(--gs-brass-hairline);
+  box-shadow: 0 10px 30px rgba(2, 7, 9, 0.72), inset 0 1px 0 rgba(244, 236, 217, 0.08);
+}
+
+.battle-screen.field-command .battle-top {
+  border-bottom: 1px solid var(--gs-brass-hairline);
+}
+
+.battle-screen.field-command .battle-bottom {
+  border-top: 2px solid var(--gs-brass);
+}
+
+.field-command .battle-top h2 {
+  font-family: var(--gs-font-display);
+  letter-spacing: 0.09em;
+  color: var(--gs-ivory);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.battle-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 5px;
+}
+
+.battle-posture {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(204, 92, 79, 0.65);
+  background: linear-gradient(180deg, #4b201c, #311412);
+  color: #f9d8c8;
+  font-family: var(--gs-font-ui);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.battle-posture[hidden] {
+  display: none !important;
+}
+
+#battle-fort-status {
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--gs-brass-hairline);
+  background: #172d31;
+  color: var(--gs-brass-bright);
+  font-weight: 600;
+}
+
+.field-command .banner-score {
+  background: #091518;
+  border: 1px solid var(--gs-brass-hairline);
+  border-radius: 5px;
+  padding: 6px 10px;
+}
+
+.field-command .banner-force span {
+  font-family: var(--gs-font-display);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--gs-muted);
+}
+
+.field-command .banner-force b {
+  font-family: var(--gs-font-ui);
+  font-size: 14px;
+  color: var(--gs-ivory);
+}
+
+.field-command .banner-force.friendly i {
+  background: linear-gradient(90deg, #3c7d9b, #73bad9);
+}
+
+.field-command .banner-force.enemy i {
+  background: linear-gradient(90deg, #b54538, #e07a60);
+}
+
+.field-command #battle-timer {
+  font-family: var(--gs-font-display);
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  color: var(--gs-brass-bright);
+  padding: 3px 10px;
+  border-inline: 1px solid var(--gs-brass-subtle);
+}
+
+.field-command .battle-commands {
+  background: #0a171a;
+  border: 1px solid var(--gs-brass-subtle);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+
+.field-command .battle-commands button,
+.field-command .battle-commands select,
+.field-command .battle-buttons button,
+.field-command .battle-buttons select {
+  background: linear-gradient(180deg, #1b3439, #102226);
+  border: 1px solid var(--gs-brass-hairline);
+  border-radius: 4px;
+  color: var(--gs-ivory);
+  font-family: var(--gs-font-ui);
+  font-weight: 600;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.field-command .battle-commands button:hover,
+.field-command .battle-buttons button:hover {
+  border-color: var(--gs-brass-bright);
+  background: linear-gradient(180deg, #25454b, #173035);
+}
+
+.field-command .battle-commands #battle-start {
+  background: linear-gradient(180deg, #e7c87e 0%, #c89b44 58%, #a67c2c 100%);
+  color: #191105;
+  border-color: #f4dca0;
+  font-family: var(--gs-font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.field-command .battle-buttons #battle-retreat {
+  background: linear-gradient(180deg, #74342d, #4f211c);
+  border-color: #c2675a;
+  color: #fff2df;
+}
+
+.field-command .battle-units .unitcard {
+  background: linear-gradient(170deg, #1c353a, #102226);
+  border: 1px solid var(--gs-brass-hairline);
+  border-radius: 5px;
+  box-shadow: inset 0 1px 0 rgba(244, 236, 217, 0.08);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.field-command .battle-units .unitcard:hover {
+  border-color: var(--gs-brass-bright);
+  transform: translateY(-1px);
+}
+
+.field-command .battle-units .unitcard.active {
+  background: linear-gradient(170deg, #2e4b42, #1b322f);
+  border-color: var(--gs-brass-bright);
+  box-shadow: 0 0 0 1px rgba(231, 200, 130, 0.35), inset 0 1px 0 rgba(244, 236, 217, 0.16);
+}
+
+.field-command .battle-units .unitcard.reserve {
+  background: linear-gradient(170deg, #253d50, #162736);
+  border-color: #6b95b6;
+}
+
+/* Battle Result Chronicle Card */
+.battle-result .resultcard {
+  background: linear-gradient(170deg, #192f34, #0c1a1d);
+  border: 1px solid var(--gs-brass);
+  border-top: 3px solid var(--gs-brass-bright);
+  box-shadow: 0 26px 76px rgba(2, 6, 8, 0.88), 0 0 0 4px #0c1a1d;
+}
+
+.battle-result .resultcard h2 {
+  font-family: var(--gs-font-display);
+  letter-spacing: 0.09em;
+  color: var(--gs-brass-bright);
+}
+
+/* ==========================================================================
+   6. RESPONSIVE REFINEMENT FOR 7-DESTINATION DOCK & SMALL VIEWPORTS
+   ========================================================================== */
+@media (max-width: 720px) {
+  #quick-nav.chronicle-nav {
+    gap: 2px;
+    padding: 4px 3px;
+  }
+  #quick-nav.chronicle-nav > button {
+    min-width: 44px;
+    padding: 4px 2px;
+    font-size: 9px;
+  }
+  #quick-nav.chronicle-nav i {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px), (max-height: 680px) {
+  .battle-screen.field-command .battle-bottom {
+    padding: 4px 6px max(4px, env(safe-area-inset-bottom));
+  }
+  .battle-screen .battle-guide {
+    margin: 0 0 4px;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+  .field-command .battle-units .unitcard {
+    min-height: 58px;
+    padding: 4px 6px;
+  }
+  .unitcard .regiment-flags {
+    margin-top: 1px;
+    min-height: 8px;
+  }
+}
+
+/* ==========================================================================
+   7. 5-GENERATION FAMILY TREE & HERALDIC COAT OF ARMS STUDIO
+   ========================================================================== */
+.lineage-tree-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.lineage-tree-lines path {
+  fill: none;
+  stroke: rgba(212, 163, 59, 0.55);
+  stroke-width: 1.6;
+}
+.lineage-tier {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 10px;
+}
+.lineage-tier-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.lineage-gen-pill {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid rgba(212, 163, 59, 0.45);
+  border-radius: 999px;
+  color: #e7c882;
+  background: rgba(20, 32, 34, 0.85);
+}
+.lineage-person.is-ruler {
+  border-color: #d4a33b;
+  box-shadow: 0 0 0 1px rgba(212, 163, 59, 0.35);
+}
+.lineage-person.is-focus {
+  background: rgba(45, 75, 66, 0.36);
+}
+.lineage-person.is-deceased {
+  opacity: 0.78;
+}
+.lineage-crest {
+  display: inline-flex;
+  align-items: center;
+}
+.legacy-coa-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.coa-emblem-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.coa-motto {
+  font-style: italic;
+  color: #cfb889;
+  font-size: 11px;
+  text-align: center;
+  max-width: 130px;
+}
+.coa-studio-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.coa-studio-preview {
+  min-width: 110px;
+  display: flex;
+  justify-content: center;
+}
+.coa-studio-controls {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.coa-field-row,
+.coa-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.coa-field-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: #cfb889;
+}
+
+/* ==========================================================================
+   8. VISUAL PORTRAIT AGING STAGES & GENETIC RESEMBLANCE BADGES
+   ========================================================================== */
+.portrait-frame.age-youth .portrait-photo {
+  filter: saturate(1.1) brightness(1.06) contrast(0.96);
+}
+.portrait-frame.age-mature .portrait-photo {
+  filter: saturate(0.95) contrast(1.08) sepia(0.10);
+}
+.portrait-frame.age-elder .portrait-photo {
+  filter: saturate(0.68) contrast(1.14) sepia(0.24) brightness(0.95);
+}
+.portrait-frame.age-elder::after {
+  content: '✦';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9px;
+  color: #e7c882;
+}
+.portrait-frame.is-deceased .portrait-photo {
+  filter: grayscale(0.85) contrast(1.08);
+}
+.gene-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 163, 59, 0.4);
+  background: rgba(25, 42, 46, 0.78);
+  color: #e7d7b4;
+  margin-right: 4px;
+}
+
+/* ==========================================================================
+   9. PASSAGE OF TIME CAPITAL TRANSITION & KEYBINDING CONTROLS
+   ========================================================================== */
+@keyframes passageFadeGlow {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.passage-of-time-overlay {
+  border: 1px solid #d8b36a;
+  border-left: 4px solid #e7c882;
+  background: linear-gradient(135deg, rgba(44, 34, 18, 0.94), rgba(18, 34, 38, 0.94));
+  margin-bottom: 12px;
+  animation: passageFadeGlow 420ms ease-out both;
+}
+[data-motion="reduce"] .passage-of-time-overlay {
+  animation: none;
+}
+.passage-era-badge {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #e7c882;
+  margin-bottom: 4px;
+}
+.passage-lineage {
+  margin: 4px 0;
+  color: #f6ecd8;
+  font-size: 13px;
+}
+.keybind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.keybind-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(201, 164, 92, 0.28);
+  border-radius: 5px;
+  background: rgba(15, 29, 32, 0.72);
+  font-size: 12px;
+}
+.keybind-btn {
+  min-width: 58px;
+  font-family: monospace;
+  font-weight: 700;
+  padding: 3px 8px;
+}

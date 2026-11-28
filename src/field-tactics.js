@@ -6,6 +6,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export const FIELD_ORDERS = {
   advance: 'Advance',
   hold: 'Hold position',
+  brace: 'Brace (Anti-Cavalry)',
   charge: 'Charge',
   fallback: 'Fall back',
   move: 'Move and hold'
@@ -91,6 +92,11 @@ export function terrainHeight(x, z, terrain = 'plains') {
   if (t === 'marsh') {
     return 0.18 * Math.sin(x * 0.08) * Math.cos(z * 0.08) - 0.1;
   }
+  if (t === 'river') {
+    const bank = Math.min(1, Math.abs(z) / 8);
+    const bed = Math.abs(z) < 4.5 ? -0.42 * Math.cos((z / 4.5) * (Math.PI / 2)) : 0;
+    return bed + bank * 0.48 + 0.16 * Math.sin(x * 0.05) * Math.cos(z * 0.05);
+  }
   return 0.28 * Math.sin(x * 0.045) * Math.cos(z * 0.055) + 0.14 * Math.cos((x - z) * 0.03);
 }
 
@@ -137,6 +143,12 @@ export function terrainForestCovers(terrain = 'plains') {
       { id: 'bog_grove', x: 0, z: 12, radius: 6.5, density: 0.7, label: 'Bog Copse' }
     ];
   }
+  if (t === 'river') {
+    return [
+      { id: 'river_willows_w', x: -30, z: -12, radius: 7.5, density: 0.78, label: 'Riverbank Willows' },
+      { id: 'river_willows_e', x: 30, z: 12, radius: 7.5, density: 0.78, label: 'Fordside Alders' }
+    ];
+  }
   return [
     { id: 'flank_west', x: -34, z: 4, radius: 7.5, density: 0.75, label: 'West Copse' },
     { id: 'flank_east', x: 34, z: -4, radius: 7.5, density: 0.75, label: 'East Copse' }
@@ -151,7 +163,7 @@ function isInfantryOrSpear(g) {
 function isBracedPosture(g) {
   const o = g?.fieldOrder || g?.order;
   const form = g?.formationId;
-  return !g?.moving && (o === 'hold' || form === 'shield_wall' || form === 'pike_square');
+  return !g?.moving && (o === 'hold' || o === 'brace' || form === 'shield_wall' || form === 'pike_square');
 }
 
 function liveTroopCount(g) {
@@ -361,29 +373,33 @@ export function fieldTerrain(g, terrain = 'plains') {
   const highGround = height >= 1.15;
   const edge = Math.abs(g.x);
 
+  if (t === 'river' && Math.abs(g.z) < 4.5) {
+    return { name: 'River crossing', speed: g.type === 'cavalry' ? 0.58 : 0.65, cover: 0.9, rangedMitigation: 1.05, inForestCover: false, inRiver: true, highGround: false, height, grove: null };
+  }
   if (grove) {
     const edgeFactor = edge >= 50 ? 0.85 : 1;
     return {
       name: grove.label,
-      speed: (g.type === 'cavalry' ? 0.74 : 0.92) * edgeFactor,
+      speed: (g.type === 'cavalry' ? 0.65 : 0.92) * edgeFactor,
       cover: 1.54,
       rangedMitigation: 0.65,
       inForestCover: true,
+      inRiver: false,
       highGround,
       height,
       grove
     };
   }
   if (edge >= 50) {
-    return { name: 'Rough ground', speed: g.type === 'cavalry' ? 0.68 : 0.82, cover: 1.22, rangedMitigation: 1 / 1.22, inForestCover: false, highGround, height, grove: null };
+    return { name: 'Rough ground', speed: g.type === 'cavalry' ? 0.68 : 0.82, cover: 1.22, rangedMitigation: 1 / 1.22, inForestCover: false, inRiver: false, highGround, height, grove: null };
   }
   if (edge >= 38) {
-    return { name: 'Broken ground', speed: g.type === 'cavalry' ? 0.85 : 0.94, cover: 1.10, rangedMitigation: 1 / 1.10, inForestCover: false, highGround, height, grove: null };
+    return { name: 'Broken ground', speed: g.type === 'cavalry' ? 0.85 : 0.94, cover: 1.10, rangedMitigation: 1 / 1.10, inForestCover: false, inRiver: false, highGround, height, grove: null };
   }
   if (t === 'marsh') {
-    return { name: 'Marshland', speed: g.type === 'cavalry' ? 0.72 : 0.86, cover: 1.05, rangedMitigation: 1 / 1.05, inForestCover: false, highGround, height, grove: null };
+    return { name: 'Marshland', speed: g.type === 'cavalry' ? 0.72 : 0.86, cover: 1.05, rangedMitigation: 1 / 1.05, inForestCover: false, inRiver: false, highGround, height, grove: null };
   }
-  return { name: highGround ? 'High ground' : 'Open field', speed: 1, cover: 1, rangedMitigation: 1, inForestCover: false, highGround, height, grove: null };
+  return { name: highGround ? 'High ground' : 'Open field', speed: 1, cover: 1, rangedMitigation: 1, inForestCover: false, inRiver: false, highGround, height, grove: null };
 }
 
 export function attackAspect(g, e) {
@@ -404,12 +420,20 @@ export function coordinateFieldAI(state) {
   const enemy = live.filter(g => g.side === 'attacker');
   if (!ours.length || !enemy.length) return 'ended';
 
+  const cmd = ours.find(g => g.isCommander);
+  const wavering = ours.filter(g => (g.morale ?? 75) < 55).length;
+  const anyRouted = state.groups.some(g => g.side === 'defender' && g.routed);
+  if (cmd && (wavering >= 2 || (anyRouted && wavering >= 1))) {
+    triggerRallyHorn(state, 'defender');
+  }
+
   const strength = fieldStrength(ours, 'defender');
   const opposition = fieldStrength(enemy, 'attacker');
   const archers = ours.filter(g => g.type === 'archers');
   const infantry = ours.filter(g => g.type === 'infantry');
   const cavalry = ours.filter(g => g.type === 'cavalry');
   const danger = enemy.filter(g => g.type === 'cavalry' && archers.some(a => dist(a, g) < 21));
+  const cavChargingInf = enemy.filter(g => g.type === 'cavalry' && infantry.some(f => dist(f, g) < 18));
   const exposed = enemy.filter(g => g.type === 'archers' && !enemy.some(a => a.type === 'infantry' && dist(a, g) < 7));
 
   const posture = danger.length && infantry.length
@@ -440,7 +464,15 @@ export function coordinateFieldAI(state) {
       const d = dist(a, threat) || 1;
       const point = [a.x + (threat.x - a.x) / d * 4, a.z + (threat.z - a.z) / d * 4];
       if (dist(g, { x: point[0], z: point[1] }) > 3) issueFieldOrder(g, 'move', point);
-      else if (g.fieldOrder !== 'hold') issueFieldOrder(g, 'hold');
+      else if (g.fieldOrder !== 'brace') {
+        if (g.kind === 'pikemen' || g.kind === 'spearmen') g.formationId = 'pike_square';
+        issueFieldOrder(g, 'brace');
+      }
+      continue;
+    }
+    if (g.type === 'infantry' && cavChargingInf.some(c => dist(g, c) < 18)) {
+      if (g.kind === 'pikemen' || g.kind === 'spearmen') g.formationId = 'pike_square';
+      if (g.fieldOrder !== 'brace') issueFieldOrder(g, 'brace');
       continue;
     }
     if (g.type === 'cavalry' && exposed.length && g.fatigue < 70) {
@@ -463,7 +495,7 @@ export function coordinateFieldAI(state) {
 
 function targetPosition(g, e, enemies) {
   const order = g.fieldOrder || 'advance';
-  if (['hold', 'move', 'fallback'].includes(order)) {
+  if (['hold', 'brace', 'move', 'fallback'].includes(order)) {
     return { point: [g.anchorX ?? g.x, g.anchorZ ?? g.z], skirmishing: false };
   }
 
@@ -557,13 +589,17 @@ function updateEncirclement(groups) {
 function computeStatusFlags(g, terrainInfo) {
   if (g.routed) return ['ROUT'];
   const flags = [];
+  if (g.isCommander) flags.push('GENERAL');
   if (g.encircled) flags.push('ENCIRCLED');
   if (g.type === 'cavalry' && ((g.chargeMomentum || 0) >= 0.45 || (g.fieldOrder === 'charge' && g.moving))) flags.push('CHARGE');
   if ((isInfantryOrSpear(g) && isBracedPosture(g)) || (g.bracedCounterTimer || 0) > 0) flags.push('BRACED');
   if (g.flanked || (g.flankedTimer || 0) > 0) flags.push('FLANKED');
+  if (g.exhausted) flags.push('EXHAUSTED');
+  if (terrainInfo.inRiver) flags.push('RIVER_CROSS');
   if (terrainInfo.inForestCover) flags.push('COVER');
   if (terrainInfo.highGround) flags.push('HIGH_GROUND');
   if ((g.rallyBuffTimer || 0) > 0) flags.push('RALLIED');
+  if (g.inGeneralAura && !g.isCommander) flags.push('AURA');
   if (g.skirmishing) flags.push('SKIRMISH');
   return flags;
 }
@@ -574,6 +610,8 @@ export function stepField(state, dt) {
   state.fieldTime = (state.fieldTime || 0) + dt;
   state.effects ??= [];
   state.projectiles ??= [];
+  state.generalFallen ??= { attacker: false, defender: false };
+  state.battleEvents ??= [];
   ensureTacticalStats(state);
   for (const e of state.effects) e.age += dt;
   state.effects = state.effects.filter(e => e.age < e.duration);
@@ -652,6 +690,17 @@ export function stepField(state, dt) {
   for (const g of live) {
     if (g.encircled && !wasEncircled.get(g)) {
       recordSideStat(state, g.side === 'attacker' ? 'defender' : 'attacker', 'encirclements', 1);
+    }
+  }
+  const liveCommanders = {
+    attacker: live.find(g => g.side === 'attacker' && g.isCommander) || null,
+    defender: live.find(g => g.side === 'defender' && g.isCommander) || null
+  };
+  for (const g of live) {
+    const cmd = liveCommanders[g.side];
+    g.inGeneralAura = Boolean(cmd && dist(g, cmd) <= 16);
+    if (g.inGeneralAura && !g.encircled) {
+      g.morale = cap((g.morale || 0) + dt * 0.65, 0, 100);
     }
   }
   const hits = [];
@@ -745,8 +794,8 @@ export function stepField(state, dt) {
     }
     g.facing = Math.atan2(g.facingX, g.facingZ);
 
-    // Friendly groups repel one another gently, but holding/ordered units stay anchored.
-    if (!['hold', 'move', 'fallback'].includes(order)) {
+    // Friendly groups repel one another gently, but holding/braced/ordered units stay anchored.
+    if (!['hold', 'brace', 'move', 'fallback'].includes(order)) {
       for (const other of live) {
         if (other === g || other.side !== g.side) continue;
         const p = positions.get(other.id);
@@ -788,7 +837,7 @@ export function stepField(state, dt) {
     }
 
     // A regiment can rally passively only while stationary, not encircled, and beyond every enemy's weapon reach.
-    if (!moving && !g.encircled && ['hold', 'fallback'].includes(g.fieldOrder) && !enemies.some(other => dist(g, other) <= other.range + 3)) {
+    if (!moving && !g.encircled && ['hold', 'brace', 'fallback'].includes(g.fieldOrder) && !enemies.some(other => dist(g, other) <= other.range + 3)) {
       const rallyRate = 1.2 + cmdAura * 0.25;
       g.morale = Math.min(100, g.morale + Math.min(dt * rallyRate, Math.max(0, (g.initialMorale ?? 85) - g.morale)));
     }
@@ -811,31 +860,34 @@ export function stepField(state, dt) {
 
     const targetIsSpearOrInf = isInfantryOrSpear(e);
     const targetBracedPosture = isBracedPosture(e);
-    const isPikeSpecialist = e.kind === 'pikemen' || e.kind === 'spearmen' || e.formationId === 'pike_square';
+    const isPikeSpecialist = e.kind === 'pikemen' || e.kind === 'spearmen' || e.formationId === 'pike_square' || e.fieldOrder === 'brace';
     const bracedAgainstCav = (g.type === 'cavalry' || g.kind === 'cavalry') && targetIsSpearOrInf && targetBracedPosture && aspect !== 'rear';
 
+    const uphillChargePenalty = (g.type === 'cavalry' || g.kind === 'cavalry') && (eTerrain.height - terrain.height) >= 0.75 ? 0.72 : 1;
     const chargeMult = (g.type === 'cavalry' || g.kind === 'cavalry') && !bracedAgainstCav
-      ? (1 + (g.chargeMomentum || 0) * 0.65) * (aggressive && moving ? 1.24 : 1)
+      ? (1 + (g.chargeMomentum || 0) * 0.65 * uphillChargePenalty) * (aggressive && moving ? 1.24 : 1)
       : 1;
     const braceMitigation = bracedAgainstCav
       ? (isPikeSpecialist ? 1.95 : e.formationId === 'shield_wall' ? 1.60 : 1.38)
       : 1;
     const shieldMitigation = e.formationId === 'shield_wall' && aspect === 'front' && !e.moving ? 0.80 : 1;
-    const unshieldedRangedMult = g.type === 'archers' && !(e.formationId === 'shield_wall' && aspect === 'front' && !e.moving) ? 1.28 : 1;
+    const unshieldedRangedMult = g.type === 'archers' && !(e.formationId === 'shield_wall' && aspect === 'front' && !e.moving) ? 1.45 : 1;
     const rangedCoverMult = g.type === 'archers' ? (eTerrain.rangedMitigation ?? (1 / eTerrain.cover)) * unshieldedRangedMult : 1;
     const highGroundDmgMult = highGroundAdv ? 1.18 : 1;
+    const hillsDefMult = eTerrain.highGround ? 1.20 : 1;
+    const riverAttackMult = terrain.inRiver ? 0.80 : 1;
     const commanderAttack = 1 + cmdAura * 0.035;
     const attackerFatigueMult = g.type === 'archers'
       ? Math.max(0.65, 1 - g.fatigue * 0.0028)
       : Math.max(0.40, (1 - g.fatigue * 0.0045) * (g.exhausted ? 0.80 : 1));
     const targetDefensePenalty = (e.encircled ? 1.28 : 1) * (e.exhausted ? 1.16 : 1);
 
-    const damage = g.damage * commanderAttack * overwhelm * flank * rangedCoverMult * highGroundDmgMult *
+    const damage = g.damage * commanderAttack * overwhelm * flank * rangedCoverMult * highGroundDmgMult * riverAttackMult *
       (0.75 + 0.25 * (g.cohesion ?? 100) / 100) * (0.75 + 0.25 * cap(g.morale / 100, 0, 1)) *
       attackerFatigueMult * targetDefensePenalty * power * chargeMult * (g.type === 'cavalry' && e.type === 'archers' ? 1.35 : 1) *
-      shieldMitigation / (Math.max(0.6, e.armor || 1) * braceMitigation * (g.type === 'cavalry' ? Math.max(0.6, e.cavalryCounter || 1) : 1)) *
+      shieldMitigation / (Math.max(0.6, e.armor || 1) * hillsDefMult * braceMitigation * (g.type === 'cavalry' ? Math.max(0.6, e.cavalryCounter || 1) : 1)) *
       (0.88 + random(state) * 0.24);
-    const moraleShock = (g.type === 'cavalry' || g.kind === 'cavalry') && !bracedAgainstCav ? (g.chargeMomentum || 0) * 14 : 0;
+    const moraleShock = (g.type === 'cavalry' || g.kind === 'cavalry') && !bracedAgainstCav ? (g.chargeMomentum || 0) * 14 * uphillChargePenalty : 0;
 
     hits.push({ g, e, damage, aspect, moraleShock });
 
@@ -892,7 +944,7 @@ export function stepField(state, dt) {
       e.flankedTimer = 1.6;
     }
     const eAura = Math.max(0, e.commanderMartial || 0);
-    const rallyGuard = (e.rallyBuffTimer || 0) > 0 ? 0.6 : 1;
+    const rallyGuard = ((e.rallyBuffTimer || 0) > 0 ? 0.6 : 1) * (e.inGeneralAura ? 0.88 : 1);
     const flankMoraleMult = aspect === 'rear' ? 1.55 : aspect === 'flank' ? 1.28 : 1;
     const encircledMoraleMult = e.encircled ? 1.48 : 1;
     const exhaustedMoraleMult = e.exhausted ? 1.18 : 1;
@@ -932,11 +984,27 @@ export function stepField(state, dt) {
   for (const g of stillLive) {
     const tInfo = fieldTerrain(g, terrainType);
     g.troops = liveTroopCount(g);
-    g.status = g.fieldOrder === 'charge' ? 'charging' : g.moving ? 'moving' : g.fieldOrder === 'hold' ? 'holding' : 'engaging';
+    g.status = g.fieldOrder === 'charge' ? 'charging' : g.fieldOrder === 'brace' ? 'braced' : g.moving ? 'moving' : g.fieldOrder === 'hold' ? 'holding' : 'engaging';
     g.statusFlags = computeStatusFlags(g, tInfo);
   }
 
   for (const g of routed) {
+    if (g.isCommander && !state.generalFallen[g.side]) {
+      state.generalFallen[g.side] = true;
+      const cmdLabel = g.commanderName || (g.side === 'attacker' ? 'Your General' : 'Enemy General');
+      state.battleEvents.push({
+        time: Number((state.fieldTime || 0).toFixed(1)),
+        side: g.side,
+        kind: 'general_fallen',
+        text: `${cmdLabel} has fallen! ${g.side === 'attacker' ? 'Your' : 'Enemy'} army suffers -25 morale shock!`
+      });
+      if (state.battleEvents.length > 16) state.battleEvents.splice(0, state.battleEvents.length - 16);
+      for (const ally of stillLive) {
+        if (ally.side === g.side) {
+          ally.morale = cap(ally.morale - 25, 0, 100);
+        }
+      }
+    }
     for (const ally of stillLive) {
       if (ally.side === g.side && dist(ally, g) < 14) {
         ally.morale = cap(ally.morale - 7 * Math.min(1, (g.troopCount || 0) / Math.max(1, ally.troopCount || 0)), 0, 100);

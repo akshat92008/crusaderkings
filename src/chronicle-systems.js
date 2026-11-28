@@ -170,4 +170,171 @@ export function tickChronicles(g,world){const c=initChronicles(g,world);if(c.las
  if(g.turn%12===0){for(const id of Object.values(g.politics.realms[realm].council)){const p=g.politics.people[id];if(!p?.alive||p.id===r.id)continue;const delta=p.traits.some(t=>r.traits.includes(t))?5:-3;changeOpinion(g,r.id,id,delta);}}
  }
  if(g.turn%12===0)for(const [key,x] of Object.entries(c.relationships))if(!g.politics.people[x.a]?.alive||!g.politics.people[x.b]?.alive)delete c.relationships[key];
+ tickStoryFlags(g);
+}
+
+// Pillar 3: Itemized Vassal Opinion Breakdown (permanent, fading, and ongoing modifiers).
+export function vassalOpinionBreakdown(g,realm,personId){
+ const s=g.politics?.realms?.[realm],r=s&&g.politics?.people?.[s.ruler],v=g.politics?.people?.[personId],f=g.factions?.[realm];
+ if(!r||!v)return {total:0,items:[]};
+ const items=[];
+ const baseRel=personalOpinion(g,r.id,v.id);
+ if(baseRel!==0)items.push({label:baseRel>0?'Personal rapport & past gifts':'Personal rivalry & slights',delta:baseRel,type:'fading'});
+ const shared=(v.traits||[]).filter(t=>(r.traits||[]).includes(t));
+ if(shared.length)items.push({label:`Shared traits (${shared.slice(0,2).join(', ')})`,delta:shared.length*6,type:'ongoing'});
+ const councilRole=Object.entries(s.council||{}).find(([,cid])=>cid===v.id)?.[0];
+ if(councilRole)items.push({label:`Seated on Royal Council (${councilRole})`,delta:12,type:'ongoing'});
+ const held=Object.values(g.politics?.holdings||{}).filter(h=>h.realm===realm&&h.lord===v.id);
+ if(held.some(h=>h.tax===2))items.push({label:'High estate taxation',delta:-15,type:'ongoing'});
+ else if(held.some(h=>h.tax===0))items.push({label:'Low estate taxation',delta:10,type:'ongoing'});
+ if(held.some(h=>h.levy===2))items.push({label:'Heavy military levy',delta:-10,type:'ongoing'});
+ if(held.some(h=>h.autonomy===0))items.push({label:'Crown restricted local autonomy',delta:-12,type:'ongoing'});
+ else if(held.some(h=>h.autonomy===2))items.push({label:'Chartered estate autonomy',delta:10,type:'ongoing'});
+ for(const gr of (v.grievances||[]).filter(x=>x.against===r.id).slice(0,3)){
+  items.push({label:`Grievance: ${gr.reason}`,delta:-Math.round((gr.severity||20)*0.5),type:gr.permanent?'permanent':'fading'});
+ }
+ const rLangs=new Set(r.civic?.languages||[]);
+ const vCulture=v.civic?.culture||g.civic?.realms?.[realm]?.culture;
+ if(vCulture&&rLangs.size>1)items.push({label:'Sovereign speaks subject court tongues',delta:6,type:'ongoing'});
+ if((v.traits||[]).includes('ambitious'))items.push({label:'Ambitious nature',delta:-10,type:'ongoing'});
+ if((v.traits||[]).includes('content'))items.push({label:'Content vassal',delta:10,type:'ongoing'});
+ if((f?.legitimacy??50)<40)items.push({label:'Weak crown legitimacy',delta:-12,type:'ongoing'});
+ else if((f?.legitimacy??50)>=80)items.push({label:'Respected crown legitimacy',delta:8,type:'ongoing'});
+ const total=cap(items.reduce((sum,x)=>sum+x.delta,0),-100,100);
+ return {total,items};
+}
+
+// Pillar 10: Inter-Generational Story Flags, Illustrated Dynasty Epitaphs & Achievements.
+export function recordStoryFlag(g,flag){
+ g.storyFlags??=[];
+ const entry={id:'sf'+(g.storyFlags.length+1)+'_'+g.turn,turn:g.turn,year:g.year,triggered:false,...flag};
+ g.storyFlags.unshift(entry);
+ g.storyFlags=g.storyFlags.slice(0,60);
+ return entry;
+}
+
+export function tickStoryFlags(g){
+ if(!Array.isArray(g.storyFlags)||!g.storyFlags.length||g.turn%12!==0)return;
+ g.chronicles??={version:1,realms:{},relationships:{},history:[],lastTick:-1};
+ g.chronicles.pendingCallbacks??=[];
+ for(const fl of g.storyFlags){
+  if(fl.triggered)continue;
+  const yearsElapsed=Math.floor((g.turn-(fl.turn||0))/12);
+  if(yearsElapsed>=(fl.delayYears||20)&&fl.realm===g.player){
+   fl.triggered=true;
+   const cb={
+    id:'cb_'+fl.id,flagId:fl.id,year:g.year,yearsAgo:yearsElapsed,
+    title:fl.callbackTitle||'Echoes from the Royal Archive',
+    description:fl.callbackText||`An old sealed letter from ${fl.year} (${yearsElapsed} years ago) resurfaces: ${fl.summary||'a past dynastic betrayal'}. The court demands an answer.`,
+    targetRealm:fl.targetRealm||null,
+    resolved:false
+   };
+   g.chronicles.pendingCallbacks.unshift(cb);
+   g.chronicles.pendingCallbacks=g.chronicles.pendingCallbacks.slice(0,8);
+   note(g,g.player,`DYNASTIC ECHO (${yearsElapsed} yrs later): ${cb.title}`);
+  }
+ }
+}
+
+export function deriveRulerEpithet(g,c,realm){
+ const t=new Set(c?.traits||[]);
+ if(c?.epithet)return c.epithet;
+ if(t.has('cruel')||t.has('wrathful'))return 'the Fearsome';
+ if(t.has('pillar-of-faith')||t.has('zealous'))return 'the Pious';
+ if(t.has('architect')||t.has('diligent'))return 'the Builder';
+ if(t.has('strategist')||t.has('battle-hardened'))return 'the Ironhand';
+ if(t.has('scholar-king')||t.has('genius'))return 'the Wise';
+ if(t.has('just')||t.has('kind'))return 'the Just';
+ if(t.has('paranoid')||t.has('master-schemer'))return 'the Watchful';
+ if(t.has('drunkard'))return 'the Reveler';
+ if(t.has('broken'))return 'the Haunted';
+ return (g.factions?.[realm]?.prestige||0)>=80?'the Magnanimous':'the Steadfast';
+}
+
+export function recordRulerEpitaph(g,c,realm,successor){
+ if(!c)return null;
+ g.chronicles??={version:1,realms:{},relationships:{},history:[],lastTick:-1};
+ g.chronicles.epitaphs??=[];
+ const epithet=deriveRulerEpithet(g,c,realm);
+ const childrenFates=(c.children||[]).map(cid=>g.politics?.people?.[cid]).filter(Boolean).map(ch=>({
+  id:ch.id,name:ch.name,alive:ch.alive,age:ch.age,
+  fate:ch.id===successor?.id?'Ascended the throne':!ch.alive?`Died (${ch.deathReason||'natural causes'})`:`Lives at court (age ${ch.age})`
+ }));
+ const cause=c.deathReason||(c.age>=65?'died of old age':'passed peacefully at court');
+ const lastWords=cause.includes('battle')?'Hold the standard—yield not one league of our ancestors’ earth!'
+  :cause.includes('assassin')?'Check the cups... trust no counselor in the shadow...'
+  :cause.includes('plague')?'Seal the gates and pray the realm outlives this fever...'
+  :cause.includes('execut')?'History will judge whose crown was truly lawful.'
+  :'Guard the dynasty, keep the realm united, and remember our house.';
+ const memories=(c.memories||[]).slice(-6);
+ const greatestAchievement=memories.find(m=>/victory|fulfilled|built|founded|hybrid|sacred/i.test(m))||`Guided ${g.factions?.[realm]?.name||realm} through ${Math.max(1,Math.round((g.turn-(c.reignStartTurn||0))/12))} years of statecraft.`;
+ const worstCrisis=memories.find(m=>/break|plague|revolt|civil war|crisis|famine|assassin/i.test(m))||'Weathered the shifting ambitions of vassals and rival crowns.';
+ const entry={
+  id:'ep_'+c.id+'_'+g.turn,
+  rulerId:c.id,name:c.name,epithet,house:c.house,realm,
+  age:c.age,deathYear:g.year,deathReason:cause,lastWords,
+  successorId:successor?.id||null,successorName:successor?.name||'Interregnum',
+  traits:[...(c.traits||[])],
+  greatestAchievement,worstCrisis,
+  definingMoment:memories[memories.length-1]||greatestAchievement,
+  childrenFates
+ };
+ g.chronicles.epitaphs.unshift(entry);
+ g.chronicles.epitaphs=g.chronicles.epitaphs.slice(0,30);
+ if(realm===g.player)g.chronicles.pendingObituary=entry;
+ return entry;
+}
+
+export function playerAchievements(g){
+ const r=g.player,f=g.factions?.[r];
+ const epitaphs=g.chronicles?.epitaphs?.filter(e=>e.realm===r)||[];
+ const thwarted=g.intrigue?.thwarted?.[r]||0;
+ const hybrids=Object.values(g.identity?.hybrids||{}).filter(h=>h.realm===r).length;
+ const routes=Object.keys(g.tradeRoutes?.investments||{}).filter(k=>k.endsWith(':'+r)).length;
+ const provs=Object.values(g.provinces||{}).filter(p=>p.owner===r).length;
+ const successions=g.kingdom?.courts?.[r]?.successions||0;
+ return [
+  {id:'paranoid_physician',name:'The Paranoid Physician',desc:'Thwart 5 hostile schemes against your court.',done:thwarted>=5,progress:`${thwarted}/5`},
+  {id:'dynasty_survivor',name:'Through Three Crowns',desc:'Survive 3 royal successions without losing the throne.',done:successions>=3,progress:`${successions}/3`},
+  {id:'architect_hybrids',name:'Architect of Civilizations',desc:'Forge a named Hybrid Court Culture.',done:hybrids>=1,progress:`${hybrids}/1`},
+  {id:'silk_lord',name:'Lord of the Trade Winds',desc:'Charter caravan investments on 2 macro trade routes.',done:routes>=2,progress:`${routes}/2`},
+  {id:'empire_builder',name:'Sovereign of Ten Provinces',desc:'Hold at least 10 provinces under one banner.',done:provs>=10,progress:`${provs}/10`},
+  {id:'living_chronicle',name:'Chronicler of Ages',desc:'Record 2 royal epitaphs in the Dynasty Chronicle.',done:epitaphs.length>=2,progress:`${epitaphs.length}/2`},
+  {id:'prestigious_house',name:'Glorious Dynasty',desc:'Accumulate 150 dynastic prestige.',done:(f?.prestige||0)>=150,progress:`${Math.round(f?.prestige||0)}/150`}
+ ];
+}
+
+export function dynastyChronicleSummary(g){
+ const r=g.player,f=g.factions?.[r],epitaphs=(g.chronicles?.epitaphs||[]).filter(e=>e.realm===r);
+ const yearsRuled=Math.max(1,(g.year||1450)-1450);
+ const provs=Object.values(g.provinces||{}).filter(p=>p.owner===r).length;
+ const warsWon=Object.values(g.conflict?.wars||{}).filter(w=>(w.attacker===r&&w.status==='claim enforced')||(w.defender===r&&w.status==='attacker defeated')).length;
+ const crisesSurvived=g.kingdom?.courts?.[r]?.successions||0;
+ const achievements=playerAchievements(g);
+ const ruler=g.politics?.people?.[g.politics?.realms?.[r]?.ruler];
+ const house=ruler?.house||'Royal House';
+ const houseLabel=/^House\b/i.test(house)?house:`House ${house}`;
+ const capitalLevel=g.hometown?.realms?.[r]?.level||1;
+ const greatestBattle=g.chronicles?.greatestBattle||null;
+ const campaignComplete=(g.year||1450)>=1600;
+ const unlockedCount=achievements.filter(a=>a.done).length;
+ return {
+  realmName:f?.name||r,
+  house,
+  houseName:houseLabel,
+  currentRuler:ruler?{id:ruler.id,name:ruler.name,age:ruler.age,epithet:deriveRulerEpithet(g,ruler,r)}:null,
+  year:g.year||1450,
+  yearsRuled,provs,provinces:provs,warsWon,crisesSurvived,capitalLevel,greatestBattle,campaignComplete,
+  epitaphs,achievements,unlockedCount,
+  shareCaption:`Sovereign 1450 — ${houseLabel} of ${f?.name||r} (${1450}–${g.year||1450}): ${provs} provinces, Capital Stage ${capitalLevel}/10, ${warsWon} wars won, ${crisesSurvived} successions weathered, ${unlockedCount}/${achievements.length} achievements.`,
+  alternateHistory:`From 1450 to ${g.year||1450}, ${houseLabel} of ${f?.name||r} held ${provs} provinces across ${yearsRuled} years, raised their royal capital to Stage ${capitalLevel}/10, endured ${crisesSurvived} royal successions, and reshaped the early-modern world.`
+ };
+}
+
+export function opinionBreakdown(g, personId) {
+ const p = g.politics?.people?.[personId];
+ if (!p) return { total: 0, positive: 0, negative: 0, reasons: [] };
+ const r = vassalOpinionBreakdown(g, p.realm, personId);
+ const reasons = (r.items || []).map(x => ({ label: x.label, value: x.delta, duration: x.type }));
+ return { total: r.total, positive: reasons.filter(x => x.value > 0).reduce((s, x) => s + x.value, 0), negative: reasons.filter(x => x.value < 0).reduce((s, x) => s + x.value, 0), reasons };
 }

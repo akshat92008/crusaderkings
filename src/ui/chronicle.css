@@ -46,3 +46,117 @@ html[data-motion=reduce] :is(.chronicle-nav,.leftbar,.rightbar,.maptop,.toast,.e
 @media (max-width: 1180px) {
  html[data-density=standard] .topresources .resource:has(#resource-prestige, #resource-legitimacy) { display:none }
 }
+
+/* Gameplay Pillars UI — Stress, Hooks, Agendas, Trade, Regiment Morale & Color-Blind Mode */
+.stress-meter { margin:8px 0; padding:8px 10px; background:#0d1a1e; border:1px solid #355253; border-radius:4px; }
+.stress-meter-head { display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; }
+.stress-bar { height:8px; background:#1c2d31; border-radius:3px; overflow:hidden; position:relative; }
+.stress-bar > span { display:block; height:100%; background:#4ca67a; transition:width .25s ease; }
+.stress-bar.warn > span { background:#d89c3b; }
+.stress-bar.danger > span { background:#d45147; }
+.trait-cat-badge { display:inline-block; font-size:10px; text-transform:uppercase; letter-spacing:.04em; opacity:.78; margin-left:4px; padding:1px 4px; border-radius:2px; background:rgba(255,255,255,.08); }
+.hook-badge { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.05em; padding:2px 6px; border-radius:3px; text-transform:uppercase; margin-left:6px; }
+.hook-badge.strong { background:#7a2424; color:#ffd6d2; border:1px solid #d45147; }
+.hook-badge.weak { background:#3c3720; color:#f3dca0; border:1px solid #c5a255; }
+.agenda-card { border-left:3px solid #c5a255; padding-left:9px; margin:6px 0; }
+.opinion-list { display:grid; gap:4px; margin-top:6px; }
+.opinion-row { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:3px 6px; background:rgba(255,255,255,.03); border-radius:3px; }
+.opinion-row .pos { color:#8ad49c; font-weight:600; }
+.opinion-row .neg { color:#e68a7e; font-weight:600; }
+.opinion-row .tag { opacity:.72; font-size:11px; margin-left:4px; }
+.trade-route-card { border-left:3px solid #598a82; padding-left:10px; }
+.trade-route-card.blockaded { border-left-color:#d45147; }
+.achievement-grid { display:grid; gap:6px; margin-top:6px; }
+.achievement-item { padding:7px 9px; border:1px solid rgba(184,155,97,.25); border-radius:4px; background:rgba(15,32,36,.65); }
+.achievement-item.unlocked { border-color:#d7b46d; background:rgba(56,48,24,.35); }
+.battle-event-banner { margin-top:6px; padding:6px 10px; border-radius:4px; background:rgba(122,30,28,.9); border:1px solid #e79d6c; color:#fff2e5; font-size:12px; font-weight:700; letter-spacing:.03em; }
+.unitcard .regiment-leader { grid-column:1 / -1; display:block; font-size:10px; color:#e4ca83; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.unitcard .regiment-morale { grid-column:1 / -1; display:block; width:100%; height:4px; margin-top:3px; background:rgba(0,0,0,.45); border-radius:2px; overflow:hidden; }
+.unitcard .regiment-morale > span { display:block; height:100%; background:#59b8e6; transition:width .18s ease; }
+.unitcard .regiment-flags { grid-column:1 / -1; display:block; font-size:9px; letter-spacing:.03em; color:#f2cf84; margin-top:2px; min-height:11px; }
+.obituary-panel { padding:8px 10px; border:1px solid #c5a255; border-radius:4px; background:rgba(22,19,14,.55); margin:8px 0; }
+
+/* Okabe-Ito High-Contrast Color-Blind Safe Palette */
+body.colorblind-mode .up,
+body.colorblind-mode .pos,
+body.colorblind-mode .event-effect-chip.pos,
+body.colorblind-mode .adviser-badge.pos { color:#56b4e9 !important; }
+body.colorblind-mode .down,
+body.colorblind-mode .neg,
+body.colorblind-mode .event-effect-chip.neg,
+body.colorblind-mode .adviser-badge.warn { color:#e69f00 !important; }
+body.colorblind-mode .stress-bar > span { background:#0072b2; }
+body.colorblind-mode .stress-bar.warn > span { background:#e69f00; }
+body.colorblind-mode .stress-bar.danger > span { background:#d55e00; }
+body.colorblind-mode .hook-badge.strong { background:#d55e00; color:#ffffff; border-color:#f0e442; }
+body.colorblind-mode .hook-badge.weak { background:#0072b2; color:#ffffff; border-color:#56b4e9; }
+body.colorblind-mode .banner-force.friendly i { background:#0072b2 !important; }
+body.colorblind-mode .banner-force.enemy i { background:#d55e00 !important; }
+body.colorblind-mode .unitcard .unithealth span { background:#0072b2 !important; }
+body.colorblind-mode .unitcard .regiment-morale > span { background:#f0e442 !important; }
+body.colorblind-mode .legend-dot.gold { background:#0072b2 !important; }
+body.colorblind-mode .legend-dot.coral { background:#d55e00 !important; }
+body.colorblind-mode #toggle-colorblind { background:#0072b2; border-color:#f0e442; color:#ffffff; }
+
+/* Age-stage portrait framing & badges */
+.portrait-mark.age-youth { box-shadow:0 0 0 2px #6bb897; }
+.portrait-mark.age-prime { box-shadow:0 0 0 2px #d7b46d; }
+.portrait-mark.age-mature { box-shadow:0 0 0 2px #b78d56; }
+.portrait-mark.age-elder { box-shadow:0 0 0 2px #c8ccd0; filter:saturate(.82) contrast(1.06); }
+.age-stage-badge { display:inline-block; font-size:10px; text-transform:uppercase; letter-spacing:.05em; padding:1px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; background:rgba(215,180,109,.16); border:1px solid rgba(215,180,109,.45); color:#f2dcb0; }
+.age-stage-badge.age-youth { border-color:#6bb897; color:#b8f0d8; }
+.age-stage-badge.age-elder { border-color:#b8c0c8; color:#e2e8ee; }
+
+/* Transparent Economic Forecast card */
+.forecast-card { border-left:3px solid #d7b46d; padding-left:10px; background:rgba(17,33,37,.72); }
+.forecast-tips { margin-top:6px; display:grid; gap:3px; }
+
+/* Commander Portrait Avatar inside 3D Battle Regiment Card */
+.unitcard .commander-portrait-avatar { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; overflow:hidden; border:2px solid #e5c16a; box-shadow:0 0 6px rgba(229,193,106,.55); font-size:10px; font-weight:700; color:#fff8e8; }
+.unitcard .commander-portrait-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* Living Settlement Ambient States & Siege Damage */
+.ht-ambient-alert { position:absolute; top:10px; left:10px; z-index:45; padding:4px 9px; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:.03em; background:rgba(24,18,14,.88); border:1px solid #d8b36a; color:#f8e8c8; pointer-events:none; }
+.ht-ambient-siege .ht-ambient-alert { background:rgba(130,28,24,.92); border-color:#f09675; color:#fff2ea; }
+.ht-ambient-famine .ht-ambient-alert { background:rgba(105,64,20,.92); border-color:#e4b363; }
+.ht-ambient-siege .ht-smoke { opacity:.95; filter:brightness(.55); }
+.ht-ambient-famine .ht-walker { animation-duration:18s !important; opacity:.65; }
+.ht-siege-damage-list { margin-top:8px; padding-top:8px; border-top:1px solid rgba(216,179,106,.28); display:grid; gap:6px; }
+
+/* First-Hour Guided Sovereign Onboarding Bar */
+.onboarding-strip { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding:6px 12px; background:rgba(13,26,30,.92); border-bottom:1px solid rgba(201,164,92,.4); font-size:12px; z-index:4; }
+.onboarding-strip[hidden] { display:none !important; }
+.onboarding-head { display:flex; align-items:center; gap:10px; color:#e4ca83; }
+.onboarding-steps { display:flex; flex-wrap:wrap; gap:6px; }
+.onboarding-step { padding:4px 9px; border-radius:4px; border:1px solid rgba(201,164,92,.45); background:rgba(26,48,52,.85); color:#f2e8d4; font-size:11px; cursor:pointer; }
+.onboarding-step:hover { border-color:#e5c16a; background:rgba(46,72,76,.95); }
+.onboarding-step.done { border-color:#5ba57b; background:rgba(30,68,52,.72); color:#bfe8cf; }
+
+/* Greatest Story Illustrated Dynasty Chronicle End Screen */
+.chronicle-endscreen-modal { z-index:95; padding:18px; overflow:auto; }
+.chronicle-endscreen-card { width:min(820px, 100%); max-height:calc(100dvh - 36px); overflow:auto; background:linear-gradient(160deg,#181410,#231c14 55%,#14100c); border:2px solid #c9a45c; border-radius:10px; padding:22px; color:#f4ead5; box-shadow:0 24px 60px rgba(0,0,0,.78); }
+.chronicle-endscreen-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; border-bottom:1px solid rgba(201,164,92,.35); padding-bottom:12px; margin-bottom:14px; }
+.chronicle-endscreen-head h2 { margin:6px 0 4px; font:700 28px/1.15 Georgia,serif; color:#f9efd8; }
+.chronicle-endscreen-card .chronicle-endscreen-head .smallnote { color:#d8c39b !important; opacity:1; margin:4px 0 0; font-size:12px; line-height:1.45; }
+.chronicle-endscreen-stats { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-bottom:14px; }
+.chronicle-endscreen-stats > div { padding:10px 12px; border:1px solid rgba(201,164,92,.35); border-radius:6px; background:rgba(201,164,92,.08); }
+.chronicle-endscreen-stats small { display:block; font-size:10px; letter-spacing:.08em; color:#cbb07a; }
+.chronicle-endscreen-stats b { font:700 22px/1.2 Georgia,serif; color:#fff5df; }
+.chronicle-alt-history { font:400 15px/1.55 Georgia,serif; color:#ede0c4; margin:0 0 14px; }
+.chronicle-highlight-box { padding:12px 14px; border-left:3px solid #d7b46d; background:rgba(201,164,92,.1); border-radius:4px; margin-bottom:14px; }
+.chronicle-highlight-box h4 { margin:0 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#e4c277; }
+.chronicle-highlight-box p { margin:0; font-size:14px; }
+.chronicle-timeline-sec h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:#d7b46d; }
+.chronicle-reign-list { display:grid; gap:8px; max-height:220px; overflow:auto; margin-bottom:16px; }
+.chronicle-reign-item { padding:10px 12px; border:1px solid rgba(201,164,92,.25); border-radius:6px; background:rgba(15,12,9,.55); }
+.chronicle-reign-item b { display:block; color:#f7ebd0; font-size:15px; }
+.chronicle-reign-item small { color:#c7ad78; font-size:12px; }
+.chronicle-reign-item p { margin:5px 0 0; font-size:13px; color:#e5d8bc; }
+.chronicle-export-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.chronicle-canvas-wrap { margin-top:12px; border:1px solid rgba(201,164,92,.45); border-radius:6px; overflow:hidden; background:#120f0b; }
+.chronicle-canvas-wrap canvas { width:100%; height:auto; display:block; }
+@media (max-width: 680px) {
+ .chronicle-endscreen-stats { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}
+
+

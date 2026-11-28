@@ -1,8 +1,46 @@
 import {eventImage} from '../game-art.js';
-import {SUPPORTED_LOCALES} from '../i18n.js';
+import {SUPPORTED_LOCALES, LOCALE_NAMES, applyTranslations} from '../i18n.js';
 import {browserCampaignAudio} from '../field-audio.js';
 
 const STORE = 'reign1450.interface.v1';
+const KEYBIND_STORE = 'reign1450.keybindings.v1';
+export const DEFAULT_KEYBINDINGS = Object.freeze({
+  search: '/',
+  lockTooltip: 't',
+  nextMonth: 'n',
+  togglePause: ' ',
+  openHometown: 'c',
+  openChronicle: 'j',
+  battlePause: 'p'
+});
+const KEYBIND_LABELS = Object.freeze({
+  search: 'Campaign Search',
+  lockTooltip: 'Pin & Expand Tooltip',
+  nextMonth: 'Advance Month',
+  togglePause: 'Pause / Play Time',
+  openHometown: 'Open Royal Capital',
+  openChronicle: 'Open Chronicle',
+  battlePause: 'Pause / Resume 3D Battle'
+});
+export function getKeybindings() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(KEYBIND_STORE)); } catch {}
+  return { ...DEFAULT_KEYBINDINGS, ...(saved && typeof saved === 'object' ? saved : {}) };
+}
+export function setKeybinding(action, key) {
+  if (!Object.hasOwn(DEFAULT_KEYBINDINGS, action) || !key) return getKeybindings();
+  const next = getKeybindings();
+  next[action] = key === 'Spacebar' ? ' ' : key.length === 1 ? key.toLowerCase() : key;
+  try { localStorage.setItem(KEYBIND_STORE, JSON.stringify(next)); } catch {}
+  return next;
+}
+export function resetKeybindings() {
+  try { localStorage.removeItem(KEYBIND_STORE); } catch {}
+  return { ...DEFAULT_KEYBINDINGS };
+}
+function formatKeyLabel(k) {
+  return k === ' ' ? 'SPACE' : String(k || '').toUpperCase();
+}
 const categories = {
   critical: 'Succession, invasions and crises',
   important: 'Court and political decisions',
@@ -13,7 +51,7 @@ const defaults = {critical: 'pause', important: 'notify', works: 'notify', chron
 const modes = {pause: 'Pause and show', notify: 'Notify', record: 'Chronicle only'};
 const choices = {
   density: {standard: 'Standard', expert: 'Expert'},
-  scale: {90: '90%', 100: '100%', 110: '110%', 125: '125%'},
+  scale: {90: '90%', 100: '100%', 115: '115%', 125: '125%'},
   motion: {system: 'System preference', reduce: 'Reduced'},
   delay: {0: 'Immediate', 300: 'Short', 700: 'Long'},
   graphics: {low: 'Low (Battery / 8 GB)', medium: 'Medium (Balanced)', high: 'High (Full 3D)'}
@@ -49,25 +87,62 @@ function options(values, value) {
 export function installSettings(hooks = {}) {
   apply();
   let dialog;
+  let capturingAction = null;
+  const renderKeybindRows = () => {
+    const binds = getKeybindings();
+    return Object.entries(KEYBIND_LABELS).map(([act, lbl]) =>
+      '<div class="keybind-row"><span>'+lbl+'</span><button type="button" class="rowbtn keybind-btn" data-rebind="'+act+'">'+formatKeyLabel(binds[act])+'</button></div>'
+    ).join('');
+  };
   document.addEventListener('click', e => {
     if (!e.target.closest('#open-settings,[data-open-campaign-settings]')) return;
     if (!dialog) {
       dialog = document.createElement('dialog');
       dialog.id = 'campaign-settings'; dialog.setAttribute('aria-labelledby','campaign-settings-title');
       const vols = browserCampaignAudio.getBusVolumes?.() || {master:1,music:1,sfx:1,ambience:1};
-      const localeOpts = SUPPORTED_LOCALES.map(loc => '<option value="'+loc+'"'+(preferences.locale===loc?' selected':'')+'>'+loc.toUpperCase()+'</option>').join('');
+      const localeOpts = SUPPORTED_LOCALES.map(loc => '<option value="'+loc+'"'+(preferences.locale===loc?' selected':'')+'>'+(LOCALE_NAMES[loc]||loc.toUpperCase())+'</option>').join('');
+      const cbOn = document.body.classList.contains('colorblind-mode');
       dialog.innerHTML = '<header><h2 id="campaign-settings-title">Campaign settings</h2><form method="dialog"><button autofocus aria-label="Close settings">Close</button></form></header>'+
         '<div class="settings-fields">'+Object.entries(choices).map(([k,v]) => '<label>'+labels[k]+'<select data-setting="'+k+'">'+options(v,preferences[k])+'</select></label>').join('')+'<label>Language<select data-locale>'+localeOpts+'</select></label></div>'+
+        '<fieldset><legend>Accessibility &amp; Guidance</legend><div class="settings-delivery"><label><input type="checkbox" data-accessibility-colorblind'+(cbOn?' checked':'')+'> Color-blind safe palette (Okabe-Ito high contrast)</label><button type="button" data-reset-onboarding>Show First-Hour Guide</button></div></fieldset>'+
         '<fieldset><legend>Audio mixer</legend><div class="settings-audio-grid">'+[['master','Master'],['music','Music Score'],['sfx','Battle &amp; UI SFX'],['ambience','Camp Ambience']].map(([b,lbl])=>'<label><span>'+lbl+'</span><input type="range" min="0" max="100" value="'+Math.round((vols[b]??1)*100)+'" data-audio-bus="'+b+'"></label>').join('')+'</div></fieldset>'+
         '<fieldset><legend>Notifications</legend>'+Object.entries(categories).map(([k,label]) => '<div class="settings-delivery"><label>'+label+'<select data-delivery="'+k+'">'+options(modes,preferences.delivery[k])+'</select></label><label><input type="checkbox" data-sound="'+k+'"'+(preferences.sound[k]?' checked':'')+' aria-label="Sound for '+label+'"> Sound</label></div>').join('')+'</fieldset>'+
-        '<details><summary>Keyboard shortcuts</summary><p><kbd>/</kbd> Search the campaign<br><kbd>T</kbd> Pin and expand a focused tooltip<br><kbd>Esc</kbd> Close an overlay or tooltip</p></details>';
+        '<details><summary>Custom Keybindings</summary><div class="keybind-grid" data-keybind-grid>'+renderKeybindRows()+'</div><div style="margin-top:8px"><button type="button" class="rowbtn" data-reset-keybinds>Reset Default Keys</button> <small>Click any key button and press a new key.</small></div></details>';
+      dialog.addEventListener('click', e => {
+        if (e.target.closest('[data-reset-onboarding]')) {
+          hooks.onResetOnboarding?.();
+          dialog.close();
+          return;
+        }
+        const rebindBtn = e.target.closest('[data-rebind]');
+        if (rebindBtn) {
+          capturingAction = rebindBtn.dataset.rebind;
+          for (const b of dialog.querySelectorAll('[data-rebind]')) b.textContent = b === rebindBtn ? 'PRESS KEY...' : formatKeyLabel(getKeybindings()[b.dataset.rebind]);
+          return;
+        }
+        if (e.target.closest('[data-reset-keybinds]')) {
+          capturingAction = null;
+          resetKeybindings();
+          const grid = dialog.querySelector('[data-keybind-grid]');
+          if (grid) grid.innerHTML = renderKeybindRows();
+          hooks.onKeybindingsChange?.(getKeybindings());
+        }
+      });
       dialog.addEventListener('change', e => {
         const input = e.target;
+        if (input.hasAttribute('data-accessibility-colorblind')) {
+          hooks.onColorblindChange?.(input.checked);
+          return;
+        }
         if (input.dataset.setting) {
           preferences[input.dataset.setting] = input.value;
           if (input.dataset.setting === 'graphics') hooks.onGraphicsChange?.(input.value);
         }
-        if (input.hasAttribute('data-locale')) preferences.locale = input.value;
+        if (input.hasAttribute('data-locale')) {
+          preferences.locale = input.value;
+          applyTranslations(document, input.value);
+          hooks.onLocaleChange?.(input.value);
+        }
         if (input.dataset.delivery) preferences.delivery[input.dataset.delivery] = input.value;
         if (input.dataset.sound) preferences.sound[input.dataset.sound] = input.checked;
         apply();
@@ -77,9 +152,23 @@ export function installSettings(hooks = {}) {
         const bus = e.target.dataset?.audioBus;
         if (bus) hooks.onAudioBusChange?.(bus, Number(e.target.value) / 100);
       });
-      dialog.addEventListener('keydown', e => e.stopPropagation());
+      dialog.addEventListener('keydown', e => {
+        if (capturingAction) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.key !== 'Escape') setKeybinding(capturingAction, e.key);
+          capturingAction = null;
+          const grid = dialog.querySelector('[data-keybind-grid]');
+          if (grid) grid.innerHTML = renderKeybindRows();
+          hooks.onKeybindingsChange?.(getKeybindings());
+          return;
+        }
+        e.stopPropagation();
+      });
       document.body.append(dialog);
     }
+    const cbBox = dialog.querySelector('[data-accessibility-colorblind]');
+    if (cbBox) cbBox.checked = document.body.classList.contains('colorblind-mode');
     const gfxSel = dialog.querySelector('[data-setting="graphics"]');
     if (gfxSel) {
       try { preferences.graphics = localStorage.getItem('crown-of-nations.gfx-quality') || preferences.graphics; } catch {}

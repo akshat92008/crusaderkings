@@ -41,9 +41,34 @@ export function realmFaith(g,realm){
 export function transferProvince(g,id,realm){
  const p=g.provinces[id];
  if(!p||!Object.hasOwn(g.factions,realm)||p.owner===realm)return false;
+ const prevOwner=p.owner;
  p.owner=realm;
  if(realm!=='independent'&&g.independentPolities?.[id])delete g.independentPolities[id];
  if(reconcileProvincialHolding(g,id))syncTitles(g);
+ // Reset cultural tenure on conquest/transfer
+ if(g.civic?.provinces?.[id])g.civic.provinces[id].ruleTenure=0;
+ // Pillar 5: Faith Conversion Choice event when player conquers a different-faith province
+ const localFaith=g.civic?.provinces?.[id]?.faith;
+ const myFaith=g.civic?.realms?.[realm]?.faith;
+ if(realm===g.player&&prevOwner&&prevOwner!==realm&&localFaith&&myFaith&&localFaith!==myFaith&&g.identity){
+  g.identity.pendingConversionChoice={
+   province:id,provinceName:p.name||id,localFaith,realmFaith:myFaith,fromRealm:prevOwner,turn:g.turn
+  };
+ }
+ // Pillar 5: Sacred Site Capture announcement & moral authority surge
+ const sacredNames={
+  latium:'Apostolic See of Rome',jerusalem:'Holy City of Jerusalem',thrace:'Imperial Cathedral of Constantinople',
+  hejaz:'Sacred Sanctuary of Mecca',benares:'Sacred Ghats of Varanasi',kyoto:'Sacred Shrines of Kyoto',
+  cusco:'Temple of the Sun at Cusco',lhasa:'Potala Monastic Sanctuary'
+ };
+ if(sacredNames[id]&&g.factions[realm]){
+  g.factions[realm].prestige=(g.factions[realm].prestige||0)+20;
+  if(myFaith)adjustMoralAuthority(g,myFaith,8,'Captured '+sacredNames[id]);
+  if(Array.isArray(g.log)){
+   g.log.unshift({date:(g.year||1450)+' · month '+((g.month||0)+1),text:'Sacred Site Captured! '+g.factions[realm].name+' seized '+sacredNames[id]+' (+20 prestige, +8 moral authority).'});
+   if(g.log.length>45)g.log.length=45;
+  }
+ }
  return true;
 }
 

@@ -1,12 +1,14 @@
 import {disposeFieldMaterials} from './field-visuals.js';
 import {suppressFortScenery} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
-import {updateFieldCharacters} from './battle-presentation.js';
+import {updateFieldCharacters, animationClipState} from './battle-presentation.js';
 import {terrainHeight,terrainForestCovers} from './field-tactics.js';
+import {sampledSoldierBudget,createFrameBudgetMonitor,disposeThreeObject} from './render-performance.js';
 /**
  * Sovereign 1450 — Three.js 3D battle renderer with cleared 0 A.D. (CC BY-SA 3.0),
- * Polyfork (MIT/CC0) and KayKit (CC0) regional armies, mounts, and 3D flora/rocks.
- * Bundled locally by scripts/build_3d_battle.mjs. No runtime CDN dependence.
+ * Polyfork (MIT/CC0) and KayKit (CC0) regional armies, mounts, 3D siege fortifications,
+ * Hometown capital silhouettes, and 3D flora/rocks.
+ * Bundled locally by scripts/build-battle-bundle.mjs. No runtime CDN dependence.
  */
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -22,9 +24,12 @@ const meshes={
  sphere:()=>new THREE.SphereGeometry(.5,9,7)
 };
 const walkClip=clips=>clips.find(c=>/^(Walking_A|walk)$/i.test(c.name))||clips.find(c=>/walk/i.test(c.name))||clips.find(c=>/run/i.test(c.name));
+const runClip=clips=>clips.find(c=>/^(Running_A|run)$/i.test(c.name))||clips.find(c=>/run|charge|gallop/i.test(c.name))||walkClip(clips);
 const idleClip=clips=>clips.find(c=>/^(Idle_A|idle)$/i.test(c.name))||clips.find(c=>/idle/i.test(c.name))||clips[0];
 const attackClip=clips=>clips.find(c=>/^(attack_melee|1H_Melee_Attack_Slice)$/i.test(c.name))||clips.find(c=>/melee.*attack|attack.*slash|attack_melee/i.test(c.name))||clips.find(c=>/attack/i.test(c.name));
 const bowClip=clips=>clips.find(c=>/^attack_ranged$/i.test(c.name))||clips.find(c=>/bow.*(shoot|release)/i.test(c.name))||clips.find(c=>/shoot.*bow|archery|attack_ranged/i.test(c.name))||attackClip(clips);
+const deathClip=clips=>clips.find(c=>/^(death|Death_A)$/i.test(c.name))||clips.find(c=>/death|die/i.test(c.name))||null;
+const rallyClip=clips=>clips.find(c=>/^(promotion|cheer|rally)$/i.test(c.name))||clips.find(c=>/promot|cheer|victory/i.test(c.name))||null;
 const elapsedTime=(phase,t,j)=>(t*10+phase+j*Math.PI*.6);
 
 const SOUTH_INDIA_REALMS=new Set(['vijayanagara','bahmani','mysore','madurai','keladi','ceylon','kandy']);
@@ -78,31 +83,46 @@ export function regionalFamilyForRealm(realmId){
  return regionalAliasFallback(detailedRegionalFamilyForRealm(realmId));
 }
 
+function createSharedHorseAssets(){
+ return {
+  geo:{
+   body:new THREE.SphereGeometry(.5,9,7),
+   neck:new THREE.CylinderGeometry(.22,.31,1,7),
+   box:new THREE.BoxGeometry(1,1,1),
+   leg:new THREE.CylinderGeometry(.10,.08,.70,6),
+   hoof:new THREE.BoxGeometry(.19,.14,.27),
+   tail:new THREE.ConeGeometry(.17,.63,6)
+  },
+  mat:{
+   fur:new THREE.MeshLambertMaterial({color:0x775136}),
+   mane:new THREE.MeshLambertMaterial({color:0x382d29}),
+   saddle:new THREE.MeshLambertMaterial({color:0x594137})
+  }
+ };
+}
 
-/** Simple authored procedural mount until a properly rigged horse is integrated. */
-function createHorse(){
+/** Shared-geometry procedural mount for any cavalry fallback lacking an embedded horse rig. */
+function createHorse(shared){
  const horse=new THREE.Group();
- const fur=new THREE.MeshLambertMaterial({color:0x775136});
- const mane=new THREE.MeshLambertMaterial({color:0x382d29});
- const saddle=new THREE.MeshLambertMaterial({color:0x594137});
+ const {geo,mat}=shared;
  const shape=(geometry,material,x,y,z,sx,sy,sz)=>{
   const item=new THREE.Mesh(geometry,material);item.position.set(x,y,z);item.scale.set(sx,sy,sz);horse.add(item);return item;
  };
- shape(new THREE.SphereGeometry(.5,9,7),fur,0,.88,0,.78,.64,1.30);
- const neck=shape(new THREE.CylinderGeometry(.22,.31,1,7),fur,0,1.20,.52,.9,1,.9);
+ shape(geo.body,mat.fur,0,.88,0,.78,.64,1.30);
+ const neck=shape(geo.neck,mat.fur,0,1.20,.52,.9,1,.9);
  neck.rotation.x=-.50;
- shape(new THREE.BoxGeometry(1,1,1),fur,0,1.52,.80,.34,.42,.61);
- shape(new THREE.BoxGeometry(1,1,1),mane,0,1.42,.50,.42,.32,.14);
- shape(new THREE.BoxGeometry(1,1,1),saddle,0,1.23,-.12,.70,.22,.56);
+ shape(geo.box,mat.fur,0,1.52,.80,.34,.42,.61);
+ shape(geo.box,mat.mane,0,1.42,.50,.42,.32,.14);
+ shape(geo.box,mat.saddle,0,1.23,-.12,.70,.22,.56);
  const legs=[];
  for(const x of [-.30,.30])for(const z of [-.47,.47]){
   const joint=new THREE.Group();joint.position.set(x,.57,z);horse.add(joint);
-  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.10,.08,.70,6),fur);
+  const leg=new THREE.Mesh(geo.leg,mat.fur);
   leg.position.y=-.31;joint.add(leg);
-  const hoof=new THREE.Mesh(new THREE.BoxGeometry(.19,.14,.27),mane);
+  const hoof=new THREE.Mesh(geo.hoof,mat.mane);
   hoof.position.set(0,-.69,.07);joint.add(hoof);legs.push(joint);
  }
- const tail=shape(new THREE.ConeGeometry(.17,.63,6),mane,0,.93,-.83,.85,1,1);
+ const tail=shape(geo.tail,mat.mane,0,.93,-.83,.85,1,1);
  tail.rotation.x=.46;
  return {horse,legs};
 }
@@ -114,8 +134,8 @@ export function formationPosition(index,count,id,spacing=1){
   const depth=Math.floor(Math.sqrt(index)),start=depth*depth,within=index-start,number=depth*2+1;
   return [(within-(number-1)/2)*spacing,(depth-1.3)*spacing*1.3];
  }
- if(id==='longbow_line'||id==='volley_line')return [(index-(count-1)/2)*spacing*.84,0];
- if(id==='pike_square'){
+ if(id==='longbow_line'||id==='volley_line'||id==='line')return [(index-(count-1)/2)*spacing*.84,0];
+ if(id==='pike_square'||id==='square'){
   const side=Math.ceil(Math.sqrt(count));
   return [(index%side-(side-1)/2)*spacing,(Math.floor(index/side)-(side-1)/2)*spacing];
  }
@@ -130,26 +150,79 @@ export function formationPosition(index,count,id,spacing=1){
  if(id==='shield_wall')return [(index%7-3)*spacing*.85,(Math.floor(index/7)-.5)*spacing*.75];
  return [(col-2)*spacing,(row-1)*spacing];
 }
+
 export class ThreeBattleScene {
  constructor(canvas,config={}) {
-  this.isThreeBattle=true;this.canvas=canvas;this.modelsReady=false;this.loadingStatus='Loading KayKit infantry';
-  this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
+  this.isThreeBattle=true;this.canvas=canvas;this.modelsReady=false;this.loadingStatus='Loading 3D regional armies';
+  let probeSoftware=false;
+  try{
+   const probe=document.createElement('canvas').getContext('webgl2');
+   if(probe){
+    const dbg=probe.getExtension('WEBGL_debug_renderer_info');
+    const str=String((dbg&&probe.getParameter(dbg.UNMASKED_RENDERER_WEBGL))||probe.getParameter(probe.RENDERER)||'');
+    probeSoftware=/SwiftShader|llvmpipe|softpipe|Software|Basic Render|Mesa/i.test(str);
+    probe.getExtension('WEBGL_lose_context')?.loseContext();
+   }
+  }catch{}
+  this.renderer=new THREE.WebGLRenderer({canvas,antialias:!probeSoftware,alpha:false,powerPreference:'high-performance'});
   this.renderer.outputColorSpace=THREE.SRGBColorSpace;
-  this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.45;
+  this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.42;
   this.gl=this.renderer.getContext();
+  let rendererStr='';
+  try{
+   const dbg=this.gl?.getExtension?.('WEBGL_debug_renderer_info');
+   rendererStr=String((dbg&&this.gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL))||this.gl?.getParameter?.(this.gl.RENDERER)||'');
+  }catch{}
+  this.isSoftwareGl=probeSoftware||/SwiftShader|llvmpipe|softpipe|Software|Basic Render|Mesa/i.test(rendererStr);
   this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x9da9a0);
-  this.scene.fog=new THREE.FogExp2(0x9da9a0,.0035);
-  this.camera=new THREE.PerspectiveCamera(60,1,.5,330);
-  this.scene.add(new THREE.HemisphereLight(0xd9e5da,0x51452f,2.15));
-  const sunlight=new THREE.DirectionalLight(0xffe9bd,2.3);sunlight.position.set(-35,70,55);this.scene.add(sunlight);
+  this.scene.fog=new THREE.FogExp2(0x9da9a0,.0034);
+  this.camera=new THREE.PerspectiveCamera(60,1,.5,340);
+  this.scene.add(new THREE.HemisphereLight(0xd9e5da,0x51452f,2.05));
+  const sunlight=new THREE.DirectionalLight(0xffe8b8,2.25);sunlight.position.set(-35,70,55);this.scene.add(sunlight);
+  const rimLight=new THREE.DirectionalLight(0xa7c5d9,0.55);rimLight.position.set(42,30,-52);this.scene.add(rimLight);
   this.batches={};this.tmp=new THREE.Object3D();this.color=new THREE.Color();
+  this._sharedHorse=createSharedHorseAssets();
+  this._sharedAssets=new Set([...Object.values(this._sharedHorse.geo),...Object.values(this._sharedHorse.mat)]);
+  this.frameBudget=createFrameBudgetMonitor(60);
   for(const [kind,make] of Object.entries(meshes)){
    const inst=new THREE.InstancedMesh(make(),new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide}),9000);
    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);inst.frustumCulled=false;inst.count=0;this.scene.add(inst);this.batches[kind]=inst;
   }
-  this.groups=new Map();this.templates={};this.siegeTemplates={};this.envGroup=null;this.siegeProps=null;this.siegeReady=false;this.graphicsQuality=GRAPHICS_PRESETS[config.graphicsQuality]?config.graphicsQuality:'medium';this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
+  const reqQuality=GRAPHICS_PRESETS[config.graphicsQuality]?config.graphicsQuality:'medium';
+  this.groups=new Map();this.templates={};this.regionalTemplates={};this.siegeTemplates={};this.envGroup=null;this.siegeProps=null;this.siegeReady=false;this.graphicsQuality=this.isSoftwareGl?'low':reqQuality;this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
+  this.terrainType=String(config.terrain||'plains').toLowerCase();
   this.environment=buildMedievalBattlefield(this.scene,config);if(config.fieldBattle||config.siegeMode){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}
+  this.commanderAuras=this._createCommanderAuras();
+  this.riverGroup=this.terrainType==='river'?this._createRiverVisual():null;
   this.prepareCharacters();
+ }
+ _createCommanderAuras(){
+  const make=(hex)=>{
+   const grp=new THREE.Group();
+   const ring=new THREE.Mesh(new THREE.RingGeometry(2.5,3.25,28),new THREE.MeshBasicMaterial({color:hex,side:THREE.DoubleSide,transparent:true,opacity:0.55}));
+   ring.rotation.x=-Math.PI/2;ring.position.y=0.18;grp.add(ring);
+   const outer=new THREE.Mesh(new THREE.RingGeometry(14.5,15.2,40),new THREE.MeshBasicMaterial({color:hex,side:THREE.DoubleSide,transparent:true,opacity:0.18}));
+   outer.rotation.x=-Math.PI/2;outer.position.y=0.14;grp.add(outer);
+   const crown=new THREE.Mesh(new THREE.OctahedronGeometry(0.55,0),new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:0.35}));
+   crown.position.y=5.8;grp.add(crown);
+   grp.visible=false;
+   this.scene.add(grp);
+   return {grp,ring,outer,crown};
+  };
+  return {attacker:make(0xf3d69b),defender:make(0xe36b58)};
+ }
+ _createRiverVisual(){
+  const g=new THREE.Group();g.name='River Crossing';
+  const water=new THREE.Mesh(new THREE.PlaneGeometry(340,9.2),new THREE.MeshLambertMaterial({color:0x366982,transparent:true,opacity:0.78,side:THREE.DoubleSide}));
+  water.rotation.x=-Math.PI/2;water.position.y=-0.12;g.add(water);
+  const fordMat=new THREE.MeshLambertMaterial({color:0x8e836e});
+  const fordGeo=new THREE.BoxGeometry(7.5,0.22,9.6);
+  for(const fx of [-22,0,22]){
+   const slab=new THREE.Mesh(fordGeo,fordMat);
+   slab.position.set(fx,-0.16,0);g.add(slab);
+  }
+  this.scene.add(g);
+  return g;
  }
  setGraphicsQuality(level){
   if(!GRAPHICS_PRESETS[level])return this.graphicsQuality;
@@ -171,6 +244,7 @@ export class ThreeBattleScene {
   const templates={};
   picks.forEach(([k],i)=>{if(loaded[i].status==='fulfilled'&&loaded[i].value?.scene)templates[k]=loaded[i].value.scene;});
   if(!Object.keys(templates).length)return;
+  this._envTemplates=templates;
   const envGroup=new THREE.Group();envGroup.name='0 A.D. Environment Props';
   const density=GRAPHICS_PRESETS[this.graphicsQuality]?.propDensity??0.8;
   const place=(tpl,x,z,targetH,rotY=0)=>{
@@ -290,7 +364,7 @@ export class ThreeBattleScene {
   if(reg){
    const spec=g.specialistId||g.kind||g.type;
    if((spec==='elephants'||g.kind==='elephants')&&reg.elephants)return reg.elephants;
-   if(i===0&&g.id.endsWith('0')&&reg.commander)return reg.commander;
+   if(i===0&&(g.isCommander||g.id.endsWith('0'))&&reg.commander)return reg.commander;
    if((spec==='horsebow'||g.kind==='horsebow')&&reg.horsebow)return reg.horsebow;
    if(g.type==='cavalry'&&reg.cavalry)return reg.cavalry;
    if((spec==='crossbow'||g.kind==='crossbow'||spec==='handgun')&&(reg[spec]||reg.crossbow))return reg[spec]||reg.crossbow;
@@ -305,9 +379,8 @@ export class ThreeBattleScene {
   if(this.groups.has(g.id)||!this.modelsReady)return;
   const spec=g.specialistId||g.kind||g.type;
   const isElephant=spec==='elephants'||g.kind==='elephants';
-  const sMul=GRAPHICS_PRESETS[this.graphicsQuality]?.soldierScale??1;
-  const baseCount=isElephant?3:g.type==='archers'?8:g.type==='cavalry'?6:11;
-  const count=Math.max(isElephant?2:4,Math.round(baseCount*sMul));
+  const count=sampledSoldierBudget(g.troopCount||g.troops||100,g.type,this.graphicsQuality,this.isSoftwareGl,isElephant);
+  g.regionalFamily=regionalFamilyForRealm(this.regionalRealms[g.side]);
   const units=[];
   for(let i=0;i<count;i++){
    const template=this._resolveTemplate(g,i);
@@ -323,14 +396,22 @@ export class ThreeBattleScene {
    rig.scale.multiplyScalar(scale*scaleMul);
    rig.position.y=((mounted&&!embeddedMount)?.91:0)-box.min.y*scale*scaleMul;
    let mount=null;
-   if(mounted&&!embeddedMount){mount=createHorse();root.add(mount.horse);}
+   if(mounted&&!embeddedMount){mount=createHorse(this._sharedHorse);root.add(mount.horse);}
    root.add(rig);this.scene.add(root);
    const mixer=new THREE.AnimationMixer(rig);
-   const idle=idleClip(template.animations),walk=walkClip(template.animations),attack=g.type==='archers'?bowClip(template.animations):attackClip(template.animations);
+   const clips=template.animations||[];
+   const idle=idleClip(clips),walk=walkClip(clips),run=runClip(clips),attack=g.type==='archers'?bowClip(clips):attackClip(clips),death=deathClip(clips),rally=rallyClip(clips);
    const actions={};
-   for(const [name,clip] of [['idle',idle],['walk',walk],['attack',attack]])if(clip){actions[name]=mixer.clipAction(clip);actions[name].loop=THREE.LoopRepeat;}
+   for(const [name,clip] of [['idle',idle],['walk',walk],['run',run],['attack',attack],['rally',rally]]){
+    if(clip){actions[name]=mixer.clipAction(clip);actions[name].loop=THREE.LoopRepeat;}
+   }
+   if(death){
+    actions.death=mixer.clipAction(death);
+    actions.death.loop=THREE.LoopOnce;
+    actions.death.clampWhenFinished=true;
+   }
    const start=actions.idle||actions.walk||actions.attack;if(start)start.play();
-   units.push({root,rig,mixer,actions,current:start,mode:'idle',phase:i*.19,previous:null,mount,regionalModel:!!(this.regionalTemplates?.[regionalFamilyForRealm(this.regionalRealms[g.side])]||template._assetId),restYaw:rig.rotation.y,restZ:rig.position.z});
+   units.push({root,rig,mixer,actions,current:start,mode:'idle',clipState:'idle',phase:i*.19,previous:null,mount,regionalModel:!!(this.regionalTemplates?.[g.regionalFamily]||template._assetId),restYaw:rig.rotation.y,restZ:rig.position.z,wasAlive:false,dyingStarted:false,dyingTimer:0,lodAccum:0});
    this.mixers.push(mixer);
   }
   this.groups.set(g.id,units);
@@ -340,26 +421,28 @@ export class ThreeBattleScene {
   if(!this.modelsReady)return;
   for(const g of groups||[]){
    this.prepareSquad(g);const units=this.groups.get(g.id);if(!units)continue;
-   const n=Math.round(units.length*cap(g.life/100,0,1));const cols=g.type==='archers'?4:g.type==='cavalry'?3:5;
+   const n=Math.round(units.length*cap(g.life/100,0,1));
    const facing=Math.atan2(g.targetX-g.x,g.targetZ-g.z);
    const moving=Math.hypot(g.targetX-g.x,g.targetZ-g.z)>.7;
    const fighting=g.cooldown>.22&&g.cooldown<.72;
    const mode=fighting?'attack':moving?'walk':'idle';
+   const clipState=animationClipState({...g,moving,attackPulse:fighting?0.3:0});
    for(let i=0;i<units.length;i++){
     const u=units[i];u.root.visible=!g.routed&&i<n;
     if(!u.root.visible)continue;
     const spacing=g.type==='archers'?1.08:g.type==='cavalry'?1.8:.92;
     const [dx,dz]=formationPosition(i,units.length,g.formationId,spacing);
-    u.root.position.set(g.x+dx,0,g.z+dz);
+    const wy=terrainHeight(g.x+dx,g.z+dz,this.terrainType||'plains');
+    u.root.position.set(g.x+dx,wy,g.z+dz);
     u.root.rotation.y=facing+(g.side==='defender'?Math.PI:0);
     if(u.mount)for(let j=0;j<u.mount.legs.length;j++)u.mount.legs[j].rotation.x=moving?Math.sin(elapsedTime(u.phase,u.mixer.time,j))*.36:0;
-    if(mode!==u.mode){
-     const action=u.actions[mode]||u.actions.walk||u.actions.idle;
+    if(clipState!==u.clipState||mode!==u.mode){
+     const action=u.actions[clipState]||u.actions[mode]||u.actions.walk||u.actions.idle;
      if(action&&action!==u.current){
       action.reset().fadeIn(.14).play();
       u.current?.fadeOut(.14);u.current=action;
      }
-     u.mode=mode;
+     u.mode=mode;u.clipState=clipState;
     }
     u.mixer.update(dt);
    }
@@ -367,7 +450,8 @@ export class ThreeBattleScene {
  }
  render(objects,camera,groups,elapsed,siege=null,capitalLayout=null){
   if(this.disposed)return null;
-  const maxDpr=GRAPHICS_PRESETS[this.graphicsQuality]?.pixelRatio||1.25;
+  const frameStart=globalThis.performance?.now?.()||0;
+  const maxDpr=this.isSoftwareGl?1:(GRAPHICS_PRESETS[this.graphicsQuality]?.pixelRatio||1.25);
   const w=Math.max(this.canvas.clientWidth,1),h=Math.max(this.canvas.clientHeight,1),dpr=Math.min(window.devicePixelRatio||1,maxDpr);
   this.renderer.setPixelRatio(dpr);this.renderer.setSize(w,h,false);
   this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
@@ -384,15 +468,56 @@ export class ThreeBattleScene {
    inst.instanceMatrix.needsUpdate=true;
    if(inst.instanceColor)inst.instanceColor.needsUpdate=true;
   }
+  if(this.commanderAuras){
+   for(const side of ['attacker','defender']){
+    const aura=this.commanderAuras[side];
+    const cmd=(groups||[]).find(g=>g.side===side&&g.isCommander&&!g.routed&&(g.life??100)>0);
+    if(aura&&cmd){
+     const gy=terrainHeight(cmd.x,cmd.z,this.terrainType||'plains');
+     aura.grp.visible=true;
+     aura.grp.position.set(cmd.x,gy,cmd.z);
+     const pulse=1+Math.sin(elapsed*3.2)*0.08;
+     aura.ring.scale.set(pulse,pulse,1);
+     aura.crown.rotation.y=elapsed*1.6;
+     aura.crown.position.y=5.6+Math.sin(elapsed*2.4)*0.22;
+    }else if(aura){
+     aura.grp.visible=false;
+    }
+   }
+  }
   let dt=elapsed-this.lastRenderTime;this.lastRenderTime=elapsed;
   this.updateCharacters(groups,cap(dt,0,.05));
   this.updateSiegeVisuals(siege,capitalLayout,groups,elapsed);
   this.environment?.update(elapsed);
   this.renderer.render(this.scene,this.camera);
+  if(frameStart)this.frameBudget?.record((globalThis.performance?.now?.()||frameStart)-frameStart);
   return null;
+ }
+ _buildCapitalCompound(b,x,z,y){
+  const grp=new THREE.Group();
+  const isFort=b.effect==='defense'||b.key==='citadel'||b.key==='fort'||b.key==='watchtower';
+  const isPalace=b.key==='palace'||b.key==='town'||b.key==='cathedral'||b.key==='temple';
+  const damaged=Boolean(b.damaged);
+  const wallMat=new THREE.MeshLambertMaterial({color:damaged?0x5a4c42:(isPalace?0xd6c7a8:isFort?0x8a877d:0xb6a388)});
+  const roofMat=new THREE.MeshLambertMaterial({color:damaged?0x3a261e:(isPalace?0xc49a45:isFort?0x5c5b55:0x8e4a38)});
+  const w=isPalace?4.6:isFort?3.6:3.0,h=(isPalace?4.8+Math.min(2.5,b.level*.28):isFort?5.6+Math.min(2.5,b.level*.25):2.6+Math.min(2.0,b.level*.22))*(damaged?0.68:1);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,w*0.86),wallMat);
+  body.position.y=h/2;grp.add(body);
+  const roof=isPalace
+   ?new THREE.Mesh(new THREE.ConeGeometry(w*0.72,2.4,6),roofMat)
+   :isFort
+    ?new THREE.Mesh(new THREE.BoxGeometry(w+0.35,0.65,w*0.86+0.35),roofMat)
+    :new THREE.Mesh(new THREE.ConeGeometry(w*0.76,1.6,4),roofMat);
+  roof.position.y=h+(isFort?0.32:isPalace?1.2:0.8);
+  if(!isFort&&!isPalace)roof.rotation.y=Math.PI/4;
+  if(damaged)roof.rotation.z=0.14;
+  grp.add(roof);
+  grp.position.set(x,y,z);
+  return {node:grp,baseY:y,isDef:isFort,damaged,baseScale:1};
  }
  updateSiegeVisuals(siege,capitalLayout,groups,elapsed){
   if(!siege||!this.siegeReady||this.disposed)return;
+  const terrain=this.terrainType||'plains';
   if(!this.siegeProps){
    const g=new THREE.Group();g.name='3D Siege Fortifications';this.scene.add(g);
    const fitMesh=(tpl,targetH,x,z,rotY=0)=>{
@@ -401,18 +526,40 @@ export class ThreeBattleScene {
     const box=new THREE.Box3().setFromObject(node);
     const h=Math.max(0.1,box.max.y-box.min.y);
     const s=targetH/h;
+    const gy=terrainHeight(x,z,terrain);
     node.scale.setScalar(s);
-    node.position.set(x,-box.min.y*s,z);
+    node.position.set(x,gy-box.min.y*s,z);
     node.rotation.y=rotY;
     g.add(node);
-    return {node,baseY:-box.min.y*s,baseScale:s};
+    return {node,baseY:gy-box.min.y*s,baseScale:s};
    };
    const structures=new Map();
+   const rubble=new Map();
+   const rubbleGeo=new THREE.DodecahedronGeometry(1.15,0);
+   const rubbleMat=new THREE.MeshLambertMaterial({color:0x665e53});
+   const emberMat=new THREE.MeshBasicMaterial({color:0xe57a35});
    for(const st of siege.structures||[]){
     const tpl=st.id==='gate'?this.siegeTemplates.gate||this.siegeTemplates.wall:this.siegeTemplates.tower||this.siegeTemplates.wall;
     const targetH=st.id==='gate'?9.2:10.8;
     const item=fitMesh(tpl,targetH,st.x,st.z,0);
     if(item)structures.set(st.id,item);
+    // Pre-built breach debris cluster hidden until structure collapses
+    const rGrp=new THREE.Group();
+    const gy=terrainHeight(st.x,st.z,terrain);
+    for(let k=0;k<5;k++){
+     const rock=new THREE.Mesh(rubbleGeo,rubbleMat);
+     const a=k*1.25;
+     rock.position.set(Math.cos(a)*2.4,0.4+(k%2)*0.3,Math.sin(a)*1.4);
+     rock.scale.set(0.9+(k%3)*0.35,0.55+(k%2)*0.3,0.9);
+     rGrp.add(rock);
+    }
+    const ember=new THREE.Mesh(rubbleGeo,emberMat);
+    ember.scale.set(0.55,0.3,0.55);ember.position.set(0.4,0.35,0.2);
+    rGrp.add(ember);
+    rGrp.position.set(st.x,gy,st.z);
+    rGrp.visible=false;
+    g.add(rGrp);
+    rubble.set(st.id,{grp:rGrp,ember});
    }
    for(const wx of [-36,-13,13,36]){
     fitMesh(this.siegeTemplates.wall||this.siegeTemplates.tower,6.8,wx,-18,0);
@@ -422,37 +569,44 @@ export class ThreeBattleScene {
    const ramCount=Math.min(2,atkEng?.ram||0);
    for(let i=0;i<ramCount;i++){
     const item=fitMesh(this.siegeTemplates.ram,3.2,(i-0.5)*11+(ramCount===1?5.5:0),6,Math.PI);
-    if(item)engines.push({kind:'ram',item});
+    if(item)engines.push({kind:'ram',item,baseZ:6});
    }
    const catCount=Math.min(2,(atkEng?.catapult||0)+(atkEng?.bombard||0));
    for(let i=0;i<catCount;i++){
     const item=fitMesh(this.siegeTemplates.catapult,3.4,i===0?-16:16,14,Math.PI);
-    if(item)engines.push({kind:'catapult',item});
+    if(item)engines.push({kind:'catapult',item,baseZ:14});
    }
-   // Represent defender's real Hometown buildings behind the rampart.
+   // Represent defender's full Hometown 64-plot capital structures 1:1 behind the rampart.
+   const capitalBuildings=[];
    if(capitalLayout?.buildings?.length){
-    for(const b of capitalLayout.buildings.slice(0,18)){
-     const isDef=b.effect==='defense'||b.key==='citadel'||b.key==='fort';
-     const tpl=isDef?(this.siegeTemplates.tower||this.siegeTemplates.wall):this.siegeTemplates.wall;
-     const h=isDef?7.5:4.2+Math.min(3,b.level*.3);
-     fitMesh(tpl,h,cap(b.x,-34,34),cap(b.z,-62,-27),0);
+    for(const b of capitalLayout.buildings.slice(0,64)){
+     const bx=cap(b.x,-36,36),bz=cap(b.z,-66,-25),by=terrainHeight(bx,bz,terrain);
+     const comp=this._buildCapitalCompound(b,bx,bz,by);
+     g.add(comp.node);
+     capitalBuildings.push(comp);
     }
    }
-   this.siegeProps={group:g,structures,engines};
+   this.siegeProps={group:g,structures,rubble,engines,capitalBuildings};
   }
   for(const st of siege.structures||[]){
    const item=this.siegeProps.structures.get(st.id);
+   const deb=this.siegeProps.rubble?.get(st.id);
    if(!item)continue;
    const ratio=st.max>0?cap(st.hp/st.max,0,1):0;
    if(ratio<=0){
     // Collapse tower / sink gate leaves so the breach gap is visibly passable.
-    item.node.scale.set(item.baseScale,item.baseScale*0.18,item.baseScale);
-    item.node.position.y=item.baseY-0.55;
-    item.node.rotation.z=st.id==='gate'?0:(st.id==='left'?-0.22:0.22);
+    item.node.scale.set(item.baseScale,item.baseScale*0.14,item.baseScale);
+    item.node.position.y=item.baseY-0.7;
+    item.node.rotation.z=st.id==='gate'?0:(st.id==='left'?-0.24:0.24);
+    if(deb){
+     deb.grp.visible=true;
+     deb.ember.scale.setScalar(0.45+Math.abs(Math.sin(elapsed*4.2))*0.28);
+    }
    }else{
     item.node.scale.set(item.baseScale,item.baseScale*(0.55+0.45*ratio),item.baseScale);
     item.node.position.y=item.baseY;
     item.node.rotation.z=0;
+    if(deb)deb.grp.visible=false;
    }
   }
   const breached=siege.structures?.[0]?.hp<=0;
@@ -462,19 +616,54 @@ export class ThreeBattleScene {
     const front=(groups||[]).filter(u=>u.side===siege.assaultSide&&!u.routed).sort((a,b)=>a.z-b.z)[0];
     const desired=front?cap(front.z-1.5,targetZ,8):-8;
     eng.item.node.position.z+=(desired-eng.item.node.position.z)*0.08;
+    // Rhythmic ramming thrust when engaging the gate
+    if(!breached&&eng.item.node.position.z<-11.5){
+     const thrust=Math.pow(Math.max(0,Math.sin(elapsed*2.6)),4)*1.15;
+     eng.item.node.position.z-=thrust*0.18;
+    }
    }else{
-    eng.item.node.position.y=eng.item.baseY+Math.abs(Math.sin(elapsed*1.8))*0.08;
+    // Catapult / bombard recoil cadence
+    const cycle=elapsed*1.4;
+    const recoil=Math.pow(Math.max(0,Math.sin(cycle)),8);
+    eng.item.node.position.y=eng.item.baseY+recoil*0.24;
+    eng.item.node.position.z=eng.baseZ+recoil*0.45;
    }
   }
  }
  dispose(){
-  this.disposed=true;disposeFieldMaterials(this);
-  for(const units of this.groups.values())for(const u of units){u.mixer.stopAllAction();this.scene.remove(u.root);}
+  this.disposed=true;
+  disposeFieldMaterials(this);
+  for(const units of this.groups.values()){
+   for(const u of units){
+    u.mixer?.stopAllAction?.();
+    if(u.rig)u.mixer?.uncacheRoot?.(u.rig);
+    this.scene.remove(u.root);
+    disposeThreeObject(u.root,this._sharedAssets);
+   }
+  }
   this.groups.clear();this.mixers.length=0;
-  if(this.envGroup){this.scene.remove(this.envGroup);this.envGroup=null;}
-  if(this.siegeProps?.group){this.scene.remove(this.siegeProps.group);this.siegeProps=null;}
-  this.environment?.dispose();
-  for(const m of Object.values(this.batches)){m.geometry.dispose();m.material.dispose();this.scene.remove(m);}
-  this.renderer.dispose();
+  if(this._sharedHorse){
+   for(const g of Object.values(this._sharedHorse.geo))g.dispose?.();
+   for(const m of Object.values(this._sharedHorse.mat))m.dispose?.();
+   this._sharedHorse=null;
+  }
+  this._sharedAssets?.clear?.();
+  if(this.envGroup){this.scene.remove(this.envGroup);disposeThreeObject(this.envGroup);this.envGroup=null;}
+  if(this.siegeProps?.group){this.scene.remove(this.siegeProps.group);disposeThreeObject(this.siegeProps.group);this.siegeProps=null;}
+  if(this.riverGroup){this.scene.remove(this.riverGroup);disposeThreeObject(this.riverGroup);this.riverGroup=null;}
+  if(this.commanderAuras){
+   for(const a of Object.values(this.commanderAuras)){this.scene.remove(a.grp);disposeThreeObject(a.grp);}
+   this.commanderAuras=null;
+  }
+  if(this._envTemplates){for(const t of Object.values(this._envTemplates))disposeThreeObject(t);this._envTemplates=null;}
+  for(const t of Object.values(this.templates||{}))disposeThreeObject(t?.scene);
+  for(const fam of Object.values(this.regionalTemplates||{}))for(const t of Object.values(fam||{}))disposeThreeObject(t?.scene);
+  for(const t of Object.values(this.siegeTemplates||{}))disposeThreeObject(t?.scene);
+  this.templates={};this.regionalTemplates={};this.siegeTemplates={};
+  this.environment?.dispose?.();
+  for(const m of Object.values(this.batches)){m.geometry?.dispose?.();m.material?.dispose?.();this.scene.remove(m);}
+  this.batches={};
+  this.renderer.renderLists?.dispose?.();
+  this.renderer.dispose?.();
  }
 }

@@ -123,6 +123,108 @@ export function regencyAction(g,r,action,id){
  return ok('Regency authority updated.');
 }
 
+export const REGENCY_DRAMA_EVENTS=[
+ {
+  id:'regent_enriching_family',
+  title:"The Regent's Patronage",
+  text:(regent,head)=>`Whispers from the exchequer report that Regent ${regent.name} is awarding lucrative tax farms and stipends to their own kinsmen while ${head.name} waits to come of age.`,
+  choices:[
+   {id:'confront',label:'Publicly challenge the appointments',effect:'Regent influence −12, legitimacy +4, regent opinion −18'},
+   {id:'audit',label:'Order a quiet exchequer audit',effect:'Recover 90 gold, regent influence −6'},
+   {id:'tolerate',label:'Tolerate it to preserve court harmony',effect:'Stability +5, regent influence +10'}
+  ]
+ },
+ {
+  id:'uncle_claimant_faction',
+  title:'An Ambitious Kinsman Tests the Throne',
+  text:(regent,head)=>`Senior lords are dining nightly with a rival royal kinsman, openly questioning whether ${head.name} and Regent ${regent.name} can hold the realm together.`,
+  choices:[
+   {id:'concession',label:'Grant regional charters to waverers (−100g)',effect:'Vassal loyalty +10, faction pressure −15'},
+   {id:'bribe',label:'Buy off the kinsman’s lieutenants (−70g)',effect:'Regent influence −5, legitimacy +6'},
+   {id:'guard',label:'Double the palace watch and denounce them',effect:'Legitimacy +8, stability −4, regent influence +6'}
+  ]
+ },
+ {
+  id:'censor_tutors',
+  title:'Battle for the Sovereign’s Mind',
+  text:(regent,head)=>`Regent ${regent.name} proposes replacing ${head.name}’s independent tutors with hand-picked loyalists who teach deference to the Regency Council.`,
+  choices:[
+   {id:'independent',label:'Insist on independent scholars',effect:'Sovereign learning +1, regent influence −10'},
+   {id:'comply',label:'Accept the Regent’s tutors',effect:'Stability +4, regent influence +12'},
+   {id:'secret',label:'Keep both sets of tutors (−50g)',effect:'Sovereign intrigue +1, diplomacy +1'}
+  ]
+ },
+ {
+  id:'loyalist_rally',
+  title:'Oath of the Crown Loyalists',
+  text:(regent,head)=>`A delegation of provincial barons kneels before ${head.name}, offering an oath to curb Regent ${regent.name}’s overreach when the sovereign reaches majority.`,
+  choices:[
+   {id:'reward',label:'Reward their fidelity (−80g)',effect:'Vassal loyalty +12, regent influence −15'},
+   {id:'charter',label:'Seal a formal Regency Charter',effect:'Legitimacy +7, stability +4, regent influence −6'},
+   {id:'cautious',label:'Thank them politely and keep gold',effect:'Prestige +8'}
+  ]
+ }
+];
+
+export function currentRegencyDrama(g,r=g.player){
+ const d=g.regencies?.pendingDrama;
+ if(!d||d.realm!==r)return null;
+ const x=regencyView(g,r);
+ if(!x){delete g.regencies.pendingDrama;return null;}
+ return d;
+}
+
+export function tickRegencyDrama(g,r){
+ if(r!==g.player)return null;
+ const root=initRegencies(g),x=regencyView(g,r);
+ if(!x){if(root.pendingDrama?.realm===r)delete root.pendingDrama;return null;}
+ if(root.pendingDrama)return root.pendingDrama;
+ if(g.turn-(x.lastDramaTurn??-100)<12)return null;
+ const regent=person(g,x.regent),head=person(g,x.sovereign);
+ if(!regent||!head)return null;
+ x.seenDrama??=[];
+ const pool=REGENCY_DRAMA_EVENTS.filter(e=>!x.seenDrama.includes(e.id));
+ if(!pool.length)return null;
+ const pick=pool[(g.turn+x.influence)%pool.length];
+ x.lastDramaTurn=g.turn;
+ x.seenDrama.push(pick.id);
+ root.pendingDrama={
+  id:pick.id,realm:r,regentId:regent.id,sovereignId:head.id,turn:g.turn,
+  title:pick.title,text:pick.text(regent,head),choices:pick.choices
+ };
+ return root.pendingDrama;
+}
+
+export function resolveRegencyDrama(g,r,choiceIndex){
+ const d=currentRegencyDrama(g,r);
+ if(!d)return no('No active regency event.');
+ const choice=d.choices[Number(choiceIndex)];
+ if(!choice)return no('Invalid regency choice.');
+ const x=regencyView(g,r),f=g.factions[r],head=person(g,d.sovereignId),regent=person(g,d.regentId);
+ if(!x||!f)return no('Regency ended.');
+ if(d.id==='regent_enriching_family'){
+  if(choice.id==='confront'){x.influence=cap(x.influence-12,0,100);f.legitimacy=cap((f.legitimacy||50)+4,0,100);}
+  else if(choice.id==='audit'){f.treasury+=90;x.influence=cap(x.influence-6,0,100);}
+  else{f.stability=cap((f.stability||50)+5,0,100);x.influence=cap(x.influence+10,0,100);}
+ }else if(d.id==='uncle_claimant_faction'){
+  if(choice.id==='concession'){f.treasury=Math.max(0,f.treasury-100);for(const h of Object.values(g.politics.holdings||{}))if(h.realm===r)h.loyalty=cap((h.loyalty||50)+10,0,100);for(const fx of Object.values(g.conflict?.factions||{}))if(fx.realm===r)fx.pressure=cap((fx.pressure||0)-15,0,100);}
+  else if(choice.id==='bribe'){f.treasury=Math.max(0,f.treasury-70);x.influence=cap(x.influence-5,0,100);f.legitimacy=cap((f.legitimacy||50)+6,0,100);}
+  else{f.legitimacy=cap((f.legitimacy||50)+8,0,100);f.stability=cap((f.stability||50)-4,0,100);x.influence=cap(x.influence+6,0,100);}
+ }else if(d.id==='censor_tutors'){
+  if(choice.id==='independent'){if(head?.skills)head.skills.learning=cap((head.skills.learning||1)+1,1,10);x.influence=cap(x.influence-10,0,100);}
+  else if(choice.id==='comply'){f.stability=cap((f.stability||50)+4,0,100);x.influence=cap(x.influence+12,0,100);}
+  else{f.treasury=Math.max(0,f.treasury-50);if(head?.skills){head.skills.intrigue=cap((head.skills.intrigue||1)+1,1,10);head.skills.diplomacy=cap((head.skills.diplomacy||1)+1,1,10);}}
+ }else if(d.id==='loyalist_rally'){
+  if(choice.id==='reward'){f.treasury=Math.max(0,f.treasury-80);x.influence=cap(x.influence-15,0,100);for(const h of Object.values(g.politics.holdings||{}))if(h.realm===r)h.loyalty=cap((h.loyalty||50)+12,0,100);}
+  else if(choice.id==='charter'){f.legitimacy=cap((f.legitimacy||50)+7,0,100);f.stability=cap((f.stability||50)+4,0,100);x.influence=cap(x.influence-6,0,100);}
+  else{f.prestige=(f.prestige||0)+8;}
+ }
+ delete g.regencies.pendingDrama;
+ note(g,r,d.title+': '+choice.label+'.');
+ reconcileRegency(g,r);
+ return ok(d.title+' resolved: '+choice.label+'.');
+}
+
 export function tickRegency(g,r){
  const x=reconcileRegency(g,r);
  if(!x||g.turn-x.lastTick<3)return;
@@ -140,5 +242,6 @@ export function tickRegency(g,r){
   if(f.prestige>=20&&f.legitimacy>=50)regencyAction(g,r,'regency-assert');
   else if(f.treasury>=200)regencyAction(g,r,'regency-concession');
  }
+ tickRegencyDrama(g,r);
  reconcileRegency(g,r);
 }

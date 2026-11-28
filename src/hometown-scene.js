@@ -26,4 +26,20 @@ export function townAdornment(level){let s='<svg class="ht-town-ornament" viewBo
  if(level>=9)s+='<path d="M34 113L60 100L86 113L60 119Z" fill="#e6c982" opacity=".9"/>';
  if(level>=10)s+='<circle cx="60" cy="9" r="4" fill="#ffe3a2"/><path d="M4 98V68M116 98V68" stroke="#edcd7d" stroke-width="3"/><path d="M4 68l18 6-18 7M116 68l-18 6 18 7" fill="#a34436"/>';
  return s+'</svg>';}
-export function ambientTown(level,hasConstruction=false){return '<div class="ht-ambient" aria-hidden="true"><span class="ht-person person-a" data-town-extra="villager_walk_strip"><i></i></span><span class="ht-person person-b" data-town-extra="villager_walk_strip"><i></i></span>'+(level>=5?'<span class="ht-person person-c" data-town-extra="villager_walk_strip"><i></i></span>':'')+(level>=7?'<span class="ht-person person-d" data-town-extra="villager_walk_strip"><i></i></span>':'')+(level>=3?'<span class="ht-cart" data-town-extra="cart">▰</span>':'')+'<span class="ht-smoke smoke-a" data-town-extra="fx_smoke"></span><span class="ht-smoke smoke-b" data-town-extra="fx_smoke"></span>'+(hasConstruction?'<span class="ht-smoke smoke-c" data-town-extra="fx_build_puff"></span>':'')+'</div>';}
+export function ambientTown(level,hasConstruction=false,state={}){
+ const besieged=Boolean(state?.besieged||(state?.damagedCount||0)>0);
+ const famine=Boolean(state?.famine);
+ const prosperous=Boolean(state?.prosperous&&!besieged&&!famine);
+ const cls='ht-ambient'+(besieged?' ht-ambient-siege':'')+(famine?' ht-ambient-famine':'')+(prosperous?' ht-ambient-prosperous':'');
+ return '<div class="'+cls+'" aria-hidden="true">'
+  +(famine?'':'<span class="ht-person person-a" data-town-extra="villager_walk_strip"><i></i></span>')
+  +'<span class="ht-person person-b" data-town-extra="villager_walk_strip"><i></i></span>'
+  +(level>=5&&!famine?'<span class="ht-person person-c" data-town-extra="villager_walk_strip"><i></i></span>':'')
+  +(level>=7||prosperous?'<span class="ht-person person-d" data-town-extra="villager_walk_strip"><i></i></span>':'')
+  +(level>=3&&!besieged&&!famine?'<span class="ht-cart" data-town-extra="cart">▰</span>':'')
+  +(besieged?'<span class="ht-guard-badge" title="Garrison on alert">⚔</span><span class="ht-smoke smoke-siege" data-town-extra="fx_smoke"></span>':'')
+  +'<span class="ht-smoke smoke-a" data-town-extra="fx_smoke"></span>'
+  +'<span class="ht-smoke smoke-b" data-town-extra="fx_smoke"></span>'
+  +(hasConstruction?'<span class="ht-smoke smoke-c" data-town-extra="fx_build_puff"></span>':'')
+  +'</div>';
+}

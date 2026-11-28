@@ -1,6 +1,6 @@
 import {effectiveCharacterSkill} from './character-agency.js';
 import {BannerRenderer} from './banner-renderer.js';
-import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells,cardFormationChoices,toggleCardReserve} from './simple-card-battle.js';
+import {arrangeCardArmy,freeDeploymentCell,moveCard,cardRole,cardBattleOutcome,deploymentCells,cardFormationChoices,toggleCardReserve,chooseAiBattlePreset,assignAiReserves,coordinateCardBattleAI} from './simple-card-battle.js';
 import {chooseBattleRenderer, freshBattleCanvas, disposeNativeRenderer} from './battle-lifecycle.js';
 import {fieldFrameSteps, renderInterval} from './render-performance.js';
 import {browserFieldAudio, browserBattleMusic, browserCampaignAudio} from './field-audio.js';
@@ -685,10 +685,10 @@ export class BattleGame {
     const fieldStats = (armies, reserve, type) => combinedFieldStats(armies, reserve, a => armyReadiness(game, a), (a, t) => regimentProfile(game, a, t), type);
 
     const a = descriptor.fieldBattle
-      ? aggregateForce(alliedFieldArmies, garrison)
+      ? (alliedFieldArmies.length ? aggregateForce(alliedFieldArmies, garrison) : startingTroops(playerFaction, Math.max(85, descriptor.attackTroops || descriptor.defenseGarrison || 110)))
       : fieldArmy
         ? { ...fieldArmy, ...Object.fromEntries(['infantry', 'archers', 'cavalry'].map(t => [t, (fieldArmy[t] || 0) + garrison[t]])) }
-        : garrison;
+        : descriptor.attackTroops ? startingTroops(playerFaction, Math.max(85, descriptor.attackTroops)) : garrison;
     const enemyArmy = descriptor.enemyArmy && game?.armies?.[descriptor.enemyArmy];
     const enemies = descriptor.fieldBattle && !descriptor.showcase
       ? aggregateForce(hostileFieldArmies, hostileGarrison)
@@ -736,16 +736,20 @@ export class BattleGame {
     const sideCommander = (armies, realmId) => {
       for (const army of armies) {
         const name = armyReadiness(game, army).commander;
-        const character = game?.politics?.people?.[game.military?.armies?.[army.id]?.commander];
-        if (name && character) return {name, martial: effectiveCharacterSkill(game, character, 'martial')};
+        const cmdId = game.military?.armies?.[army.id]?.commander;
+        const character = game?.politics?.people?.[cmdId];
+        if (name && character) return {id: cmdId, name, martial: effectiveCharacterSkill(game, character, 'martial')};
       }
-      const ruler = game?.politics?.people?.[game?.politics?.realms?.[realmId]?.ruler];
-      return ruler?.alive ? {name: ruler.name, martial: effectiveCharacterSkill(game, ruler, 'martial')} : null;
+      const rulerId = game?.politics?.realms?.[realmId]?.ruler;
+      const ruler = game?.politics?.people?.[rulerId];
+      return ruler?.alive ? {id: rulerId, name: ruler.name, martial: effectiveCharacterSkill(game, ruler, 'martial')} : null;
     };
-    this.commanders = descriptor.fieldBattle ? {
+    this.commanders = {
       attacker: sideCommander(alliedFieldArmies, game?.player),
       defender: sideCommander(hostileFieldArmies, descriptor.enemy)
-    } : null;
+    };
+    this.generalFallen = { attacker: false, defender: false };
+    this.battleEvents = [];
     const atkMartial = descriptor.commanderMartial?.attacker ?? this.commanders?.attacker?.martial ?? 0;
     const defMartial = descriptor.commanderMartial?.defender ?? this.commanders?.defender?.martial ?? 0;
 
@@ -776,6 +780,10 @@ export class BattleGame {
       }
       g.simpleField=this.simpleField;
       g.isCommander = idx === 0;
+      if (g.isCommander && this.commanders?.attacker) {
+        g.commanderName = this.commanders.attacker.name;
+        g.commanderId = this.commanders.attacker.id || null;
+      }
       g.realmId = game?.player || playerFaction?.id || null;
       g.commanderMartial = atkMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
@@ -820,6 +828,10 @@ export class BattleGame {
       }
       g.simpleField=this.simpleField;
       g.isCommander = idx === 0;
+      if (g.isCommander && this.commanders?.defender) {
+        g.commanderName = this.commanders.defender.name;
+        g.commanderId = this.commanders.defender.id || null;
+      }
       g.realmId = enemy?.id || descriptor.enemy || null;
       g.commanderMartial = defMartial;
       if (this.simpleField && entry.profile) {g.profile = entry.profile; g.specialistId = entry.specialistId; if(g.specialistId==='horsebow')g.baseRange=5;}
@@ -839,7 +851,10 @@ export class BattleGame {
 
     if(this.simpleField){
       arrangeCardArmy(this.groups,'attacker',descriptor.defenseMode?-1:1);
-      arrangeCardArmy(this.groups,'defender',descriptor.defenseMode?1:-1);
+      const aiPreset=chooseAiBattlePreset(this.groups,'defender',{siege:!!this.siege,terrain:this.terrainType});
+      arrangeCardArmy(this.groups,'defender',descriptor.defenseMode?1:-1,aiPreset);
+      assignAiReserves(this.groups,'defender',{siege:!!this.siege,difficulty:this.game?.kingdom?.difficulty||'normal'});
+      this.enemyPosture=this.siege?'Siege defense':aiPreset==='defensive'?'Defensive line':aiPreset==='cavalry_assault'?'Cavalry vanguard':aiPreset==='flanks'?'Flanking wings':'Deploying';
       if (this.siege) {
         const holdSide = this.siege.assaultSide === 'attacker' ? 'defender' : 'attacker';
         for (const g of this.groups) {
@@ -1274,6 +1289,8 @@ export class BattleGame {
       this.onStatus({
         groups: this.groups,
         commanders: this.commanders,
+        generalFallen: { ...(this.generalFallen || { attacker: false, defender: false }) },
+        battleEvents: (this.battleEvents || []).slice(-6),
         selected: this.selected,
         selectedGroupId: this.selectedGroupId,
         selectedGroup: sel,
@@ -1379,9 +1396,13 @@ export class BattleGame {
       this.elapsed += sdt;
       if (this.descriptor?.fieldBattle || this.simpleField) {
         if (this.nextFieldPlan === undefined || this.elapsed >= this.nextFieldPlan) {
-          if (this.simpleField) this.enemyPosture = this.siege ? 'Holding Walls' : 'Advancing';
-          else coordinateFieldAI(this);
-          this.nextFieldPlan = this.elapsed + 4;
+          if (this.simpleField) {
+            coordinateCardBattleAI(this, { difficulty: this.game?.kingdom?.difficulty || 'normal' });
+            this.nextFieldPlan = this.elapsed + 2.5;
+          } else {
+            coordinateFieldAI(this);
+            this.nextFieldPlan = this.elapsed + 3;
+          }
         }
         if (!this.simpleField && this.elapsed % 6 < sdt) {
           const enemyFaction = this.game?.factions?.[this.descriptor?.enemy];
@@ -1653,7 +1674,9 @@ export class BattleGame {
     for (const p of this.projectiles) {
       if (this.descriptor.fieldBattle) {
         for (const q of projectileTrail(p, this.ctx instanceof CanvasFallback, terrain)) {
-          instance(obj, q.x, q.y, q.z, q.size, q.size, q.size, q.head ? [0.98, 0.83, 0.52] : [0.64, 0.51, 0.29], 'sphere');
+          const shot = p.kind === 'shot';
+          const col = shot ? (q.head ? [1.0, 0.56, 0.18] : [0.82, 0.34, 0.12]) : (q.head ? [0.98, 0.83, 0.52] : [0.64, 0.51, 0.29]);
+          instance(obj, q.x, q.y, q.z, q.size, q.size, q.size, col, 'sphere');
         }
       } else {
         const t = p.t;
@@ -1664,7 +1687,7 @@ export class BattleGame {
     if (this.descriptor.fieldBattle) {
       for (const effect of this.effects || []) {
         for (const p of battleImpactParticles(effect, terrain)) {
-          const color = p.kind === 'dust' ? [0.59, 0.51, 0.36] : p.kind === 'rout' ? [0.80, 0.69, 0.47] : p.kind === 'rally' ? [0.96, 0.84, 0.42] : [1, 0.80, 0.39];
+          const color = p.kind === 'breach' ? [0.95, 0.45, 0.16] : p.kind === 'dust' ? [0.59, 0.51, 0.36] : p.kind === 'rout' ? [0.80, 0.69, 0.47] : p.kind === 'rally' ? [0.96, 0.84, 0.42] : [1, 0.80, 0.39];
           instance(obj, p.x, p.y, p.z, p.size, p.size, p.size, color, 'sphere');
         }
       }
@@ -1764,10 +1787,14 @@ export class BattleGame {
 
     // Overhead HP, Morale, Badge, Troop Count, and Status Tags
     const tagColors = {
+      GENERAL: '#f3d69b',
+      AURA: '#d9c579',
       CHARGE: '#e8a448',
       BRACED: '#7ab3d6',
       ENCIRCLED: '#ff5252',
       FLANKED: '#e36354',
+      EXHAUSTED: '#d98236',
+      RIVER_CROSS: '#5db3d6',
       ROUT: '#c74c4c',
       COVER: '#6bb87b',
       HIGH_GROUND: '#d9c579',
@@ -1865,13 +1892,19 @@ export class BattleGame {
     } else if (!this.paused && !this.done) {
       this.update(Math.min(dt, 0.045));
     }
-    const interval = renderInterval(this.ctx instanceof CanvasFallback, this.mobile);
+    const interval = this.ctx?.isSoftwareGl ? 66 : renderInterval(this.ctx instanceof CanvasFallback, this.mobile);
     if (this.lastRenderAt == null || now - this.lastRenderAt >= interval - 2) {
       this.render();
       this.lastRenderAt = now;
     }
     if (Math.floor(this.elapsed * 2) !== Math.floor(before * 2)) this.report();
-    this.raf = globalThis.requestAnimationFrame?.(this.loop);
+    if (this.ctx?.isSoftwareGl) {
+      this._swTimer = globalThis.setTimeout?.(() => {
+        if (this.running) this.raf = globalThis.requestAnimationFrame?.(this.loop);
+      }, 33);
+    } else {
+      this.raf = globalThis.requestAnimationFrame?.(this.loop);
+    }
   }
 
   finish(victory, leftPower, rightPower = null) {
@@ -1914,6 +1947,7 @@ export class BattleGame {
       roster,
       fieldBattle: !!this.descriptor?.fieldBattle,
       fortBreached: !!this.siege && siegeBreached(this.siege),
+      generalFallen: { ...(this.generalFallen || { attacker: false, defender: false }) },
       reason: this.finishReason || null,
       seconds: Math.round(this.elapsed),
       tacticalStats,
@@ -1956,6 +1990,7 @@ export class BattleGame {
     const doc = globalThis.document;
     doc?.removeEventListener?.('visibilitychange', this._onVisibility);
     globalThis.cancelAnimationFrame?.(this.raf);
+    if (this._swTimer) { globalThis.clearTimeout?.(this._swTimer); this._swTimer = null; }
     win?.removeEventListener?.('keydown', this._onKeyDown);
     win?.removeEventListener?.('keyup', this._onKeyUp);
     this.canvas?.removeEventListener?.('wheel', this._onWheel);

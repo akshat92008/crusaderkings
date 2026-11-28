@@ -423,6 +423,7 @@ export function joinFaction(g,factionId,provinceId,secret=false){
  if(!x||!ACTIVE_FACTION_STATUSES.includes(x.status))return no('Faction is not active.');
  const h=g.politics?.holdings?.[provinceId];
  if(!h||h.realm!==x.realm||h.lord===g.politics.realms[x.realm]?.ruler)return no('Select a vassal holding in the realm.');
+ if((g.politics?.people?.[h.lord]?.noRebelUntil||0)>g.turn)return no('A strong royal hook prevents this lord from joining factions.');
  ensureFactionFields(g,x);
  if(secret){
   if(!x.secretMembers.some(s=>s.province===provinceId))x.secretMembers.push({person:h.lord,province:provinceId});
@@ -578,7 +579,7 @@ export function tickConflict(g,world){
  for(const [realm,s] of Object.entries(g.politics.realms)){
   const f=g.factions[realm],local=holdings(g,realm);
   if(!f||!local.length)continue;
-  const disloyalIds=local.filter(([,v])=>v.loyalty<42&&v.lord!==s.ruler&&!isImprisoned(g,v.lord)).map(([id])=>id);
+  const disloyalIds=local.filter(([,v])=>v.loyalty<42&&v.lord!==s.ruler&&!isImprisoned(g,v.lord)&&!((g.politics?.people?.[v.lord]?.noRebelUntil||0)>g.turn)).map(([id])=>id);
 
   // Update all active concurrent factions in this realm.
   const activeList=Object.values(c.factions).filter(x=>x.realm===realm&&ACTIVE_FACTION_STATUSES.includes(x.status));

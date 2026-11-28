@@ -193,8 +193,10 @@ export function tickCrossroads(g, world = null) {
  for (const def of Object.values(CROSSROADS_ERAS)) {
   if (year >= def.unlockYear && !c.globalUnlocked.includes(def.id)) {
    c.globalUnlocked.push(def.id);
+   if (def.id === 'printing_press') c.printingPressActivated = true;
   }
  }
+ if (c.globalUnlocked.includes('printing_press')) c.printingPressActivated = true;
 
  if ((g.turn || 0) % 6 !== 0) return;
  for (const [realm, f] of Object.entries(g.factions || {})) {

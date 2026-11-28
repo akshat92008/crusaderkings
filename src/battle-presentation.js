@@ -1,5 +1,6 @@
 import {styleFieldSquad, cavalryGait} from './field-visuals.js';
 import {terrainHeight} from './field-tactics.js';
+import {mixerLodInterval} from './render-performance.js';
 
 // Shared formation geometry and renderer-independent skinned character update.
 const cap = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -8,15 +9,17 @@ export function formationOffsets(count, id, type = 'infantry') {
   const n = Math.max(0, Math.floor(count));
   const spacing = type === 'cavalry' ? 1.65 : type === 'archers' ? 1.12 : 0.94;
   const points = [];
-  const cols = id === 'pike_square'
+  const cols = id === 'pike_square' || id === 'square'
     ? Math.ceil(Math.sqrt(n))
     : id === 'shield_wall'
       ? Math.min(7, n)
-      : id === 'longbow_line' || id === 'volley_line'
+      : id === 'longbow_line' || id === 'volley_line' || id === 'line'
         ? Math.min(9, n)
-        : id === 'skirmish'
-          ? Math.min(5, n)
-          : Math.min(6, n);
+        : id === 'column'
+          ? Math.min(3, n)
+          : id === 'skirmish' || id === 'loose'
+            ? Math.min(5, n)
+            : Math.min(6, n);
   for (let i = 0; i < n; i++) {
     let x = 0;
     let z = 0;
@@ -38,8 +41,8 @@ export function formationOffsets(count, id, type = 'infantry') {
       const row = Math.floor(i / Math.max(1, cols));
       const col = i % Math.max(1, cols);
       const width = Math.min(cols, n - row * cols);
-      x = (col - (width - 1) / 2) * spacing * (id === 'skirmish' ? 1.5 : 1);
-      z = -row * spacing * (id === 'shield_wall' ? 0.76 : id === 'skirmish' ? 1.45 : 1);
+      x = (col - (width - 1) / 2) * spacing * (id === 'skirmish' || id === 'loose' ? 1.5 : 1);
+      z = -row * spacing * (id === 'shield_wall' ? 0.76 : id === 'skirmish' || id === 'loose' ? 1.45 : id === 'column' ? 1.25 : 1);
     }
     points.push([x, z]);
   }
@@ -74,6 +77,17 @@ export function visualMode(g) {
   return g.routed ? 'walk' : (g.attackPulse || 0) > 0 ? 'attack' : g.moving ? 'walk' : 'idle';
 }
 
+/** Full 0 A.D. clip state resolution: idle, walk, run, attack, rally (promotion), death. */
+export function animationClipState(g) {
+  if (!g) return 'idle';
+  if ((g.life ?? 100) <= 0 && !g.routed) return 'death';
+  if ((g.rallyBuffTimer || 0) > 6.5 && !g.moving && (g.attackPulse || 0) <= 0) return 'rally';
+  if ((g.attackPulse || 0) > 0) return 'attack';
+  if (g.routed || g.fieldOrder === 'charge' || g.status === 'charging' || (g.chargeMomentum || 0) >= 0.45) return 'run';
+  if (g.moving) return 'walk';
+  return 'idle';
+}
+
 export function visibleSoldierCount(g, count) {
   if (g.routed && (g.routAge || 0) >= 3) return 0;
   if (g.life <= 0 || g.troopCount === 0) return 0;
@@ -88,6 +102,7 @@ function turnToward(a, b, t) {
 export function updateFieldCharacters(scene, groups, dt) {
   if (!scene.modelsReady) return;
   const terrain = scene.terrainType || groups?.[0]?.terrainType || null;
+  const camPos = scene.camera?.position || null;
   for (const g of groups || []) {
     if (g.troopCount === 0 || (g.routed && (g.routAge || 0) >= 3)) {
       for (const u of scene.groups.get(g.id) || []) u.root.visible = false;
@@ -102,11 +117,34 @@ export function updateFieldCharacters(scene, groups, dt) {
     if (g.visualLayout?.key !== key) g.visualLayout = { key, offsets: formationOffsets(n, g.formationId, g.type) };
     const offsets = g.visualLayout.offsets;
     const mode = visualMode(g);
+    const clipState = animationClipState(g);
     const blend = 1 - Math.exp(-Math.max(0, dt) * 14);
+    const squadDist = camPos ? Math.hypot((g.x || 0) - camPos.x, (g.z || 0) - camPos.z) : 0;
+    const lodStep = mixerLodInterval(squadDist, scene.graphicsQuality || 'medium', !!scene.isSoftwareGl);
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
-      u.root.visible = i < n;
-      if (!u.root.visible) continue;
+      if (i >= n) {
+        if (u.wasAlive && !g.routed && u.actions?.death && (u.dyingTimer || 0) < 1.15) {
+          u.root.visible = true;
+          if (!u.dyingStarted) {
+            u.dyingStarted = true;
+            u.dyingTimer = 0;
+            u.actions.death.reset().fadeIn(0.08).play();
+            if (u.current && u.current !== u.actions.death) u.current.fadeOut(0.08);
+            u.current = u.actions.death;
+            u.clipState = 'death';
+          }
+          u.dyingTimer = (u.dyingTimer || 0) + Math.max(0, dt);
+          if (dt > 0) u.mixer.update(dt);
+          continue;
+        }
+        u.root.visible = false;
+        continue;
+      }
+      u.wasAlive = true;
+      u.dyingStarted = false;
+      u.dyingTimer = 0;
+      u.root.visible = true;
       const p = soldierWorldPose(g, offsets[i], terrain);
       if (!u.fieldReady || u.fieldRevision !== g.deploymentRevision) {
         u.root.position.set(p.x, p.y, p.z);
@@ -121,15 +159,22 @@ export function updateFieldCharacters(scene, groups, dt) {
         );
         u.root.rotation.y = turnToward(u.root.rotation.y, p.yaw, blend);
       }
+      const isRunning = clipState === 'run';
       if (u.mount) {
-        const gait = cavalryGait(u.mixer.time, u.phase || 0, g.fieldOrder === 'charge');
+        const gait = cavalryGait(u.mixer.time, u.phase || 0, isRunning || g.fieldOrder === 'charge');
         for (let j = 0; j < u.mount.legs.length; j++) {
-          u.mount.legs[j].rotation.x = mode === 'walk' ? gait.legs[j % 4] : 0;
+          u.mount.legs[j].rotation.x = (mode === 'walk' || isRunning) ? gait.legs[j % 4] : 0;
         }
-        u.root.position.y = p.y + (mode === 'walk' ? gait.bob : 0);
+        u.root.position.y = p.y + ((mode === 'walk' || isRunning) ? gait.bob : 0);
       }
-      if (mode !== u.mode || (mode === 'attack' && u.attackSerial !== g.attackSerial)) {
-        const action = u.actions[mode] || (u.regionalModel && mode === 'attack' ? u.actions.idle : null) || u.actions.walk || u.actions.idle;
+      if (clipState !== u.clipState || mode !== u.mode || (mode === 'attack' && u.attackSerial !== g.attackSerial)) {
+        const action = u.actions[clipState]
+          || (clipState === 'run' ? u.actions.walk : null)
+          || (clipState === 'rally' ? u.actions.idle : null)
+          || u.actions[mode]
+          || (u.regionalModel && mode === 'attack' ? u.actions.idle : null)
+          || u.actions.walk
+          || u.actions.idle;
         if (action && (action !== u.current || mode === 'attack')) {
           action.reset().fadeIn(0.10).play();
           if (u.current !== action) u.current?.fadeOut(0.12);
@@ -139,17 +184,30 @@ export function updateFieldCharacters(scene, groups, dt) {
           }
         }
         u.mode = mode;
+        u.clipState = clipState;
         u.attackSerial = g.attackSerial;
       }
-      if (u.current && mode === 'walk') u.current.timeScale = g.fieldOrder === 'charge' ? 1.25 : 1;
+      if (u.current && isRunning) u.current.timeScale = u.actions.run ? 1.15 : 1.38;
+      else if (u.current && mode === 'walk') u.current.timeScale = g.fieldOrder === 'charge' ? 1.25 : 1;
       else if (u.current && mode === 'attack' && u.current.getClip) {
         const duration = u.current.getClip().duration;
         u.current.timeScale = Math.max(0.7, Math.min(3, duration / (g.type === 'archers' ? 0.45 : 0.30)));
       } else if (u.current) u.current.timeScale = 1;
-      if (dt > 0) u.mixer.update(dt);
-      if (u.regionalModel && !u.actions.attack) {
-        const lunge = mode === 'attack' ? Math.sin(Math.PI * cap((g.attackPulse || 0) / 0.30, 0, 1)) : 0;
-        u.rig.position.z = u.restZ + 0.25 * lunge;
+      if (dt > 0) {
+        if (lodStep <= 0) {
+          u.mixer.update(dt);
+        } else {
+          u.lodAccum = (u.lodAccum || 0) + dt;
+          if (u.lodAccum >= lodStep) {
+            u.mixer.update(u.lodAccum);
+            u.lodAccum = 0;
+          }
+        }
+      }
+      if (u.rig && u.restZ !== undefined && u.restYaw !== undefined) {
+        const lunge = (u.regionalModel && !u.actions.attack && mode === 'attack') ? Math.sin(Math.PI * cap((g.attackPulse || 0) / 0.30, 0, 1)) : 0;
+        const flinch = (g.hitFlash || 0) > 0 ? Math.sin((g.hitFlash / 0.18) * Math.PI) * 0.14 : 0;
+        u.rig.position.z = u.restZ + 0.25 * lunge - flinch;
         u.rig.rotation.y = u.restYaw + 0.18 * lunge;
       }
     }
@@ -206,17 +264,18 @@ export function battleImpactParticles(effect, terrain = null) {
   const out = [];
   if (t >= 1) return out;
   const dust = effect.kind === 'dust';
-  const count = dust ? 5 : effect.kind === 'rout' ? 8 : 4;
+  const breach = effect.kind === 'breach';
+  const count = breach ? 12 : dust ? 5 : effect.kind === 'rout' ? 8 : 4;
   const baseY = terrain ? terrainHeight(effect.x, effect.z, terrain) : 0;
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2 + (effect.seed || 0) * 0.37;
-    const spread = (dust ? 2.6 : 1.5) * t + 0.15;
+    const spread = (breach ? 5.2 : dust ? 2.6 : 1.5) * t + 0.15;
     out.push({
       x: effect.x + Math.cos(angle) * spread,
       z: effect.z + Math.sin(angle) * spread,
-      y: baseY + (dust ? 0.15 : 0.55) + Math.sin(t * Math.PI) * (dust ? 0.7 : 1.2),
-      size: (dust ? 0.48 : 0.21) * (1 - t) + 0.04,
-      kind: dust ? 'dust' : effect.kind
+      y: baseY + (breach ? 0.8 : dust ? 0.15 : 0.55) + Math.sin(t * Math.PI) * (breach ? 3.2 : dust ? 0.7 : 1.2),
+      size: (breach ? 0.62 : dust ? 0.48 : 0.21) * (1 - t) + 0.06,
+      kind: breach ? 'breach' : dust ? 'dust' : effect.kind
     });
   }
   return out;

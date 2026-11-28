@@ -379,15 +379,29 @@ function positionMultipleFronts(g,world,realm,armies,fronts){
 function positionArmy(g,world,realm,plan){
  const armies=Object.values(g.armies).filter(a=>a.owner===realm&&!a.contingent&&!embarked(g,a.id)&&size(a)>45&&!invasionReserved(g,a.id)&&controller(g,a.province)===realm).sort((a,b)=>size(b)-size(a)||a.id.localeCompare(b.id));
  if(!armies.length)return;
+ // Relief force: if enemy occupies one of our own provinces, route a staging force to an adjacent friendly border.
+ const occupiedOwned=Object.values(g.provinces).filter(p=>p.owner===realm&&controller(g,p.id)!==realm).map(p=>p.id);
+ let deployable=armies;
+ if(occupiedOwned.length){
+  const reliefBorders=world.provinces.filter(p=>controller(g,p.id)===realm&&p.neighbors.some(nid=>occupiedOwned.includes(nid))).map(p=>p.id);
+  if(reliefBorders.length){
+   const reliefArmy=deployable[0];
+   if(!reliefBorders.includes(reliefArmy.province)){
+    const route=nearestOwnedRoute(world,reliefArmy.province,reliefBorders,id=>controller(g,id)===realm);
+    if(route&&route.length>1){onArmyMarch(g,reliefArmy);reliefArmy.province=route[1];}
+   }
+   deployable=deployable.slice(1);
+   if(!deployable.length)return;
+  }
+ }
  // Core-province protection: hold/move a reserve army to a threatened core province when needed.
  const threatenedCores=threatenedCoreProvinces(g,world,realm);
- let deployable=armies;
- if(threatenedCores.length&&armies.length>1){
+ if(threatenedCores.length&&deployable.length>1){
   const prof=PERSONALITY_PROFILES[plan.profile]||PERSONALITY_PROFILES.cautious;
-  const reserveCount=Math.max(1,Math.min(armies.length-1,Math.floor(armies.length*prof.defenseReserve)));
-  const guards=armies.slice(armies.length-reserveCount);
+  const reserveCount=Math.max(1,Math.min(deployable.length-1,Math.floor(deployable.length*prof.defenseReserve)));
+  const guards=deployable.slice(deployable.length-reserveCount);
   const guardIds=new Set(guards.map(a=>a.id));
-  deployable=armies.filter(a=>!guardIds.has(a.id));
+  deployable=deployable.filter(a=>!guardIds.has(a.id));
   for(const ga of guards){
    if(threatenedCores.includes(ga.province))continue;
    const route=nearestOwnedRoute(world,ga.province,threatenedCores,id=>controller(g,id)===realm);
@@ -403,6 +417,7 @@ function positionArmy(g,world,realm,plan){
  const ranked=borders.map(p=>({id:p.id,score:Math.max(...p.neighbors.filter(id=>controller(g,id)===plan.target).map(id=>strategicTargetScore(g,world,principal,g.provinces[id])))+(p.neighbors.includes(objective)?50:0)})).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
  const occupied=new Set(),escorted=new Set(),max=plan.goal==='conquer'?Math.min(deployable.length,3):Math.min(deployable.length,Math.max(1,borders.length));
  for(const a of deployable.slice(0,max)){
+  // When conquering, concentrate armies on the highest-scoring staging border so assaults hit with decisive combined power.
   const destinations=plan.goal==='conquer'?ranked.map(x=>x.id):[...ranked.filter(x=>!occupied.has(x.id)).map(x=>x.id),...ranked.filter(x=>occupied.has(x.id)).map(x=>x.id)];
   let route=null;for(const dest of destinations){route=nearestOwnedRoute(world,a.province,[dest],id=>controller(g,id)===realm);if(route)break;}
   if(route){occupied.add(route.at(-1));if(route.length>1){for(const unit of [a,...fieldContingentsAt(g,realm,a.province,plan.target).filter(unit=>!escorted.has(unit.id))]){escorted.add(unit.id);onArmyMarch(g,unit);unit.province=route[1];}}}

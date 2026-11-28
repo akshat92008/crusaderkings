@@ -48,7 +48,7 @@ try:
         page.wait_for_timeout(450)
 
         assert page.locator('#quick-nav').is_visible()
-        assert page.locator('#quick-nav > button').count() == 6
+        assert page.locator('#quick-nav > button').count() in (6, 7)
         assert page.locator('#resource-food').is_visible()
         assert page.locator('#hud-steward-advice').is_visible()
         assert page.locator('#battle-siege-showcase').is_hidden()

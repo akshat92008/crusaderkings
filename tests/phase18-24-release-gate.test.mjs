@@ -7,7 +7,9 @@ import { SUPPORTED_LOCALES, BASE_STRINGS, t } from '../src/i18n.js';
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
 test('Phase 20: i18n localization supports English + priority locales without missing keys', () => {
-  assert.deepEqual([...SUPPORTED_LOCALES], ['en', 'zh-CN', 'de', 'es', 'pt-BR']);
+  for (const req of ['en', 'zh-CN', 'de', 'es', 'pt-BR', 'ru', 'pl', 'fr', 'hi']) {
+    assert.ok(SUPPORTED_LOCALES.includes(req), `Missing locale ${req}`);
+  }
   for (const locale of SUPPORTED_LOCALES) {
     for (const key of Object.keys(BASE_STRINGS)) {
       const val = t(key, locale);

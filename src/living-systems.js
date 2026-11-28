@@ -54,7 +54,7 @@ export function tickLiving(g,world,removeCharacter){const s=initLiving(g);if(s.l
  const change=(random(s)<(h.chronic?.48:.64)?-10:9)-(h.until>=g.turn?5:0)-(doc?Math.floor(doc.skills.learning/2):0)+(affected.has(p.realm)?4:0)+(p.civic?.stress>=75?3:0);
  h.severity=cap(h.severity+change,0,100);
  if(!h.severity){h.condition='well';h.chronic=false;h.injury=false;h.immuneUntil=g.turn+18;if(p.id===ruler(g,p.realm)?.id)note(g,p.realm,p.name+' recovered.');}
- else if(h.severity>=85&&random(s)<(meta.mortality||.18)){if(removeCharacter(g,world,p.id))note(g,p.realm,p.name+' died after '+(meta.name||'illness').toLowerCase()+'.');}
+ else if(h.severity>=85&&random(s)<(meta.mortality||.18)){p.deathReason='died of '+(meta.name||'illness').toLowerCase();if(removeCharacter(g,world,p.id))note(g,p.realm,p.name+' died after '+(meta.name||'illness').toLowerCase()+'.');}
  }
  for(const [r,x] of Object.entries(s.realms)){const f=g.factions[r],land=own(g,r);if(!land.length)continue;for(const role of ['physician','faithAdvisor','culturePatron'])if(x[role]&&(!adult(g,r,x[role])||x[role]===ruler(g,r)?.id))x[role]=null;
  const advisor=office(g,r,'faithAdvisor');if(advisor){const supported=land.filter(p=>g.identity.institutions[p.id]?.level>0);for(const p of supported){const l=g.civic.provinces[p.id];if(x.policy==='relief')l.localTrust=cap(l.localTrust+2,0,100);if(x.policy==='mediation')l.acceptance=cap(l.acceptance+2,0,100);}if(supported.length&&g.identity.realms[r])g.identity.realms[r].faithAuthority=cap(g.identity.realms[r].faithAuthority+Math.floor(advisor.skills.learning/2),0,100);}

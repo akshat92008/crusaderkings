@@ -58,8 +58,202 @@ export function toggleCardReserve(groups,g){
  g.reserve=true;return true;
 }
 export function releaseCardReserves(state){
- const own=state.groups.filter(g=>g.side==='attacker'&&!g.routed&&g.life>0);
- if(state.fieldTime>=12||!own.some(g=>!g.reserve))for(const g of own)if(g.reserve){g.reserve=false;g.deployFlash=.7;}
+ const elapsed=state.fieldTime||0;
+ for(const side of ['attacker','defender']){
+  const own=state.groups.filter(g=>g.side===side&&!g.routed&&g.life>0);
+  const reserves=own.filter(g=>g.reserve);
+  if(!reserves.length)continue;
+  const front=own.filter(g=>!g.reserve);
+  const avgLife=front.length?front.reduce((s,g)=>s+(g.life||0),0)/front.length:0;
+  const anyRouted=state.groups.some(g=>g.side===side&&g.routed);
+  const trigger=side==='attacker'
+   ?(elapsed>=12||!front.length)
+   :(elapsed>=10||!front.length||avgLife<74||anyRouted);
+  if(trigger){
+   for(const g of reserves){g.reserve=false;g.deployFlash=.7;}
+   if(side==='defender'&&Array.isArray(state.battleEvents)){
+    state.battleEvents.push({time:Number(elapsed.toFixed(1)),side:'defender',kind:'reserves',text:'Enemy commander commits fresh tactical reserves!'});
+    if(state.battleEvents.length>16)state.battleEvents.splice(0,state.battleEvents.length-16);
+   }
+  }
+ }
+}
+export function chooseAiBattlePreset(groups,side='defender',opts={}){
+ const own=groups.filter(g=>g.side===side&&!g.routed);
+ const foe=groups.filter(g=>g.side!==side&&!g.routed);
+ if(!own.length)return 'balanced';
+ if(opts.siege)return 'defensive';
+ const countRole=(arr,r)=>arr.filter(g=>cardRole(g)===r).length;
+ const myCav=countRole(own,'mounted'),myRng=countRole(own,'ranged'),myFoot=countRole(own,'foot');
+ const foeCav=countRole(foe,'mounted'),foeRng=countRole(foe,'ranged');
+ const myPower=own.reduce((n,g)=>n+(g.troopCount||100),0);
+ const foePower=foe.reduce((n,g)=>n+(g.troopCount||100),0);
+ if(myPower<foePower*0.78||opts.terrain==='hills'||opts.terrain==='mountain')return 'defensive';
+ if(myCav>=2&&foeRng>=2)return 'flanks';
+ if(myCav>=Math.max(2,myFoot))return 'cavalry_assault';
+ if(myRng>=2&&myFoot>=2&&foeCav<2)return 'ranged_cover';
+ if(myCav>=1&&foeCav>=1)return 'flanks';
+ return 'balanced';
+}
+export function assignAiReserves(groups,side='defender',opts={}){
+ if(opts.siege)return [];
+ const own=groups.filter(g=>g.side===side&&!g.routed&&!g.isCommander);
+ if(own.length<4)return [];
+ const candidates=own.filter(g=>cardRole(g)==='foot'||cardRole(g)==='mounted').sort((a,b)=>(b.troopCount||0)-(a.troopCount||0)||byId(a,b));
+ const count=opts.difficulty==='hard'&&own.length>=6?2:1;
+ const picked=candidates.slice(0,count);
+ for(const g of picked)g.reserve=true;
+ return picked;
+}
+export function coordinateCardBattleAI(state,opts={}){
+ const side=opts.side||'defender';
+ const foeSide=side==='defender'?'attacker':'defender';
+ const live=state.groups.filter(g=>!g.reserve&&!g.routed&&(g.life??100)>0&&(g.troopCount??1)>0);
+ const ours=live.filter(g=>g.side===side);
+ const foes=live.filter(g=>g.side===foeSide);
+ if(!ours.length||!foes.length){state.enemyPosture='Battle decided';return state.enemyPosture;}
+
+ const now=Number.isFinite(state.elapsed)?state.elapsed:(state.fieldTime||0);
+ const siegeActive=!!state.siege&&!siegeBreached(state.siege);
+ const holdingWalls=siegeActive&&state.siege.assaultSide!==side;
+
+ // Automatic enemy commander rally horn when morale wavers (25s cooldown, fair rules).
+ const cmd=ours.find(g=>g.isCommander);
+ state.rallyCooldowns??={};
+ const readyAt=state.rallyCooldowns[side]??-Infinity;
+ const waveringCount=ours.filter(g=>(g.morale??75)<56).length;
+ const anyRouted=state.groups.some(g=>g.side===side&&g.routed);
+ if(cmd&&now>=readyAt&&(waveringCount>=2||(anyRouted&&waveringCount>=1))){
+  let rallied=0,sx=0,sz=0;
+  for(const g of ours){
+   g.morale=clamp((g.morale??70)+22,0,100);
+   g.rallyBuffTimer=8;
+   rallied++;sx+=g.x;sz+=g.z;
+  }
+  state.rallyCooldowns[side]=now+25;
+  if(rallied>0){
+   state.effects??=[];
+   state.effects.push({kind:'rally',x:sx/rallied,z:sz/rallied,age:0,duration:1.1});
+   state.battleEvents??=[];
+   state.battleEvents.push({time:Number(now.toFixed(1)),side,kind:'rally',text:`${cmd.commanderName||'Enemy General'} sounds the war horn — enemy ranks rally!`});
+   if(state.battleEvents.length>16)state.battleEvents.splice(0,state.battleEvents.length-16);
+  }
+ }
+
+ const foot=ours.filter(g=>cardRole(g)==='foot');
+ const mounted=ours.filter(g=>cardRole(g)==='mounted');
+ const ranged=ours.filter(g=>cardRole(g)==='ranged');
+ const foeCav=foes.filter(g=>cardRole(g)==='mounted');
+ const foeRng=foes.filter(g=>cardRole(g)==='ranged');
+ const foeFoot=foes.filter(g=>cardRole(g)==='foot');
+
+ const threatenedArchers=ranged.length?foeCav.filter(c=>ranged.some(a=>distance(a,c)<24)):[];
+ const incomingCav=foeCav.filter(c=>foot.some(f=>distance(f,c)<20));
+ const exposedArchers=foeRng.filter(a=>!foeFoot.some(f=>distance(f,a)<9));
+ const ourStr=ours.reduce((n,g)=>n+soldiers(g)*(0.5+clamp((g.morale??75)/100,0,1)*0.5),0);
+ const foeStr=foes.reduce((n,g)=>n+soldiers(g)*(0.5+clamp((g.morale??75)/100,0,1)*0.5),0);
+ const engagedFoes=foeFoot.filter(f=>foot.some(a=>distance(a,f)<7));
+ const reservePending=state.groups.some(g=>g.side===side&&g.reserve&&!g.routed);
+
+ let posture='Coordinated advance';
+ if(holdingWalls)posture='Siege defense';
+ else if(threatenedArchers.length&&foot.length)posture='Screen archers';
+ else if(incomingCav.length&&foot.length)posture='Anti-cavalry brace';
+ else if(exposedArchers.length&&mounted.length)posture='Flank archers';
+ else if(engagedFoes.length&&mounted.length)posture='Hammer & anvil';
+ else if(ourStr<foeStr*0.72)posture='Defensive regroup';
+ else if(reservePending&&now>=7)posture='Holding reserves';
+
+ for(const g of ours){
+  g.focusTargetId=null;
+  const role=cardRole(g);
+  const nearestFoe=foes.slice().sort((a,b)=>distance(g,a)-distance(g,b)||byId(a,b))[0];
+  if(!nearestFoe)continue;
+
+  // Recovering units retreat briefly before breaking, then rejoin the line.
+  if(g.fieldOrder==='fallback'){
+   if((g.morale??75)>=52&&!foes.some(f=>distance(g,f)<11))g.fieldOrder='advance';
+   continue;
+  }
+  if(!holdingWalls&&!g.isCommander&&(g.morale??75)<30&&(g.life??100)>18&&distance(g,nearestFoe)<15){
+   g.fieldOrder='fallback';
+   g.moveX=clamp(g.x,-56,56);
+   g.moveZ=clamp(g.z+(g.homeDirection||-1)*14,-44,44);
+   continue;
+  }
+
+  if(holdingWalls){
+   if(role==='foot'){
+    g.formationId=(g.kind==='pikemen'||g.kind==='spearmen')?'pike_square':'shield_wall';
+    g.fieldOrder='brace';
+   }else if(role==='ranged'){
+    g.formationId='volley_line';
+    g.fieldOrder='hold';
+    const siegeThreat=foes.slice().sort((a,b)=>distance(g,a)-distance(g,b))[0];
+    if(siegeThreat)g.focusTargetId=siegeThreat.id;
+   }else{
+    g.fieldOrder='hold';
+   }
+   continue;
+  }
+
+  if(role==='foot'){
+   if(threatenedArchers.length&&ranged.length){
+    const a=ranged.slice().sort((x,y)=>distance(g,x)-distance(g,y))[0];
+    const threat=threatenedArchers.slice().sort((x,y)=>distance(a,x)-distance(a,y))[0];
+    const d=distance(a,threat)||1;
+    const sx=clamp(a.x+(threat.x-a.x)/d*4.5,-58,58);
+    const sz=clamp(a.z+(threat.z-a.z)/d*4.5,-42,42);
+    g.formationId='pike_square';
+    if(distance(g,{x:sx,z:sz})>3.5){g.fieldOrder='move';g.moveX=sx;g.moveZ=sz;}
+    else g.fieldOrder='brace';
+   }else if(incomingCav.some(c=>distance(g,c)<18)){
+    g.formationId='pike_square';
+    g.fieldOrder='brace';
+   }else if(foeRng.length>=2&&distance(g,nearestFoe)>8){
+    g.formationId='shield_wall';
+    g.fieldOrder=posture==='Defensive regroup'?'hold':'advance';
+   }else if(posture==='Defensive regroup'){
+    g.formationId='shield_wall';
+    g.fieldOrder=distance(g,nearestFoe)>6?'hold':'advance';
+   }else{
+    g.formationId=(g.kind==='pikemen'||g.kind==='spearmen')?'pike_square':'shield_wall';
+    g.fieldOrder='advance';
+   }
+  }else if(role==='mounted'){
+   if(exposedArchers.length){
+    const tgt=exposedArchers.slice().sort((a,b)=>distance(g,a)-distance(g,b))[0];
+    g.formationId=g.specialistId==='elephants'?'elephant_push':'cavalry_wedge';
+    g.fieldOrder='charge';
+    g.focusTargetId=tgt.id;
+   }else if(engagedFoes.length){
+    // Hammer & anvil: swing around to strike engaged enemy infantry on the flank.
+    const tgt=engagedFoes.slice().sort((a,b)=>(a.life||100)-(b.life||100)||distance(g,a)-distance(g,b))[0];
+    g.formationId=g.specialistId==='elephants'?'elephant_push':'flank';
+    g.fieldOrder='charge';
+    g.focusTargetId=tgt.id;
+   }else{
+    const nonPike=foes.filter(f=>f.formationId!=='pike_square'&&f.kind!=='pikemen').sort((a,b)=>distance(g,a)-distance(g,b))[0];
+    g.formationId=g.specialistId==='elephants'?'elephant_push':'cavalry_wedge';
+    g.fieldOrder='charge';
+    if(nonPike)g.focusTargetId=nonPike.id;
+   }
+  }else{
+   // Ranged units kite closing melee or fire concentrated volleys at high-value targets.
+   const closeMelee=foes.filter(f=>cardRole(f)!=='ranged'&&distance(g,f)<11);
+   if(closeMelee.length){
+    g.formationId='skirmish';
+    g.fieldOrder='advance';
+   }else{
+    g.formationId=g.specialistId==='longbow'?'longbow_line':'volley_line';
+    g.fieldOrder=distance(g,nearestFoe)<=Math.max(12,g.range||14)?'hold':'advance';
+    const highValue=foeFoot.filter(f=>distance(g,f)<=Math.max(16,(g.range||14)+2)).sort((a,b)=>(b.troopCount||0)-(a.troopCount||0))[0];
+    if(highValue)g.focusTargetId=highValue.id;
+   }
+  }
+ }
+ state.enemyPosture=posture;
+ return posture;
 }
 export function moveCard(g,p){
  g.x=p.x;g.z=p.z;g.lane=p.x<-12?0:p.x>12?2:1;
@@ -113,7 +307,7 @@ export function cardCounter(g,e){
  if(gs==='elephants'&&b==='foot'&&!(es==='pikes'||e.kind==='pikemen'||e.formationId==='pike_square'))return 1.28;
  if(a==='mounted'&&b==='ranged')return 1.38;
  if(a==='ranged'&&b==='foot')return 1.14;
- if(a==='foot'&&b==='mounted'&&(g.kind==='pikemen'||g.kind==='spearmen'||gs==='pikes'||e.formationId==='pike_square'||g.formationId==='pike_square'))return 1.45;
+ if(a==='foot'&&b==='mounted'&&(g.kind==='pikemen'||g.kind==='spearmen'||gs==='pikes'||e.formationId==='pike_square'||g.formationId==='pike_square'||g.fieldOrder==='brace'))return 1.45;
  return 1;
 }
 export function stepCardBattle(state,dt,terrainInfo=null){
@@ -130,7 +324,7 @@ export function stepCardBattle(state,dt,terrainInfo=null){
  const assaultCount=Math.max(1,live.filter(g=>g.side===assaultSide).length);
  const snapshot=new Map(live.map(g=>[g.id,{x:g.x,z:g.z,life:g.life}])),hits=new Map(),targetLoad=new Map();
  for(const g of groups){
-  g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.hitFlash=Math.max(0,(g.hitFlash||0)-dt);g.deployFlash=Math.max(0,(g.deployFlash||0)-dt);g.skirmishing=false;
+  g.attackPulse=Math.max(0,(g.attackPulse||0)-dt);g.hitFlash=Math.max(0,(g.hitFlash||0)-dt);g.deployFlash=Math.max(0,(g.deployFlash||0)-dt);g.rallyBuffTimer=Math.max(0,(g.rallyBuffTimer||0)-dt);g.skirmishing=false;
   if(g.reserve){g.moving=false;g.status='reserve';continue;}
   if(g.routed){
    if(g.isCommander&&!g.commanderShockDone){
@@ -182,70 +376,72 @@ export function stepCardBattle(state,dt,terrainInfo=null){
   if(!enemies.length){g.moving=false;continue;}
   const score=e=>distance(pos,snapshot.get(e.id))+(g.lane!==e.lane?3:0)+(cardRole(g)==='mounted'&&cardRole(e)==='ranged'?-6:0)+Math.min(10,Math.max(0,(targetLoad.get(e.id)||0)/Math.max(1,soldiers(e))-1)*4);
   const best=enemies.slice().sort((a,b)=>score(a)-score(b)||byId(a,b))[0],old=enemies.find(e=>e.id===g.cardTargetId);
-  const fieldOrder=siege?null:g.fieldOrder;
- const focus=!siege&&enemies.find(enemy=>enemy.id===g.focusTargetId);
- const e=rangedEnemy||focus||(old&&score(old)<=score(best)+4?old:best);
- g.cardTargetId=e.id;
- targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
- const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz);
- const anchored=fieldOrder==='move'||fieldOrder==='fallback';
- const moveX=anchored?g.moveX-pos.x:dx,moveZ=anchored?g.moveZ-pos.z:dz;
- const moveDistance=Math.hypot(moveX,moveZ);
- const enemyTerrain=terrainInfo?.(e);
- const pace=fieldOrder==='charge'&&role==='mounted'?speed*1.18:speed;
- const travel=anchored?moveDistance:Math.max(0,d-reach*.88);
- let step=fieldOrder==='hold'?0:Math.min(travel,pace*dt),moveDir=1;
- if(!anchored&&fieldOrder!=='hold'&&form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
- g.moving=step>0.01;
- g.vx=moveDistance?moveDir*moveX/moveDistance*step/dt:0;
- g.vz=moveDistance?moveDir*moveZ/moveDistance*step/dt:0;
- if(anchored&&g.moving){g.facingX=moveX/moveDistance;g.facingZ=moveZ/moveDistance;}
- else if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;}
- if(g.moving||d>0.01)g.facing=Math.atan2(g.facingX,g.facingZ);
- if(fieldOrder==='move'&&moveDistance<=step+.02)g.fieldOrder='advance';
- const minZ=siegeActive&&g.side===assaultSide&&!siegeCorridorBreached(siege,pos.x)?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
- if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;g.fatigue=clamp((g.fatigue||0)+dt*((form==='cavalry_wedge'||form==='flank')?0.024:0.012),0,1);}
- // Soft friendly separation keeps regiment bodies legible without blocking attacks.
- for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,minZ,maxZ);}
- g.targetX=anchored?g.moveX:target.x;g.targetZ=anchored?g.moveZ:target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
- g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.skirmishing?'skirmishing':g.moving?'moving':'engaging';
- g.statusFlags=[];
- if(fieldOrder==='hold')g.statusFlags.push('HOLD');
- if(fieldOrder==='fallback')g.statusFlags.push('FALL BACK');
- if(g.skirmishing)g.statusFlags.push('SKIRMISH');
- if(form==='shield_wall'||form==='pike_square')g.statusFlags.push('BRACED');
- if((form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6)g.statusFlags.push('CHARGE');
- if(form==='ambush'&&terrain?.inForestCover)g.statusFlags.push('AMBUSH');
- if(siegeActive&&g.side!==assaultSide)g.statusFlags.push('GARRISON');
- if(d>reach||g.cooldown>1e-8||fieldOrder==='fallback')continue;
- g.fatigue=clamp((g.fatigue||0)+0.018,0,1);
- g.cooldown=form==='longbow_line'?.95:form==='volley_line'?1.04:role==='ranged'?1.15:.85;
- g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
- const fatiguePenalty=1-0.22*clamp(g.fatigue||0,0,1);
- const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65)*fatiguePenalty,protection=clamp(e.armor||1,.75,1.65)*(1-0.12*clamp(e.fatigue||0,0,1));
- const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
- const wallCover=siegeActive&&e.side!==assaultSide?.72:1;
- const cover=role==='ranged'?clamp((enemyTerrain?.rangedMitigation??1)*wallCover,.55,1):1;
- const highGround=(terrain?.height??0)-(enemyTerrain?.height??0)>.75?(form==='longbow_line'||form==='volley_line'?1.16:1.1):1;
- const chargeReady=(form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6;
- const flanking=(form==='flank'||form==='encirclement')&&((targetLoad.get(e.id)||0)>soldiers(g)*1.05||Math.abs(pos.x-target.x)>=12);
- const offMult=(chargeReady?(form==='elephant_push'?1.36:1.28):1)*(flanking?(form==='encirclement'?1.26:1.2):1)*(form==='ambush'&&terrain?.inForestCover?1.24:1)*(form==='longbow_line'&&cardRole(e)==='foot'?1.1:1)*(1+clamp(g.commanderMartial||0,0,25)*.015);
- const defForm=e.formationId||'';
- const defMult=(defForm==='shield_wall'&&role==='ranged'?.78:1)*(defForm==='skirmish'&&role==='ranged'?.75:1)*(defForm==='ambush'&&enemyTerrain?.inForestCover?.84:1);
- const moraleMult=(chargeReady?1.45:1)*(flanking?1.3:1)*(defForm==='shield_wall'?.78:1);
- if(chargeReady)g.chargeSpent=true;
- if(flanking)g.statusFlags.push('FLANK');
- const loss=soldiers(g)*rate*quality*cardCounter(g,e)*cover*highGround*offMult*defMult/protection;
- const prev=hits.get(e)||{loss:0,morale:0};
- hits.set(e,{loss:prev.loss+loss,morale:prev.morale+loss*moraleMult});
- if(defForm==='pike_square'&&role==='mounted'){
-  const selfPrev=hits.get(g)||{loss:0,morale:0};
-  hits.set(g,{loss:selfPrev.loss+loss*.45,morale:selfPrev.morale+loss*.55});
+  const fieldOrder=siegeActive&&g.side===assaultSide?null:g.fieldOrder;
+  const focus=!siegeActive&&enemies.find(enemy=>enemy.id===g.focusTargetId);
+  const e=rangedEnemy||focus||(old&&score(old)<=score(best)+4?old:best);
+  g.cardTargetId=e.id;
+  targetLoad.set(e.id,(targetLoad.get(e.id)||0)+soldiers(g));
+  const target=snapshot.get(e.id),dx=target.x-pos.x,dz=target.z-pos.z,d=Math.hypot(dx,dz);
+  const anchored=fieldOrder==='move'||fieldOrder==='fallback';
+  const moveX=anchored?g.moveX-pos.x:dx,moveZ=anchored?g.moveZ-pos.z:dz;
+  const moveDistance=Math.hypot(moveX,moveZ);
+  const enemyTerrain=terrainInfo?.(e);
+  const pace=fieldOrder==='charge'&&role==='mounted'?speed*1.18:speed;
+  const travel=anchored?moveDistance:Math.max(0,d-reach*.88);
+  let step=(fieldOrder==='hold'||fieldOrder==='brace')?0:Math.min(travel,pace*dt),moveDir=1;
+  if(!anchored&&fieldOrder!=='hold'&&fieldOrder!=='brace'&&form==='skirmish'&&role==='ranged'&&cardRole(e)==='foot'&&d>0.01&&d<reach*.48){step=Math.min(reach*.48-d,speed*dt*.75);moveDir=-1;g.skirmishing=true;}
+  g.moving=step>0.01;
+  g.vx=moveDistance?moveDir*moveX/moveDistance*step/dt:0;
+  g.vz=moveDistance?moveDir*moveZ/moveDistance*step/dt:0;
+  if(anchored&&g.moving){g.facingX=moveX/moveDistance;g.facingZ=moveZ/moveDistance;}
+  else if(d>0.01){g.facingX=dx/d;g.facingZ=dz/d;}
+  if(g.moving||d>0.01)g.facing=Math.atan2(g.facingX,g.facingZ);
+  if(fieldOrder==='move'&&moveDistance<=step+.02)g.fieldOrder='advance';
+  const minZ=siegeActive&&g.side===assaultSide&&!siegeCorridorBreached(siege,pos.x)?-16.5:-46,maxZ=siegeActive&&g.side!==assaultSide?-20.5:46;
+  if(g.moving){g.x=clamp(pos.x+g.vx*dt,-64,64);g.z=clamp(pos.z+g.vz*dt,minZ,maxZ);g.distanceMoved=(g.distanceMoved||0)+step;g.fatigue=clamp((g.fatigue||0)+dt*((form==='cavalry_wedge'||form==='flank')?0.024:0.012),0,1);}
+  // Soft friendly separation keeps regiment bodies legible without blocking attacks.
+  for(const ally of live){if(ally===g||ally.side!==g.side)continue;const a=snapshot.get(ally.id);let sx=pos.x-a.x,sz=pos.z-a.z,dist=Math.hypot(sx,sz);if(dist>=4.6)continue;if(dist<.001){sx=byId(g,ally)<0?-1:1;sz=0;dist=1;}const push=Math.min(.09,dt*(4.6-dist)*.65);g.x=clamp(g.x+sx/dist*push,-64,64);g.z=clamp(g.z+sz/dist*push,minZ,maxZ);}
+  g.targetX=anchored?g.moveX:target.x;g.targetZ=anchored?g.moveZ:target.z;g.phase=(g.phase||0)+dt*(role==='mounted'?10:5);
+  g.cooldown=Math.max(0,(g.cooldown||0)-dt);g.status=g.skirmishing?'skirmishing':fieldOrder==='brace'?'braced':g.moving?'moving':'engaging';
+  g.statusFlags=[];
+  if(fieldOrder==='hold')g.statusFlags.push('HOLD');
+  if(fieldOrder==='fallback')g.statusFlags.push('FALL BACK');
+  if(g.skirmishing)g.statusFlags.push('SKIRMISH');
+  if(form==='shield_wall'||form==='pike_square'||fieldOrder==='brace')g.statusFlags.push('BRACED');
+  if((form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6)g.statusFlags.push('CHARGE');
+  if(form==='ambush'&&terrain?.inForestCover)g.statusFlags.push('AMBUSH');
+  if(siegeActive&&g.side!==assaultSide)g.statusFlags.push('GARRISON');
+  if((g.rallyBuffTimer||0)>0)g.statusFlags.push('RALLIED');
+  if(d>reach||g.cooldown>1e-8||fieldOrder==='fallback')continue;
+  g.fatigue=clamp((g.fatigue||0)+0.018,0,1);
+  g.cooldown=form==='longbow_line'?.95:form==='volley_line'?1.04:role==='ranged'?1.15:.85;
+  g.attackPulse=role==='ranged'?.45:.3;g.attackSerial=(g.attackSerial||0)+1;
+  const fatiguePenalty=1-0.22*clamp(g.fatigue||0,0,1);
+  const quality=clamp((g.damage||10)/(g.type==='cavalry'?18:role==='ranged'?9:11),.65,1.65)*fatiguePenalty,protection=clamp(e.armor||1,.75,1.65)*(1-0.12*clamp(e.fatigue||0,0,1));
+  const rate=role==='ranged'?.038:role==='mounted'?.048:.046;
+  const wallCover=siegeActive&&e.side!==assaultSide?.72:1;
+  const cover=role==='ranged'?clamp((enemyTerrain?.rangedMitigation??1)*wallCover,.55,1):1;
+  const highGround=(terrain?.height??0)-(enemyTerrain?.height??0)>.75?(form==='longbow_line'||form==='volley_line'?1.16:1.1):1;
+  const chargeReady=(form==='cavalry_wedge'||form==='elephant_push')&&!g.chargeSpent&&(g.distanceMoved||0)>=6;
+  const flanking=(form==='flank'||form==='encirclement')&&((targetLoad.get(e.id)||0)>soldiers(g)*1.05||Math.abs(pos.x-target.x)>=12);
+  const offMult=(chargeReady?(form==='elephant_push'?1.36:1.28):1)*(flanking?(form==='encirclement'?1.26:1.2):1)*(form==='ambush'&&terrain?.inForestCover?1.24:1)*(form==='longbow_line'&&cardRole(e)==='foot'?1.1:1)*(1+clamp(g.commanderMartial||0,0,25)*.015);
+  const defForm=e.formationId||'';
+  const defBraced=e.fieldOrder==='brace';
+  const defMult=(defForm==='shield_wall'&&role==='ranged'?.78:1)*(defForm==='skirmish'&&role==='ranged'?.75:1)*(defForm==='ambush'&&enemyTerrain?.inForestCover?.84:1)*(defBraced&&role!=='ranged'?.82:1);
+  const moraleMult=(chargeReady?1.45:1)*(flanking?1.3:1)*(defForm==='shield_wall'||defBraced?.78:1);
+  if(chargeReady)g.chargeSpent=true;
+  if(flanking)g.statusFlags.push('FLANK');
+  const loss=soldiers(g)*rate*quality*cardCounter(g,e)*cover*highGround*offMult*defMult/protection;
+  const prev=hits.get(e)||{loss:0,morale:0};
+  hits.set(e,{loss:prev.loss+loss,morale:prev.morale+loss*moraleMult});
+  if((defForm==='pike_square'||defBraced)&&role==='mounted'){
+   const selfPrev=hits.get(g)||{loss:0,morale:0};
+   hits.set(g,{loss:selfPrev.loss+loss*.45,morale:selfPrev.morale+loss*.55});
+  }
+  if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
+  else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});
  }
- if(role==='ranged')state.projectiles.push({sx:pos.x,sz:pos.z,tx:target.x,tz:target.z,t:0,kind:'arrow'});
- else state.effects.push({kind:'impact',x:target.x,z:target.z,age:0,duration:.32});
- }
- for(const [g,impact] of hits){const pct=100*impact.loss/Math.max(1,g.troopCount),mPct=100*impact.morale/Math.max(1,g.troopCount);const guard=1+clamp(g.commanderMartial||0,0,25)*.012;g.life=clamp(g.life-pct,0,100);g.morale=clamp((g.morale??75)-mPct*.55/guard,0,100);g.hitFlash=.18;}
+ for(const [g,impact] of hits){const pct=100*impact.loss/Math.max(1,g.troopCount),mPct=100*impact.morale/Math.max(1,g.troopCount);const guard=1+clamp(g.commanderMartial||0,0,25)*.012;const rallyGuard=(g.rallyBuffTimer||0)>0?.6:1;g.life=clamp(g.life-pct,0,100);g.morale=clamp((g.morale??75)-mPct*.55*rallyGuard/guard,0,100);g.hitFlash=.18;}
  for(const g of live){
   if(g.life<=8||soldiers(g)<.5||(g.life<=35&&g.morale<=10)){g.routed=true;g.routAge=0;g.moving=true;g.attackPulse=0;g.status='routing';g.statusFlags=['ROUT'];g.troops=0;state.effects.push({kind:'rout',x:g.x,z:g.z,age:0,duration:.6});}
   else g.troops=Math.round(soldiers(g));

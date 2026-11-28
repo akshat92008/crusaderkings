@@ -4,8 +4,8 @@ import {partitionRepresentatives} from './succession-systems.js';
 import {councilPermission,triggerTitleRevolt} from './political-conflict.js';
 import {regencyView} from './regency-systems.js';
 import {removePoliticalCharacter} from './dynastic-politics.js';
-import {recordGrievance,rememberBereavement} from './character-agency.js';
-import {changeOpinion} from './chronicle-systems.js';
+import {recordGrievance,rememberBereavement,actAgainstNatureStress} from './character-agency.js';
+import {changeOpinion,recordStoryFlag} from './chronicle-systems.js';
 // 5-tier landed title hierarchy (empire, kingdom, duchy, county, barony) with de jure / de facto separation.
 // Provincial holders remain authoritative in g.politics.holdings.
 import {controller} from './campaign-war.js';
@@ -346,11 +346,14 @@ export function partitionInheritance(g,realm,deceased,primary){
  }
  const crown=holdings(g,realm).filter(([id,h])=>h.lord===deceased.id&&estateLaw(g,id)==='customary').sort(([a],[b])=>a.localeCompare(b));
  const available=heirs.filter(c=>!isImprisoned(g,c.id));
+ const distributed=[];
  if(effectiveLaw==='partition'&&available.length){
   let i=0;
   for(const [id,h] of crown){
-   h.lord=i===0?primary.id:available[(i-1)%available.length].id;
+   const recip=i===0?primary:available[(i-1)%available.length];
+   h.lord=recip.id;
    h.loyalty=65;
+   distributed.push({province:id,lordId:recip.id,lordName:recip.name,isPrimary:i===0});
    i++;
   }
   // Also distribute secondary duchies held by the deceased under partition/gavelkind.
@@ -363,7 +366,7 @@ export function partitionInheritance(g,realm,deceased,primary){
   }
   if(crown.length>1)note(g,realm,'Partition distributed '+crown.length+' crown holdings among the heirs.');
  }else{
-  for(const [,h] of crown){h.lord=primary.id;h.loyalty=65;}
+  for(const [id,h] of crown){h.lord=primary.id;h.loyalty=65;distributed.push({province:id,lordId:primary.id,lordName:primary.name,isPrimary:true});}
  }
  // Also transfer baronies held directly by deceased (if not overridden by county lord)
  for(const b of Object.values(g.feudal.baronies)){
@@ -373,6 +376,7 @@ export function partitionInheritance(g,realm,deceased,primary){
   }
  }
  syncTitles(g);
+ return {law:effectiveLaw,primary:primary.id,primaryName:primary.name,distributed};
 }
 
 export function claimantCandidates(g,realm){
@@ -487,7 +491,9 @@ export function executePrisoner(g,world,realm,prisonerId,opts={}){
  const adultHeirIds=kinIds.filter(id=>(victim.children||[]).includes(id)&&live(g,id)?.age>=16);
 
  x.status='executed';x.ended=g.turn;x.resolution='executed';x.executedBy=r?.id||realm;
- victim.deathReason='executed';victim.executedBy=r?.id||realm;
+ victim.deathReason='executed on the block';victim.executedBy=r?.id||realm;
+ if(r?.id)actAgainstNatureStress(g,r.id,'execute');
+ recordStoryFlag(g,realm,'executed_noble',{subject:victim.name,actor:r?.name||realm,house:victim.house});
  const remover=opts.removeCharacter||removePoliticalCharacter;
  if(typeof remover==='function')remover(g,world,prisonerId);
  victim.alive=false;victim.deathYear??=g.year;

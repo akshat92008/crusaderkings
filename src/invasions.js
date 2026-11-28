@@ -74,11 +74,14 @@ export function findInvasionOptions(g,world){
     const alliedDefense=fieldContingentsAt(g,player,target.id,rival).reduce((n,a)=>n+armyPower(g,a),0);
     const advantage=power/Math.max(1,defense+alliedDefense+defenseSupport(g,player,rival)),distance=path.length-1;
     const cbs=availableCasusBelli(g,world,rival,player);
+    const hasSiegeEngines=group.some(a=>{const eng=g.military?.armies?.[a.id]?.engines;return eng&&((eng.ram||0)+(eng.catapult||0)+(eng.bombard||0))>0;});
+    const playerDistracted=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(player)&&![w.attacker,w.defender].includes(rival));
+    const opportunism=(!stationed.length?0.45:0)+(hasSiegeEngines&&(province.buildings?.fort||0)>0?0.35:0)+(playerDistracted?0.4:0);
     candidates.push({
      by:rival,army:army.id,armies:group.map(a=>a.id),province:target.id,staging:neighborId,
      path:path.slice(1),eta:3+distance,status:'approaching',
      cb:cbs.find(c=>c.goal===target.id)?.cb||cbs[0]?.cb||null,
-     advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)+(strategicPlan(g,rival)?.target===player&&strategicPlan(g,rival)?.goal==='conquer'?1:0)+(cbs.length?0.3:0)
+     advantage,threatScore:advantage*1.8-distance*.14+Math.min(1,warChest/900)*.25+(activeWar(g,rival,player)?.goal===target.id?2:0)+(strategicPlan(g,rival)?.target===player&&strategicPlan(g,rival)?.goal==='conquer'?1:0)+(cbs.length?0.3:0)+opportunism
     });
    }
   }
@@ -202,9 +205,10 @@ export function resolveInvasion(g,world,threat,result){
  }
  recordCampaignBattle(g,found.by,g.player,found.province,!defended);recordStrategicBattle(g,found.by,g.player,!defended,1-enemyRatio);recordStrategicBattle(g,g.player,found.by,defended,1-playerRatio);
  g.kingdom.threats=g.kingdom.threats.filter(t=>t!==found);
- g.kingdom.nextInvasionTurn=g.turn+6;
+ const isHard=g.kingdom.difficulty==='hard';
+ g.kingdom.nextInvasionTurn=g.turn+(isHard?4:6);
  g.kingdom.rivalInvasionCooldowns??={};
- g.kingdom.rivalInvasionCooldowns[found.by]=g.turn+12;
+ g.kingdom.rivalInvasionCooldowns[found.by]=g.turn+(isHard?9:12);
  const msg=defended?'Your defenders repelled '+g.factions[found.by].name+' at '+found.province:
   g.factions[found.by].name+' captured '+found.province+' after a successful assault';
  return {ok:true,defended,msg};

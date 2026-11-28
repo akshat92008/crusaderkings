@@ -2,7 +2,7 @@ import {personalUnionAction,reconcilePersonalUnions,unionJuniorDomain} from './p
 import {allocateCharacterName,allocateHouseName} from './name-pools.js';
 import {humanControlsRealm,humanControlsCharacter,reconcileCareer} from './player-career.js';
 import {estateLaw,estateSuccession} from './estate-succession.js';
-import {characterInteraction,recordLifeEvent,rememberBereavement,personalPoliticalSupport,recordGrievance} from './character-agency.js';
+import {characterInteraction,recordLifeEvent,rememberBereavement,personalPoliticalSupport,recordGrievance,actAgainstNatureStress} from './character-agency.js';
 import {reconcileRegency,tickRegency,regencyAction} from './regency-systems.js';
 import {
  successionCandidates,nominateSuccessor,hereditaryLine,crownExcluded,crownExclusionTerms,
@@ -20,7 +20,7 @@ import {
 import {authorityAction,authorityModifiers,politicalEstates} from './realm-authority.js';
 import {courtAction,initRoyalCourt,tickRoyalCourt} from './royal-court.js';
 import {partitionInheritance,isImprisoned,regionalLoyalty,syncTitles,addClaim,claimantCandidates} from './feudal-systems.js';
-import {personalOpinion,changeOpinion} from './chronicle-systems.js';
+import {personalOpinion,changeOpinion,recordRulerEpitaph,recordStoryFlag} from './chronicle-systems.js';
 import {councilPermission} from './political-conflict.js';
 import {
  ensureCharacterGenetics,setChildhoodFocus,completeChildEducation,
@@ -66,11 +66,11 @@ function person(g,realm,age,opts={}){
 }
 
 function link(a,b){a.spouse=b.id;b.spouse=a.id;delete a.marriageLineage;delete b.marriageLineage;}
-function ancestors(p,c,depth=3){if(!c||depth<=0)return [];return c.parents.flatMap(id=>[id,...ancestors(p,p.people[id],depth-1)]);}
+function ancestors(p,c,depth=3){if(!c||depth<=0)return [];return (c.parents||[]).flatMap(id=>[id,...ancestors(p,p.people[id],depth-1)]);}
 function eligible(p,a,b){
  if(!a||!b||!a.alive||!b.alive||a.id===b.id||a.sex===b.sex)return false;
  if(a.spouse===b.id||(a.spouses||[]).includes(b.id))return false;
- if(a.parents.includes(b.id)||b.parents.includes(a.id))return false;
+ if((a.parents||[]).includes(b.id)||(b.parents||[]).includes(a.id))return false;
  if(ancestors(p,a).includes(b.id)||ancestors(p,b).includes(a.id))return false;
  if(ancestors(p,a).some(x=>ancestors(p,b).includes(x)))return false;
  return !a.spouse&&!b.spouse;
@@ -78,10 +78,10 @@ function eligible(p,a,b){
 function secondaryEligible(p,a,b){
  if(!a||!b||!a.alive||!b.alive||a.id===b.id||a.sex===b.sex)return false;
  if(a.spouse===b.id||(a.spouses||[]).includes(b.id))return false;
- if(a.parents.includes(b.id)||b.parents.includes(a.id))return false;
+ if((a.parents||[]).includes(b.id)||(b.parents||[]).includes(a.id))return false;
  return !ancestors(p,a).includes(b.id)&&!ancestors(p,b).includes(a.id);
 }
-function children(p,r){return r.children.map(id=>live(p,id)).filter(Boolean);}
+function children(p,r){return (r?.children||[]).map(id=>live(p,id)).filter(Boolean);}
 function successor(p,realm,g){return successionCandidates(g,realm)[0];}
 export function successionPreview(g,realm){return g.politics?.realms?.[realm]?successor(g.politics,realm,g)||null:null;}
 
@@ -485,7 +485,7 @@ export function politicsAction(g,world,action,id,extra){
  }
  if(!v||v.realm!==g.player||g.provinces[id]?.owner!==g.player||v.lord===r.id)return {ok:false,msg:'Select a loyal holding in your realm.'};
  if(action==='gift'){if(f.treasury<100)return {ok:false,msg:'Need 100 gold.'};f.treasury-=100;v.wealth+=100;v.loyalty=clamp(v.loyalty+15,0,100);}
- else if(action==='tax'||action==='levy'||action==='autonomy'){if(v.exemptions?.[action])return {ok:false,msg:'Revoke the estate exemption before changing this rate.'};const value=Number(extra);if(![0,1,2].includes(value)||v[action]===value)return {ok:false,msg:'Select a different contract level.'};const delta=value-v[action];v[action]=value;v.loyalty=clamp(v.loyalty+(action==='autonomy'?12:-12)*delta,0,100);}
+ else if(action==='tax'||action==='levy'||action==='autonomy'){if(v.exemptions?.[action])return {ok:false,msg:'Revoke the estate exemption before changing this rate.'};const value=Number(extra);if(![0,1,2].includes(value)||v[action]===value)return {ok:false,msg:'Select a different contract level.'};const delta=value-v[action];v[action]=value;v.loyalty=clamp(v.loyalty+(action==='autonomy'?12:-12)*delta,0,100);if(action==='tax'&&value===2)actAgainstNatureStress(g,r.id,'high_tax');}
  else if(action==='replace'){if(!councilPermission(g,g.player,'revoke')&&!(v.leverageUntil>g.turn))return {ok:false,msg:'Binding council refused revocation; investigate the estate or secure support.'};if(f.legitimacy<50)return {ok:false,msg:'Need 50 legitimacy.'};const previous=p.people[v.lord];v.lord=person(g,g.player,35,{house:allocateHouseName(g,{realm:g.player,seed:`appointed:${id}:${g.turn}`})}).id;v.loyalty=60;f.legitimacy-=10;previous.memories.push('Lost the holding of '+id);for(const h of Object.values(p.holdings))if(h.realm===g.player&&h!==v)h.loyalty=clamp(h.loyalty-5,0,100);}
  else if(action==='concede'){if(v.loyalty>=45||g.turn<v.concessionUntil||f.treasury<150)return {ok:false,msg:'No active grievance, recent concession, or insufficient gold.'};f.treasury-=150;v.autonomy=2;v.loyalty=clamp(v.loyalty+30,0,100);v.concessionUntil=g.turn+24;}
  else return {ok:false,msg:'Unknown political action.'};
@@ -502,7 +502,7 @@ function succeedRealmCrown(g,world,p,c,realm,estateHeir){
  const rulesElsewhere=Object.entries(p.realms).some(([rId,rs])=>rId!==realm&&rs?.ruler===h.id);
  if(!rulesElsewhere&&h.realm!==realm)h.realm=realm;
  s.ruler=h.id;delete s.nominee;
- partitionInheritance(g,realm,c,h);
+ const partitionInfo=partitionInheritance(g,realm,c,h)||null;
  // Propagate heritable claims from deceased to primary heir as weak claims.
  for(const cl of Object.values(g.feudal?.claimants||{})){
   if(cl.person===c.id&&cl.heritable&&cl.realm!==realm)addClaim(g,h.id,cl.realm,{titleId:cl.titleId,strength:'weak',from:c.id,heritable:false});
@@ -526,20 +526,152 @@ function succeedRealmCrown(g,world,p,c,realm,estateHeir){
  if(g.factions[realm].legitimacy<55)crisisReasons.push('low_legitimacy');
  if(claimants.length)crisisReasons.push('pretenders');
  if(crownPolicy(g,realm).gender==='male_preference'&&h.sex==='female')crisisReasons.push('contested_gender');
+ if(partitionInfo?.distributed?.length>1)crisisReasons.push('partition');
  if(crisisReasons.length){
-  s.claimantCrisis={active:true,started:g.turn,until:g.turn+24,ruler:h.id,reasons:crisisReasons,pretenders:claimants.map(x=>x.person)};
+  s.claimantCrisis={
+   active:true,started:g.turn,until:g.turn+24,ruler:h.id,reasons:crisisReasons,
+   pretenders:claimants.map(x=>x.person),
+   pretenderNames:claimants.map(x=>p.people[x.person]?.name||x.person),
+   partition:partitionInfo
+  };
   if(realm===g.player)log(g,'Succession crisis: rival claimants contest '+h.name+'’s accession.');
  }else{
   delete s.claimantCrisis;
  }
- if(realm===g.player)log(g,c.name+' died. '+h.name+' inherited the crown.');
+ const epitaph=recordRulerEpitaph(g,c,realm,h);
+ if(epitaph&&partitionInfo)epitaph.partition=partitionInfo;
+ if(epitaph&&crisisReasons.length)epitaph.crisisReasons=crisisReasons;
+ if(realm===g.player){
+  if(g.chronicles&&epitaph)g.chronicles.pendingObituary=epitaph;
+  if(g.hometown)g.hometown.generationBanner={year:g.year,from:c.name,to:h.name,turn:g.turn,text:`${h.name} inherits the crown of ${g.factions[realm]?.name||realm} from ${c.name}. The capital enters a new generation.`};
+  if(partitionInfo?.distributed?.length>1){
+   const grouped=new Map();
+   for(const d of partitionInfo.distributed){
+    const lid=d.lordId||d.heirId||'heir',lname=d.lordName||d.heirName||p.people[lid]?.name||'Heir';
+    if(!grouped.has(lid))grouped.set(lid,{heirId:lid,heirName:lname,provinces:[]});
+    if(d.province)grouped.get(lid).provinces.push(d.province);
+    else if(Array.isArray(d.provinces))grouped.get(lid).provinces.push(...d.provinces);
+   }
+   const groupedArr=[...grouped.values()];
+   const shares=groupedArr.map(d=>`${d.heirName} (${d.provinces.length} domain${d.provinces.length===1?'':'s'})`).join(', ');
+   g.politics.pendingPartitionEvent={
+    id:`part_${c.id}_${g.turn}`,realm,turn:g.turn,law:partitionInfo.law||'partition',
+    deceasedName:c.name,heirId:h.id,heirName:h.name,distributed:groupedArr,
+    title:'The Realm Is Divided — Succession Partition',
+    desc:`Upon the death of ${c.name}, the crown's holdings have been partitioned under ${partitionInfo.law||'Partition Law'}: ${shares}. How will ${h.name} respond to the division of the realm?`,
+    choices:[
+     {id:'honor_partition',label:'Honor the Partition Compact (+10 Vassal Loyalty, +6 Legitimacy)'},
+     {id:'assert_claims',label:'Proclaim Unified Crown Claims (+10 Prestige, +15 Rival Tension, Forge Reunification Claims)'},
+     {id:'buy_back',label:'Compensate Junior Heirs to Consolidate (-180g, +8 Stability, +6 Loyalty)',cost:180}
+    ]
+   };
+   recordStoryFlag(g,{key:'partition_split',realm,title:`Partition of ${c.name}'s Realm`,summary:`${c.name}'s domains were split among ${groupedArr.length} heirs.`,delayYears:15});
+  }
+  if(crisisReasons.includes('pretenders')||(crisisReasons.includes('low_legitimacy')&&claimants.length)){
+   const topClaimantId=claimants[0]?.person;
+   const topClaimant=topClaimantId?p.people[topClaimantId]:null;
+   const foreignRival=Object.keys(g.factions||{}).filter(id=>id!==realm&&id!=='independent'&&(g.factions[realm]?.relations?.[id]||0)<15).sort()[0]||null;
+   if(topClaimant){
+    g.politics.pendingSuccessionWar={
+     id:`swar_${topClaimant.id}_${g.turn}`,realm,turn:g.turn,stage:1,
+     claimantId:topClaimant.id,claimantName:topClaimant.name,
+     foreignBacker:foreignRival,foreignBackerName:foreignRival?(g.factions[foreignRival]?.name||foreignRival):'Foreign Opportunists',
+     title:`Contested Succession — ${topClaimant.name} Claims the Throne (Stage 1/2)`,
+     desc:`${topClaimant.name} challenges ${h.name}'s accession and has sent envoys to ${foreignRival?(g.factions[foreignRival]?.name||foreignRival):'neighboring courts'} seeking swords and gold to press their claim.`,
+     choices:[
+      {id:'bribe_claimant',label:`Offer Royal Appanage & Gold (-160g, +12 Legitimacy, Pacify ${topClaimant.name})`,cost:160},
+      {id:'confront_foreign',label:'Confront the Foreign Backer & Rally Loyalists (Proceed to Stage 2/2)'},
+      {id:'arrest_claimant',label:'Seize the Claimant Immediately (-6 Stability, +10 Prestige, Risk Uprising)'}
+     ]
+    };
+   }
+  }
+  log(g,c.name+' ('+(c.deathReason||'passed at court')+') died. '+h.name+' inherited the crown.');
+ }
  return nextEstateHeir;
+}
+
+export function currentPartitionEvent(g){
+ const ev=g?.politics?.pendingPartitionEvent;
+ return ev&&ev.realm===g.player?ev:null;
+}
+export function resolvePartitionEvent(g,choiceId){
+ const ev=currentPartitionEvent(g);
+ if(!ev)return {ok:false,msg:'No active partition event.'};
+ const f=g.factions?.[ev.realm];
+ if(choiceId==='honor_partition'){
+  for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===ev.realm)h.loyalty=clamp(h.loyalty+10,0,100);
+  if(f)f.legitimacy=clamp((f.legitimacy||50)+6,0,100);
+  log(g,`${ev.heirName} honored the realm partition compact, soothing noble houses.`);
+ }else if(choiceId==='buy_back'){
+  if(f&&(f.treasury||0)<180)return {ok:false,msg:'Requires 180 gold to compensate junior heirs.'};
+  if(f){f.treasury-=180;f.stability=clamp((f.stability||50)+8,0,100);}
+  for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===ev.realm)h.loyalty=clamp(h.loyalty+6,0,100);
+  log(g,`${ev.heirName} compensated junior heirs from the treasury to preserve crown cohesion.`);
+ }else{
+  if(f)f.prestige=(f.prestige||0)+10;
+  for(const d of ev.distributed||[]){
+   if(d.heirId&&d.heirId!==ev.heirId&&g.politics?.people?.[d.heirId])changeOpinion(g,d.heirId,ev.heirId,-15);
+  }
+  log(g,`${ev.heirName} proclaimed sovereign claims over every partitioned domain.`);
+ }
+ delete g.politics.pendingPartitionEvent;
+ return {ok:true,msg:'Succession partition response enacted.'};
+}
+export function currentSuccessionWarEvent(g){
+ const ev=g?.politics?.pendingSuccessionWar;
+ return ev&&ev.realm===g.player?ev:null;
+}
+export function resolveSuccessionWarEvent(g,world,choiceId){
+ const ev=currentSuccessionWarEvent(g);
+ if(!ev)return {ok:false,msg:'No active contested succession event.'};
+ const f=g.factions?.[ev.realm];
+ if(ev.stage===1&&choiceId==='confront_foreign'){
+  ev.stage=2;
+  ev.title=`Foreign Intervention — ${ev.foreignBackerName} Backs ${ev.claimantName} (Stage 2/2)`;
+  ev.desc=`Envoys confirm that ${ev.foreignBackerName} is arming ${ev.claimantName}'s faction along the frontier. Settle the succession crisis decisively.`;
+  ev.choices=[
+   {id:'diplomatic_deterrence',label:`Pay War Indemnity & Sign Frontier Pact (-140g, +10 Legitimacy, End Crisis)`,cost:140},
+   {id:'crush_claimant',label:'Mobilize Loyal Banners & Crush the Pretender (-8 Stability, +18 Prestige, +8 Legitimacy)'}
+  ];
+  return {ok:true,msg:`${ev.foreignBackerName}'s involvement exposed — finalize your response (Stage 2/2).`};
+ }
+ if(choiceId==='bribe_claimant'){
+  if(f&&(f.treasury||0)<160)return {ok:false,msg:'Requires 160 gold to grant an appanage.'};
+  if(f){f.treasury-=160;f.legitimacy=clamp((f.legitimacy||50)+12,0,100);}
+  delete g.politics.realms[ev.realm]?.claimantCrisis;
+  log(g,`${ev.claimantName} accepted a royal appanage, averting a succession war.`);
+ }else if(choiceId==='diplomatic_deterrence'){
+  if(f&&(f.treasury||0)<140)return {ok:false,msg:'Requires 140 gold for frontier settlement.'};
+  if(f){f.treasury-=140;f.legitimacy=clamp((f.legitimacy||50)+10,0,100);}
+  if(ev.foreignBacker&&f?.relations)f.relations[ev.foreignBacker]=clamp((f.relations[ev.foreignBacker]||0)+12,-100,100);
+  delete g.politics.realms[ev.realm]?.claimantCrisis;
+  log(g,`Diplomatic compact neutralized ${ev.foreignBackerName}'s backing of ${ev.claimantName}.`);
+ }else if(choiceId==='arrest_claimant'){
+  if(f){f.stability=clamp((f.stability||50)-6,0,100);f.prestige=(f.prestige||0)+10;}
+  const claimant=g.politics?.people?.[ev.claimantId];
+  if(claimant)claimant.imprisoned={by:ev.realm,since:g.turn,reason:'Contested succession conspiracy'};
+  delete g.politics.realms[ev.realm]?.claimantCrisis;
+  log(g,`Royal guards arrested ${ev.claimantName} before the pretender could raise banners.`);
+ }else{
+  if(f){f.stability=clamp((f.stability||50)-8,0,100);f.prestige=(f.prestige||0)+18;f.legitimacy=clamp((f.legitimacy||50)+8,0,100);}
+  if(ev.foreignBacker&&f?.relations)f.relations[ev.foreignBacker]=clamp((f.relations[ev.foreignBacker]||0)-25,-100,100);
+  for(const h of Object.values(g.politics?.holdings||{}))if(h.realm===ev.realm&&h.loyalty<55)h.loyalty=clamp(h.loyalty-10,0,100);
+  delete g.politics.realms[ev.realm]?.claimantCrisis;
+  recordStoryFlag(g,{key:'succession_war_won',realm:ev.realm,title:`Succession Crisis of ${ev.claimantName}`,summary:`Defeated ${ev.claimantName}'s foreign-backed bid for the crown.`,delayYears:18});
+  log(g,`Loyalist banners routed ${ev.claimantName}'s succession rising and defied ${ev.foreignBackerName}.`);
+ }
+ delete g.politics.pendingSuccessionWar;
+ return {ok:true,msg:'Contested succession crisis resolved.'};
 }
 
 function death(g,world,c){
  const p=g.politics;
  rememberBereavement(g,c);
- c.alive=false;c.deathYear=g.year;
+ if(!c.deathReason){
+  c.deathReason=c.age>=60?'died of old age':(c.age<12?'died in childhood':'died of sudden fever');
+ }
+ c.alive=false;c.deathYear=g.year;c.deathTurn=g.turn;
  // Clear primary and secondary spouse links cleanly.
  for(const sp of allSpouses(g,c)){
   const history=(p.marriages||[]).slice().reverse().find(m=>!m.ended&&((m.a===c.id&&m.b===sp.id)||(m.b===c.id&&m.a===sp.id)));

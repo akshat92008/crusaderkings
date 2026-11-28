@@ -13,6 +13,95 @@ const pair=(a,b)=>[a,b].sort().join('|'),ok=msg=>({ok:true,msg}),no=msg=>({ok:fa
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
 export const PERSONALITY_AXES=Object.freeze(['boldness','compassion','greed','honor','zeal','sociability','diligence']);
 export const SOCIAL_ROLES=Object.freeze(['landed','commander','merchant','clergy','courtier']);
+export const TRAIT_CATEGORIES=Object.freeze(['personality','born','health','acquired','faith','culture']);
+export const TRAIT_CATALOG=Object.freeze({
+ // 1. Personality (27)
+ brave:{id:'brave',name:'Brave',category:'personality',opposite:'cautious',summary:'Leads from the front; gains stress when retreating.',mods:{martial:2,combat:12,opinion:4}},
+ cautious:{id:'cautious',name:'Cautious',category:'personality',opposite:'brave',summary:'Avoids reckless risks; prefers fortified patience.',mods:{intrigue:1,stewardship:1,combat:-4}},
+ coward:{id:'coward',name:'Coward',category:'personality',opposite:'brave',summary:'Fears the melee; suffers morale shock unless hardened by survival.',mods:{martial:-2,combat:-14,opinion:-6}},
+ ambitious:{id:'ambitious',name:'Ambitious',category:'personality',opposite:'content',summary:'Restlessly seeks higher crowns, titles, and leverage.',mods:{diplomacy:1,martial:1,intrigue:1,opinion:-8}},
+ content:{id:'content',name:'Content',category:'personality',opposite:'ambitious',summary:'Loyal and steady; resists sedition and faction schemes.',mods:{stewardship:1,opinion:10,stressMult:0.8}},
+ cruel:{id:'cruel',name:'Cruel',category:'personality',opposite:'kind',summary:'Rules by fear and harsh punishments; thrives on dread.',mods:{intrigue:2,martial:1,opinion:-14}},
+ kind:{id:'kind',name:'Kind',category:'personality',opposite:'cruel',summary:'Merciful and beloved; gains heavy stress from executions or cruelty.',mods:{diplomacy:2,opinion:12}},
+ paranoid:{id:'paranoid',name:'Paranoid',category:'personality',opposite:'trusting',summary:'Hard to assassinate, quick to suspect plots everywhere.',mods:{intrigue:2,opinion:-8,stressMult:1.25}},
+ trusting:{id:'trusting',name:'Trusting',category:'personality',opposite:'paranoid',summary:'Wins goodwill easily, but vulnerable to court betrayal.',mods:{diplomacy:2,intrigue:-2,opinion:8}},
+ lustful:{id:'lustful',name:'Lustful',category:'personality',opposite:'chaste',summary:'Higher fertility and court romance, higher scandal risk.',mods:{intrigue:1,opinion:-2}},
+ chaste:{id:'chaste',name:'Chaste',category:'personality',opposite:'lustful',summary:'Respected by clergy; disciplined against court temptations.',mods:{learning:1,opinion:4}},
+ gluttonous:{id:'gluttonous',name:'Gluttonous',category:'personality',opposite:'temperate',summary:'Indulges lavish banquets; relieves stress through feasts.',mods:{stewardship:-1,opinion:-4}},
+ temperate:{id:'temperate',name:'Temperate',category:'personality',opposite:'gluttonous',summary:'Frugal and clear-headed in administration and health.',mods:{stewardship:2,learning:1,opinion:5}},
+ proud:{id:'proud',name:'Proud',category:'personality',opposite:'humble',summary:'Commands royal aura; deeply offended by slights.',mods:{diplomacy:1,martial:1,opinion:-4}},
+ humble:{id:'humble',name:'Humble',category:'personality',opposite:'proud',summary:'Wins devotion from clergy and commoners alike.',mods:{learning:1,opinion:8,stressMult:0.85}},
+ just:{id:'just',name:'Just',category:'personality',opposite:'arbitrary',summary:'Upholds law and charters; suffers stress from tyranny or bribery.',mods:{stewardship:2,diplomacy:1,opinion:10}},
+ arbitrary:{id:'arbitrary',name:'Arbitrary',category:'personality',opposite:'just',summary:'Bends law to personal whim without losing sleep.',mods:{intrigue:2,opinion:-10}},
+ generous:{id:'generous',name:'Generous',category:'personality',opposite:'greedy',summary:'Beloved patron; gains stress when imposing harsh taxes.',mods:{diplomacy:2,stewardship:-1,opinion:12}},
+ greedy:{id:'greedy',name:'Greedy',category:'personality',opposite:'generous',summary:'Extracts maximum gold from estates and customs.',mods:{stewardship:2,opinion:-8}},
+ honest:{id:'honest',name:'Honest',category:'personality',opposite:'deceitful',summary:'Trusted in treaties; stressed by schemes and blackmail.',mods:{diplomacy:2,intrigue:-2,opinion:8}},
+ deceitful:{id:'deceitful',name:'Deceitful',category:'personality',opposite:'honest',summary:'Natural conspirator with strong scheme power.',mods:{intrigue:3,diplomacy:-1,opinion:-8}},
+ patient:{id:'patient',name:'Patient',category:'personality',opposite:'wrathful',summary:'Measured strategist who endures long sieges and crises.',mods:{learning:1,stewardship:1,stressMult:0.8}},
+ wrathful:{id:'wrathful',name:'Wrathful',category:'personality',opposite:'patient',summary:'Fierce in battle, quick to retaliate against insults.',mods:{martial:2,combat:8,opinion:-8}},
+ diligent:{id:'diligent',name:'Diligent',category:'personality',opposite:'indolent',summary:'Tireless administrator who develops provinces rapidly.',mods:{stewardship:2,learning:1,stressMult:1.15}},
+ indolent:{id:'indolent',name:'Indolent',category:'personality',opposite:'diligent',summary:'Avoids strain and stress, at the cost of royal efficiency.',mods:{stewardship:-1,stressMult:0.7}},
+ gregarious:{id:'gregarious',name:'Gregarious',category:'personality',opposite:'reserved',summary:'Charms vassals and foreign envoys effortlessly.',mods:{diplomacy:2,opinion:10}},
+ reserved:{id:'reserved',name:'Reserved',category:'personality',opposite:'gregarious',summary:'Guarded and private; shields secrets from court gossips.',mods:{intrigue:1,learning:1,opinion:-3}},
+ // 2. Born / Congenital (9)
+ genius:{id:'genius',name:'Genius',category:'born',opposite:'slow',summary:'Rare generational intellect excelling across every craft of rule.',mods:{diplomacy:3,martial:3,stewardship:3,intrigue:3,learning:3,opinion:6}},
+ quick:{id:'quick',name:'Quick',category:'born',opposite:'slow',summary:'Sharp mind that masters administration and rhetoric rapidly.',mods:{diplomacy:2,stewardship:2,learning:2}},
+ slow:{id:'slow',name:'Slow',category:'born',opposite:'genius',summary:'Struggles with complex statecraft and intrigues.',mods:{diplomacy:-2,stewardship:-2,learning:-2}},
+ strong:{id:'strong',name:'Strong',category:'born',opposite:'weak',summary:'Mighty constitution in battle and illness.',mods:{martial:2,combat:12,opinion:4}},
+ weak:{id:'weak',name:'Weak',category:'born',opposite:'strong',summary:'Frail frame; vulnerable to wounds and camp fevers.',mods:{martial:-2,combat:-10}},
+ beautiful:{id:'beautiful',name:'Beautiful',category:'born',opposite:'ugly',summary:'Commanding presence that sways courts and suitors.',mods:{diplomacy:3,opinion:10}},
+ ugly:{id:'ugly',name:'Ugly',category:'born',opposite:'beautiful',summary:'Faces unfair court prejudice, yet often sharpens resolve.',mods:{diplomacy:-1,opinion:-8}},
+ giant:{id:'giant',name:'Giant',category:'born',opposite:'dwarf',summary:'Towering stature inspiring dread on the battlefield.',mods:{martial:3,combat:15,opinion:-2}},
+ dwarf:{id:'dwarf',name:'Dwarf',category:'born',opposite:'giant',summary:'Short stature often underestimated by rival lords.',mods:{intrigue:1,learning:1,opinion:-4}},
+ // 3. Health (8)
+ ill:{id:'ill',name:'Ill',category:'health',summary:'Weakened by fever or sickness; reduced court vigor.',mods:{martial:-1,stewardship:-1,combat:-8}},
+ drunkard:{id:'drunkard',name:'Drunkard',category:'health',summary:'Coping mechanism from stress; dulls judgment and stewardship.',mods:{stewardship:-2,diplomacy:-1,stressMult:0.85}},
+ insomniac:{id:'insomniac',name:'Insomniac',category:'health',summary:'Haunted nights slow recovery and sharpen paranoia.',mods:{learning:1,stewardship:-1,stressMult:1.2}},
+ robust:{id:'robust',name:'Robust',category:'health',summary:'Hearty vitality that shrugs off campaigns and winter.',mods:{martial:1,combat:6}},
+ infirm:{id:'infirm',name:'Infirm',category:'health',summary:'Age and frailty limit personal command; invites regency.',mods:{martial:-3,diplomacy:-1,stewardship:-2}},
+ 'one-eyed':{id:'one-eyed',name:'One-Eyed',category:'health',summary:'Lost an eye in war; feared and respected by veterans.',mods:{martial:1,intrigue:1,combat:4}},
+ wounded:{id:'wounded',name:'Wounded',category:'health',summary:'Carries a serious battle wound impairing martial command for months.',mods:{martial:-2,combat:-14}},
+ 'plague-scarred':{id:'plague-scarred',name:'Plague-Scarred',category:'health',summary:'Survived pestilence with hardened immunity and grim resolve.',mods:{learning:1,opinion:-2}},
+ // 4. Acquired (11)
+ scarred:{id:'scarred',name:'Scarred',category:'acquired',summary:'Bears honorable marks of past battles.',mods:{martial:1,opinion:4,combat:5}},
+ 'battle-hardened':{id:'battle-hardened',name:'Battle-Hardened',category:'acquired',summary:'Forged in real combat; immune to panic on the field.',mods:{martial:2,combat:14,stressMult:0.85}},
+ inspired:{id:'inspired',name:'Inspired',category:'acquired',summary:'Seized by visionary clarity in statecraft and culture.',mods:{learning:2,diplomacy:2,stewardship:1}},
+ broken:{id:'broken',name:'Broken',category:'acquired',summary:'Shattered by extreme stress; struggles to project royal authority.',mods:{diplomacy:-2,martial:-2,stewardship:-2,opinion:-10}},
+ reclusive:{id:'reclusive',name:'Reclusive',category:'acquired',summary:'Withdrew from court crowds to cope with pressure.',mods:{diplomacy:-2,learning:1,stressMult:0.8}},
+ flagellant:{id:'flagellant',name:'Flagellant',category:'acquired',summary:'Endures harsh penance to purge stress and sin.',mods:{learning:1,opinion:2,stressMult:0.8}},
+ strategist:{id:'strategist',name:'Strategist',category:'acquired',summary:'Master of flank timing, supply lines, and decisive terrain.',mods:{martial:3,combat:15}},
+ duelist:{id:'duelist',name:'Duelist',category:'acquired',summary:'Deadly in personal combat and tourney lists.',mods:{martial:2,combat:12}},
+ architect:{id:'architect',name:'Architect',category:'acquired',summary:'Transforms provincial capitals and fortifications.',mods:{stewardship:3}},
+ poet:{id:'poet',name:'Poet',category:'acquired',summary:'Composes verses remembered across royal courts.',mods:{diplomacy:2,learning:1,opinion:6}},
+ 'master-schemer':{id:'master-schemer',name:'Master Schemer',category:'acquired',summary:'Weaves webs of hooks, informants, and blackmail.',mods:{intrigue:3}},
+ // 5. Faith (6)
+ zealous:{id:'zealous',name:'Zealous',category:'faith',opposite:'cynical',summary:'Fiercely defends orthodoxy; demands holy wars and conversion.',mods:{martial:1,learning:1,opinion:4}},
+ cynical:{id:'cynical',name:'Cynical',category:'faith',opposite:'zealous',summary:'Questions clerical authority; favors pragmatic intrigue.',mods:{intrigue:2,learning:1,opinion:-4}},
+ devoted:{id:'devoted',name:'Devoted',category:'faith',summary:'Known for pious charity and shrine patronage.',mods:{learning:2,opinion:8}},
+ heretical:{id:'heretical',name:'Heretical',category:'faith',summary:'Embraces heterodox teachings rejected by the orthodoxy.',mods:{learning:1,opinion:-16}},
+ excommunicated:{id:'excommunicated',name:'Excommunicated',category:'faith',summary:'Cast out by religious authorities; rival realms gain holy CB.',mods:{diplomacy:-3,opinion:-25}},
+ 'pillar-of-faith':{id:'pillar-of-faith',name:'Pillar of Faith',category:'faith',summary:'Revered champion of temples, pilgrimages, and sacred sites.',mods:{diplomacy:2,learning:2,opinion:12}},
+ // 6. Culture (6)
+ cultured:{id:'cultured',name:'Cultured',category:'culture',summary:'Patron of manuscripts, music, and courtly refinement.',mods:{diplomacy:2,learning:1,opinion:6}},
+ polyglot:{id:'polyglot',name:'Polyglot',category:'culture',summary:'Speaks multiple court languages; excels at foreign diplomacy.',mods:{diplomacy:3,opinion:8}},
+ cosmopolitan:{id:'cosmopolitan',name:'Cosmopolitan',category:'culture',summary:'Welcomes diverse traditions and accelerates cultural fusion.',mods:{diplomacy:2,stewardship:1,opinion:6}},
+ traditionalist:{id:'traditionalist',name:'Traditionalist',category:'culture',summary:'Guards ancestral customs; boosts native vassal loyalty.',mods:{stewardship:1,opinion:4}},
+ francophile:{id:'francophile',name:'Culture-Admirer',category:'culture',summary:'Fascinated by foreign court etiquette and arts.',mods:{diplomacy:1,learning:1,opinion:4}},
+ 'scholar-king':{id:'scholar-king',name:'Scholar-King',category:'culture',summary:'Unites royal rule with deep classical learning.',mods:{learning:3,stewardship:1,opinion:8}}
+});
+export function traitDefinition(id){return TRAIT_CATALOG[id]||{id,name:String(id||'').replace(/[-_]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),category:'acquired',summary:'Personal character trait.',mods:{}};}
+export function traitCategory(id){return traitDefinition(id).category;}
+export function traitsByCategory(category){return Object.values(TRAIT_CATALOG).filter(t=>t.category===category);}
+export function traitModifiers(p){
+ const out={diplomacy:0,martial:0,stewardship:0,intrigue:0,learning:0,opinion:0,combat:0,stressMult:1};
+ for(const id of p?.traits||[]){
+  const m=TRAIT_CATALOG[id]?.mods;
+  if(!m)continue;
+  for(const k of ['diplomacy','martial','stewardship','intrigue','learning','opinion','combat'])if(m[k])out[k]+=m[k];
+  if(m.stressMult)out.stressMult*=m.stressMult;
+ }
+ return out;
+}
 export function deriveSocialRole(g,p,landedSet=null,commanderSet=null){
  if(!p)return 'courtier';
  const char=typeof p==='string'?g.politics?.people?.[p]:p;
@@ -125,7 +214,240 @@ export function characterInteractionAs(g,r,actor,id,action){const s=g.politics?.
  g.chronicles.relationships[pair(p.id,id)].last=g.turn;note(g,p,p.name+' → '+q.name+': '+action.slice(9));return ok('Personal interaction completed.');}
 
 const has=(p,t)=>(p.traits||[]).includes(t);
-const stress=(p,n)=>{if(p.civic)p.civic.stress=cap(num(p.civic.stress)+n,0,100);};
+const stress=(p,n)=>{
+ if(!p)return;
+ const cur=Number.isFinite(p.stress)?p.stress:num(p.civic?.stress)*3;
+ const next=cap(Math.round(cur+n*3),0,300);
+ p.stress=next;
+ if(p.civic)p.civic.stress=cap(Math.round(next/3),0,100);
+};
+export function characterAgeStage(age){
+ const a=Number(age)||0;
+ if(a<18)return {stage:'youth',label:'Youth',cssClass:'age-youth'};
+ if(a<40)return {stage:'prime',label:'Prime',cssClass:'age-prime'};
+ if(a<60)return {stage:'mature',label:'Mature',cssClass:'age-mature'};
+ return {stage:'elder',label:'Elder',cssClass:'age-elder'};
+}
+const MINOR_BREAK_CHOICES=[
+ {id:'drink',label:'Drown the Strain in Wine (-45 Stress, Gain Drunkard)',cost:0},
+ {id:'isolate',label:'Retreat to Private Chambers (-45 Stress, Gain Reclusive)',cost:0},
+ {id:'confide',label:'Confide in Trusted Companions (-55 Stress, 60g)',cost:60},
+ {id:'penance',label:'Undertake Harsh Spiritual Penance (-45 Stress, +12 Piety, Gain Flagellant)',cost:0}
+];
+const CRISIS_STAGE1_CHOICES=[
+ {id:'crisis_seek_redemption',label:'Seek Counsel & Inner Reckoning (Enter Redemption Arc, 80g)',cost:80},
+ {id:'crisis_lash_out',label:'Lash Out at the Court (Enter Tyranny Spiral, +10 Dread / -6 Stability)',cost:0},
+ {id:'crisis_abdicate_duties',label:'Retreat into Melancholy (-45 Stress, -8 Legitimacy, Gain Reclusive)',cost:0}
+];
+const CRISIS_STAGE2_REDEMPTION_CHOICES=[
+ {id:'redemption_embrace',label:'Rise Tempered by Trial (-90 Stress, Gain Inspired, +8 Legitimacy)',cost:0},
+ {id:'redemption_humble',label:'Dedicate Your Reign to Service (-80 Stress, Gain Humble & Just, +6 Stability)',cost:0}
+];
+const CRISIS_STAGE2_SPIRAL_CHOICES=[
+ {id:'spiral_purge',label:'Purge Suspected Traitors (-70 Stress, Gain Paranoid & Cruel, -8 Stability)',cost:0},
+ {id:'spiral_reckless',label:'Drown Fear in Excess (-65 Stress, Gain Broken & Drunkard, -6 Prestige)',cost:0}
+];
+export function addStress(g,personId,amount,reason=''){
+ const p=live(g,personId);if(!p?.alive)return {ok:false,stress:0,breakTriggered:null};
+ const mods=traitModifiers(p);
+ const scaled=amount>0?Math.round(amount*mods.stressMult):Math.round(amount);
+ const prev=Number.isFinite(p.stress)?p.stress:num(p.civic?.stress)*3;
+ const next=cap(prev+scaled,0,300);
+ p.stress=next;
+ p.civic??={stress:0};
+ p.civic.stress=cap(Math.round(next/3),0,100);
+ if(reason&&scaled>=12){
+  note(g,p,`${p.name} suffered +${scaled} stress (${reason}).`,'stress');
+ }
+ let breakTriggered=null;
+ const isPlayerRuler=p.id===g.politics?.realms?.[g.player]?.ruler;
+ if(prev<200&&next>=200){
+  breakTriggered='major';
+  p.traits??=[];
+  if(!p.traits.includes('broken'))p.traits.push('broken');
+  if(g.factions?.[p.realm]&&p.id===g.politics?.realms?.[p.realm]?.ruler){
+   g.factions[p.realm].stability=cap((g.factions[p.realm].stability||50)-6,0,100);
+  }
+  note(g,p,`${p.name} suffered a Major Mental Break (${reason||'unbearable pressure'}) and became Broken.`,'stress_break');
+  if(isPlayerRuler){
+   const root=initAgency(g);
+   root.pendingStressBreak={
+    personId:p.id,severity:'major',tier:'major',stage:1,stress:next,reason:reason||'Unbearable pressure of the crown',turn:g.turn,
+    title:'Major Mental Break — The Crown Cracks',
+    desc:`${p.name} has reached extreme stress (${next}/300) after ${reason||'acting against their deepest convictions'}. Erratic decrees threaten court stability unless a coping outlet is chosen.`,
+    description:`${p.name} has reached extreme stress (${next}/300) after ${reason||'acting against their deepest convictions'}. Erratic decrees threaten court stability unless a coping outlet is chosen.`,
+    choices:CRISIS_STAGE1_CHOICES
+   };
+   g.log?.unshift({date:g.year+' · month '+(g.month+1),text:`MENTAL BREAK: ${p.name} suffered a Major Break (${next}/300 stress)!`});
+   if(g.log)g.log=g.log.slice(0,45);
+  }else{
+   p.stress=cap(next-55,0,300);p.civic.stress=cap(Math.round(p.stress/3),0,100);
+  }
+ }else if(prev<150&&next>=150){
+  breakTriggered='crisis';
+  note(g,p,`${p.name} entered a Sovereign Stress Crisis (${next}/300) — teetering between redemption and ruin.`,'stress_break');
+  if(isPlayerRuler){
+   const root=initAgency(g);
+   root.pendingStressBreak={
+    personId:p.id,severity:'crisis',tier:'crisis',stage:1,stress:next,reason:reason||'Relentless weight of kingship',turn:g.turn,
+    title:'Character Crisis — Edge of the Abyss (Stage 1/2)',
+    desc:`${p.name} stands at a breaking point (${next}/300 stress). Will you seek redemption through reflection, or spiral into ruthless suspicion?`,
+    description:`${p.name} stands at a breaking point (${next}/300 stress). Will you seek redemption through reflection, or spiral into ruthless suspicion?`,
+    choices:CRISIS_STAGE1_CHOICES
+   };
+   g.log?.unshift({date:g.year+' · month '+(g.month+1),text:`STRESS CRISIS: ${p.name} reached ${next}/300 stress — a decisive turning point begins.`});
+   if(g.log)g.log=g.log.slice(0,45);
+  }else{
+   p.stress=cap(next-45,0,300);p.civic.stress=cap(Math.round(p.stress/3),0,100);
+  }
+ }else if(prev<100&&next>=100){
+  breakTriggered='minor';
+  const copingPool=['drunkard','reclusive','flagellant','insomniac'];
+  const picked=copingPool[hash(p.id+':'+g.turn)%copingPool.length];
+  if(isPlayerRuler){
+   const root=initAgency(g);
+   root.pendingStressBreak={
+    personId:p.id,severity:'minor',tier:'minor',stage:1,stress:next,reason:reason||'Accumulated strain of rule',turn:g.turn,
+    title:'Mental Break — The Weight of the Crown',
+    desc:`${p.name} is overwhelmed by stress (${next}/300) after ${reason||'hard choices at court'}. How will you cope with the strain?`,
+    description:`${p.name} is overwhelmed by stress (${next}/300) after ${reason||'hard choices at court'}. How will you cope with the strain?`,
+    choices:MINOR_BREAK_CHOICES
+   };
+   g.log?.unshift({date:g.year+' · month '+(g.month+1),text:`STRESS BREAK: ${p.name} reached ${next}/300 stress — choose a coping path.`});
+   if(g.log)g.log=g.log.slice(0,45);
+  }else{
+   p.traits??=[];
+   if(!p.traits.includes(picked))p.traits.push(picked);
+   p.stress=cap(next-35,0,300);p.civic.stress=cap(Math.round(p.stress/3),0,100);
+   note(g,p,`${p.name} coped with a minor stress break by becoming ${traitDefinition(picked).name}.`,'stress_break');
+  }
+ }
+ return {ok:true,stress:p.stress,civicStress:p.civic.stress,breakTriggered};
+}
+export function currentStressBreak(g){
+ const b=g.agency?.pendingStressBreak;
+ if(!b)return null;
+ const p=live(g,b.personId);
+ if(!p?.alive){delete g.agency.pendingStressBreak;return null;}
+ if(!Array.isArray(b.choices)||!b.choices.length){
+  b.choices=b.severity==='crisis'||b.severity==='major'?CRISIS_STAGE1_CHOICES:MINOR_BREAK_CHOICES;
+ }
+ b.tier??=b.severity||'minor';
+ b.desc??=b.description||'';
+ return b;
+}
+export function resolveStressBreak(g,choiceId){
+ const b=currentStressBreak(g);
+ if(!b)return no('No active mental break to resolve.');
+ const p=live(g,b.personId);
+ if(!p?.alive)return no('Character is no longer living.');
+ p.traits??=[];
+ const f=g.factions?.[p.realm];
+ if(choiceId==='crisis_seek_redemption'){
+  if(f&&f.treasury>=80)f.treasury-=80;
+  g.agency.pendingStressBreak={
+   personId:p.id,severity:'crisis',tier:'crisis',stage:2,arc:'redemption',stress:p.stress,turn:g.turn,
+   title:'Redemption Arc — Dawn After the Storm (Stage 2/2)',
+   desc:`Through quiet counsel and honest reckoning, ${p.name} confronts the fears gnawing at the crown. Seal this transformation into your character's legacy.`,
+   description:`Through quiet counsel and honest reckoning, ${p.name} confronts the fears gnawing at the crown.`,
+   choices:CRISIS_STAGE2_REDEMPTION_CHOICES
+  };
+  return ok(`${p.name} entered the Redemption Arc (Stage 2/2).`);
+ }
+ if(choiceId==='crisis_lash_out'){
+  if(f)f.stability=cap((f.stability||50)-6,0,100);
+  g.agency.pendingStressBreak={
+   personId:p.id,severity:'crisis',tier:'crisis',stage:2,arc:'spiral',stress:p.stress,turn:g.turn,
+   title:'Spiral Crisis — Shadows in the Throne Room (Stage 2/2)',
+   desc:`Suspicion consumes ${p.name}. Every whispered word in the hall sounds like treason. How far will the spiral run?`,
+   description:`Suspicion consumes ${p.name}. Every whispered word in the hall sounds like treason.`,
+   choices:CRISIS_STAGE2_SPIRAL_CHOICES
+  };
+  return ok(`${p.name} descended into the Spiral Crisis (Stage 2/2).`);
+ }
+ if(choiceId==='redemption_embrace'){
+  p.traits=p.traits.filter(t=>t!=='broken');
+  if(!p.traits.includes('inspired'))p.traits.push('inspired');
+  p.stress=cap((p.stress||150)-90,0,300);
+  if(f)f.legitimacy=cap((f.legitimacy||50)+8,0,100);
+  note(g,p,`${p.name} emerged from a sovereign crisis Inspired and renewed.`,'stress_break');
+ }else if(choiceId==='redemption_humble'){
+  p.traits=p.traits.filter(t=>t!=='broken'&&t!=='proud');
+  if(!p.traits.includes('humble'))p.traits.push('humble');
+  if(!p.traits.includes('just'))p.traits.push('just');
+  p.stress=cap((p.stress||150)-80,0,300);
+  if(f)f.stability=cap((f.stability||50)+6,0,100);
+  note(g,p,`${p.name} emerged from crisis Humble and Just, calming the realm.`,'stress_break');
+ }else if(choiceId==='spiral_purge'){
+  if(!p.traits.includes('paranoid'))p.traits.push('paranoid');
+  if(!p.traits.includes('cruel'))p.traits.push('cruel');
+  p.stress=cap((p.stress||150)-70,0,300);
+  if(f)f.stability=cap((f.stability||50)-8,0,100);
+  note(g,p,`${p.name} spiraled into dark suspicion, purging courtiers (Paranoid, Cruel).`,'stress_break');
+ }else if(choiceId==='spiral_reckless'){
+  if(!p.traits.includes('broken'))p.traits.push('broken');
+  if(!p.traits.includes('drunkard'))p.traits.push('drunkard');
+  p.stress=cap((p.stress||150)-65,0,300);
+  if(f)f.prestige=Math.max(0,(f.prestige||0)-6);
+  note(g,p,`${p.name} succumbed to despair and reckless excess (Broken, Drunkard).`,'stress_break');
+ }else if(choiceId==='crisis_abdicate_duties'){
+  if(!p.traits.includes('reclusive'))p.traits.push('reclusive');
+  p.stress=cap((p.stress||150)-45,0,300);
+  if(f)f.legitimacy=cap((f.legitimacy||50)-8,0,100);
+  note(g,p,`${p.name} withdrew from public audiences during a royal crisis (Reclusive).`,'stress_break');
+ }else{
+  const drop=b.severity==='major'?65:45;
+  if(choiceId==='drink'){
+   if(!p.traits.includes('drunkard'))p.traits.push('drunkard');
+   p.stress=cap((p.stress||100)-drop,0,300);
+   note(g,p,`${p.name} turned to wine to dull the stress of rule (Drunkard).`,'stress_break');
+  }else if(choiceId==='isolate'){
+   if(!p.traits.includes('reclusive'))p.traits.push('reclusive');
+   p.stress=cap((p.stress||100)-drop,0,300);
+   note(g,p,`${p.name} withdrew into reclusive chambers to recover (Reclusive).`,'stress_break');
+  }else if(choiceId==='confide'){
+   if(f&&f.treasury>=60)f.treasury-=60;
+   p.stress=cap((p.stress||100)-(drop+10),0,300);
+   note(g,p,`${p.name} confided in loyal companions and eased the burden of rule.`,'stress_break');
+  }else if(choiceId==='penance'){
+   if(!p.traits.includes('flagellant'))p.traits.push('flagellant');
+   p.stress=cap((p.stress||100)-drop,0,300);
+   p.piety=num(p.piety)+12;
+   note(g,p,`${p.name} sought harsh spiritual penance to master stress.`,'stress_break');
+  }else{
+   p.stress=cap((p.stress||100)-15,0,300);
+   if(b.severity==='minor'&&!p.traits.includes('insomniac'))p.traits.push('insomniac');
+   note(g,p,`${p.name} endured the strain in sleepless silence.`,'stress_break');
+  }
+ }
+ if(p.civic)p.civic.stress=cap(Math.round(p.stress/3),0,100);
+ delete g.agency.pendingStressBreak;
+ return ok(`${p.name} weathered the mental break (Stress now ${p.stress}/300).`);
+}
+const ACTION_STRESS_RULES={
+ execute:{kind:45,just:30,generous:20,cruel:-18},
+ bribe:{just:30,honest:35,deceitful:-10},
+ extort:{generous:35,just:28,greedy:-12},
+ high_tax:{generous:32,kind:22,greedy:-10},
+ retreat:{brave:35,proud:25,cautious:-10},
+ forced_conversion:{cynical:25,kind:30,zealous:-15},
+ tolerance:{zealous:32,cynical:-10},
+ betray:{honest:40,just:35,deceitful:-12},
+ declare_war:{content:30,cautious:22,brave:-10,ambitious:-12},
+ forgive:{wrathful:28,cruel:25,kind:-12}
+};
+export function actAgainstNatureStress(g,personId,actionTag,customReason=''){
+ const p=live(g,personId);if(!p?.alive)return {ok:false,delta:0};
+ const table=ACTION_STRESS_RULES[actionTag];if(!table)return {ok:false,delta:0};
+ let delta=0;const triggered=[];
+ for(const t of p.traits||[]){
+  if(table[t]){delta+=table[t];triggered.push(traitDefinition(t).name);}
+ }
+ if(!delta)return {ok:true,delta:0,stress:p.stress||0};
+ const reason=customReason||`${actionTag.replace(/_/g,' ')} clashed with ${triggered.join(', ')}`;
+ const res=addStress(g,personId,delta,reason);
+ return {...res,delta,triggered};
+}
 const controlled=(g,p)=>humanControlsCharacter(g,p.id)||p.id===g.politics.realms[p.realm]?.ruler&&humanControlsRealm(g,p.realm);
 const bonds=(g,p,q)=>{const b=record(g,p.id).bonds;return b[q.id]??={trust:0,grievance:0,last:-120};};
 function bond(g,p,q,trust,grievance=0){const x=bonds(g,p,q);x.trust=cap(x.trust+trust,-100,100);x.grievance=cap(x.grievance+grievance,0,100);x.last=g.turn;}
@@ -151,29 +473,42 @@ export function rememberBereavement(g,p,extraIds=[]){
  for(const id of family){const q=live(g,id);if(!q?.alive)continue;stress(q,has(q,'reserved')?14:20);note(g,q,q.name+' mourned the death of '+p.name+'.','bereavement',p.id);}
 }
 
-const OPPOSITE_TRAITS={brave:'cautious',cautious:'brave',ambitious:'content',content:'ambitious',just:'arbitrary',arbitrary:'just',zealous:'cynical',cynical:'zealous',diligent:'indolent',indolent:'diligent',generous:'greedy',greedy:'generous',gregarious:'reserved',reserved:'gregarious',honest:'deceitful',deceitful:'honest',patient:'wrathful',wrathful:'patient'};
+const OPPOSITE_TRAITS={brave:'cautious',cautious:'brave',coward:'brave',ambitious:'content',content:'ambitious',just:'arbitrary',arbitrary:'just',zealous:'cynical',cynical:'zealous',diligent:'indolent',indolent:'diligent',generous:'greedy',greedy:'generous',gregarious:'reserved',reserved:'gregarious',honest:'deceitful',deceitful:'honest',patient:'wrathful',wrathful:'patient',cruel:'kind',kind:'cruel',paranoid:'trusting',trusting:'paranoid',lustful:'chaste',chaste:'lustful',gluttonous:'temperate',temperate:'gluttonous',proud:'humble',humble:'proud'};
 export function evolveCharacterTraits(g,p,milestone=null){
  if(!p?.alive)return [];
  p.traits??=[];
  const added=[];
- const grant=trait=>{
+ const grant=(trait,force=false)=>{
   if(p.traits.includes(trait))return false;
   const opp=OPPOSITE_TRAITS[trait];
   if(opp&&p.traits.includes(opp))p.traits=p.traits.filter(t=>t!==opp);
-  else if(p.traits.length>=5)return false;
+  else if(!force&&p.traits.length>=6)return false;
   p.traits.push(trait);
   added.push(trait);
-  p.memories??=[];p.memories.push(p.name+' developed the '+trait+' trait in '+g.year+'.');
+  p.memories??=[];p.memories.push(p.name+' developed the '+traitDefinition(trait).name+' trait in '+g.year+'.');
   return true;
  };
- if(milestone==='victory'){if(!grant('brave'))grant('strategist');}
+ if(milestone==='survived_battle'){
+  if(p.traits.includes('coward')||p.traits.includes('cautious')){
+   p.traits=p.traits.filter(t=>t!=='coward'&&t!=='cautious');
+   grant('battle-hardened',true);
+  }else if(!grant('battle-hardened'))grant('scarred',true);
+ }
+ else if(milestone==='betrayed'){
+  p.traits=p.traits.filter(t=>t!=='trusting');
+  grant('paranoid',true);
+ }
+ else if(milestone==='scholar_mentored'){if(!grant('diligent'))grant('cultured');}
+ else if(milestone==='pilgrimage'){if(!grant('pillar-of-faith'))grant('devoted');}
+ else if(milestone==='wounded'){grant('scarred',true);}
+ else if(milestone==='victory'){if(!grant('brave'))if(!grant('battle-hardened'))grant('strategist');}
  else if(milestone==='schism')grant('zealous');
  else if(milestone==='petition')grant('just');
  else if(milestone==='vendetta'){if(!grant('wrathful'))grant('ambitious');}
  else if(milestone==='stewardship')grant('diligent');
  else{
   if((p.grievances||[]).some(gr=>gr.severity>=55))grant(hash(p.id+g.turn)%2===0?'wrathful':'ambitious');
-  else if((p.civic?.stress||0)>=80)grant('cynical');
+  else if((p.civic?.stress||0)>=80||(p.stress||0)>=200)grant('cynical');
  }
  return added;
 }
@@ -413,5 +748,58 @@ export function playerLifeAction(g,actorId,action,target){const p=live(g,actorId
 function reviewChosenGoal(g,p){const x=record(g,p.id),q=personalGoalStatus(g,p);if(!q||q.status!=='active')return;if(q.kind==='friend'&&!live(g,q.target)?.alive){x.chosenGoal.status='failed';return;}if(q.progress>=q.required){x.chosenGoal.status='completed';x.chosenGoal.ended=g.turn;x.goals['player:'+q.kind]=1;x.influence=cap(x.influence+8,0,100);stress(p,-8);note(g,p,p.name+' fulfilled '+q.label+'.','goal',q.target||null);}}
 export function personalPoliticalSupport(g,person,liege){const a=g.agency?.people?.[person]?.bonds?.[liege];return a?cap((num(a.trust)-num(a.grievance))*.08,-8,8):0;}
 
-// Health and stress modify performed work, never the underlying trained skill.
-export function effectiveCharacterSkill(g,p,skill){if(!p?.alive)return 1;const base=cap(num(p.skills?.[skill])||1,1,5),severity=num(g.living?.health?.[p.id]?.severity),stressValue=num(p.civic?.stress);return Math.max(1,base-Math.floor(severity/35)-(stressValue>=85?1:0));}
+// Health, traits, and stress modify performed work, never the underlying trained skill.
+export function effectiveCharacterSkill(g,p,skill){
+ if(!p?.alive)return 1;
+ const base=cap(num(p.skills?.[skill])||1,1,10);
+ const tMod=traitModifiers(p)[skill]||0;
+ const severity=num(g.living?.health?.[p.id]?.severity);
+ const stressValue=num(p.civic?.stress);
+ return Math.max(1,base+tMod-Math.floor(severity/35)-(stressValue>=85?1:0));
+}
+
+export const DEATH_CAUSES = Object.freeze({
+ old_age: 'Died of old age', battle: 'Fell in battle', assassinated: 'Assassinated',
+ plague: 'Died of plague', executed: 'Executed by decree', stress_collapse: 'Collapsed from severe stress',
+ illness: 'Died of grave illness'
+});
+export function deathCauseLabel(reason, actorName = null) {
+ if (!reason) return 'Died';
+ if (reason === 'executed' && actorName) return 'Executed by ' + actorName;
+ return DEATH_CAUSES[reason] || String(reason).replaceAll('_', ' ');
+}
+export const traitModifiersForPerson = traitModifiers;
+export function grantTrait(g, p, traitId) {
+ if (!p || !traitId) return false;
+ p.traits ??= [];
+ if (p.traits.includes(traitId)) return false;
+ const opp = TRAIT_CATALOG[traitId]?.opposite;
+ if (opp) p.traits = p.traits.filter(t => t !== opp);
+ p.traits.push(traitId);
+ return true;
+}
+export const triggerMentalBreak = (g, p, tier = 'minor') => addStress(g, p?.id || p, tier === 'crisis' ? 160 : tier === 'major' ? 105 : 80, tier + ' break');
+export const resolveStressCrisis = (g, personId, mode = 'redemption') => resolveStressBreak(g, mode === 'spiral' ? 'crisis_lash_out' : 'crisis_seek_redemption');
+
+const GENE_EYES = ['Hazel', 'Amber', 'Chestnut', 'Slate Blue', 'Deep Brown', 'Storm Grey'];
+const GENE_HAIR = ['Dark Chestnut', 'Raven Black', 'Burnished Auburn', 'Golden Ash', 'Copper', 'Silvered Onyx'];
+const GENE_FEATURES = ['Aquiline Nose', 'High Cheekbones', 'Square Jaw', 'Arching Brows', 'Deep-Set Gaze', 'Noble Chin'];
+
+export function geneticAppearance(person, people = {}) {
+ if (!person) return null;
+ const parentObjs = (person.parents || []).map(pid => people?.[pid]).filter(Boolean);
+ const p0 = parentObjs[0], p1 = parentObjs[1] || p0;
+ const pick = (arr, src, offset) => arr[(hash((src?.dna || src?.id || src?.name || 'seed') + ':' + offset)) % arr.length];
+ const eyes = p0 ? pick(GENE_EYES, (hash(person.id) % 2 === 0 ? p0 : p1), 'eyes') : pick(GENE_EYES, person, 'eyes');
+ const hair = p1 ? pick(GENE_HAIR, (hash(person.name || person.id) % 2 === 0 ? p1 : p0), 'hair') : pick(GENE_HAIR, person, 'hair');
+ const feature = pick(GENE_FEATURES, p0 || person, 'feat');
+ const age = Number.isFinite(person.age) ? person.age : 25;
+ const stage = age < 18 ? 'Youth' : age < 45 ? 'Prime' : age < 65 ? 'Mature' : 'Elder';
+ return {
+  eyes,
+  hair: age >= 60 ? 'Silvered ' + hair : hair,
+  feature,
+  resembles: p0 ? p0.name : null,
+  stage
+ };
+}

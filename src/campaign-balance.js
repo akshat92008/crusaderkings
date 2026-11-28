@@ -1,11 +1,15 @@
 // Deterministic AI recruitment budget and land route planning.
-export function aiRecruitmentBudget({treasury,food,population,armySize,goal,levy=1,personality=null,budget=null}){
+export function aiRecruitmentBudget({treasury,food,population,armySize,goal,levy=1,personality=null,budget=null,difficulty='normal',provinces=0}){
  const goalBonus=['conquer','defend'].includes(goal)?180:0;
  const persTargetMod=personality==='martial'?90:personality==='ambitious'?60:personality==='cautious'?30:personality==='greedy'?-40:0;
- const target=Math.min(950,Math.max(170,Math.round(100+population*.32+goalBonus+persTargetMod)));
+ const empireBonus=provinces>=4?Math.min(260,(provinces-3)*35):0;
+ const maxCap=difficulty==='hard'?1650:provinces>=4?1350:950;
+ const popRate=difficulty==='hard'?0.42:0.32;
+ const target=Math.min(maxCap,Math.max(170,Math.round(100+population*popRate+goalBonus+persTargetMod+empireBonus)));
  const reserve=goal==='recover'?300:personality==='greedy'?260:personality==='cautious'?240:personality==='martial'?140:180;
  if(!Number.isFinite(treasury)||food<0||treasury<=reserve+35||armySize>=target)return null;
- const desired=Math.max(1,Math.round(35*Math.max(.2,levy)));
+ const baseBatch=difficulty==='hard'?45:35;
+ const desired=Math.max(1,Math.round(baseBatch*Math.max(.2,levy)));
  const availGold=Number.isFinite(budget)?Math.min(treasury-reserve,Math.max(0,budget)):treasury-reserve;
  if(availGold<35)return null;
  const count=Math.min(target-armySize,desired,Math.floor(availGold*35/120));

@@ -180,7 +180,7 @@
 /* Operation CK2: Main-screen Event Modal, Unified Audio, 2D Battle Overlay & Mobile Zero-Overlap Polish */
 .map-zoom{bottom:54px;right:14px}
 #campaign-sound[aria-pressed="false"]{opacity:.55;border-color:#7d544c}
-.event-modal{z-index:45;background:rgba(4,12,14,.78);backdrop-filter:blur(3px);padding:14px}
+.event-modal{z-index:45;background:rgba(4,12,14,.84);padding:14px}
 .event-card{width:min(620px,100%);max-height:92dvh;overflow-y:auto;background:linear-gradient(170deg,#182a2c,#0d1b1d);border:2px solid #b59459;box-shadow:0 0 0 4px #102022,0 24px 70px #000c;border-radius:6px;padding:18px 20px;display:grid;gap:12px}
 .event-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px}
 .event-badge{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#172220;background:linear-gradient(#e7d099,#bc995b);padding:4px 8px;border-radius:3px}

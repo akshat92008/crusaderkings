@@ -19,12 +19,16 @@ import {initIntrigue,tickIntrigue} from './intrigue-systems.js';
 import {initIndependence,campaignWorld} from './independence-systems.js';
 import {initIdentity,tickIdentity} from './identity-systems.js';
 import {initFeudal,tickFeudal} from './feudal-systems.js';
-import {initChronicles,tickChronicles} from './chronicle-systems.js';
+import {initChronicles,tickChronicles,tickStoryFlags} from './chronicle-systems.js';
+import {initHeirEducation,tickHeirEducation} from './heir-education.js';
+import {initTradeRoutes,tickTradeRoutes} from './trade-routes.js';
+import {tickCapitalEvents} from './hometown.js';
+import {tickChaosEvents} from './chaos-events.js';
 import {initStrategy,tickStrategy,strategicPlan,temperament} from './strategic-ai.js';
 import {controller,initCampaignWar,tickCampaignWar} from './campaign-war.js';
 import {embarked,initNaval,tickNaval,portBlocked} from './naval-systems.js';
 import {initMilitary,tickMilitary,syncRegiments} from './military-systems.js';
-import {initEconomy,tickEconomy,economyModifiers} from './economy-systems.js';
+import {initEconomy,tickEconomy,economyModifiers,tickEconomicDilemmas} from './economy-systems.js';
 import {initHeritage,tickHeritage,heritageModifiers} from './heritage-systems.js';
 import {initCivic,tickCivic,civicModifiers} from './civic-systems.js';
 import {initConflict,tickConflict} from './political-conflict.js';
@@ -70,13 +74,13 @@ function newCourt(f,g){
  };
 }
 export function initializeKingdomSystems(g,world){
- if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initAgency(g);initLandless(g,world);reconcilePersonalUnions(g);return g.kingdom;}
+ if(g.kingdom?.version===1){initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initTradeRoutes(g);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initHeirEducation(g);initAgency(g);initLandless(g,world);reconcilePersonalUnions(g);return g.kingdom;}
  const before=g.kingdom||{},courts={...(before.courts||{})};
  g.kingdom={version:1,courts,tradePacts:before.tradePacts||{},threats:before.threats||[],
   pendingEvent:before.pendingEvent||null,eventsResolved:before.eventsResolved||0,
   choices:before.choices||[],victory:before.victory||null,difficulty:before.difficulty||'normal'};
  for(const f of world.factions)if(!courts[f.id])courts[f.id]=newCourt(f,g);
- initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initAgency(g);initLandless(g,world);reconcilePersonalUnions(g);
+ initPolitics(g,world);initConflict(g);initCivic(g,world);initHeritage(g,world);initEconomy(g,world);initTradeRoutes(g);initMilitary(g);initCampaignWar(g);initNaval(g,world);initStrategy(g,world);initChronicles(g,world);initFeudal(g,world);initIdentity(g,world);initIndependence(g);initIntrigue(g);initInstitutions(g);initDiplomacy(g);initLiving(g);initExpanded(g);initRoyalCourt(g);initCouncilTasks(g);initAuthority(g);initVassalCourts(g);initEstateConflicts(g);initRegencies(g);initHeirEducation(g);initAgency(g);initLandless(g,world);reconcilePersonalUnions(g);
  return g.kingdom;
 }
 export const currentCourt=g=>g.kingdom?.courts?.[g.player]||null;
@@ -302,28 +306,66 @@ function tickSuccession(g,world){
  }
 }
 function aiMonthly(g,world){
- // Cap each rival to one infrastructure action and one recruitment decision
- // per cycle. No API calls, runaway build loops or invented "learning".
+ // Cap each rival to deterministic fair infrastructure, recruitment, and siege-engine decisions.
  const provsByOwner=new Map(),armiesByOwner=new Map(),provMap=new Map(world.provinces.map(x=>[x.id,x]));
  for(const p of Object.values(g.provinces)){let arr=provsByOwner.get(p.owner);if(!arr){arr=[];provsByOwner.set(p.owner,arr);}arr.push(p);}
  for(const a of Object.values(g.armies)){let arr=armiesByOwner.get(a.owner);if(!arr){arr=[];armiesByOwner.set(a.owner,arr);}arr.push(a);}
+ const difficulty=g.kingdom?.difficulty||'normal';
+ const recruitMod=difficulty==='hard'?3:6;
  for(const f of world.factions){
   if(humanControlsRealm(g,f.id))continue;
   const nation=g.factions[f.id],land=provsByOwner.get(f.id)||[];
   if(!nation||!land.length)continue;
-  if(g.turn%3===0&&nation.treasury>450){
-   const p=choose(land.filter(p=>controller(g,p.id)===f.id),hash(f.id+g.turn));if(!p)continue;
-   const neighbor=provMap.get(p.id)?.neighbors||[];
-   const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
-   const goal=strategicPlan(g,f.id)?.goal,kind=nation.food<130||goal==='recover'?'farm':goal==='defend'&&frontier&&(p.buildings.fort||0)<3?'fort':goal==='conquer'&&(p.buildings.barracks||0)<3?'barracks':(p.buildings.market||0)<3?'market':'farm';
-   const base={farm:180,fort:440,market:260,barracks:300}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
-   if(level<3&&nation.treasury>cost+150){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
+  const plan=strategicPlan(g,f.id);
+  const goal=plan?.goal;
+  if(g.turn%3===0&&nation.treasury>380){
+   const ownedControlled=land.filter(p=>controller(g,p.id)===f.id);
+   const p=ownedControlled.length?choose(ownedControlled,hash(f.id+g.turn)):null;
+   if(p){
+    const neighbor=provMap.get(p.id)?.neighbors||[];
+    const frontier=neighbor.some(id=>g.provinces[id]?.owner!==f.id);
+    const kind=nation.food<130||goal==='recover'?'farm':goal==='defend'&&frontier&&(p.buildings.fort||0)<3?'fort':goal==='conquer'&&(p.buildings.barracks||0)<3?'barracks':(p.buildings.market||0)<3?'market':'farm';
+    const base={farm:180,fort:440,market:260,barracks:300}[kind],level=p.buildings[kind]||0,cost=Math.round(base*(level+1)*civicModifiers(g,f.id).build*economyModifiers(g,f.id).cost);
+    if(level<3&&nation.treasury>cost+140){nation.treasury-=cost;p.buildings[kind]++;p.development=clamp(p.development+1,1,20);}
+   }
   }
-  if(g.turn%6===0){
-   const all=armiesByOwner.get(f.id)||[],friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id)),eligible=all.filter(a=>!a.contingent&&!embarked(g,a.id)&&controller(g,a.province)===f.id&&!invasionReserved(g,a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
-   const budget=aiRecruitmentBudget({treasury:nation.treasury,food:nation.food,population:land.reduce((n,p)=>n+p.population,0),armySize:all.reduce((n,a)=>n+size(a),0),goal:strategicPlan(g,f.id)?.goal,levy:politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy});
-   if(budget&&friendly.length){let a=eligible[0];if(!a&&!all.some(a=>size(a)>0)){const id='a'+g.nextId++;a={id,owner:f.id,province:friendly[0].id,infantry:0,archers:0,cavalry:0,experience:0,morale:70,commander:allocateCommanderName(g,f.id,id),doctrine:militaryDoctrine(f).id};g.armies[id]=a;}
+  if(g.turn%recruitMod===0){
+   const all=armiesByOwner.get(f.id)||[],friendly=land.filter(p=>controller(g,p.id)===f.id).sort((a,b)=>b.development-a.development||a.id.localeCompare(b.id));
+   const eligible=all.filter(a=>!a.contingent&&!embarked(g,a.id)&&controller(g,a.province)===f.id&&!invasionReserved(g,a.id)).sort((a,b)=>size(a)-size(b)||a.id.localeCompare(b.id));
+   const budget=aiRecruitmentBudget({
+    treasury:nation.treasury,food:nation.food,population:land.reduce((n,p)=>n+p.population,0),
+    armySize:all.reduce((n,a)=>n+size(a),0),goal,
+    levy:politicalLevy(g,f.id)*civicModifiers(g,f.id).levy*heritageModifiers(g,f.id).levy,
+    personality:plan?.profile||null,budget:plan?.objective?.budget??null,
+    difficulty,provinces:land.length
+   });
+   if(budget&&friendly.length){
+    const nativeCount=all.filter(a=>!a.contingent&&size(a)>0).length;
+    const maxArmies=Math.min(3,1+Math.floor(land.length/3));
+    const shouldRaiseSecond=nativeCount>0&&nativeCount<maxArmies&&nation.treasury>budget.cost+650&&eligible.every(a=>size(a)>=280);
+    let a=shouldRaiseSecond?null:eligible[0];
+    if(!a&&(shouldRaiseSecond||!all.some(x=>size(x)>0))){
+     const id='a'+g.nextId++;
+     a={id,owner:f.id,province:friendly[0].id,infantry:0,archers:0,cavalry:0,experience:0,morale:72,commander:allocateCommanderName(g,f.id,id),doctrine:militaryDoctrine(f).id};
+     g.armies[id]=a;
+     all.push(a);
+    }
     if(a){nation.treasury-=budget.cost;const mix=startingTroops(f,budget.count);for(const t of ['infantry','archers','cavalry'])a[t]+=mix[t];a.morale=clamp(a.morale+1,0,100);syncRegiments(g,a);}
+   }
+   // Intentional siege-engine construction for offensive/warring armies facing fortified neighbors.
+   const atWar=Object.values(g.conflict?.wars||{}).some(w=>w.status==='active'&&[w.attacker,w.defender].includes(f.id));
+   if((goal==='conquer'||atWar)&&nation.treasury>420&&eligible.length&&g.military?.armies){
+    const lead=eligible.slice().sort((a,b)=>size(b)-size(a)||a.id.localeCompare(b.id))[0];
+    const hasFortTarget=(provMap.get(lead.province)?.neighbors||[]).some(nid=>g.provinces[nid]?.owner!==f.id&&(g.provinces[nid]?.buildings?.fort||0)>=1)||atWar;
+    if(hasFortTarget){
+     const m=g.military.armies[lead.id]??={engines:{ram:0,catapult:0,bombard:0},regiments:[]};
+     m.engines??={ram:0,catapult:0,bombard:0};
+     let pick=null,cost=0;
+     if((nation.tech||1)>=3&&(m.engines.bombard||0)<1&&nation.treasury>=620){pick='bombard';cost=340;}
+     else if((m.engines.catapult||0)<2&&nation.treasury>=480){pick='catapult';cost=220;}
+     else if((m.engines.ram||0)<2&&nation.treasury>=380){pick='ram';cost=120;}
+     if(pick){nation.treasury-=cost;m.engines[pick]=(m.engines[pick]||0)+1;}
+    }
    }
   }
   if(g.turn%12===0&&nation.treasury>450){
@@ -341,7 +383,7 @@ export function advanceKingdomSystems(g,world){
  // Trade is already included in the campaign balance.
  tickStrategy(g,world);
  if(g.turn%3===0)aiMonthly(g,world);
- tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickMilitary(g,world);tickCampaignWar(g,world);tickNaval(g,world);tickChronicles(g,world);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);tickLandless(g,world);tickPersonalUnions(g);reconcileCareer(g);
+ tickPolitics(g,world);tickAuthority(g);tickVassalCourts(g);tickEstateConflicts(g,world);tickCouncilTasks(g);tickConflict(g,world);world=campaignWorld(g,world);tickCivic(g,world);tickHeritage(g,world);tickEconomy(g,world);tickTradeRoutes(g);tickEconomicDilemmas(g);tickMilitary(g,world);tickCampaignWar(g,world);tickNaval(g,world);tickChronicles(g,world);tickStoryFlags(g);tickHeirEducation(g);tickAgency(g);tickFeudal(g,world);tickIdentity(g,world);tickIntrigue(g,world,removePoliticalCharacter);tickInstitutions(g);tickDiplomacy(g,world);tickLiving(g,world,removePoliticalCharacter);tickExpanded(g,world);tickCapitalEvents(g,world);tickChaosEvents(g,world);tickLandless(g,world);tickPersonalUnions(g);reconcileCareer(g);
  const incoming=progressEnemyInvasions(g,world);
  if(incoming?.status==='ready'&&incoming.readyTurn===g.turn)
   log(g,'THE ENEMY HAS ARRIVED: '+g.factions[incoming.by].name+' is attacking '+incoming.province+'. Defend your settlement!');

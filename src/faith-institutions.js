@@ -4,6 +4,7 @@ import {civilianAccess,journeyDistrict} from './court-travel.js';
 // Charter options are alternate-history player policies, not assertions about real-world doctrines.
 import {controller} from './campaign-war.js';
 import {isImprisoned} from './feudal-systems.js';
+import {actAgainstNatureStress} from './character-agency.js';
 import {
  getMoralAuthority,adjustMoralAuthority,promoteCardinal,
  appointAntipope,deposeAntipope,antipopeAction,
@@ -151,10 +152,11 @@ export function faithSystemView(g,r){
  const heresies=land.map(p=>g.identity?.heresies?.[p.id]).filter(Boolean);
  const clerics=land.map(p=>({province:p.id,...(g.identity?.clergyAppointments?.[p.id]||{})})).filter(x=>x.person);
  const alliances=Object.values(g.identity?.faithAlliances||{}).filter(a=>a.partners.includes(r)&&a.until>g.turn);
- const sites=land.filter(p=>g.identity?.institutions?.[p.id]?.sanctuary||SACRED_SITES[p.id]).map(p=>({id:p.id,name:SACRED_SITES[p.id]?.name||('Sanctuary of '+p.id)}));
+ const sites=land.filter(p=>g.identity?.institutions?.[p.id]?.sanctuary||SACRED_SITES[p.id]).map(p=>({id:p.id,name:SACRED_SITES[p.id]?.name||('Sanctuary of '+p.id),sacred:Boolean(SACRED_SITES[p.id]),matchingFaith:!SACRED_SITES[p.id]||SACRED_SITES[p.id].faith===c.faith}));
  const family=faithFamily(g,c.faith);
  const availableSchools=Object.values(RELIGIOUS_SCHOOLS).filter(sc=>sc.system===sys.system||sc.families.includes(family)||sys.system==='traditional'||(sys.system==='orthodox'&&sc.system==='catholic'));
- return {faith:c.faith,family,system:sys.system,state:sys,heresies,clerics,alliances,sites,crusade:g.identity?.crusade||null,jihad:g.identity?.jihad||null,moralAuthority:getMoralAuthority(g,c.faith),cardinals:g.deepSystems?.cardinals||null,antipope:g.deepSystems?.antipopes?.[r]||null,crusadeSummary:crusadeSummary(g),religiousSchool:selectedReligiousSchool(g,r),availableSchools,coronation:g.deepSystems?.coronations?.[r]||null,canonizedAncestors:Object.values(g.deepSystems?.canonized||{}).filter(x=>x.realm===r)};
+ const heresySharePct=land.length?Math.round(heresies.length/land.length*100):0;
+ return {faith:c.faith,family,system:sys.system,state:sys,heresies,heresySharePct,clerics,alliances,sites,religiousLeagues:g.identity?.religiousLeagues||null,crusade:g.identity?.crusade||null,jihad:g.identity?.jihad||null,moralAuthority:getMoralAuthority(g,c.faith),cardinals:g.deepSystems?.cardinals||null,antipope:g.deepSystems?.antipopes?.[r]||null,crusadeSummary:crusadeSummary(g),religiousSchool:selectedReligiousSchool(g,r),availableSchools,coronation:g.deepSystems?.coronations?.[r]||null,canonizedAncestors:Object.values(g.deepSystems?.canonized||{}).filter(x=>x.realm===r)};
 }
 export function faithCharterModifiers(g,r){
  const s=state(g,r),out={research:0,acceptance:0,unrest:0};if(!s||!advisor(g,r))return out;
@@ -340,11 +342,12 @@ function runSystemAction(g,r,action,id,extra,v,c,i,f,s){
  }
  if(action==='faith-respond-heresy'){
   const h=g.identity?.heresies?.[id];if(!h||!own(g,r,id)||!['reconcile','suppress','embrace'].includes(extra))return no('Requires an active local heresy and valid response (reconcile/suppress/embrace).');
-  if(extra==='reconcile'){if(f.treasury<110)return no('Requires 110 gold.');f.treasury-=110;h.severity-=40;i.faithAuthority=clamp(i.faithAuthority+4,0,100);adjustMoralAuthority(g,c.faith,1,'heresy reconciled');if(h.severity<=0)delete g.identity.heresies[id];}
-  else if(extra==='suppress'){if(f.treasury<90)return no('Requires 90 gold.');f.treasury-=90;delete g.identity.heresies[id];const p=g.provinces[id];if(Number.isFinite(p?.unrest))p.unrest=clamp(p.unrest+8,0,100);i.faithAuthority=clamp(i.faithAuthority+6,0,100);adjustMoralAuthority(g,c.faith,2,'heresy suppressed');}
+  if(extra==='reconcile'){if(f.treasury<110)return no('Requires 110 gold.');f.treasury-=110;h.severity-=40;i.faithAuthority=clamp(i.faithAuthority+4,0,100);adjustMoralAuthority(g,c.faith,1,'heresy reconciled');if(h.severity<=0)delete g.identity.heresies[id];actAgainstNatureStress(g,head.id,'tolerance');}
+  else if(extra==='suppress'){if(f.treasury<90)return no('Requires 90 gold.');f.treasury-=90;delete g.identity.heresies[id];const p=g.provinces[id];if(Number.isFinite(p?.unrest))p.unrest=clamp(p.unrest+8,0,100);i.faithAuthority=clamp(i.faithAuthority+6,0,100);adjustMoralAuthority(g,c.faith,2,'heresy suppressed');actAgainstNatureStress(g,head.id,'forced_conversion');}
   else{const name=h.name;if(validName(g,name)){(g.identity.faithDefinitions??={})[name]={parent:c.faith,family:faithFamily(g,c.faith),charter:{...s.policies},founded:g.turn,realm:r};c.faith=name;if(head.civic)head.civic.faith=name;const lc=g.civic?.provinces?.[id];if(lc)lc.faith=name;delete g.identity.heresies[id];f.legitimacy=clamp((f.legitimacy||50)-6,0,100);adjustMoralAuthority(g,c.faith,-3,'schism');note(g,r,s,'Schism! The court embraced '+name+'.');return ok('Schism embraced.');}}
   note(g,r,s,'The court addressed the religious movement in '+id+' ('+extra+').');return ok('Heresy addressed.');
  }
+ if(action==='faith-join-league')return joinReligiousLeague(g,r,id);
  if(action==='faith-promote-cardinal')return promoteCardinal(g,id,Number(extra)||150,r);
  if(action==='faith-appoint-antipope')return appointAntipope(g,id,r);
  if(action==='faith-depose-antipope')return deposeAntipope(g,id||r,r);
@@ -405,14 +408,50 @@ export function tickFaithCharter(g,r,land){
  if(g.identity.crusade&&g.turn>=g.identity.crusade.ends)delete g.identity.crusade;
  if(g.identity.jihad&&g.turn>=g.identity.jihad.ends)delete g.identity.jihad;
  if(sys?.excommunicated&&sys.excommunicatedUntil<=g.turn)sys.excommunicated=false;
- // Emergent heresy checks when faith authority falls very low
- if(land.length&&i.faithAuthority<38&&g.turn>0&&g.turn%12===0){
+ // Pillar 5: Trigger Religious Leagues once Printing Press (1465) is active
+ if((g.year>=1465||g.crossroads?.printingPressActivated||g.crossroads?.globalUnlocked?.includes('printing_press'))&&!g.identity.religiousLeagues){
+  triggerReligiousLeagues(g);
+ }
+ // Emergent heresy checks when faith authority falls low or unrest spikes
+ if(land.length&&g.turn>0&&g.turn%12===0){
   g.identity.heresies??={};
-  const target=land.find(p=>!g.identity.heresies[p.id]&&g.civic?.provinces?.[p.id]?.faith===c.faith);
-  if(target&&Object.keys(g.identity.heresies).length<8){
+  const lowAuth=i.faithAuthority<45;
+  const target=land.find(p=>!g.identity.heresies[p.id]&&g.civic?.provinces?.[p.id]?.faith===c.faith&&(lowAuth||(p.unrest||0)>=55));
+  if(target&&Object.keys(g.identity.heresies).length<12){
    const names={catholic:'Reformed Evangelicals',orthodox:'Old Rite Dissenters',islamic:'Purist Reformers',dharmic:'Heterodox Ascetics',traditional:'Syncretic Revivalists'};
    g.identity.heresies[target.id]={province:target.id,name:(names[sys.system]||'Reform')+' of '+target.id.toUpperCase(),parentFaith:c.faith,severity:50,started:g.turn};
    note(g,r,state(g,r,true),'A heterodox movement emerged in '+target.id+'.');
+  }
+  // Spread active heresies with severity >= 55 to another province in the same realm
+  const activeHere=land.filter(p=>g.identity.heresies[p.id]);
+  for(const p of activeHere){
+   const h=g.identity.heresies[p.id];
+   h.severity=clamp((h.severity||50)+4,10,100);
+   if(h.severity>=55&&Object.keys(g.identity.heresies).length<12){
+    const spreadTo=land.find(q=>q.id!==p.id&&!g.identity.heresies[q.id]&&g.civic?.provinces?.[q.id]?.faith===c.faith);
+    if(spreadTo){
+     g.identity.heresies[spreadTo.id]={province:spreadTo.id,name:h.name,parentFaith:c.faith,severity:35,started:g.turn};
+     note(g,r,state(g,r,true),'Heresy ('+h.name+') spread from '+p.id+' to '+spreadTo.id+'!');
+     break;
+    }
+   }
+  }
+  // If >= 30% of realm provinces have active heresy, drain legitimacy & faith authority
+  const heresyCount=land.filter(p=>g.identity.heresies[p.id]).length;
+  if(land.length>0&&heresyCount/land.length>=0.3){
+   f.legitimacy=clamp((f.legitimacy||50)-2,0,100);
+   i.faithAuthority=clamp(i.faithAuthority-2,0,100);
+   if(r===g.player)note(g,r,state(g,r,true),'Widespread heresy ('+Math.round(heresyCount/land.length*100)+'% of provinces) is draining royal legitimacy!');
+  }
+ }
+ // Pillar 5: Sacred Site Control quarterly moral authority & prestige
+ if(g.turn%3===0){
+  for(const p of land){
+   const site=SACRED_SITES[p.id];
+   if(site&&site.faith===c.faith){
+    adjustMoralAuthority(g,c.faith,1,'Control of '+site.name);
+    f.prestige=(f.prestige||0)+2;
+   }
   }
  }
  if(s?.council&&g.turn>=s.council.ends){
@@ -506,4 +545,107 @@ export function completeSacredJourney(g,r,activity){
  addPiety(head,bonus*3);
  if(actual.host!==r){const a=g.factions[r],b=g.factions[actual.host];a.relations??={};b.relations??={};a.relations[actual.host]=clamp((a.relations[actual.host]||0)+5,-100,100);b.relations[r]=clamp((b.relations[r]||0)+5,-100,100);}
  head.memories??=[];head.memories.push('Completed a sacred journey to '+x.province+' in '+g.year+'.');note(g,r,state(g,r,true),'The ruler completed a sacred journey to a recognized sanctuary.');return true;
+}
+
+// Pillar 5: Religious Leagues (triggered by Printing Press 1465) & Conquest Faith Conversion Choice events.
+export function triggerReligiousLeagues(g){
+ if(!g.identity)return null;
+ if(g.identity.religiousLeagues)return g.identity.religiousLeagues;
+ const catholic=[],protestant=[],neutral=[];
+ for(const [rid,f] of Object.entries(g.factions||{})){
+  if(!f||rid==='independent'||f.rebel)continue;
+  const faith=court(g,rid)?.faith||f.religion;
+  if(faithFamily(g,faith)!=='Christianity')continue;
+  if(rid===g.player){neutral.push(rid);continue;}
+  const auth=g.identity?.realms?.[rid]?.faithAuthority??55;
+  if(faith==='Latin Christianity'&&auth>=52)catholic.push(rid);
+  else if(faith==='Latin Christianity')protestant.push(rid);
+  else neutral.push(rid);
+ }
+ const leagues=g.identity.religiousLeagues={
+  active:true,startedYear:g.year||1465,startedTurn:g.turn||0,
+  catholic:{name:'Catholic League',members:catholic},
+  protestant:{name:'Evangelical League',members:protestant},
+  neutral,tensions:40,warStarted:false
+ };
+ if(Array.isArray(g.log)){
+  g.log.unshift({date:(g.year||1465)+' · month '+((g.month||0)+1),text:'The Printing Press sparks confessional divisions! The Catholic and Evangelical Religious Leagues have formed.'});
+  if(g.log.length>45)g.log.length=45;
+ }
+ return leagues;
+}
+
+export function joinReligiousLeague(g,r,side){
+ const leagues=g.identity?.religiousLeagues||(g.year>=1465||g.crossroads?.printingPressActivated?triggerReligiousLeagues(g):null);
+ if(!leagues)return no('Religious Leagues emerge after the Printing Press (1465).');
+ if(side==='evangelical')side='protestant';
+ if(!['catholic','protestant','neutral'].includes(side))return no('Choose Catholic League, Evangelical League, or Neutral.');
+ leagues.catholic.members=leagues.catholic.members.filter(x=>x!==r);
+ leagues.protestant.members=leagues.protestant.members.filter(x=>x!==r);
+ leagues.neutral=leagues.neutral.filter(x=>x!==r);
+ if(side==='catholic')leagues.catholic.members.push(r);
+ else if(side==='protestant')leagues.protestant.members.push(r);
+ else leagues.neutral.push(r);
+ const allies=side==='catholic'?leagues.catholic.members:side==='protestant'?leagues.protestant.members:[];
+ const rivals=side==='catholic'?leagues.protestant.members:side==='protestant'?leagues.catholic.members:[];
+ const f=g.factions[r];
+ for(const a of allies)if(a!==r&&g.factions[a]){f.relations[a]=clamp((f.relations[a]||0)+10,-100,100);g.factions[a].relations[r]=clamp((g.factions[a].relations[r]||0)+10,-100,100);}
+ for(const rv of rivals)if(rv!==r&&g.factions[rv]){f.relations[rv]=clamp((f.relations[rv]||0)-15,-100,100);g.factions[rv].relations[r]=clamp((g.factions[rv].relations[r]||0)-15,-100,100);}
+ if(side!=='neutral')leagues.tensions=clamp((leagues.tensions||40)+8,0,100);
+ const label=side==='catholic'?'Catholic League':side==='protestant'?'Evangelical League':'Neutrality';
+ note(g,r,state(g,r,true)||g.identity.realms[r],(f?.name||r)+' aligned with the '+label+'.');
+ return ok('Joined '+label+'.');
+}
+
+export function currentFaithConversionChoice(g,r=g.player){
+ const ev=g.identity?.pendingConversionChoice;
+ if(!ev)return null;
+ if(g.provinces?.[ev.province]?.owner!==r){delete g.identity.pendingConversionChoice;return null;}
+ return {
+  ...ev,
+  title:`Faith of ${ev.provinceName}`,
+  text:`You have brought ${ev.provinceName} under your banner, where the people follow ${ev.localFaith} rather than your court faith of ${ev.realmFaith}. How will the Crown govern their conscience?`,
+  choices:[
+   {id:'forced',label:`Force Conversion to ${ev.realmFaith}`,effect:'Province adopts court faith, +25 unrest, Zealous/Compassionate stress check'},
+   {id:'tolerance',label:'Grant Religious Autonomy',effect:'+15 acceptance & local trust, −10 unrest, Zealous stress check'},
+   {id:'coexistence',label:'Charter Coexistence Academies (−50g)',effect:'+8 acceptance, +10 research progress, balanced stability'}
+  ]
+ };
+}
+
+export function resolveFaithConversionChoice(g,r,choiceIndex){
+ const ev=currentFaithConversionChoice(g,r);
+ if(!ev)return no('No active religious conversion decision.');
+ const choice=ev.choices[Number(choiceIndex)];
+ if(!choice)return no('Invalid conversion choice.');
+ const p=g.provinces[ev.province],l=g.civic?.provinces?.[ev.province],f=g.factions[r],head=ruler(g,r);
+ if(choice.id==='forced'){
+  if(l)l.faith=ev.realmFaith;
+  if(p)p.unrest=clamp((p.unrest||0)+25,0,100);
+  if(g.identity?.realms?.[r])g.identity.realms[r].faithAuthority=clamp((g.identity.realms[r].faithAuthority||50)+5,0,100);
+  if(head?.id)actAgainstNatureStress(g,head.id,'forced_conversion');
+ }else if(choice.id==='tolerance'){
+  if(l){l.acceptance=clamp((l.acceptance||50)+15,0,100);l.localTrust=clamp((l.localTrust||50)+15,0,100);}
+  if(p)p.unrest=clamp((p.unrest||0)-10,0,100);
+  if(head?.id)actAgainstNatureStress(g,head.id,'tolerance');
+ }else{
+  if(f)f.treasury=Math.max(0,(f.treasury||0)-50);
+  if(l){l.acceptance=clamp((l.acceptance||50)+8,0,100);l.localTrust=clamp((l.localTrust||50)+8,0,100);}
+  if(g.identity?.realms?.[r]?.research)g.identity.realms[r].research.progress+=10;
+ }
+ delete g.identity.pendingConversionChoice;
+ note(g,r,state(g,r,true)||g.identity.realms[r],`${ev.provinceName}: ${choice.label}.`);
+ return ok(`${ev.provinceName}: ${choice.label}.`);
+}
+
+export const CONVERSION_POLICIES = Object.freeze({
+ forced: { id: 'forced', name: 'Forced Inquisition', unrest: 2, acceptance: -2, authority: 2 },
+ tolerant: { id: 'tolerant', name: 'Regulated Tolerance', unrest: 0, acceptance: 1, authority: 1 },
+ coexistence: { id: 'coexistence', name: 'Plural Coexistence', unrest: -1, acceptance: 3, authority: 0 }
+});
+export function religiousLeaguesView(g, r = g.player) {
+ const rl = g.identity?.religiousLeagues;
+ if (!rl?.active) return { active: false, catholic: [], protestant: [], memberOf: null };
+ const c = rl.catholic?.members || [], p = rl.protestant?.members || [];
+ return { active: true, startedYear: rl.startedYear, catholic: [...c], protestant: [...p], memberOf: c.includes(r) ? 'catholic' : p.includes(r) ? 'protestant' : null };
 }

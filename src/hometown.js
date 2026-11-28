@@ -138,7 +138,26 @@ export function recordCapitalMilestone(g,r,text){
   h.founded.unshift({year,text:String(text)});
   if(h.founded.length>16)h.founded.length=16;
 }
-export function hometownModifiers(g,r){const h=active(g,r);if(!h||!h.capital||!permitted(g,h.capital,r))return {tax:1,food:1,recruit:1,cost:1,power:1,siege:1,order:0,defense:1,trade:1,knowledge:1,buildSpeed:1};const t=totals(g,r);const wf=workforceProfile(g,r);return {tax:1+Math.min(.35,t.tax*.006),food:(1+Math.min(.4,t.food*.007))*wf.mult.food,recruit:(1+Math.min(.3,t.recruit*.006))*wf.mult.recruit,cost:1-Math.min(.2,t.research*.004),power:1+Math.min(.2,t.military*.004),siege:1+Math.min(.3,t.siege*.008),order:Math.min(2,t.order*.05),defense:1+Math.min(.25,t.defense*.006),trade:(1+Math.min(.35,(t.tax+t.wood)*.003))*wf.mult.trade,knowledge:Number(((1+t.research*.015)*wf.mult.knowledge).toFixed(2)),buildSpeed:wf.mult.build};}
+export function hometownModifiers(g,r){
+ const h=active(g,r);
+ if(!h||!h.capital||!permitted(g,h.capital,r))return {tax:1,food:1,recruit:1,cost:1,power:1,siege:1,order:0,defense:1,trade:1,knowledge:1,buildSpeed:1};
+ const t=totals(g,r);const wf=workforceProfile(g,r);
+ const notables=(h.notables||[]).filter(n=>n.alive&&!n.recruited);
+ const hasRole=role=>notables.some(n=>n.role===role);
+ return {
+  tax:1+Math.min(.35,t.tax*.006)+(hasRole('merchant')?0.04:0),
+  food:(1+Math.min(.4,t.food*.007))*wf.mult.food,
+  recruit:(1+Math.min(.3,t.recruit*.006))*wf.mult.recruit+(hasRole('captain')?0.06:0),
+  cost:1-Math.min(.2,t.research*.004),
+  power:1+Math.min(.2,t.military*.004)+(hasRole('blacksmith')?0.05:0),
+  siege:1+Math.min(.3,t.siege*.008),
+  order:Math.min(2,t.order*.05),
+  defense:1+Math.min(.25,t.defense*.006)+(hasRole('captain')?0.08:0),
+  trade:(1+Math.min(.35,(t.tax+t.wood)*.003))*wf.mult.trade+(hasRole('merchant')?0.08:0),
+  knowledge:Number((((1+t.research*.015)*wf.mult.knowledge)+(hasRole('scholar')?0.15:0)).toFixed(2)),
+  buildSpeed:wf.mult.build
+ };
+}
 // Local agricultural infrastructure improves the province that built it.
 // Research travels with the realm, while buildings belong to their province.
 // Royal reserves and local merchant goods are distinct existing inventories.
@@ -337,17 +356,19 @@ export function cancelHome(g,id){const h=active(g,g.player);if(!h||!humanControl
 export function homePositions(g,p,h){const pending=new Set(h.queue.filter(q=>q.type==='building'&&q.province===p).map(q=>q.key));const built=Object.keys(HOME_BUILDINGS).filter(k=>homeLevel(g,p,k)>0||pending.has(k)),used=new Set([27]),spots={};for(const k of built){const v=h.positions[k];if(Number.isInteger(v)&&v>=0&&v<64&&!used.has(v)){spots[k]=v;used.add(v);}}for(const k of built)if(spots[k]===undefined){const slot=Array.from({length:64},(_,i)=>i).find(i=>!used.has(i));if(slot!==undefined){spots[k]=slot;used.add(slot);}}return spots;}
 export function placeHome(g,world,key,slot){const h=active(g,g.player),p=homeCapital(g,world);slot=Number(slot);if(!h||!humanControlsRealm(g,g.player)||!HOME_BUILDINGS[key]||!Number.isInteger(slot)||slot<0||slot>=64||slot===27)return no('Select a valid building and empty plot.');if(Object.entries(homePositions(g,p,h)).some(([k,v])=>k!==key&&v===slot))return no('Plot occupied.');if(!homeLevel(g,p,key)&&!h.queue.some(q=>q.type==='building'&&q.key===key&&q.province===p)){const q=queueHome(g,world,'building',key,p);if(!q.ok)return q;}h.positions[key]=slot;return ok('Building plot reserved.');}
 export function moveHome(g,world,key,slot){const h=active(g,g.player),p=homeCapital(g,world);slot=Number(slot);if(!h||!humanControlsRealm(g,g.player)||!HOME_BUILDINGS[key]||!homeLevel(g,p,key)||!Number.isInteger(slot)||slot<0||slot>=64||slot===27)return no('Invalid building placement.');if(Object.entries(homePositions(g,p,h)).some(([k,v])=>k!==key&&v===slot))return no('Plot occupied.');h.positions[key]=slot;return ok('Building moved.');}
-const AI_BUILD_PRIORITY=['farm','house','well','lumber','quarry','market','granary','barracks','fort','library'];
-const AI_RESEARCH_PRIORITY=['farming','forestry','masonry','trade','infantry'];
+const AI_BUILD_PRIORITY=['farm','barracks','fort','market','lumber','quarry','house','stable','archery','workshop','granary','well','library'];
+const AI_RESEARCH_PRIORITY=['farming','infantry','archery','cavalry','siege','masonry','forestry','trade'];
 function aiPriceFor(cost,t){return {gold:Math.max(1,Math.round(cost*(1-Math.min(.2,(t.research||0)*.004)))),wood:Math.ceil(cost*.22),stone:Math.ceil(cost*.14),iron:Math.ceil(cost*.07),food:Math.ceil(cost*.03)};}
 function tickAiHometown(g,world,root){
- if(g.turn<12||g.turn%12!==0)return;
- const keys=Object.keys(g.factions||{}).filter(r=>r!=='independent'&&!humanControlsRealm(g,r)).sort();
+ if(g.turn<6||g.turn%6!==0)return;
+ const provCounts=new Map();
+ for(const p of Object.values(g.provinces||{}))provCounts.set(p.owner,(provCounts.get(p.owner)||0)+1);
+ const keys=Object.keys(g.factions||{}).filter(r=>r!=='independent'&&!humanControlsRealm(g,r)).sort((a,b)=>(provCounts.get(b)||0)-(provCounts.get(a)||0)||a.localeCompare(b));
  let budgetOps=0;
  for(const r of keys){
-  if(budgetOps>=18)break;
+  if(budgetOps>=32)break;
   const f=g.factions[r],cap=homeCapital(g,world,r);
-  if(!f||!cap||f.treasury<650||(f.food||0)<80)continue;
+  if(!f||!cap||f.treasury<480||(f.food||0)<60)continue;
   let h=root.realms[r];
   if(!h){
    if(Object.keys(root.realms).length>=64)continue;
@@ -361,14 +382,14 @@ function tickAiHometown(g,world,root){
   const candB=AI_BUILD_PRIORITY.map(k=>({key:k,lv:homeLevel(g,cap,k),d:HOME_BUILDINGS[k]})).filter(x=>x.d&&h.level>=x.d.unlock&&x.lv<h.level&&x.lv<10&&!queued.has('building:'+x.key)).sort((a,b)=>a.lv-b.lv||a.key.localeCompare(b.key))[0];
   if(candB){
    const target=candB.lv+1,price=aiPriceFor(candB.d.cost*target,t);
-   if(f.treasury>=price.gold+220&&(f.food||0)>=price.food+40&&materials.every(m=>(h.stock[m]||0)>=price[m])){
+   if(f.treasury>=price.gold+200&&(f.food||0)>=price.food+35&&materials.every(m=>(h.stock[m]||0)>=price[m])){
     const q={ok:true,type:'building',key:candB.key,province:cap,target,name:candB.d.name,price,months:1+Math.floor(target/3),id:h.next++,started:false};
     q.remaining=q.months;changeFunds(g,r,q,-1);h.queue.push(q);budgetOps++;continue;
    }
   }
   if(h.level<10&&!queued.has('town:town')){
    const target=h.level+1,price=aiPriceFor(220*target,t);
-   if(f.treasury>=price.gold+260&&(f.food||0)>=price.food+40&&materials.every(m=>(h.stock[m]||0)>=price[m])){
+   if(f.treasury>=price.gold+240&&(f.food||0)>=price.food+35&&materials.every(m=>(h.stock[m]||0)>=price[m])){
     const q={ok:true,type:'town',key:'town',province:cap,target,name:'Town Hall',price,months:2+Math.floor(target/2),id:h.next++,started:false};
     q.remaining=q.months;changeFunds(g,r,q,-1);h.queue.push(q);budgetOps++;continue;
    }
@@ -376,14 +397,14 @@ function tickAiHometown(g,world,root){
   const candR=AI_RESEARCH_PRIORITY.map(k=>({key:k,lv:researchLevel(h,k),d:HOME_RESEARCH[k]})).filter(x=>x.d&&x.lv<10&&x.lv+1<=h.level&&homeLevel(g,cap,x.d.building)>=Math.ceil((x.lv+1)/2)&&!queued.has('research:'+x.key))[0];
   if(candR){
    const target=candR.lv+1,price=aiPriceFor(100*target,t);
-   if(f.treasury>=price.gold+220&&(f.food||0)>=price.food+40&&materials.every(m=>(h.stock[m]||0)>=price[m])){
+   if(f.treasury>=price.gold+200&&(f.food||0)>=price.food+35&&materials.every(m=>(h.stock[m]||0)>=price[m])){
     const q={ok:true,type:'research',key:candR.key,province:cap,target,name:candR.d.name,price,months:Math.max(1,2+Math.floor(target/3)-Math.floor((t.research||0)/15)),id:h.next++,started:false};
     q.remaining=q.months;changeFunds(g,r,q,-1);h.queue.push(q);budgetOps++;
    }
   }
  }
 }
- export function tickHometown(g,world){const root=g.hometown;if(!root||root.lastTick===g.turn)return;root.lastTick=g.turn;
+ export function tickHometown(g,world){const root=g.hometown??={version:1,realms:{},buildings:{},workforce:{},founded:[],notables:{},capitalEvents:{},damaged:{},lastTick:-1};if(root.lastTick===g.turn)return;root.lastTick=g.turn;
  tickAiHometown(g,world,root);
  for(const [r,h] of Object.entries(root.realms)){const f=g.factions[r];if(!f)continue;const cap=homeCapital(g,world,r);if(!cap){for(const q of h.queue)if(!q.started)changeFunds(g,r,q,1);h.queue=[];continue;}if(h.capital!==cap){h.positions={};h.capital=cap;}const prod=homeProduction(g,r),t=totals(g,r),wf=workforceProfile(g,r);for(const k of materials)h.stock[k]=Math.min(1000+h.level*700+t.storage*100,integer(h.stock[k])+prod[k]);
  h.knowledge=Number(((h.knowledge||0)+(2+t.research*.35)*wf.mult.knowledge).toFixed(1));
@@ -422,6 +443,7 @@ export function homeCapitalLayout(g,provinceId){
    name:HOME_BUILDINGS[key]?.name||key,
    effect:HOME_BUILDINGS[key]?.effect||'civic',
    level:lv,
+   damaged:Boolean(h.damaged?.[key]),
    slot,
    row,
    col,
@@ -432,6 +454,7 @@ export function homeCapitalLayout(g,provinceId){
  return {
   isCapital:true,
   realmId,
+  plotTotal:64,
   level:integer(h.level,1),
   gatehouse:homeLevel(g,provinceId,'gatehouse'),
   watchtower:homeLevel(g,provinceId,'watchtower'),
@@ -477,3 +500,266 @@ export function stewardAdvice(g,world=null,r=g?.player){
  }
  return items;
 }
+
+// Pillar 8: The Living Capital — Named Citizens & Heroes, Building Events, Siege Readiness & Generation Banner
+const hashStr=s=>{let n=2166136261;for(const c of String(s||''))n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;};
+const NOTABLE_FIRST=['Aldric','Beatrice','Lorenzo','Farid','Klara','Harun','Meera','Tomas','Soraya','Willem','Rohan','Elena','Matteo','Yasmin','Gideon','Nadia'];
+const NOTABLE_EPITHETS={
+ blacksmith:['the Hammer','of the Foundry','Ironhand','Steelwright'],
+ scholar:['the Polymath','the Chronicler','of the Scriptorium','the Astronomer'],
+ merchant:['the Silkfactor','Goldscale','of the Quay','the Guildmaster'],
+ captain:['Ironwatch','the Gatewarden','Shieldbearer','of the Bastion']
+};
+export const CAPITAL_NOTABLE_ROLES=[
+ {role:'blacksmith',label:'Master Blacksmith',skillKey:'martial',bonusLabel:'+5% Army Combat Power',bio:'Forges tempered steel arms for the capital garrison.'},
+ {role:'scholar',label:'Master Scholar',skillKey:'learning',bonusLabel:'+15% Research Speed',bio:'Translates classical treatises and trains royal clerks.'},
+ {role:'merchant',label:'Guild Merchant',skillKey:'stewardship',bonusLabel:'+8% Trade & +4% Tax',bio:'Connects capital warehouses to caravan factors abroad.'},
+ {role:'captain',label:'Captain of the Watch',skillKey:'martial',bonusLabel:'+8% Capital Defense & +6% Levies',bio:'Drills the city militia and inspects gatehouse bars nightly.'}
+];
+
+export function ensureCapitalNotables(g,r=g.player){
+ const h=active(g,r);if(!h)return [];
+ if(!Array.isArray(h.notables)||!h.notables.length){
+  h.notables=CAPITAL_NOTABLE_ROLES.map((def,idx)=>{
+   const seed=hashStr(`${r}:${h.capital}:${def.role}:${idx}`);
+   const first=NOTABLE_FIRST[seed%NOTABLE_FIRST.length];
+   const epList=NOTABLE_EPITHETS[def.role];
+   const ep=epList[(seed>>>8)%epList.length];
+   return {
+    id:`notable_${r}_${def.role}`,
+    name:`${first} ${ep}`,
+    role:def.role,
+    roleLabel:def.label,
+    skillKey:def.skillKey,
+    skill:11+(seed%6),
+    age:26+((seed>>>4)%20),
+    bonusLabel:def.bonusLabel,
+    bio:def.bio,
+    recruited:false,
+    alive:true
+   };
+  });
+ }
+ return h.notables;
+}
+
+export function capitalNotables(g,r=g.player){
+ return ensureCapitalNotables(g,r);
+}
+
+export function recruitCapitalNotable(g,world,notableId){
+ const r=g.player,h=active(g,r),f=g.factions?.[r];
+ if(!h||!f||!humanControlsRealm(g,r))return no('Open Hometown as sovereign first.');
+ const list=ensureCapitalNotables(g,r);
+ const n=list.find(x=>x.id===notableId);
+ if(!n||!n.alive)return no('Citizen unavailable.');
+ if(n.recruited)return no(`${n.name} already serves in the royal court.`);
+ if((f.treasury||0)<40)return no('Need 40 gold to grant a court appointment.');
+ f.treasury-=40;
+ n.recruited=true;
+ if(g.politics?.people){
+  const pid='p'+(g.politics.nextPerson||Object.keys(g.politics.people).length+10);
+  if(Number.isFinite(g.politics.nextPerson))g.politics.nextPerson++;
+  const baseSkills={diplomacy:7,martial:7,stewardship:7,intrigue:6,learning:7};
+  baseSkills[n.skillKey]=Math.max(12,n.skill);
+  const civicRealm=g.civic?.realms?.[r];
+  g.politics.people[pid]={
+   id:pid,name:n.name,realm:r,house:'Citizen of '+((world?.provinces?.find(p=>p.id===h.capital)?.name)||h.capital),
+   alive:true,age:n.age,sex:n.id.length%2?'female':'male',
+   parents:[],children:[],spouse:null,spouses:[],concubines:[],claims:[],bastard:false,legitimized:false,
+   skills:baseSkills,
+   traits:[n.role==='scholar'?'scholar':n.role==='merchant'?'shrewd':n.role==='captain'?'brave':'diligent'],
+   loyalty:78,prestige:20,piety:5,wealth:25,
+   civic:{culture:civicRealm?.culture||'Local',faith:civicRealm?.faith||'Local',stress:0},
+   memories:[`Elevated from ${n.roleLabel} of the capital to the royal court.`]
+  };
+  n.personId=pid;
+ }
+ recordCapitalMilestone(g,r,`Elevated ${n.name} (${n.roleLabel}) to the royal court`);
+ if(g.log){g.log.unshift({date:g.year+' · month '+(g.month+1),text:`${n.name} (${n.roleLabel}) joined your royal court from the capital.`});g.log=g.log.slice(0,45);}
+ return ok(`${n.name} recruited to the royal court!`);
+}
+
+export function capitalSiegeReadiness(g,world,r=g.player){
+ const cap=homeCapital(g,world,r);
+ if(!cap)return {capital:null,wallsLevel:0,granaryMonths:0,garrisonStrength:0,earlyWarning:false,defendingNotables:[],damagedBuildings:{},damagedCount:0,effectiveDefenseRating:0,status:'No Capital'};
+ const h=active(g,r);
+ const damaged=h?.damagedBuildings||{};
+ const fort=homeLevel(g,cap,'fort');
+ const citadel=homeLevel(g,cap,'citadel');
+ const gatehouse=homeLevel(g,cap,'gatehouse');
+ const watchtower=homeLevel(g,cap,'watchtower');
+ const barracks=homeLevel(g,cap,'barracks');
+ const granary=homeLevel(g,cap,'granary');
+ const warehouse=homeLevel(g,cap,'warehouse');
+ const wallsLevel=fort+citadel*2+gatehouse;
+ const granaryMonths=4+granary*3+warehouse;
+ const dmgList=Object.entries(damaged).filter(([,v])=>v>0);
+ const dmgPenalty=dmgList.reduce((n,[,v])=>n+v,0)/Math.max(1,dmgList.length*100);
+ const garrisonStrength=Math.max(30,Math.round((60+fort*45+barracks*30+citadel*90+watchtower*20+gatehouse*25)*(1-dmgPenalty*0.35)));
+ const defendingNotables=capitalNotables(g,r).filter(n=>n.alive&&!n.recruited);
+ const effectiveDefenseRating=Math.max(0,Math.round(wallsLevel*10*(1-dmgPenalty*0.5)));
+ const status=dmgList.length?'Damaged — Needs Repair':wallsLevel>=5?'Fortress':wallsLevel>=2?'Defensible':'Vulnerable';
+ return {capital:cap,wallsLevel,fort,citadel,gatehouse,watchtower,barracks,granary,granaryMonths,garrisonStrength,earlyWarning:watchtower>0,defendingNotables,damagedBuildings:{...damaged},damagedCount:dmgList.length,effectiveDefenseRating,status};
+}
+
+// Phase 7.3 & Pillar 8C: Persist 3D siege damage directly onto Living Capital structures and resolve notable citizen defense
+export function applyCapitalSiegeDamage(g,world,provinceId,result={}){
+ const owner=g?.provinces?.[provinceId]?.owner;
+ if(!owner)return {ok:false,damaged:[],notableEvent:null};
+ const h=active(g,owner);
+ if(!h||h.capital!==provinceId)return {ok:false,damaged:[],notableEvent:null};
+ const fortDamage=Math.max(0,Number(result.fortDamage??result.structureDamage??(result.siegeBreached?45:result.victory?35:15)));
+ if(fortDamage<=0)return {ok:false,damaged:[],notableEvent:null};
+ h.damagedBuildings??={};
+ const targets=['fort','gatehouse','watchtower','barracks','market','granary'].filter(k=>homeLevel(g,provinceId,k)>0);
+ if(!targets.length)targets.push('town');
+ const damaged=[];
+ for(let i=0;i<Math.min(3,targets.length);i++){
+  const key=targets[i];
+  const pct=clamp(Math.round(fortDamage*(i===0?1:0.65)),15,90);
+  h.damagedBuildings[key]=clamp((h.damagedBuildings[key]||0)+pct,0,100);
+  damaged.push({key,damage:h.damagedBuildings[key]});
+ }
+ let notableEvent=null;
+ const defenders=ensureCapitalNotables(g,owner).filter(n=>n.alive&&!n.recruited);
+ if(defenders.length){
+  const pick=defenders[hashStr(`${owner}:${provinceId}:${g.turn}:siege`)%defenders.length];
+  if(result.victory&&fortDamage>=40){
+   pick.alive=false;
+   notableEvent=`${pick.name} (${pick.roleLabel}) fell heroically defending the capital walls during the siege.`;
+  }else{
+   notableEvent=`${pick.name} (${pick.roleLabel}) rallied townsfolk along the ramparts during the siege.`;
+  }
+  recordCapitalMilestone(g,owner,notableEvent);
+  if(owner===g.player&&g.log){g.log.unshift({date:g.year+' · month '+(g.month+1),text:notableEvent});g.log=g.log.slice(0,45);}
+ }
+ recordCapitalMilestone(g,owner,`Capital siege damaged ${damaged.map(d=>d.key).join(', ')} (${fortDamage}% assault intensity).`);
+ return {ok:true,damaged,notableEvent};
+}
+
+export function repairCapitalBuilding(g,world,buildingKey){
+ const r=g.player,h=active(g,r),f=g.factions?.[r];
+ if(!h||!f||!humanControlsRealm(g,r))return no('Open Hometown as sovereign first.');
+ const dmg=h.damagedBuildings?.[buildingKey]||0;
+ if(dmg<=0)return no('This structure does not require repair.');
+ const goldCost=Math.max(25,Math.round(dmg*0.8));
+ const woodCost=Math.max(10,Math.round(dmg*0.4));
+ const stoneCost=Math.max(10,Math.round(dmg*0.35));
+ if((f.treasury||0)<goldCost||(h.stock?.wood||0)<woodCost||(h.stock?.stone||0)<stoneCost){
+  return no(`Need ${goldCost}g, ${woodCost} wood, and ${stoneCost} stone to repair.`);
+ }
+ f.treasury-=goldCost;
+ h.stock.wood-=woodCost;
+ h.stock.stone-=stoneCost;
+ delete h.damagedBuildings[buildingKey];
+ const label=buildingKey==='town'?'Town Hall':(HOME_BUILDINGS[buildingKey]?.name||buildingKey);
+ recordCapitalMilestone(g,r,`Repaired siege damage to ${label}`);
+ return ok(`${label} repaired and restored to full strength.`);
+}
+
+export const CAPITAL_BUILDING_EVENTS=[
+ {
+  id:'cap_sanctuary_miracle',
+  buildings:['chapel','palace'],
+  title:'Pilgrims Gather at the Capital Sanctuary',
+  text:'Word of a healing miracle at your capital sanctuary draws pilgrims and merchants from neighboring provinces, filling the markets—though local clergy debate its orthodoxy.',
+  choices:[
+   {id:'patronize',label:'Sponsor the Shrine (+15 Prestige, +35g, +2 Stability)',effects:{gold:35,prestige:15,stability:2}},
+   {id:'tax_pilgrims',label:'Levy Pilgrim Tolls (+90g, -2 Stability)',effects:{gold:90,stability:-2}},
+   {id:'investigate',label:'Order Clerical Inquiry (+10 Legitimacy, +8 Knowledge)',effects:{legitimacy:10,knowledge:8}}
+  ]
+ },
+ {
+  id:'cap_university_thesis',
+  buildings:['university','library','school'],
+  title:'Controversial Thesis Nailed to the Academy Doors',
+  text:'A bold scholar in your capital academy has published a treatise challenging entrenched guild and clerical privileges. Crowds debate it in every tavern.',
+  choices:[
+   {id:'protect_scholar',label:'Protect Academic Freedom (+18 Knowledge, -3 Stability)',effects:{knowledge:18,stability:-3,prestige:6}},
+   {id:'censor',label:'Suppress the Pamphlets (+5 Stability, +5 Legitimacy)',effects:{stability:5,legitimacy:5}},
+   {id:'royal_debate',label:'Host a Royal Disputation (+10 Knowledge, +10 Prestige, -25g)',effects:{gold:-25,knowledge:10,prestige:10}}
+  ]
+ },
+ {
+  id:'cap_market_cartel',
+  buildings:['market','tradehall','guild','bank'],
+  title:'Merchant Guild Cartel Dispute',
+  text:'Master merchants in your capital market demand a royal monopoly on cloth and spice brokerage, promising higher customs revenue while smaller artisans protest.',
+  choices:[
+   {id:'grant_charter',label:'Grant Guild Charter (+110g, -4 Stability)',effects:{gold:110,stability:-4}},
+   {id:'open_market',label:'Defend Free Craftmen (+5 Stability, +40g, +5 Legitimacy)',effects:{gold:40,stability:5,legitimacy:5}},
+   {id:'royal_brokerage',label:'Establish Crown Brokerage (+65g, +5 Prestige)',effects:{gold:65,prestige:5}}
+  ]
+ },
+ {
+  id:'cap_arms_tournament',
+  buildings:['barracks','academy','forge','armory'],
+  title:'Grand Capital Arms Tournament',
+  text:'Knights, crossbowmen, and capital smiths propose a three-day tournament outside the walls to showcase newly forged arms and drill the levies.',
+  choices:[
+   {id:'fund_tourney',label:'Fund Grand Prizes (-45g, +18 Prestige, +4 Stability)',effects:{gold:-45,prestige:18,stability:4}},
+   {id:'drill_militia',label:'Focus on Garrison Drills (+60 Iron/Wood reserves, +3 Stability)',effects:{wood:35,iron:25,stability:3}},
+   {id:'recruit_champions',label:'Enlist Winning Retainers (+10 Prestige, +6 Legitimacy)',effects:{prestige:10,legitimacy:6}}
+  ]
+ }
+];
+
+export function tickCapitalEvents(g,world){
+ const r=g.player,h=active(g,r);
+ if(!h||!humanControlsRealm(g,r))return;
+ ensureCapitalNotables(g,r);
+ const cap=homeCapital(g,world,r);
+ if(!cap)return;
+ if(g.hometown.pendingEvent)return;
+ const lastTurn=h.lastCapitalEventTurn??-12;
+ if(g.turn<6||(g.turn-lastTurn)<9)return;
+ const eligible=CAPITAL_BUILDING_EVENTS.filter(ev=>ev.buildings.some(b=>homeLevel(g,cap,b)>0));
+ if(!eligible.length)return;
+ const pick=eligible[hashStr(`${r}:${g.turn}:capev`)%eligible.length];
+ h.lastCapitalEventTurn=g.turn;
+ g.hometown.pendingEvent={
+  id:pick.id,
+  realm:r,
+  capital:cap,
+  turn:g.turn,
+  title:pick.title,
+  text:pick.text,
+  choices:pick.choices.map(c=>({id:c.id,label:c.label}))
+ };
+}
+
+export function currentCapitalEvent(g){
+ const ev=g?.hometown?.pendingEvent;
+ return ev&&ev.realm===g.player?ev:null;
+}
+
+export function resolveCapitalEvent(g,choiceId){
+ const ev=currentCapitalEvent(g);
+ if(!ev)return no('No active capital event.');
+ const def=CAPITAL_BUILDING_EVENTS.find(e=>e.id===ev.id);
+ const ch=def?.choices.find(c=>c.id===choiceId)||def?.choices[0];
+ if(!ch)return no('Invalid choice.');
+ const f=g.factions?.[g.player],h=active(g,g.player);
+ const ef=ch.effects||{};
+ if(f){
+  if(ef.gold)f.treasury=Math.round((f.treasury||0)+ef.gold);
+  if(ef.prestige)f.prestige=Math.max(0,(f.prestige||0)+ef.prestige);
+  if(ef.stability)f.stability=clamp((f.stability||50)+ef.stability,0,100);
+  if(ef.legitimacy)f.legitimacy=clamp((f.legitimacy||50)+ef.legitimacy,0,100);
+ }
+ if(h){
+  if(ef.knowledge)h.knowledge=Number(((h.knowledge||0)+ef.knowledge).toFixed(1));
+  if(ef.wood)h.stock.wood=integer(h.stock.wood)+ef.wood;
+  if(ef.iron)h.stock.iron=integer(h.stock.iron)+ef.iron;
+  recordCapitalMilestone(g,g.player,`${ev.title}: ${ch.label.split(' (')[0]}`);
+ }
+ delete g.hometown.pendingEvent;
+ return ok(`${ev.title} resolved.`);
+}
+
+export function dismissGenerationBanner(g){
+ if(g?.hometown?.generationBanner)delete g.hometown.generationBanner;
+ return ok('Banner dismissed.');
+}
+

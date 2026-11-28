@@ -196,3 +196,163 @@ export function tickEconomy(g,world){const e=initEconomy(g,world);if(e.lastTick=
  }
  for(const map of [e.routes,e.loans])for(const [id,x] of Object.entries(map))if(x.closed!==undefined&&x.status!=='defaulted'&&g.turn-x.closed>120)delete map[id];
 }
+
+// Pillar 9: Banker Faction Debt Ultimatum, Famine Dilemma & Transparent Ledger Breakdown
+export function economicLedgerBreakdown(g,realm=g?.player){
+ const e=g?.economy,s=e?.realms?.[realm],f=g?.factions?.[realm];
+ const activeLoans=Object.values(e?.loans||{}).filter(l=>l.realm===realm&&['active','defaulted'].includes(l.status));
+ const totalDebt=activeLoans.reduce((sum,l)=>sum+(l.remaining||0)+(l.interest||0),0);
+ const monthlyInterest=activeLoans.filter(l=>l.status==='active').reduce((sum,l)=>sum+Math.ceil((l.remaining||0)*(l.rate||1)/100),0);
+ const inflation=s?.inflation||0;
+ const credit=s?.credit??70;
+ const tariffLabel=['Free Trade (0%)','Balanced (5%)','Protectionist (12%)'][s?.tariff??1]||'Balanced (5%)';
+ const crises=Object.values(e?.crises||{}).filter(c=>g?.provinces?.[c.province]?.owner===realm);
+ return {
+  treasury:Math.round(f?.treasury||0),
+  totalDebt,
+  monthlyInterest,
+  activeLoans,
+  inflation,
+  credit,
+  tariffLabel,
+  merchantGuild:Boolean(s?.merchantGuild),
+  tradeNet:Math.round(s?.tradeNet||0),
+  crises
+ };
+}
+
+// Phase 9.3: Transparent Resource & Deficit Diagnostic Forecast
+export function economicForecast(g,realm=g?.player,stats=null){
+ const f=g?.factions?.[realm];
+ const ledger=economicLedgerBreakdown(g,realm);
+ const ownLand=own(g,realm);
+ const armies=Object.values(g?.armies||{}).filter(a=>a.owner===realm);
+ const troops=armies.reduce((n,a)=>n+Math.max(0,(a.infantry||0)+(a.archers||0)+(a.cavalry||0)),0);
+ const baseFood=ownLand.reduce((n,p)=>n+Math.max(1,Math.round((p.population||10)*0.08+(p.buildings?.farm||0)*8)),0);
+ const armyFoodDrain=Math.round(troops*0.025);
+ const crisisSpoilage=ledger.crises.filter(c=>c.kind==='famine'||c.kind==='drought').length*12;
+ const foodNet=stats&&Number.isFinite(stats.foodDelta)?stats.foodDelta:(stats&&Number.isFinite(stats.food)?stats.food:(baseFood-armyFoodDrain-crisisSpoilage));
+ const storedFood=Math.floor(f?.food||0);
+ const monthsUntilFoodShortage=foodNet<0?Math.max(0,Math.floor(Math.max(0,storedFood)/Math.abs(foodNet))):null;
+
+ const goldNet=stats&&Number.isFinite(stats.balance)?stats.balance:0;
+ const monthsUntilBankruptcy=goldNet<0?Math.max(0,Math.floor(Math.max(0,ledger.treasury)/Math.abs(goldNet))):null;
+
+ const suggestions=[];
+ if(foodNet<0||storedFood<100){
+  suggestions.push({id:'food_action',severity:monthsUntilFoodShortage!==null&&monthsUntilFoodShortage<=4?'danger':'warn',text:'Food reserves declining — build Farms, shift Workforce to Farmers, or reduce standing army upkeep.'});
+ }
+ if(goldNet<0||ledger.treasury<60){
+  suggestions.push({id:'gold_action',severity:monthsUntilBankruptcy!==null&&monthsUntilBankruptcy<=4?'danger':'warn',text:'Treasury balance negative — charter Macro Trade Caravans, adjust taxation, or stabilize currency.'});
+ }
+ if(ledger.inflation>=12){
+  suggestions.push({id:'inflation_action',severity:'warn',text:`Inflation at ${ledger.inflation}% is eroding tax revenue — use Stabilize Currency when treasury permits.`});
+ }
+ if(ledger.totalDebt>=250){
+  suggestions.push({id:'debt_action',severity:'warn',text:`Active sovereign debt (${ledger.totalDebt}g, −${ledger.monthlyInterest}g/mo interest) — repay loans before Banker Consortium pressure escalates.`});
+ }
+ if(!suggestions.length){
+  suggestions.push({id:'healthy',severity:'ok',text:'Crown treasury and royal granaries are in healthy surplus.'});
+ }
+ return {
+  food:{gross:baseFood,armyDrain:armyFoodDrain,spoilage:crisisSpoilage,net:foodNet,stored:storedFood,monthsUntilShortage:monthsUntilFoodShortage},
+  gold:{treasury:ledger.treasury,net:goldNet,monthlyInterest:ledger.monthlyInterest,supplySurcharge:stats?.supplyLineUpkeep||0,monthsUntilBankruptcy},
+  inflation:ledger.inflation,
+  totalDebt:ledger.totalDebt,
+  suggestions
+ };
+}
+
+export function tickEconomicDilemmas(g){
+ const e=g?.economy;if(!e||!humanControlsRealm(g,g.player))return;
+ const realm=g.player,f=g.factions?.[realm],s=e.realms?.[realm];
+ if(!f||!s||e.pendingDilemma)return;
+ const last=e.lastDilemmaTurn??-18;
+ if(g.turn<4||(g.turn-last)<12)return;
+ const ledger=economicLedgerBreakdown(g,realm);
+ const hasFamine=ledger.crises.some(c=>c.kind==='famine'||c.kind==='drought')||(f.food||0)<40;
+ if(hasFamine&&(f.food||0)<120){
+  e.lastDilemmaTurn=g.turn;
+  e.pendingDilemma={
+   id:'famine_rationing',
+   realm,
+   turn:g.turn,
+   title:'Granary Crisis: Famine Stalks the Realm',
+   text:'Harvests have failed and royal granaries run perilously low. Your Marshal and Steward clash over who receives the remaining grain stores.',
+   choices:[
+    {id:'feed_army',label:'Feed the Army First (+10 Army Morale, +8 Provincial Unrest, -25 Food)'},
+    {id:'feed_civilians',label:'Open Granaries to Civilians (-8 Provincial Unrest, +6 Legitimacy, -15 Army Morale)'},
+    {id:'import_grain',label:'Emergency Grain Imports (-140g, +160 Food, +3 Stability)'}
+   ]
+  };
+  return;
+ }
+ if(ledger.totalDebt>=300||(f.treasury||0)<-120){
+  e.lastDilemmaTurn=g.turn;
+  e.pendingDilemma={
+   id:'banker_ultimatum',
+   realm,
+   turn:g.turn,
+   title:'The Banking Houses Demand Satisfaction',
+   text:`Creditors hold ${ledger.totalDebt}g in crown notes (treasury ${Math.round(f.treasury||0)}g). The consortium threatens to freeze royal credit unless you act immediately.`,
+   choices:[
+    {id:'debase_coinage',label:'Debase the Coinage (+220g, +7% Inflation, +5 Unrest)'},
+    {id:'emergency_tax',label:'Levy Emergency War Tax (+150g, -6 Stability, -4 Legitimacy)'},
+    {id:'guild_monopoly',label:'Grant Banker Monopoly Charter (+180g, +12 Credit, -8 Prestige)'}
+   ]
+  };
+ }
+}
+
+export function currentEconomicDilemma(g){
+ const d=g?.economy?.pendingDilemma;
+ return d&&d.realm===g.player?d:null;
+}
+
+export function resolveEconomicDilemma(g,choiceId){
+ const d=currentEconomicDilemma(g);
+ if(!d)return no('No active economic dilemma.');
+ const realm=g.player,f=g.factions?.[realm],s=g.economy?.realms?.[realm];
+ if(!f||!s)return no('Invalid realm.');
+ const land=own(g,realm);
+ const armies=Object.values(g.armies||{}).filter(a=>a.owner===realm);
+ if(d.id==='famine_rationing'){
+  if(choiceId==='feed_army'){
+   for(const a of armies)a.morale=cap((a.morale||70)+10,0,100);
+   for(const p of land)p.unrest=cap((p.unrest||0)+8,0,100);
+   f.food=cap((f.food||0)-25,-1000,50000);
+   note(g,realm,'Famine decree: armies provisioned while rural unrest climbed.');
+  }else if(choiceId==='feed_civilians'){
+   for(const a of armies)a.morale=cap((a.morale||70)-15,10,100);
+   for(const p of land)p.unrest=cap((p.unrest||0)-8,0,100);
+   f.legitimacy=cap((f.legitimacy||50)+6,0,100);
+   note(g,realm,'Famine decree: royal granaries opened to starving subjects.');
+  }else{
+   f.treasury=Math.round((f.treasury||0)-140);
+   f.food=cap((f.food||0)+160,-1000,50000);
+   f.stability=cap((f.stability||50)+3,0,100);
+   note(g,realm,'Emergency grain shipments purchased from foreign ports.');
+  }
+ }else if(d.id==='banker_ultimatum'){
+  if(choiceId==='debase_coinage'){
+   f.treasury=Math.round((f.treasury||0)+220);
+   s.inflation=cap((s.inflation||0)+7,0,40);
+   for(const p of land)p.unrest=cap((p.unrest||0)+5,0,100);
+   note(g,realm,'Royal mint debased the silver coinage to satisfy creditors (+7% inflation).');
+  }else if(choiceId==='emergency_tax'){
+   f.treasury=Math.round((f.treasury||0)+150);
+   f.stability=cap((f.stability||50)-6,0,100);
+   f.legitimacy=cap((f.legitimacy||50)-4,0,100);
+   note(g,realm,'Emergency tax assessment collected to calm the banking houses.');
+  }else{
+   f.treasury=Math.round((f.treasury||0)+180);
+   s.credit=cap((s.credit||50)+12,0,100);
+   s.merchantGuild=true;
+   f.prestige=Math.max(0,(f.prestige||0)-8);
+   note(g,realm,'Banker consortium granted royal customs monopoly in exchange for relief.');
+  }
+ }
+ delete g.economy.pendingDilemma;
+ return ok(`${d.title} resolved.`);
+}
+
