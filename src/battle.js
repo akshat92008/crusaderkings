@@ -606,6 +606,7 @@ export class BattleGame {
       terrain: this.terrainType,
       fieldBattle: !!descriptor.fieldBattle,
       siegeMode: isSiege,
+      graphicsQuality: descriptor.graphicsQuality || (win?.localStorage?.getItem?.('crown-of-nations.gfx-quality') || 'medium'),
       capitalLayout: this.capitalLayout,
       seed: 1450 + Math.round(fortLevel * 23),
       attackerRealm: game?.player,
@@ -1026,6 +1027,12 @@ export class BattleGame {
       this.report();
     }
     return res;
+  }
+
+  setGraphicsQuality(level) {
+    if (this.ctx?.setGraphicsQuality) this.ctx.setGraphicsQuality(level);
+    try { globalThis.localStorage?.setItem?.('crown-of-nations.gfx-quality', level); } catch {}
+    this.report();
   }
 
   arrangeCards(preset='balanced') {
@@ -1498,8 +1505,10 @@ export class BattleGame {
 
     if (this.fieldLandscape) {
       if (!this.ctx.isThreeBattle) obj.push(this.fieldLandscape.ground);
-      obj.push(...this.fieldLandscape.items);
-      if (this.terrainProps?.length) obj.push(...this.terrainProps);
+      if (!(this.ctx.isThreeBattle && this.ctx.envGroup?.visible)) {
+        obj.push(...this.fieldLandscape.items);
+        if (this.terrainProps?.length) obj.push(...this.terrainProps);
+      }
     } else if (!this.ctx.isThreeBattle) {
       instance(obj, 0, -0.31, 0, 150, 0.6, 118, C.grass);
       for (let x = -65; x <= 65; x += 13) {

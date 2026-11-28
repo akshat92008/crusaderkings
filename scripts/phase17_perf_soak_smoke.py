@@ -45,11 +45,11 @@ try:
         # Check 3-level lockable tooltip on #resource-gold
         gold_pill = page.locator('.topresources .resource').first
         gold_pill.hover()
-        page.wait_for_timeout(120)
+        page.locator('#ui-tooltip').wait_for(state='visible', timeout=5000)
         page.keyboard.press('t')
-        page.wait_for_timeout(120)
+        page.wait_for_timeout(80)
         page.keyboard.press('t')
-        page.wait_for_timeout(120)
+        page.wait_for_timeout(80)
         tip_text = page.locator('#ui-tooltip').inner_text()
         assert 'LEVEL 3' in tip_text.upper() or 'RULE:' in tip_text.upper(), f'Expected level-3 locked tooltip expansion, got: {tip_text}'
         page.screenshot(path=str(ROOT / 'qa-screenshots' / 'phase13-hud-locked-tooltip.png'))
@@ -58,12 +58,12 @@ try:
         # Enter & clean-dispose 6 cycles of Hometown + 3D Battle tracking JS heap & WebGL cleanup
         heaps = []
         for i in range(6):
-            page.click('#open-hometown')
+            page.click('#capital-nav')
             page.locator('#hometown-screen').wait_for(state='visible', timeout=10000)
             page.wait_for_timeout(150)
             page.keyboard.press('Escape')
             if page.locator('.map-options').get_attribute('open') is None:
-                page.locator('.map-options summary').click()
+                page.locator('.map-options > summary').click()
             page.click('#battle-showcase')
             page.locator('#battle-screen').wait_for(state='visible', timeout=20000)
             page.wait_for_function("globalThis.__activeBattle?.ctx?.modelsReady === true", timeout=25000)

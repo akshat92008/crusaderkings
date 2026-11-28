@@ -1,4 +1,6 @@
 import {eventImage} from '../game-art.js';
+import {SUPPORTED_LOCALES} from '../i18n.js';
+import {browserCampaignAudio} from '../field-audio.js';
 
 const STORE = 'reign1450.interface.v1';
 const categories = {
@@ -13,13 +15,18 @@ const choices = {
   density: {standard: 'Standard', expert: 'Expert'},
   scale: {90: '90%', 100: '100%', 110: '110%', 125: '125%'},
   motion: {system: 'System preference', reduce: 'Reduced'},
-  delay: {0: 'Immediate', 300: 'Short', 700: 'Long'}
+  delay: {0: 'Immediate', 300: 'Short', 700: 'Long'},
+  graphics: {low: 'Low (Battery / 8 GB)', medium: 'Medium (Balanced)', high: 'High (Full 3D)'}
 };
 function load() {
   let data;
   try { data = JSON.parse(localStorage.getItem(STORE)); } catch {}
-  const p = {density:'standard', scale:'100', motion:'system', delay:'300', delivery:{}, sound:{}};
+  let gfx = 'medium', locale = 'en';
+  try { gfx = localStorage.getItem('crown-of-nations.gfx-quality') || 'medium'; } catch {}
+  try { locale = localStorage.getItem('crown-of-nations.locale') || 'en'; } catch {}
+  const p = {density:'standard', scale:'100', motion:'system', delay:'300', graphics:gfx, locale, delivery:{}, sound:{}};
   for (const k in choices) if (Object.hasOwn(choices[k], data?.[k])) p[k] = data[k];
+  if (typeof data?.locale === 'string' && SUPPORTED_LOCALES.includes(data.locale)) p.locale = data.locale;
   for (const k in defaults) {
     p.delivery[k] = Object.hasOwn(modes, data?.delivery?.[k]) ? data.delivery[k] : defaults[k];
     p.sound[k] = typeof data?.sound?.[k] === 'boolean' ? data.sound[k] : k === 'critical';
@@ -32,12 +39,14 @@ function apply() {
   root.dataset.density = preferences.density;
   root.dataset.motion = preferences.motion;
   root.style.setProperty('--campaign-ui-scale', String(Number(preferences.scale) / 100));
+  try { localStorage.setItem('crown-of-nations.gfx-quality', preferences.graphics || 'medium'); } catch {}
+  try { localStorage.setItem('crown-of-nations.locale', preferences.locale || 'en'); } catch {}
 }
-const labels = {density:'Information density', scale:'Interface size', motion:'Motion', delay:'Tooltip delay'};
+const labels = {density:'Information density', scale:'Interface size', motion:'Motion', delay:'Tooltip delay', graphics:'3D battle graphics'};
 function options(values, value) {
   return Object.entries(values).map(([k,v]) => '<option value="'+k+'"'+(String(value)===k?' selected':'')+'>'+v+'</option>').join('');
 }
-export function installSettings() {
+export function installSettings(hooks = {}) {
   apply();
   let dialog;
   document.addEventListener('click', e => {
@@ -45,20 +54,36 @@ export function installSettings() {
     if (!dialog) {
       dialog = document.createElement('dialog');
       dialog.id = 'campaign-settings'; dialog.setAttribute('aria-labelledby','campaign-settings-title');
+      const vols = browserCampaignAudio.getBusVolumes?.() || {master:1,music:1,sfx:1,ambience:1};
+      const localeOpts = SUPPORTED_LOCALES.map(loc => '<option value="'+loc+'"'+(preferences.locale===loc?' selected':'')+'>'+loc.toUpperCase()+'</option>').join('');
       dialog.innerHTML = '<header><h2 id="campaign-settings-title">Campaign settings</h2><form method="dialog"><button autofocus aria-label="Close settings">Close</button></form></header>'+
-        '<div class="settings-fields">'+Object.entries(choices).map(([k,v]) => '<label>'+labels[k]+'<select data-setting="'+k+'">'+options(v,preferences[k])+'</select></label>').join('')+'</div>'+
+        '<div class="settings-fields">'+Object.entries(choices).map(([k,v]) => '<label>'+labels[k]+'<select data-setting="'+k+'">'+options(v,preferences[k])+'</select></label>').join('')+'<label>Language<select data-locale>'+localeOpts+'</select></label></div>'+
+        '<fieldset><legend>Audio mixer</legend><div class="settings-audio-grid">'+[['master','Master'],['music','Music Score'],['sfx','Battle &amp; UI SFX'],['ambience','Camp Ambience']].map(([b,lbl])=>'<label><span>'+lbl+'</span><input type="range" min="0" max="100" value="'+Math.round((vols[b]??1)*100)+'" data-audio-bus="'+b+'"></label>').join('')+'</div></fieldset>'+
         '<fieldset><legend>Notifications</legend>'+Object.entries(categories).map(([k,label]) => '<div class="settings-delivery"><label>'+label+'<select data-delivery="'+k+'">'+options(modes,preferences.delivery[k])+'</select></label><label><input type="checkbox" data-sound="'+k+'"'+(preferences.sound[k]?' checked':'')+' aria-label="Sound for '+label+'"> Sound</label></div>').join('')+'</fieldset>'+
         '<details><summary>Keyboard shortcuts</summary><p><kbd>/</kbd> Search the campaign<br><kbd>T</kbd> Pin and expand a focused tooltip<br><kbd>Esc</kbd> Close an overlay or tooltip</p></details>';
       dialog.addEventListener('change', e => {
         const input = e.target;
-        if (input.dataset.setting) preferences[input.dataset.setting] = input.value;
+        if (input.dataset.setting) {
+          preferences[input.dataset.setting] = input.value;
+          if (input.dataset.setting === 'graphics') hooks.onGraphicsChange?.(input.value);
+        }
+        if (input.hasAttribute('data-locale')) preferences.locale = input.value;
         if (input.dataset.delivery) preferences.delivery[input.dataset.delivery] = input.value;
         if (input.dataset.sound) preferences.sound[input.dataset.sound] = input.checked;
         apply();
         try { localStorage.setItem(STORE, JSON.stringify(preferences)); } catch {}
       });
+      dialog.addEventListener('input', e => {
+        const bus = e.target.dataset?.audioBus;
+        if (bus) hooks.onAudioBusChange?.(bus, Number(e.target.value) / 100);
+      });
       dialog.addEventListener('keydown', e => e.stopPropagation());
       document.body.append(dialog);
+    }
+    const gfxSel = dialog.querySelector('[data-setting="graphics"]');
+    if (gfxSel) {
+      try { preferences.graphics = localStorage.getItem('crown-of-nations.gfx-quality') || preferences.graphics; } catch {}
+      gfxSel.value = preferences.graphics;
     }
     if (!dialog.open) dialog.showModal();
   });

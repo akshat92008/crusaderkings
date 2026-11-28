@@ -43,4 +43,6 @@ html[data-motion=reduce] :is(.chronicle-nav,.leftbar,.rightbar,.maptop,.toast,.e
 }
 :root { --campaign-ui-scale:1 }
 #tab-content, #province-panel { zoom:var(--campaign-ui-scale) }
-html[data-density=standard] .topresources .resource:has(#resource-prestige, #resource-legitimacy) { display:none }
+@media (max-width: 1180px) {
+ html[data-density=standard] .topresources .resource:has(#resource-prestige, #resource-legitimacy) { display:none }
+}

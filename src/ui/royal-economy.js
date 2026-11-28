@@ -83,26 +83,42 @@ function trade(g,world,esc) {
 }
 
 const disciplines = {records:'administration', irrigation:'engineering', logistics:'strategy', accounting:'commerce', courts:'administration', workshops:'engineering', supply:'strategy', diplomacy:'diplomacy', scholarship:'scholarship', roads:'commerce', taxation:'stewardship', public_works:'engineering'};
+function techTier(id, seen = new Set()) {
+ const tech = INNOVATIONS[id];
+ if (!tech?.requires?.length || seen.has(id)) return 1;
+ seen.add(id);
+ return 1 + Math.max(...tech.requires.map(req => techTier(req, seen)));
+}
 function research(g,esc) {
  const realm = g.player, state = g.identity?.realms?.[realm];
  if (!state) return '<p>Research becomes available once your realm has a court.</p>';
  const eligible = new Set(researchOptions(g,realm));
  const rate = researchPointsPerQuarter(g,realm);
  const landed = Object.values(g.provinces).some(p=>p.owner===realm && controller(g,p.id)===realm);
- return '<h3>Royal research</h3><p>'+fmt(rate)+' research points per quarter · '+state.innovations.length+' of '+Object.keys(INNOVATIONS).length+' innovations discovered</p><div class="royal-innovations">'+Object.entries(INNOVATIONS).map(([id,tech])=>{
+ const tierNames = {1:'Tier I · Foundations', 2:'Tier II · Statecraft & Commerce', 3:'Tier III · Grand Synthesis'};
+ const byTier = new Map([[1,[]],[2,[]],[3,[]]]);
+ for (const [id, tech] of Object.entries(INNOVATIONS)) {
+  const t = Math.min(3, techTier(id));
+  byTier.get(t).push([id, tech]);
+ }
+ const renderNode = ([id, tech]) => {
   const done = state.innovations.includes(id), active = state.research?.id===id;
   const needed = tech.requires.filter(k=>!state.innovations.includes(k));
-  const status = done?'Discovered':active?'In progress':needed.length?'Locked':'Available';
+  const status = done?'✓ Discovered':active?'◐ In progress':needed.length?'🔒 Locked':'★ Available';
+  const statusCls = done?'done':active?'active':needed.length?'locked':'ready';
   const progress = active ? state.research.progress : 0;
-  const quarters = Math.ceil((tech.cost-progress)/rate);
+  const quarters = Math.ceil((tech.cost-progress)/Math.max(1, rate));
   const months = Math.max(0,quarters*3-(g.turn%3));
   const disabled = !landed?'Requires a controlled province':state.research?'Another project is underway':g.factions[realm].treasury<RESEARCH_COMMISSION_COST?'Insufficient gold':'';
-  const req = tech.requires.map(k=>INNOVATIONS[k].name).join(', ');
-  return '<article class="royal-innovation"><header>'+artIcon('skills',disciplines[id])+'<div><small>'+status+'</small><h4>'+esc(tech.name)+'</h4></div></header><p>'+esc(tech.desc)+'</p>'+
-   (req?'<small>Requires '+esc(req)+'</small>':'')+(done?'':'<small>'+tech.cost+' research points · '+(landed&&rate>0?'~'+months+' months at current pace':'Research paused')+'</small>')+
+  const reqChips = tech.requires.map(k => '<span class="tech-req-chip '+(state.innovations.includes(k)?'met':'missing')+'">'+(state.innovations.includes(k)?'✓ ':'○ ')+esc(INNOVATIONS[k].name)+'</span>').join('');
+  const nextStepId = needed.find(k => eligible.has(k));
+  return '<article class="royal-innovation '+statusCls+'"><header>'+artIcon('skills',disciplines[id])+'<div><small class="tech-status '+statusCls+'">'+status+'</small><h4>'+esc(tech.name)+'</h4></div></header><p>'+esc(tech.desc)+'</p>'+
+   (reqChips?'<div class="tech-req-row">'+reqChips+'</div>':'')+(done?'':'<small>'+tech.cost+' research pts · '+(landed&&rate>0?'~'+months+' mo at current pace':'Paused')+'</small>')+
    (active?'<progress aria-label="Research progress" max="'+tech.cost+'" value="'+progress+'"></progress><small>'+fmt(progress)+' / '+tech.cost+' points</small>':'')+
-   (!done&&!active&&eligible.has(id)?'<button class="rowbtn" data-action="identity" data-type="research" data-id="'+id+'"'+(disabled?' disabled':'')+'>Commission · '+RESEARCH_COMMISSION_COST+'g</button>'+(disabled?'<small>'+disabled+'</small>':''):'')+'</article>';
- }).join('')+'</div>';
+   (!done&&!active&&eligible.has(id)?'<button class="rowbtn" data-action="identity" data-type="research" data-id="'+id+'"'+(disabled?' disabled':'')+'>Commission · '+RESEARCH_COMMISSION_COST+'g</button>'+(disabled?'<small>'+disabled+'</small>':''):'')+
+   (!done&&!active&&nextStepId?'<button class="rowbtn" data-action="identity" data-type="research" data-id="'+nextStepId+'"'+(disabled?' disabled':'')+'>Path → Commission '+esc(INNOVATIONS[nextStepId].name)+' ('+RESEARCH_COMMISSION_COST+'g)</button>':'')+'</article>';
+ };
+ return '<h3>Royal research tree</h3><p>'+fmt(rate)+' pts/quarter · '+state.innovations.length+' / '+Object.keys(INNOVATIONS).length+' innovations mastered</p><div class="royal-tech-tree">'+[1,2,3].map(tier => '<section class="royal-tech-tier"><h4>'+tierNames[tier]+'</h4><div class="royal-innovations">'+byTier.get(tier).map(renderNode).join('')+'</div></section>').join('')+'</div>';
 }
 
 export function renderRoyalEconomy(g, world, esc, stats) {

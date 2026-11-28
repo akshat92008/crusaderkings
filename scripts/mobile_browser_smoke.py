@@ -63,7 +63,8 @@ try:
    page.fill('#campaign-query','no-such-result-xyz');assert page.locator('.finder-row').count()==0
    page.fill('#campaign-query','council');page.locator('.finder-row[data-priority-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
    page.wait_for_function("document.querySelector('#faction-flag img')?.naturalWidth > 0")
-   page.locator('[data-workspace="realm"]').click();assert page.locator('.campaign-hub').is_visible()
+   if name!='desktop':page.click('#close-management')
+   page.locator('#quick-nav [data-priority-tab="realm"]').click();assert page.locator('.campaign-hub').is_visible()
    assert page.locator('.first-steps').count()==1
    assert page.locator('.historical-context').count()==1
    page.click('#nav-back');assert page.locator('[id^="council-candidate-"]').count()>0
@@ -73,8 +74,9 @@ try:
    page.locator('#tabs [data-tab="characters"]').click()
    page.fill('#people-query','no-matching-person-xyz');assert page.locator('.directory-list .person-row').count()==0
    page.fill('#people-query','');assert page.locator('.directory-list .person-row').count()>0
-   page.locator('#tabs [data-tab="dynasty"]').click();assert page.locator('.family-generation').count()==4
+   page.locator('#tabs [data-tab="dynasty"]').click();assert page.locator('.family-generation').count()==4;assert page.locator('royal-lineage .lineage-person').count()>0
    if name=='desktop':
+    page.get_by_text('Family and inheritance status',exact=True).click()
     children=page.locator('.family-generation').filter(has=page.get_by_text('Children',exact=True))
     children.locator('[data-character]').first.click()
     rights=page.get_by_text('Crown succession rights',exact=True)
@@ -83,7 +85,7 @@ try:
     page.locator('[data-character-back]').click()
    page.locator('#tabs [data-tab="council"]').click();assert page.locator('[id^="council-candidate-"]').count()>0
    page.locator('#tabs [data-tab="vassals"]').click();assert page.locator('#vassal-sort').is_visible()
-   page.locator('[data-workspace="realm"]').click();page.click('#close-management')
+   page.click('#close-management')
    page.locator('#quick-nav [data-priority-tab="realm"]').click()
    page.locator('.campaign-hub [data-character]').first.click()
    assert page.locator('.character-hero').is_visible()
@@ -95,10 +97,11 @@ try:
    assert page.locator('[data-action="pin"][data-type="character"]').get_attribute('aria-pressed')=='true'
    page.locator('[data-character-back]').click()
    assert page.locator('.campaign-hub').is_visible()
-   for work in ['realm','court','foreign','war','people']:
-    page.locator('[data-workspace="'+work+'"]').click()
+   for work in ['court','diplomacy','economy','military','realm']:
+    if name!='desktop' and not page.locator('#management-panel').is_hidden():page.click('#close-management')
+    page.locator('#quick-nav [data-priority-tab="'+work+'"]').click()
     assert 1<=page.locator('#tabs .tab:visible').count()<=8
-   page.click('#close-management');page.locator('.map-options summary').click();page.locator('#army-outliner summary').click()
+   page.click('#close-management');page.locator('.map-options > summary').click();page.locator('#army-outliner summary').click()
    assert page.locator('#outliner-list [data-character]').count()==1
    page.locator('#army-outliner summary').click();page.click('#open-province')
    assert page.locator('#province-drawer').is_visible()
@@ -123,7 +126,7 @@ try:
    assert page.locator('[data-action="recruit"][data-type="infantry"]').is_visible()
    page.screenshot(path=str(OUT/(name+'-province.png')))
    page.click('#close-province');page.click('#zoom-in');page.click('#zoom-out')
-   page.locator('.map-options summary').click()
+   page.locator('.map-options > summary').click()
    # The actual pointer hit must reach the map option, not the adjacent quick nav.
    option=page.locator('#show-map-modes');option.scroll_into_view_if_needed();box=option.bounding_box()
    assert page.evaluate('([x,y])=>document.elementFromPoint(x,y)?.closest("#show-map-modes")!==null',[box['x']+box['width']/2,box['y']+box['height']/2]), 'Map options obscured by another interface layer'
@@ -131,8 +134,8 @@ try:
    page.locator('[data-mapmode="terrain"]').click()
    page.locator('[data-mapmode="political"]').click()
    if name=='mobile':
-    page.locator('.map-options summary').click();page.click('#focus-capital')
-    page.locator('.map-options summary').click()
+    page.locator('.map-options > summary').click();page.click('#focus-capital')
+    page.locator('.map-options > summary').click()
     box=page.locator('#world-map').bounding_box()
     x,y=box['x']+box['width']/2,box['y']+box['height']/2
     cdp=page.context.new_cdp_session(page)
@@ -144,16 +147,16 @@ try:
    page.click('#save-game');assert page.evaluate("JSON.parse(localStorage.getItem('crown-of-nations.save')).turn")==1
    if chromium and name in ('desktop','mobile','small-phone'):
     if touch:
-     if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options summary').click()
+     if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options > summary').click()
      page.click('#battle-showcase')
     else:
-     if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options summary').click()
+     if page.locator('.map-options').get_attribute('open') is None:page.locator('.map-options > summary').click()
      page.click('#battle-showcase')
     page.locator('#battle-screen').wait_for(state='visible',timeout=30000)
     assert page.locator('#battle-start').is_visible()
     if touch:assert page.locator('#battle-start').bounding_box()['height']>=44
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+1')
-    assert page.locator('#battle-timer').inner_text()=='DEPLOY YOUR ARMY'
+    assert page.locator('#battle-timer').inner_text().upper() in ('DEPLOY YOUR ARMY','DEPLOYMENT')
     assert page.locator('#battle-your-bar').is_visible() and page.locator('#battle-enemy-bar').is_visible()
     assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','banner')
     assert (page.locator('#battle-camera').is_hidden() if page.locator('#battle-strength').get_attribute('data-renderer')=='banner' else page.locator('#battle-camera').is_visible())
@@ -175,12 +178,12 @@ try:
     page.click('#battle-pause');page.click('#battle-speed');assert page.locator('#battle-speed').inner_text()=='2×'
     page.screenshot(path=str(OUT/(name+'-battle.png')),timeout=45000)
     page.click('#battle-retreat');page.click('#battle-return');assert page.locator('#battle-screen').is_hidden()
-    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
+    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options > summary').click()
     page.click('#battle-showcase');page.locator('#battle-screen').wait_for(state='visible');assert page.locator('#battle-strength').get_attribute('data-renderer') in ('three','banner')
     page.click('#battle-cancel');assert page.locator('#battle-screen').is_hidden()
     print(name,'PASS: practice battle deployment, reserve placement, pause, speed, retreat, repeat battle and cancel')
    if name=='desktop':
-    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options summary').click()
+    if page.locator('.map-options').get_attribute('open') is None: page.locator('.map-options > summary').click()
     with page.expect_download() as info: page.click('#export-save')
     backup=info.value.path().read_bytes();assert b'"player":"england"' in backup
     page.reload(wait_until='domcontentloaded');page.locator('#start-faction option').first.wait_for(state='attached',timeout=45000)

@@ -25,8 +25,22 @@
 .royal-ledger thead button { color:inherit; font:inherit; background:transparent; border:0 }
 .royal-ledger-filters { display:flex; flex-wrap:wrap; gap:7px }
 .royal-ledger-filters label { display:grid; gap:3px }
-.royal-innovation { border-top:1px solid var(--chronicle-border); padding:10px 0 }
+.royal-innovation { border:1px solid var(--chronicle-border); border-radius:5px; padding:10px; background:#122528 }
+.royal-innovation.done { border-color:#5b8f64; background:#132a22 }
+.royal-innovation.active { border-color:var(--chronicle-brass); background:#1d312d }
+.royal-innovation.locked { opacity:.82 }
 .royal-innovation header { justify-content:flex-start }
-.royal-innovation h4 { margin:0; font:650 21px/1.2 var(--chronicle-display) }
-.royal-innovation p { margin:5px 0 }
+.royal-innovation h4 { margin:0; font:650 19px/1.2 var(--chronicle-display) }
+.royal-innovation p { margin:5px 0; font-size:13px }
 .royal-innovation progress { width:100%; accent-color:var(--chronicle-brass) }
+.royal-tech-tree { display:grid; gap:14px; margin-top:10px }
+.royal-tech-tier { position:relative; padding-left:10px; border-left:2px solid var(--chronicle-border) }
+.royal-tech-tier > h4 { margin:0 0 8px; font:650 13px/1.2 var(--chronicle-body); letter-spacing:.04em; text-transform:uppercase; color:var(--chronicle-brass) }
+.royal-innovations { display:grid; gap:8px }
+.tech-req-row { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 }
+.tech-req-chip { font-size:11px; padding:2px 6px; border-radius:4px; border:1px solid var(--chronicle-border); background:#0d1c1e }
+.tech-req-chip.met { border-color:#5b8f64; color:#b6e0b9 }
+.tech-req-chip.missing { border-color:#9e6256; color:#f0beb4 }
+.tech-status.done { color:#9ad9a3 }
+.tech-status.active { color:#f4ce89 }
+.tech-status.ready { color:#f2e9d5 }

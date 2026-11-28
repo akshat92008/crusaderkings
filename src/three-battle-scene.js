@@ -2,10 +2,11 @@ import {disposeFieldMaterials} from './field-visuals.js';
 import {suppressFortScenery} from './field-scenery.js';
 import {applyFieldAtmosphere} from './field-atmosphere.js';
 import {updateFieldCharacters} from './battle-presentation.js';
+import {terrainHeight,terrainForestCovers} from './field-tactics.js';
 /**
- * Crown of Nations — Three.js battle renderer with real KayKit skinned infantry.
+ * Sovereign 1450 — Three.js 3D battle renderer with cleared 0 A.D. (CC BY-SA 3.0),
+ * Polyfork (MIT/CC0) and KayKit (CC0) regional armies, mounts, and 3D flora/rocks.
  * Bundled locally by scripts/build_3d_battle.mjs. No runtime CDN dependence.
- * Licensed CC0 asset source: KayKit Adventurers 1.0 (characters).
  */
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -26,16 +27,55 @@ const attackClip=clips=>clips.find(c=>/^(attack_melee|1H_Melee_Attack_Slice)$/i.
 const bowClip=clips=>clips.find(c=>/^attack_ranged$/i.test(c.name))||clips.find(c=>/bow.*(shoot|release)/i.test(c.name))||clips.find(c=>/shoot.*bow|archery|attack_ranged/i.test(c.name))||attackClip(clips);
 const elapsedTime=(phase,t,j)=>(t*10+phase+j*Math.PI*.6);
 
-const INDIA_REALMS=new Set(['vijayanagara','delhi','bahmani','bengal','gujarat','malwa','jaunpur','orissa','mewar','sindh','marwar','gondwana','khandesh','ahmednagar','bijapur','golconda']);
-const EAST_ASIA_REALMS=new Set(['ming','joseon','ashikaga','ayutthaya','dai-viet','dai_viet','lan-xang','prome','ava','pegu','shan','oirat','chagatai','manchu','tibetan','tibet','majapahit','malacca','sukhothai']);
-const PERSIA_REALMS=new Set(['ottomans','mamluks','timurids','qara','aq-qoyunlu','persia','safavids','oman','yemen','rasulids','bahrain','arabia','karaman','morocco','tunis','horde','uzbek','kazakh','songhai','mali','kilwa']);
+const SOUTH_INDIA_REALMS=new Set(['vijayanagara','bahmani','mysore','madurai','keladi','ceylon','kandy']);
+const NORTH_INDIA_REALMS=new Set(['delhi','bengal','gujarat','malwa','jaunpur','orissa','mewar','sindh','marwar','gondwana','khandesh','ahmednagar','bijapur','golconda','kashmir']);
+const CHINA_REALMS=new Set(['ming','manchu','joseon','tibetan','tibet']);
+const JAPAN_REALMS=new Set(['ashikaga','hosokawa','uesugi','oda','shimazu','otomo','date','takeda']);
+const SOUTHEAST_ASIA_REALMS=new Set(['ayutthaya','dai-viet','dai_viet','lan-xang','prome','ava','pegu','shan','majapahit','malacca','sukhothai','khmer','champa']);
+const STEPPE_REALMS=new Set(['horde','golden-horde','uzbek','kazakh','oirat','chagatai','nogai','crimea','timurids','mongol']);
+const OTTOMAN_REALMS=new Set(['ottomans','mamluks','karaman','oman','yemen','rasulids','bahrain','arabia','morocco','tunis','tlemcen','granada']);
+const PERSIA_REALMS=new Set(['persia','safavids','qara','aq-qoyunlu','shirvan','khorasan']);
+const BYZANTINE_REALMS=new Set(['byzantium','byzantine','trebizond','serbia','wallachia','moldavia','georgia','epirus']);
+const NORTHERN_EUROPE_REALMS=new Set(['denmark','sweden','norway','kalmar','scotland','teutonic','teutons','livonia','novgorod']);
+const EASTERN_EUROPE_REALMS=new Set(['poland','lithuania','muscovy','hungary','bohemia','mazovia','ryazan','tver']);
+const AFRICA_REALMS=new Set(['ethiopia','mali','songhai','kilwa','kongo','benin','kanem','bornu','adal','mutapa']);
+const MESOAMERICA_REALMS=new Set(['aztec','tarascans','maya','mixtec','zapotec','tlaxcala']);
+const ANDEAN_REALMS=new Set(['inca','cusco','chimu','muisca']);
+
+export function detailedRegionalFamilyForRealm(realmId){
+ const id=String(realmId||'').toLowerCase();
+ if(SOUTH_INDIA_REALMS.has(id))return 'south_india';
+ if(NORTH_INDIA_REALMS.has(id))return 'north_india';
+ if(CHINA_REALMS.has(id))return 'china';
+ if(JAPAN_REALMS.has(id))return 'japan';
+ if(SOUTHEAST_ASIA_REALMS.has(id))return 'southeast_asia';
+ if(STEPPE_REALMS.has(id))return 'steppe';
+ if(OTTOMAN_REALMS.has(id))return 'ottoman';
+ if(PERSIA_REALMS.has(id))return 'persia';
+ if(BYZANTINE_REALMS.has(id))return 'byzantine';
+ if(NORTHERN_EUROPE_REALMS.has(id))return 'northern_europe';
+ if(EASTERN_EUROPE_REALMS.has(id))return 'eastern_europe';
+ if(AFRICA_REALMS.has(id))return 'africa';
+ if(MESOAMERICA_REALMS.has(id))return 'mesoamerica';
+ if(ANDEAN_REALMS.has(id))return 'andean';
+ return 'western_europe';
+}
+
+export const GRAPHICS_PRESETS={
+ low:{label:'Low',pixelRatio:1,soldierScale:0.65,propDensity:0.45},
+ medium:{label:'Medium',pixelRatio:1.25,soldierScale:1.0,propDensity:0.8},
+ high:{label:'High',pixelRatio:1.5,soldierScale:1.25,propDensity:1.0}
+};
+
+export function regionalAliasFallback(fam){
+ if(fam==='south_india'||fam==='north_india')return 'india';
+ if(fam==='china'||fam==='japan'||fam==='southeast_asia')return 'east_asia';
+ if(fam==='ottoman'||fam==='steppe'||fam==='persia')return 'persia';
+ return 'europe';
+}
 
 export function regionalFamilyForRealm(realmId){
- const id=String(realmId||'').toLowerCase();
- if(INDIA_REALMS.has(id))return 'india';
- if(EAST_ASIA_REALMS.has(id))return 'east_asia';
- if(PERSIA_REALMS.has(id))return 'persia';
- return 'europe';
+ return regionalAliasFallback(detailedRegionalFamilyForRealm(realmId));
 }
 
 
@@ -107,9 +147,63 @@ export class ThreeBattleScene {
    const inst=new THREE.InstancedMesh(make(),new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide}),9000);
    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);inst.frustumCulled=false;inst.count=0;this.scene.add(inst);this.batches[kind]=inst;
   }
-  this.groups=new Map();this.templates={};this.siegeTemplates={};this.siegeProps=null;this.siegeReady=false;this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
+  this.groups=new Map();this.templates={};this.siegeTemplates={};this.envGroup=null;this.siegeProps=null;this.siegeReady=false;this.graphicsQuality=GRAPHICS_PRESETS[config.graphicsQuality]?config.graphicsQuality:'medium';this.regionalRealms={attacker:config.attackerRealm,defender:config.defenderRealm};this.mixers=[];this.disposed=false;this.lastRenderTime=0;
   this.environment=buildMedievalBattlefield(this.scene,config);if(config.fieldBattle||config.siegeMode){applyFieldAtmosphere(this.scene,this.renderer,config.biome);suppressFortScenery(this.environment);}
   this.prepareCharacters();
+ }
+ setGraphicsQuality(level){
+  if(!GRAPHICS_PRESETS[level])return this.graphicsQuality;
+  this.graphicsQuality=level;
+  if(this.envGroup)this.envGroup.visible=level!=='low';
+  return level;
+ }
+ async _loadEnvironmentProps(loader,manifest){
+  const roles=manifest?.families?.environment?.roles;
+  if(!roles||this.disposed)return;
+  const terrain=String(this.terrainType||'plains').toLowerCase();
+  const atkFam=detailedRegionalFamilyForRealm(this.regionalRealms.attacker);
+  const treeKey=terrain==='desert'||atkFam==='africa'||atkFam==='ottoman'?'tree_palm_date':atkFam==='north_india'||atkFam==='south_india'||atkFam==='southeast_asia'?'tree_banyan':atkFam==='china'||atkFam==='japan'?'tree_bamboo':terrain==='forest'||terrain==='mountain'||terrain==='hills'?'tree_pine':'tree_oak';
+  const rockKey=terrain==='desert'?'rock_desert':terrain==='hills'||terrain==='mountain'?'rock_highland':terrain==='coastal'?'rock_shore':'rock_gray';
+  const tentKey=atkFam==='persia'||atkFam==='ottoman'||atkFam==='steppe'?'tent_arab':atkFam==='africa'?'tent_kush':'tent_big';
+  const picks=[['tree',roles[treeKey]?.path||roles.tree_oak?.path],['bush',roles.bush_scrub?.path],['rock',roles[rockKey]?.path||roles.rock_gray?.path],['tent',roles[tentKey]?.path||roles.tent_big?.path]].filter(([,p])=>p);
+  const loaded=await Promise.allSettled(picks.map(([,p])=>loader.loadAsync(p)));
+  if(this.disposed)return;
+  const templates={};
+  picks.forEach(([k],i)=>{if(loaded[i].status==='fulfilled'&&loaded[i].value?.scene)templates[k]=loaded[i].value.scene;});
+  if(!Object.keys(templates).length)return;
+  const envGroup=new THREE.Group();envGroup.name='0 A.D. Environment Props';
+  const density=GRAPHICS_PRESETS[this.graphicsQuality]?.propDensity??0.8;
+  const place=(tpl,x,z,targetH,rotY=0)=>{
+   if(!tpl)return;
+   const obj=tpl.clone(true);
+   const box=new THREE.Box3().setFromObject(obj);
+   const h=Math.max(0.2,box.max.y-box.min.y);
+   const s=targetH/h;
+   obj.scale.setScalar(s);
+   const y=terrainHeight(x,z,terrain)-box.min.y*s;
+   obj.position.set(x,y,z);obj.rotation.y=rotY;
+   envGroup.add(obj);
+  };
+  const covers=terrainForestCovers(terrain);
+  for(const g of covers){
+   const nTrees=Math.max(2,Math.round(5*density*(g.density||0.8)));
+   for(let i=0;i<nTrees;i++){
+    const a=i*Math.PI*2/nTrees+0.3,r=g.radius*(0.28+0.5*(i%2));
+    place(templates.tree,g.x+Math.cos(a)*r,g.z+Math.sin(a)*r,5.2+(i%3)*1.1,a);
+   }
+   if(templates.bush)place(templates.bush,g.x+1.5,g.z-1.2,1.6,0.8);
+  }
+  const rockSpots=[[-46,-20],[48,18],[-52,22],[50,-26],[0,-48],[-44,44],[44,-44]];
+  for(let i=0;i<Math.ceil(rockSpots.length*density);i++){
+   const [rx,rz]=rockSpots[i];
+   place(templates.rock,rx,rz,1.8+(i%3)*0.6,i*0.9);
+  }
+  for(const [tx,tz,rot] of [[-48,48,0],[46,48,-0.4],[-48,-48,Math.PI],[46,-48,Math.PI-0.4]]){
+   place(templates.tent,tx,tz,3.6,rot);
+  }
+  this.envGroup=envGroup;
+  this.envGroup.visible=this.graphicsQuality!=='low';
+  this.scene.add(envGroup);
  }
  async prepareCharacters(){
   const loader=new GLTFLoader();
@@ -129,7 +223,13 @@ export class ThreeBattleScene {
     const mRes=await fetch('assets/battle/0ad/manifest.json');
     if(mRes.ok){
      const manifest=await mRes.json();
-     const needed=new Set([regionalFamilyForRealm(this.regionalRealms.attacker),regionalFamilyForRealm(this.regionalRealms.defender)]);
+     this.manifest=manifest;
+     const needed=new Set();
+     for(const r of [this.regionalRealms.attacker,this.regionalRealms.defender]){
+      const f=detailedRegionalFamilyForRealm(r);
+      needed.add(f);
+      needed.add(regionalAliasFallback(f));
+     }
      for(const fam of needed){
       const roles=manifest?.families?.[fam]?.roles;
       if(!roles)continue;
@@ -151,6 +251,7 @@ export class ThreeBattleScene {
        }
       }
      }
+     this._loadEnvironmentProps(loader,manifest).catch(()=>{});
      const defFam=regionalFamilyForRealm(this.regionalRealms.defender);
      const atkFam=regionalFamilyForRealm(this.regionalRealms.attacker);
      const siegeKeys=[
@@ -180,22 +281,23 @@ export class ThreeBattleScene {
  }
  _resolveTemplate(g,i){
   const realm=this.regionalRealms[g.side];
-  const fam=regionalFamilyForRealm(realm);
-  const reg=this.regionalTemplates?.[fam];
+  const fam=detailedRegionalFamilyForRealm(realm);
+  const reg=this.regionalTemplates?.[fam]||this.regionalTemplates?.[regionalAliasFallback(fam)];
+  if(fam==='japan'&&g.type==='infantry'&&!(g.specialistId==='pikes'||g.specialistId==='spearmen')){
+   const jTpl=(i===0&&g.id.endsWith('0')&&this.templates.daimyo)||this.templates.ashigaru;
+   if(jTpl)return jTpl;
+  }
   if(reg){
    const spec=g.specialistId||g.kind||g.type;
    if((spec==='elephants'||g.kind==='elephants')&&reg.elephants)return reg.elephants;
    if(i===0&&g.id.endsWith('0')&&reg.commander)return reg.commander;
    if((spec==='horsebow'||g.kind==='horsebow')&&reg.horsebow)return reg.horsebow;
    if(g.type==='cavalry'&&reg.cavalry)return reg.cavalry;
-   if((spec==='crossbow'||g.kind==='crossbow')&&reg.crossbow)return reg.crossbow;
+   if((spec==='crossbow'||g.kind==='crossbow'||spec==='handgun')&&(reg[spec]||reg.crossbow))return reg[spec]||reg.crossbow;
    if(g.type==='archers'&&reg.archers)return reg.archers;
    if((spec==='pikes'||spec==='spearmen'||g.kind==='pikemen')&&(reg.pikes||reg.spearmen))return reg.pikes||reg.spearmen;
    if((spec==='guard'||spec==='heavy_infantry')&&(reg[spec]||reg.heavy_infantry||reg.guard))return reg[spec]||reg.heavy_infantry||reg.guard;
    if(reg.infantry)return reg.infantry;
-  }
-  if(realm==='ashikaga'&&g.type==='infantry'){
-   return (i===0&&g.id.endsWith('0')&&this.templates.daimyo)||this.templates.ashigaru||this.templates.infantry;
   }
   return this.templates[g.type]||this.templates.infantry;
  }
@@ -203,7 +305,9 @@ export class ThreeBattleScene {
   if(this.groups.has(g.id)||!this.modelsReady)return;
   const spec=g.specialistId||g.kind||g.type;
   const isElephant=spec==='elephants'||g.kind==='elephants';
-  const count=isElephant?3:g.type==='archers'?8:g.type==='cavalry'?6:11;
+  const sMul=GRAPHICS_PRESETS[this.graphicsQuality]?.soldierScale??1;
+  const baseCount=isElephant?3:g.type==='archers'?8:g.type==='cavalry'?6:11;
+  const count=Math.max(isElephant?2:4,Math.round(baseCount*sMul));
   const units=[];
   for(let i=0;i<count;i++){
    const template=this._resolveTemplate(g,i);
@@ -263,7 +367,8 @@ export class ThreeBattleScene {
  }
  render(objects,camera,groups,elapsed,siege=null,capitalLayout=null){
   if(this.disposed)return null;
-  const w=Math.max(this.canvas.clientWidth,1),h=Math.max(this.canvas.clientHeight,1),dpr=Math.min(window.devicePixelRatio||1,1.5);
+  const maxDpr=GRAPHICS_PRESETS[this.graphicsQuality]?.pixelRatio||1.25;
+  const w=Math.max(this.canvas.clientWidth,1),h=Math.max(this.canvas.clientHeight,1),dpr=Math.min(window.devicePixelRatio||1,maxDpr);
   this.renderer.setPixelRatio(dpr);this.renderer.setSize(w,h,false);
   this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
   this.camera.position.set(...camera.eye);this.camera.lookAt(...camera.target);
@@ -366,6 +471,7 @@ export class ThreeBattleScene {
   this.disposed=true;disposeFieldMaterials(this);
   for(const units of this.groups.values())for(const u of units){u.mixer.stopAllAction();this.scene.remove(u.root);}
   this.groups.clear();this.mixers.length=0;
+  if(this.envGroup){this.scene.remove(this.envGroup);this.envGroup=null;}
   if(this.siegeProps?.group){this.scene.remove(this.siegeProps.group);this.siegeProps=null;}
   this.environment?.dispose();
   for(const m of Object.values(this.batches)){m.geometry.dispose();m.material.dispose();this.scene.remove(m);}

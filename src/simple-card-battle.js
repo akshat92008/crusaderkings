@@ -4,12 +4,41 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const byId=(a,b)=>String(a.id).localeCompare(String(b.id));
 export const CARD_BATTLE_LIMIT=100;
+export const BATTLE_PRESETS=[
+ {id:'balanced',label:'Balanced',desc:'Infantry shields archers · cavalry guards both flanks'},
+ {id:'defensive',label:'Defensive',desc:'Compact line anchored back on high ground'},
+ {id:'cavalry_assault',label:'Cavalry Assault',desc:'Shock horse & lancers vanguard forward on wings'},
+ {id:'flanks',label:'Flanking',desc:'Wide envelopment pincers to isolate enemy wings'},
+ {id:'ranged_cover',label:'Ranged Cover',desc:'Braced spears forward shielding concentrated volleys'}
+];
+export const REGIMENT_ROLE_GUIDE={
+ militia:{role:'Numbers & cheap screen',weakness:'Experienced shock troops'},
+ skirmishers:{role:'Cheap screen & swift skirmishing',weakness:'Armored heavy infantry'},
+ swordsmen:{role:'Balanced frontline melee',weakness:'Heavy armor & focused volleys'},
+ spearmen:{role:'Hold line & blunt charges',weakness:'Concentrated ranged fire'},
+ pikemen:{role:'Counter mounted charges',weakness:'Flanking & ranged volleys'},
+ pikes:{role:'Counter mounted charges',weakness:'Flanking & ranged volleys'},
+ shieldmen:{role:'Heavy armor anchor & arrow cover',weakness:'Sustained armor-piercing fire'},
+ guard:{role:'Break weaker formations',weakness:'Sustained gunfire & fatigue'},
+ bowmen:{role:'Ranged volley support',weakness:'Exposed melee engagements'},
+ archers:{role:'Ranged volley support',weakness:'Unprotected cavalry flanks'},
+ longbow:{role:'Long-range heavy volleys',weakness:'Exposed melee engagements'},
+ crossbow:{role:'Pierce heavy armor',weakness:'Cavalry charges & slow reload'},
+ handgun:{role:'Armor penetration & morale shock',weakness:'Fast melee rushes'},
+ scouts:{role:'Mobility & flank pursuit',weakness:'Braced spears & pikes'},
+ lancers:{role:'Devastating shock charge',weakness:'Braced pike formations'},
+ horsebow:{role:'Mounted harassment & skirmishing',weakness:'Counter-mobility & concentrated bows'},
+ elephants:{role:'Disruption & heavy shock',weakness:'Javelins, braced pikes & low morale'}
+};
 export const cardRole=g=>g.specialistId==='horsebow'||g.type==='archers'?'ranged':g.type==='cavalry'?'mounted':'foot';
 export function cardFormationChoices(group,choices){
  const role=cardRole(group),allowed=role==='ranged'?['volley_line','longbow_line','skirmish','ambush']:role==='mounted'?['cavalry_wedge','flank','encirclement','elephant_push','skirmish']:['shield_wall','pike_square','flank','ambush','skirmish'];
  return choices.filter(f=>allowed.includes(f.id));
 }
 export function cardRoleHint(g){
+ const key=g?.specialistId||g?.kind||g?.type;
+ const info=REGIMENT_ROLE_GUIDE[key];
+ if(info)return `${info.role} · vulnerable to ${info.weakness.toLowerCase()}`;
  const role=cardRole(g);
  return role==='ranged'?'Ranged support · strong against foot troops':role==='mounted'?'Fast flankers · strong against ranged troops':g.kind==='pikemen'||g.kind==='spearmen'||g.formationId==='pike_square'?'Anti-cavalry · holds the front':'Frontline · holds the field';
 }
@@ -48,6 +77,8 @@ export function arrangeCardArmy(groups,side,home,preset='balanced'){
    let x=role==='mounted'?(i%2?1:-1)*(42-Math.floor(i/2)*12):offset,z=role==='foot'?14:role==='mounted'?25:36;
    if(preset==='defensive'){z=role==='foot'?25:36;x=role==='mounted'?(i%2?1:-1)*48:offset;}
    if(preset==='flanks'){x=role==='mounted'?(i%2?1:-1)*(54-Math.floor(i/2)*12):offset;z=role==='mounted'?14:z;}
+   if(preset==='cavalry_assault'){x=role==='mounted'?(i%2?1:-1)*(30+Math.floor(i/2)*12):offset;z=role==='mounted'?14:role==='foot'?25:36;}
+   if(preset==='ranged_cover'){z=role==='foot'?14:role==='ranged'?25:36;x=role==='ranged'?offset*0.85:x;}
    const cell=freeDeploymentCell(placed,g,clamp(x,-54,54),z*home,home);
    if(cell){moveCard(g,cell);placed.push(g);}
   });
@@ -77,9 +108,12 @@ export function cardBattleOutcome(groups,elapsed,defenseMode=false,siege=null){
 }
 export function cardCounter(g,e){
  const a=cardRole(g),b=cardRole(e);
- if(a==='mounted'&&b==='ranged')return 1.35;
- if(a==='ranged'&&b==='foot')return 1.12;
- if(a==='foot'&&b==='mounted'&&(g.kind==='pikemen'||g.kind==='spearmen'||g.formationId==='pike_square'))return 1.45;
+ const gs=g.specialistId||g.kind||g.type,es=e.specialistId||e.kind||e.type;
+ if((gs==='handgun'||gs==='crossbow')&&['guard','shieldmen','heavy_infantry'].includes(es))return 1.28;
+ if(gs==='elephants'&&b==='foot'&&!(es==='pikes'||e.kind==='pikemen'||e.formationId==='pike_square'))return 1.28;
+ if(a==='mounted'&&b==='ranged')return 1.38;
+ if(a==='ranged'&&b==='foot')return 1.14;
+ if(a==='foot'&&b==='mounted'&&(g.kind==='pikemen'||g.kind==='spearmen'||gs==='pikes'||e.formationId==='pike_square'||g.formationId==='pike_square'))return 1.45;
  return 1;
 }
 export function stepCardBattle(state,dt,terrainInfo=null){

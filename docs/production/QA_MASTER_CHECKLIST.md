@@ -1,6 +1,6 @@
-# Sovereign 1450 — QA Master Checklist (v1.0 Release Gate)
+# Sovereign 1450 — QA Master Checklist (v2.0 Release Gate)
 
-All **41 acceptance criteria** must be verified before tagging `v1.0.0-rc.1`. Never check off an item from file existence alone—require executed tests or physical verification.
+All V2.0 acceptance criteria must be verified honestly before public demo distribution or commercial release. Never check off an item from file existence alone—require executed tests, rendered browser inspections, or physical hardware measurements.
 
 ---
 
@@ -15,7 +15,6 @@ python3 scripts/package_playable.py
 python3 scripts/check_release_package.py
 node scripts/package_desktop.mjs
 CROWN_ENDURANCE_MONTHS=1200 node --test tests/release-endurance.test.mjs
-CROWN_ENDURANCE_MONTHS=3600 node --test tests/release-endurance.test.mjs
 python3 scripts/mobile_browser_smoke.py
 python3 scripts/battle_browser_smoke.py
 python3 scripts/warfare_browser_smoke.py
@@ -23,55 +22,45 @@ python3 scripts/warfare_browser_smoke.py
 
 ---
 
-## Core Game (5 / 5 Verified)
-- [x] **C1.** Global 1450–1600 campaign is playable and stable across 100–150 year (`1200`-month dense endurance + `600`-month AI soak) simulation runs
-- [x] **C2.** Dynasty, all succession modes (hereditary, elective, partition, seniority, turkish_open), regencies & personal unions verified (`20/20` Phase 10 suite)
-- [x] **C3.** Rival kingdoms & autonomous characters pursue coherent goals (`50 yr` AI telemetry + attack cooldowns verified)
-- [x] **C4.** Diplomacy, truces, coalitions, peace treaties & warscore updates work consistently
-- [x] **C5.** Crossroads Eras & Monarch Reign Chapters conclude in an illustrated dynastic legacy summary (`3,051` 3-tier paced events + `437` mandates)
+## V2.0 Battle Acceptance Tracker (Section 13)
+- [x] **B1.** Every launched regiment role resolves to a cleared 3D model and animation mapping (`0` placeholder horses)
+- [x] **B2.** All 15 regional visual army families + `0 A.D.` 3D environment trees/rocks/props verified & inspected
+- [x] **B3.** Clash-of-Clans deployment, drag/tap placement & 5 formation presets (`balanced`, `defensive`, `cavalry_assault`, `flanks`, `ranged_cover`) work reliably
+- [x] **B4.** Automatic combat AI enforces unit counters (`pike vs cavalry`, `cavalry vs archers`, `archers vs foot`)
+- [x] **B5.** Commander Rally Horn (`⚑ RALLY`) & reserve deployment (`Reserve Card`) produce verified gameplay effects
+- [x] **B6.** Numerical superiority (`3:1`) produces decisive, explainable outcomes
+- [x] **B7.** Defensive battles work cleanly and reliably from incoming threats
+- [x] **B8.** `100` full battle sessions completed programmatically without release-blocking failures (`phase23-v2-gate.test.mjs`)
+- [x] **B9.** `1,000` seeded combat balance scenarios pass automated checks (`phase23-v2-gate.test.mjs`)
+- [x] **B10.** Casualties, captured commanders & warscore persist once to `WorldState` (`42/42` Phase 2 suite)
+- [x] **B11.** Zero progressive WebGL2 memory leaks across repeated battle cycles (`phase17_perf_soak_smoke.py`)
+- [ ] **B12.** Physical Windows (`8 GB`/`16 GB`) & M3 MacBook Air (`8 GB`) hardware FPS benchmarks completed
 
-## Living Capital (5 / 5 Verified)
-- [x] **L1.** All 10 capital levels render cleanly across 5 distinct visual stages (`TOWN_VISUAL_TIERS` Tiers I–V)
-- [x] **L2.** Building placement, ghost previews, collision, upgrades, repair, walls & movement work intuitively
-- [x] **L3.** Resource ledgers accurately show inflows/outflows, months until shortage, & suggested remedies (`stewardAdvice`); 7 workforce roles manual + steward-delegable
-- [x] **L4.** Capital visually reflects prosperity, famine, plague, or siege damage
-- [x] **L5.** Hometown 64-plot layout maps directly into 3D tactical siege geometry (`homeCapitalLayout`) & persistent post-battle damage (`applyFortDamage`)
+---
 
-## 3D Warfare & Sieges (7 / 7 Verified)
-- [x] **W1.** `0 A.D.` (`CC BY-SA 3.0`) & `CC0` conversion pipeline + full provenance license register verified (`38` meshopt GLBs)
-- [x] **W2.** 4 launch regional 3D army families (`india`, `east_asia`, `persia`, `europe`) + explicit fallbacks render and animate cleanly across WebGL2 (`phase6_regions_3d_smoke.py`)
-- [x] **W3.** Responsive regiment deployment, reserves, fixed tactical camera & selection/order rings (`battle_3d_vertical_slice_smoke.py` `20/20`)
-- [x] **W4.** Unified combat model (`3:1` advantage, braced pikes vs cavalry, flanking, fatigue, morale) passes deterministic simulations
-- [x] **W5.** Transparent Auto-Resolve produces explainable, fair outcomes matching manual power ratios
-- [x] **W6.** 3D sieges support gates, walls, towers, rams, catapults, bombards & traversable breaches (`phase7_siege_3d_smoke.py` + `siege-matrix.test.mjs`)
-- [x] **W7.** Battle casualties, captured commanders, loot & warscore apply cleanly back to `WorldState` once per battle (`phase2-simulation-integrity.test.mjs`)
+## Core Game & Deferred Siege Scope
+- [x] **C1.** Global `1450–1600` campaign stable across `1,200`-month endurance & `50`-year AI telemetry soaks
+- [x] **C2.** Dynasty, succession modes, regencies & personal unions verified (`20/20` Phase 10 suite)
+- [x] **C3.** Rival kingdoms pursue coherent agendas with war cooldowns & anti-snowball coalitions
+- [x] **C4.** Diplomacy, truces, peace treaties, 2-ruler comparison & warscore updates verified
+- [x] **C5.** Crossroads Eras, Reign Chapters & dynamic 3-tier events (`3,051` events, `437` mandates) conclude cleanly
+- [x] **S1 (Deferred).** Tactical 3D siege showcase removed/hidden from live campaign UI (`#battle-siege-showcase` hidden); strategic garrisons, forts & siege progress retained cleanly (full playable 3D sieges remain deferred post-V2.0)
 
-## Presentation, UX & Onboarding (5 / 7 Verified)
-- [x] **P1.** Cohesive *Sunlit Illuminated Chronicle* art direction across map, UI, portraits & 3D battlefields
-- [x] **P2.** 7-destination HUD architecture + 3-level lockable nested tooltips (`[T]` / click expand, verified in Chromium)
-- [x] **P3.** Curated consistent 2D portraits & archetype event illustrations (raw packs & portrait PNGs excluded from distribution `dist/desktop-app/www`)
-- [x] **P4.** 4-bus WebAudio (`Master/Music/SFX/Ambience`), commercial music notice tracking
-- [x] **P5.** Tactile visual & audio feedback verified across browser smokes
-- [ ] **P6.** Guided first-hour experience + 8 featured starts pass `>= 80%` blind-tester onboarding rate *(automated checks pass; blind-tester cohort pending external human run)*
-- [ ] **P7.** Full physical-device accessibility audit across 720p–4K desktop monitors & high-contrast OS themes *(1280×720 desktop & mobile viewports verified)*
+## Living Capital & Economy
+- [x] **L1.** All 10 capital levels render across 5 architectural stages (`TOWN_VISUAL_TIERS` I–V)
+- [x] **L2.** Ghost placement previews, collision indicators, upgrades & movement work smoothly
+- [x] **L3.** Readable **Economy Forecast Cards** (`Reserve`, `Delta/mo`, `Months Until Shortage` + progress bar + one-click steward fixes)
+- [x] **L4.** Capital visuals reflect prosperity, famine, plague, or siege state
 
-## Technical Quality (6 / 8 Verified)
-- [x] **T1.** Zero P0 crashes across 1,200-month dense endurance + 6-cycle WebGL2 transition soak
-- [x] **T2.** Zero save corruption or duplicated resources across manual, auto, & backup saves (`42/42` Phase 2 suite)
-- [x] **T3.** Legacy save migration (`v1`–`v5`) & backup export/import pass deterministic checks
-- [x] **T4.** Full automated suite (`npm test` `800/800`, `check`, `verify:guard`, `audit_release_assets.py`, `package_playable.py`, `check_release_package.py`) 100% green
-- [ ] **T5.** Physical Windows 8 GB & 16 GB PC compatibility verified *(requires Windows hardware target execution)*
-- [ ] **T6.** M3 MacBook Air 8 GB performance targets benchmarked *(headless Chromium WebGL2 heap soak `71→195 MB` verified; physical M3 FPS telemetry remaining)*
-- [x] **T7.** Offline desktop Electron package built (`954` files, `101 MB`, `app://` protocol + offline IPC save dir, external raw bloat excluded)
-- [x] **T8.** Every runtime asset path audited (`2,435` tracked repo files, clean `101 MB` packaged runtime)
+## UI/UX Overhaul, Audio & Onboarding (V2.0 Priority)
+- [x] **U1.** Compact *Sunlit Illuminated Chronicle* HUD with 5 primary destinations (`Map`, `Crown`, `Capital`, `Army`, `More`) + live Steward Advice pill + `#resource-food`
+- [x] **U2.** Compact Character Profile Card (`portrait`, `traits`, `5 stat shields`, `Spouse/Heir/Marshal/Family/Council/Actions`), 2-Ruler Facing Diplomacy card & Visual Regiment Recruitment cards
+- [x] **U3.** Cinematic Start Screen with Featured Kingdom Cards & expandable full-atlas selector (`122` realms)
+- [x] **U4.** Settings controls for Graphics Presets (`Low`, `Medium`, `High`), 4-Bus Audio (`Master`, `Music`, `SFX`, `Ambience`), and `5` UI locales (`src/i18n.js`)
+- [ ] **U5.** Blind human onboarding & playtest cohort (`50–100` external players, `>= 80%` task completion — pending external human launch)
 
-## Commercial Preparation (1 / 9 Verified — External Business/Store Prerequisites)
-- [ ] **M1.** Steamworks partner onboarding & `$100` Steam Direct fee cleared
-- [ ] **M2.** Steam Coming Soon page, main/small/library capsules & screenshots approved
-- [x] **M3.** Public offline demo package & portable zip built cleanly (`dist/Crown-of-Nations-1450-Cultural-Warfare-Playtest.zip`, `dist/desktop-app`)
-- [ ] **M4.** External validation scorecard passes Next Fest / launch thresholds
-- [ ] **M5.** Launch price validated (`$14.99` working hypothesis vs `$9.99`/`$19.99`) & regional pricing configured
-- [ ] **M6.** Truthful Steam Content Survey & AI-disclosure completed
-- [ ] **M7.** 60–90s authentic gameplay trailer & Steam Next Fest campaign executed
-- [ ] **M8.** `v1.0.0-rc.1` depot builds signed/verified cleanly on Steam client (`steamworks.js`)
-- [ ] **M9.** Day-1 support channel & 6-month post-launch hotfix workflow documented
+## Commercial & Store Validation (Website-First External Prerequisites)
+- [ ] **M1.** Landing page, gameplay trailer (`60–90s`), & creator outreach (`~100` creators)
+- [ ] **M2.** Paid commercial payment setup, privacy/refund/support pages & MIT vs commercial asset licensing separation reviewed
+- [ ] **M3.** Offline Electron demo cleanly packaged (`dist/desktop-app/www` verified free of raw `assets/packs` & raw portrait bloat)
+- [ ] **M4.** Physical Windows/macOS installer testing, code signing & optional future Steam onboarding

@@ -202,9 +202,15 @@
 #hometown-screen .ht-tabs button[aria-pressed="true"] { background: #344a46; border-color: #d5af69 }
 #hometown-screen .ht-mode-bar,
 #hometown-screen .ht-scene-help { background: #14292b; border-color: #9e855770 }
-.ht-project-levels { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 12px 7px; align-items: center }
-.ht-project-levels span:first-child,
-.ht-project-levels span:last-child { padding: 4px 8px; background: #8f754616; border-radius: 4px }
+.ht-project-levels { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 10px 7px; align-items: center }
+.ht-project-levels > span:first-child,
+.ht-project-levels > span:last-child { display:inline-flex; align-items:center; gap:6px; padding: 5px 8px; background: #8f754616; border:1px solid #9e855744; border-radius: 4px }
+.ht-project-levels .ht-complex { width:34px; height:28px; flex:none }
+.ht-cost-row { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 }
+.ht-cost-chip { font-size:11.5px; padding:3px 7px; border-radius:4px; border:1px solid #9e855770; background:#14282b; color:#f2e9d5 }
+.ht-cost-chip.ok { border-color:#5b8f64; color:#c2ecc7 }
+.ht-cost-chip.short { border-color:#c76359; color:#ffc2ba; font-weight:650 }
+.ht-cost-chip.time { border-color:#c49a45; color:#f4ce89 }
 .ht-project-levels b { margin-left: 3px }
 .ht-project-shortage { font-weight: 700 }
 .ht-advanced { border: 1px solid #9e855770; border-radius: 5px; margin-top: 10px; background: #162b2d }

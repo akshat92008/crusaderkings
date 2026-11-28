@@ -213,9 +213,17 @@
 }
 
 .envoy-proposal dd { margin: 0; font-variant-numeric: tabular-nums; }
-.adviser-card > h3 { text-transform: capitalize; }
-.adviser-card > h3 .game-art-icon { vertical-align: middle; }
+.adviser-card > h3 { text-transform: capitalize; margin:0 }
+.adviser-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px }
+.adviser-head h3 { margin:0; text-transform:capitalize }
+.adviser-head .game-art-icon { vertical-align: middle; margin-right:5px }
+.adviser-badge { font-size:11px; font-weight:650; padding:2px 7px; border-radius:10px; border:1px solid #92744a88; background:#1c3234; color:#f2e9d5 }
+.adviser-badge.pos { border-color:#5b8f64; color:#bde8c2 }
+.adviser-badge.warn { border-color:#c47a45; color:#ffd7a8 }
 .adviser-card .adviser-task { margin: 5px 0 0; font-weight: 650; }
+.adviser-rec { margin-top:8px; padding:8px; border-radius:4px; background:rgba(20,38,41,.14); border:1px solid #92744a66; display:grid; gap:6px }
+.adviser-rec span { font-size:12px; font-weight:600 }
+.adviser-rec-actions { display:flex; flex-wrap:wrap; gap:6px }
 
 royal-lineage {
  display: block;
